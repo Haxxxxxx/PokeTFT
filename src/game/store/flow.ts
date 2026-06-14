@@ -1,6 +1,7 @@
 /** Round orchestration across the game, combat, lobby, and carousel stores. */
 
 import { roundKind } from "../config";
+import { MEGA_STONE } from "../data/mega";
 import { generateCreepBoard, pickCarouselOptions } from "../engine/enemy";
 import { useGame } from "./gameStore";
 import { useCombat } from "./combatStore";
@@ -22,7 +23,9 @@ export function advanceFlow(): void {
   useUi.getState().setView(null);
 
   if (kind === "carousel") {
-    useCarousel.getState().open(pickCarouselOptions(game.stage, game.stage * 31 + game.round));
+    // Always offer a Mega Stone alongside four unit choices (opportunity cost).
+    const units = pickCarouselOptions(game.stage, game.stage * 31 + game.round, 4);
+    useCarousel.getState().open([MEGA_STONE, ...units]);
     return;
   }
 

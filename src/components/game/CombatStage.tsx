@@ -261,7 +261,7 @@ function CombatUnit({
   lunge: { dx: number; dy: number }; flash: string | null; faceLeft: boolean;
 }) {
   const ally = unit.team === "ally";
-  const ring = ally ? "#34d399" : "#fb7185";
+  const ring = unit.mega ? "#f0abfc" : ally ? "#34d399" : "#fb7185";
   const flip = ally ? faceLeft : !faceLeft; // mons face their target
   return (
     <div
@@ -274,10 +274,20 @@ function CombatUnit({
       <div className="h-[3px] w-11 rounded-full bg-black/70 overflow-hidden mx-auto mb-[3px]">
         <div className="h-full bg-sky-400" style={{ width: `${manaFrac * 100}%` }} />
       </div>
-      <div className="relative mx-auto rounded-full flex items-center justify-center" style={{ width: 40, height: 40, background: `radial-gradient(circle, ${ring}33, transparent 70%)`, boxShadow: `0 0 0 2px ${ring}cc, 0 3px 8px rgba(0,0,0,0.5)` }}>
+      <div
+        className="relative mx-auto rounded-full flex items-center justify-center"
+        style={{
+          width: 40, height: 40,
+          background: `radial-gradient(circle, ${ring}${unit.mega ? "55" : "33"}, transparent 70%)`,
+          boxShadow: unit.mega ? `0 0 0 2px ${ring}, 0 0 12px 2px ${ring}aa` : `0 0 0 2px ${ring}cc, 0 3px 8px rgba(0,0,0,0.5)`,
+        }}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={spriteUrl(unit.dex)} alt="" width={36} height={36} style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none" }} draggable={false} />
         {flash && <span key={flash} className="absolute inset-0 rounded-full combat-hitflash" style={{ background: "#fff" }} />}
+        {unit.mega && (
+          <span className="absolute -top-1.5 -right-1.5 text-[8px] font-extrabold bg-fuchsia-500 text-black rounded px-0.5 leading-tight">M</span>
+        )}
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { makeRng, type Rng } from "../engine/rng";
 import { makePool, rollShop, takeFromPool, returnToPool, type Pool } from "../engine/shop";
 import { roundIncome, sellValue } from "../engine/economy";
 import { applyCombines, makeInstance } from "../engine/combine";
+import { MEGA_STONE } from "../data/mega";
 
 export const BENCH_SIZE = 9;
 const INITIAL_SEED = 1337;
@@ -43,6 +44,8 @@ type State = {
   shop: (string | null)[];
   frozen: boolean;
   history: RoundRecord[];
+  /** Unequipped items in the player's inventory (e.g. Mega Stones). */
+  items: string[];
 
   // selectors
   benchUnits: () => UnitInstance[];
@@ -61,6 +64,9 @@ type State = {
   endRound: (won: boolean, survivors?: number) => void;
   pveReward: (won: boolean) => void;
   carouselTake: (defId: string) => void;
+  grantItem: (itemId: string) => void;
+  equipItem: (iid: string, itemId: string) => void;
+  unequipItem: (iid: string, itemId: string) => void;
 };
 
 // Module-level RNG so the store stays serialisable; reseeded on newGame.
@@ -80,6 +86,7 @@ export const useGame = create<State>((set, get) => ({
   shop: [],
   frozen: false,
   history: [],
+  items: [],
 
   benchUnits: () => get().units.filter((u) => u.pos === null),
   boardUnits: () => get().units.filter((u) => u.pos !== null),
@@ -96,7 +103,7 @@ export const useGame = create<State>((set, get) => ({
     const pool = makePool();
     set({
       pool, gold: 4, xp: 0, level: 1, health: startingHp,
-      streak: 0, stage: 1, round: 1, units: [], frozen: false, history: [],
+      streak: 0, stage: 1, round: 1, units: [], frozen: false, history: [], items: [],
       shop: rollShop(1, pool, rng),
     });
   },
@@ -142,6 +149,7 @@ export const useGame = create<State>((set, get) => ({
       gold: state.gold + value,
       units: state.units.filter((u) => u.iid !== iid),
       pool: { ...state.pool },
+      items: [...state.items, ...unit.items], // recover any held items
     });
   },
 
@@ -207,19 +215,56 @@ export const useGame = create<State>((set, get) => ({
     });
   },
 
-  // Carousel: take one free unit to the bench (if room), then advance the round.
-  carouselTake: (defId) => {
+  // Carousel: take one free pick (a unit, or a Mega Stone), then advance the round.
+  carouselTake: (pick) => {
     const state = get();
     let units = state.units;
-    if (state.units.filter((u) => u.pos === null).length < BENCH_SIZE) {
-      units = applyCombines([...state.units, makeInstance(defId)]);
+    let items = state.items;
+    if (pick === MEGA_STONE) {
+      items = [...state.items, MEGA_STONE];
+    } else if (state.units.filter((u) => u.pos === null).length < BENCH_SIZE) {
+      units = applyCombines([...state.units, makeInstance(pick)]);
     }
     const income = roundIncome(state.gold, state.streak);
     const record: RoundRecord = { stage: state.stage, round: state.round, kind: "carousel", outcome: "carousel" };
     set({
       ...advancePartial(state, state.gold + income),
       units,
+      items,
       history: [...state.history, record],
+    });
+  },
+
+  // Add an item to the inventory (carousel pick / loot).
+  grantItem: (itemId) => set({ items: [...get().items, itemId] }),
+
+  // Move an item from the inventory onto a unit.
+  equipItem: (iid, itemId) => {
+    const state = get();
+    const idx = state.items.indexOf(itemId);
+    if (idx < 0) return;
+    const unit = state.units.find((u) => u.iid === iid);
+    if (!unit || unit.items.length >= 3) return;
+    const items = [...state.items];
+    items.splice(idx, 1);
+    set({
+      items,
+      units: state.units.map((u) => (u.iid === iid ? { ...u, items: [...u.items, itemId] } : u)),
+    });
+  },
+
+  // Pull an item back off a unit into the inventory.
+  unequipItem: (iid, itemId) => {
+    const state = get();
+    const unit = state.units.find((u) => u.iid === iid);
+    if (!unit) return;
+    const ui = unit.items.indexOf(itemId);
+    if (ui < 0) return;
+    const newItems = [...unit.items];
+    newItems.splice(ui, 1);
+    set({
+      items: [...state.items, itemId],
+      units: state.units.map((u) => (u.iid === iid ? { ...u, items: newItems } : u)),
     });
   },
 }));

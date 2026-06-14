@@ -17,6 +17,7 @@ import { UnitDetail } from "./UnitDetail";
 import { Scoreboard } from "./Scoreboard";
 import { Timeline } from "./Timeline";
 import { Carousel } from "./Carousel";
+import { ItemTray } from "./ItemTray";
 import { CombatStage } from "./CombatStage";
 import { TrophyIcon } from "./icons";
 
@@ -93,7 +94,8 @@ export function GameClient({ playerCount = 8, startingHp = 100 }: { playerCount?
       setSecs(remaining);
       if (remaining <= 0) {
         const opts = useCarousel.getState().options;
-        if (opts && opts.length) resolveCarouselFlow(opts[0]); // auto-pick first
+        // Auto-pick a unit (index 1+), not the Mega Stone (index 0).
+        if (opts && opts.length) resolveCarouselFlow(opts[1] ?? opts[0]);
         else advanceFlow();
       }
     };
@@ -147,6 +149,7 @@ export function GameClient({ playerCount = 8, startingHp = 100 }: { playerCount?
             <div className="flex-1 flex flex-col gap-3 items-center">
               <Board />
               <Bench />
+              <ItemTray />
             </div>
           )}
 

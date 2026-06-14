@@ -78,6 +78,12 @@ export const GiftIcon = (p: P) => (
 export const TrophyIcon = (p: P) => (
   <Svg {...p}><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4ZM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" /></Svg>
 );
+export const MegaIcon = ({ size = 14, ...p }: P) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" {...p}>
+    <path d="M7 3h10l4 6-9 12L3 9z" fill="currentColor" opacity="0.25" />
+    <path d="M7 3h10l4 6-9 12L3 9l4-6zM3 9h18M9 3l3 6 3-6M12 9v12" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+  </svg>
+);
 export const PokeballIcon = ({ size = 18, ...p }: P) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" {...p}>
     <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="1.6" />
