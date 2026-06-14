@@ -76,6 +76,7 @@ export function NetGameClient() {
   const actedDeadline = useRef(-1);
   const [roundLog, setRoundLog] = useState<{ stage: number; round: number; won: boolean; pve: boolean }[]>([]);
   const [pickedKey, setPickedKey] = useState<string | null>(null);
+  const [spectate, setSpectate] = useState<string | null>(null);
 
   // server time + a 250ms repaint so the shared timer counts down smoothly
   useEffect(() => {
@@ -195,6 +196,9 @@ export function NetGameClient() {
   }
 
   const streak = me?.streak ?? 0;
+  // Spectating a rival from the scoreboard → their last-synced board (read-only).
+  // My own combat replay takes priority, so spectate only applies out of combat.
+  const spectateUnits = spectate && spectate !== myUid && phase !== "combat" ? asBoard(players[spectate]?.board) : null;
 
   // Forward-looking timeline: the current stage + the next two, each round
   // tagged with its kind (PvE / carousel / PvP) and overlaid with past results.
@@ -290,7 +294,12 @@ export function NetGameClient() {
               {ladder.map((p, i) => {
                 const dex = asBoard(p.board)[0] ? getDef(asBoard(p.board)[0].defId).dex[asBoard(p.board)[0].star - 1] : null;
                 return (
-                  <div key={p.uid} className={`flex items-center gap-2 px-1.5 py-1 rounded-lg ${p.uid === myUid ? "bg-slate-700/70 ring-1 ring-sky-500/50" : ""} ${!p.alive ? "opacity-40" : ""}`}>
+                  <div
+                    key={p.uid}
+                    onClick={() => setSpectate(p.uid === myUid ? null : (spectate === p.uid ? null : p.uid))}
+                    title={p.uid === myUid ? "Your board" : `View ${p.name}'s board`}
+                    className={`flex items-center gap-2 px-1.5 py-1 rounded-lg cursor-pointer hover:bg-slate-700/50 ${p.uid === myUid ? "bg-slate-700/70 ring-1 ring-sky-500/50" : ""} ${spectate === p.uid ? "ring-1 ring-amber-400/70 bg-amber-500/10" : ""} ${!p.alive ? "opacity-40" : ""}`}
+                  >
                     <span className="w-4 text-[10px] text-slate-500 font-bold text-center">{p.place ?? i + 1}</span>
                     <span className="w-7 h-7 rounded-md bg-black/40 border border-slate-700 flex items-center justify-center shrink-0 overflow-hidden">
                       {dex ? (
@@ -315,11 +324,20 @@ export function NetGameClient() {
             </div>
           </div>
 
-          <TraitPanel />
+          <TraitPanel units={spectateUnits ?? undefined} />
           <div className="flex-1 min-w-[440px] flex flex-col gap-3 items-center">
             {/* During combat the board is "fighting" — show the replay in its place,
-                but keep the bench + shop below fully interactive. */}
-            {phase === "combat" && combatResult && me?.alive ? (
+                but keep the bench + shop below fully interactive. Spectating a
+                rival overrides the planning board (read-only). */}
+            {spectateUnits ? (
+              <div className="w-full flex flex-col gap-2">
+                <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                  <span className="text-xs font-bold text-amber-300">Viewing {players[spectate!]?.name ?? "rival"}&apos;s board</span>
+                  <button onClick={() => setSpectate(null)} className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-300">Back to mine</button>
+                </div>
+                <Board units={spectateUnits} interactive={false} />
+              </div>
+            ) : phase === "combat" && combatResult && me?.alive ? (
               <CombatStage
                 result={combatResult}
                 opponentName={myCombat?.oppName ?? "Rival"}
