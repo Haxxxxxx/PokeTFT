@@ -5,7 +5,7 @@ import { ALL_GENS, GEN_LABELS, totalPokemonCount } from "@/game/data/generations
 import { ITEM_POOL } from "@/game/data/itemPool";
 
 const HP_OPTIONS = [50, 75, 100, 125, 150, 200];
-const POOL_SIZE_OPTIONS = [50, 100, 150, 200, 300, 400];
+const POOL_SIZE_OPTIONS = [60, 90, 120];
 
 export function GameRulesPanel({ isHost }: { isHost: boolean }) {
   const rules = usePreLobby((s) => s.rules);

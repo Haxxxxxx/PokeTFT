@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { PlayerSlot as PlayerSlotType, BotDifficulty } from "@/game/store/preLobbyStore";
 import { usePreLobby } from "@/game/store/preLobbyStore";
 
@@ -26,7 +25,6 @@ export function PlayerSlot({ slot, index, isHost }: Props) {
   const setSlot = usePreLobby((s) => s.setSlot);
   const addBot = usePreLobby((s) => s.addBot);
   const clearSlot = usePreLobby((s) => s.clearSlot);
-  const [showBotPicker, setShowBotPicker] = useState(false);
 
   const isFirst = index === 0;
 
@@ -44,27 +42,12 @@ export function PlayerSlot({ slot, index, isHost }: Props) {
             >
               + Humain
             </button>
-            <div className="relative">
-              <button
-                onClick={() => setShowBotPicker((v) => !v)}
-                className="px-3 py-1.5 rounded-lg bg-violet-900/60 hover:bg-violet-800/80 border border-violet-700 text-violet-300 text-xs font-bold transition-colors"
-              >
-                + Bot IA
-              </button>
-              {showBotPicker && (
-                <div className="absolute top-full left-0 mt-1 z-10 flex flex-col gap-1 rounded-lg border border-slate-700 bg-slate-900 shadow-xl p-1.5 min-w-[120px]">
-                  {(["easy", "medium", "hard"] as BotDifficulty[]).map((diff) => (
-                    <button
-                      key={diff}
-                      onClick={() => { addBot(slot.id, diff); setShowBotPicker(false); }}
-                      className={`px-3 py-1.5 rounded-md text-xs font-bold border transition-colors ${DIFFICULTY_COLORS[diff]}`}
-                    >
-                      {DIFFICULTY_LABELS[diff]}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <button
+              onClick={() => addBot(slot.id, "medium")}
+              className="px-3 py-1.5 rounded-lg bg-violet-900/60 hover:bg-violet-800/80 border border-violet-700 text-violet-300 text-xs font-bold transition-colors"
+            >
+              + Bot IA
+            </button>
           </div>
         )}
       </div>

@@ -31,8 +31,9 @@ export type PreLobbyState = {
   isHost: boolean;
   slots: PlayerSlot[];
   rules: GameRules;
-  phase: "lobby" | "starting";
+  phase: "welcome" | "lobby" | "starting";
 
+  enterLobby: (username: string, isHost?: boolean) => void;
   generateCode: () => void;
   setSlot: (slotId: string, update: Partial<PlayerSlot>) => void;
   addBot: (slotId: string, difficulty: BotDifficulty) => void;
@@ -61,7 +62,7 @@ function randomCode(): string {
 
 const DEFAULT_RULES: GameRules = {
   generations: [1],
-  draftPoolSize: 150,
+  draftPoolSize: 90,
   startingHp: 100,
   itemsEnabled: DEFAULT_ITEMS_ENABLED,
   maxPlayers: 8,
@@ -74,7 +75,16 @@ export const usePreLobby = create<PreLobbyState>((set, get) => ({
   isHost: true,
   slots: makeSlots(),
   rules: { ...DEFAULT_RULES },
-  phase: "lobby",
+  phase: "welcome",
+
+  enterLobby: (username, isHost = true) =>
+    set((s) => ({
+      phase: "lobby",
+      isHost,
+      slots: s.slots.map((sl) =>
+        sl.id === "slot-1" ? { ...sl, name: username, status: "ready" } : sl
+      ),
+    })),
 
   generateCode: () => set({ lobbyCode: randomCode() }),
 
@@ -95,8 +105,8 @@ export const usePreLobby = create<PreLobbyState>((set, get) => ({
   clearSlot: (slotId) =>
     set((s) => ({
       slots: s.slots.map((sl) =>
-        sl.id === slotId && sl.type !== "human"
-          ? { ...sl, type: "empty", name: "", status: "waiting" }
+        sl.id === slotId && sl.id !== "slot-1"
+          ? { ...sl, type: "empty", name: "", status: "waiting", botDifficulty: "medium" }
           : sl
       ),
     })),
