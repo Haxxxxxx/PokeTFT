@@ -53,6 +53,7 @@ type RoomState = {
   setReady: (ready: boolean) => void;
   updateMe: (patch: Partial<RoomPlayer>) => void;
   setMeta: (patch: Partial<RoomMeta>) => void;
+  setRules: (patch: Partial<{ startingHp: number; maxPlayers: number }>) => void;
   leave: () => void;
 };
 
@@ -146,6 +147,12 @@ export const useRoom = create<RoomState>((setState, getState) => ({
     const { code } = getState();
     if (!code) return;
     update(ref(db(), `games/${code}/meta`), { ...patch, updatedAt: serverTimestamp() });
+  },
+
+  setRules: (patch) => {
+    const { code } = getState();
+    if (!code) return;
+    update(ref(db(), `games/${code}/rules`), patch);
   },
 
   leave: () => {

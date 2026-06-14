@@ -1,20 +1,23 @@
 "use client";
 
-import { usePreLobby } from "@/game/store/preLobbyStore";
+import { useRoom } from "@/game/net/roomStore";
 import { WelcomeScreen } from "@/components/welcome/WelcomeScreen";
 import { LobbyScreen } from "@/components/lobby/LobbyScreen";
 import { GameClient } from "@/components/game/GameClient";
 
+/**
+ * Top-level switch driven by the networked room:
+ *  - no room  → Welcome (host / join by code)
+ *  - lobby    → Lobby (live players, ready, host start)
+ *  - playing  → the game
+ */
 export function AppRoot() {
-  const phase = usePreLobby((s) => s.phase);
-  const rules = usePreLobby((s) => s.rules);
-  const slots = usePreLobby((s) => s.slots);
+  const code = useRoom((s) => s.code);
+  const room = useRoom((s) => s.room);
 
-  if (phase === "welcome") return <WelcomeScreen />;
-  if (phase === "lobby") return <LobbyScreen />;
-
-  // Match the game roster to the players actually in the lobby (filled slots),
-  // not the slot capacity.
-  const activePlayers = Math.max(2, slots.filter((sl) => sl.type !== "empty").length);
-  return <GameClient playerCount={activePlayers} startingHp={rules.startingHp} />;
+  if (!code || !room) return <WelcomeScreen />;
+  if (room.meta?.phase === "playing") {
+    return <GameClient playerCount={room.rules?.maxPlayers ?? 8} startingHp={room.rules?.startingHp ?? 100} />;
+  }
+  return <LobbyScreen />;
 }
