@@ -450,7 +450,10 @@ export function NetGameClient() {
                   >
                     <span className="w-4 text-[10px] text-slate-500 font-bold text-center">{p.place ?? i + 1}</span>
                     <span className="w-7 h-7 rounded-md bg-black/40 border border-slate-700 flex items-center justify-center shrink-0 overflow-hidden">
-                      {dex ? (
+                      {p.photoURL ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.photoURL} alt="" width={24} height={24} style={{ imageRendering: "pixelated" }} />
+                      ) : dex ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={spriteUrl(dex)} alt="" width={22} height={22} style={{ imageRendering: "pixelated" }} />
                       ) : <span className="text-[9px] text-slate-600">{p.name.slice(0, 1).toUpperCase()}</span>}

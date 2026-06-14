@@ -8,9 +8,25 @@ import { AppSettingsPanel } from "./AppSettingsPanel";
 import { FriendsPanel } from "@/components/social/FriendsPanel";
 import { ProfileEditor } from "@/components/social/ProfileEditor";
 import { HowToPlay } from "@/components/HowToPlay";
+import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 
 type Mode = "idle" | "join";
+
+// Decorative hero composition — random showcase mons scattered behind the play CTA.
+const HERO_SLOTS: { x: string; y: string; size: number; rot: number }[] = [
+  { x: "6%", y: "12%", size: 170, rot: -12 },
+  { x: "76%", y: "8%", size: 150, rot: 10 },
+  { x: "2%", y: "60%", size: 160, rot: 8 },
+  { x: "80%", y: "58%", size: 150, rot: -8 },
+  { x: "40%", y: "2%", size: 120, rot: 0 },
+];
+// A pool of visually striking Pokémon across generations to draw from.
+const SHOWCASE_DEX = [
+  6, 9, 3, 149, 94, 130, 143, 448, 282, 384, 445, 248, 658, 700, 887, 38, 59, 131,
+  134, 135, 136, 197, 196, 169, 212, 230, 257, 260, 359, 376, 392, 395, 405, 462,
+  468, 472, 530, 553, 609, 612, 635, 663, 681, 724, 745, 778, 793, 809, 887, 998,
+];
 
 export function WelcomeScreen() {
   const t = useT();
@@ -28,6 +44,14 @@ export function WelcomeScreen() {
   const [joinError, setJoinError] = useState(false);
   const [editProfile, setEditProfile] = useState(false);
   const [howTo, setHowTo] = useState(false);
+  // Random showcase mons each visit (client-only to avoid hydration mismatch).
+  const [heroMons, setHeroMons] = useState(() => HERO_SLOTS.map((s, i) => ({ ...s, dex: SHOWCASE_DEX[i] })));
+  useEffect(() => {
+    const pool = [...SHOWCASE_DEX];
+    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHeroMons(HERO_SLOTS.map((s, i) => ({ ...s, dex: pool[i] })));
+  }, []);
 
   // Show the tutorial automatically the first time someone lands here.
   useEffect(() => {
@@ -57,7 +81,7 @@ export function WelcomeScreen() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "radial-gradient(120% 80% at 50% -10%, #1a2540 0%, #0a1020 60%)" }}>
       {/* Top nav bar */}
-      <header className="flex items-center justify-between px-6 h-16 border-b border-slate-800/80 bg-slate-950/40 backdrop-blur shrink-0">
+      <header className="flex items-center justify-between gap-3 px-4 sm:px-6 h-16 border-b border-slate-800/80 bg-slate-950/40 backdrop-blur shrink-0">
         <div className="flex items-center gap-2.5">
           <span className="text-rose-500 text-2xl">⬡</span>
           <span className="font-extrabold tracking-tight text-xl text-slate-100">Poké<span className="text-amber-400">TFT</span></span>
@@ -89,14 +113,23 @@ export function WelcomeScreen() {
       </header>
 
       {/* Main */}
-      <div className="flex-1 w-full max-w-[1320px] mx-auto flex gap-6 p-6 items-stretch">
+      <div className="flex-1 w-full max-w-[1320px] mx-auto flex flex-col lg:flex-row gap-6 p-4 sm:p-6 items-stretch">
         {/* Hero / play */}
-        <main className="flex-1 flex flex-col">
+        <main className="flex-1 flex flex-col min-h-[420px]">
           <div className="flex-1 flex flex-col justify-center items-center gap-8 rounded-3xl border border-slate-800 bg-slate-900/40 backdrop-blur p-10 relative overflow-hidden"
-            style={{ background: "radial-gradient(80% 90% at 50% 0%, rgba(251,191,36,0.06), transparent 60%), rgba(15,23,42,0.4)" }}>
-            <div className="text-center">
-              <h1 className="font-extrabold tracking-tight text-4xl text-slate-100">{t.w_hero_title}</h1>
-              <p className="text-slate-500 text-sm mt-2">{t.w_subtitle}</p>
+            style={{ background: "radial-gradient(70% 80% at 50% 30%, rgba(251,191,36,0.08), transparent 60%), rgba(15,23,42,0.5)" }}>
+            {/* Decorative floating mons */}
+            <div className="absolute inset-0 pointer-events-none select-none">
+              {heroMons.map((m, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={i} src={spriteUrl(m.dex)} alt="" width={m.size} height={m.size}
+                  className="absolute hero-float" style={{ left: m.x, top: m.y, width: m.size, ["--r" as string]: `${m.rot}deg`, imageRendering: "pixelated", opacity: 0.13, filter: "saturate(1.1)", animationDelay: `${i * 0.6}s` }} />
+              ))}
+            </div>
+
+            <div className="text-center relative z-10">
+              <h1 className="font-extrabold tracking-tight text-3xl sm:text-5xl text-slate-100 drop-shadow-[0_2px_20px_rgba(0,0,0,0.5)]">{t.w_hero_title}</h1>
+              <p className="text-slate-400 text-sm mt-2">{t.w_subtitle}</p>
             </div>
 
             {mode === "idle" ? (
@@ -132,7 +165,7 @@ export function WelcomeScreen() {
         </main>
 
         {/* Right rail: friends + settings */}
-        <aside className="w-80 shrink-0 flex flex-col gap-4">
+        <aside className="w-full lg:w-80 shrink-0 flex flex-col gap-4">
           <FriendsPanel />
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur p-5">
             <h2 className="text-xs font-extrabold uppercase tracking-widest text-slate-400 mb-3 border-b border-slate-800 pb-2">{t.s_title}</h2>
