@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { usePreLobby } from "@/game/store/preLobbyStore";
 import { AppSettingsPanel } from "./AppSettingsPanel";
+import { useT } from "@/lib/i18n";
 
 type Mode = "idle" | "create" | "join";
 
 export function WelcomeScreen() {
+  const t = useT();
   const enterLobby = usePreLobby((s) => s.enterLobby);
   const [username, setUsername] = useState("");
   const [mode, setMode] = useState<Mode>("idle");
@@ -43,19 +45,19 @@ export function WelcomeScreen() {
             <h1 className="font-extrabold tracking-tight text-3xl text-slate-100">
               Poké<span className="text-amber-400">TFT</span>
             </h1>
-            <p className="text-slate-500 text-sm">Teamfight Tactics — édition Pokémon</p>
+            <p className="text-slate-500 text-sm">{t.w_subtitle}</p>
           </div>
 
           {/* Username */}
           <div className="flex flex-col gap-2">
             <label className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
-              Ton pseudo
+              {t.w_username_label}
             </label>
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && mode === "idle") setMode("create"); }}
-              placeholder="Choisis un pseudo…"
+              placeholder={t.w_username_placeholder}
               maxLength={24}
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-base font-semibold text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
             />
@@ -71,7 +73,7 @@ export function WelcomeScreen() {
                   bg-amber-500 hover:bg-amber-400 text-black border-amber-400
                   disabled:opacity-30 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500 disabled:border-slate-700"
               >
-                ⚔ Créer une partie
+                {t.w_create}
               </button>
               <button
                 onClick={() => setMode("join")}
@@ -80,28 +82,26 @@ export function WelcomeScreen() {
                   bg-sky-900/60 hover:bg-sky-800/80 text-sky-300 border-sky-700
                   disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                🔗 Rejoindre
+                {t.w_join}
               </button>
             </div>
           )}
 
           {mode === "create" && (
             <div className="flex flex-col gap-3">
-              <p className="text-sm text-slate-400">
-                Tu seras l&apos;hôte de la partie. Les autres joueurs pourront rejoindre avec le code du lobby.
-              </p>
+              <p className="text-sm text-slate-400">{t.w_create_desc}</p>
               <div className="flex gap-3">
                 <button
                   onClick={handleCreate}
                   className="flex-1 py-3 rounded-xl font-extrabold text-sm bg-amber-500 hover:bg-amber-400 text-black border border-amber-400 transition-all"
                 >
-                  ⚔ Créer
+                  {t.w_create_btn}
                 </button>
                 <button
                   onClick={() => setMode("idle")}
                   className="px-4 py-3 rounded-xl font-bold text-sm bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700 transition-all"
                 >
-                  Retour
+                  {t.w_back}
                 </button>
               </div>
             </div>
@@ -111,20 +111,20 @@ export function WelcomeScreen() {
             <div className="flex flex-col gap-3">
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
-                  Code du lobby
+                  {t.w_join_code_label}
                 </label>
                 <input
                   value={joinCode}
                   onChange={(e) => { setJoinCode(e.target.value.toUpperCase()); setJoinError(false); }}
                   onKeyDown={(e) => { if (e.key === "Enter") handleJoin(); }}
-                  placeholder="Ex: AB3X7K"
+                  placeholder={t.w_join_code_placeholder}
                   maxLength={6}
                   className={`w-full bg-slate-800 border rounded-xl px-4 py-3 text-base font-mono font-bold text-amber-400 tracking-widest placeholder:text-slate-600 focus:outline-none transition-colors ${
                     joinError ? "border-rose-600" : "border-slate-700 focus:border-sky-500"
                   }`}
                 />
                 {joinError && (
-                  <p className="text-xs text-rose-400">Code invalide — 6 caractères requis.</p>
+                  <p className="text-xs text-rose-400">{t.w_join_error}</p>
                 )}
               </div>
               <div className="flex gap-3">
@@ -133,13 +133,13 @@ export function WelcomeScreen() {
                   disabled={!canProceed}
                   className="flex-1 py-3 rounded-xl font-extrabold text-sm bg-sky-600 hover:bg-sky-500 text-white border border-sky-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  🔗 Rejoindre
+                  {t.w_join_btn}
                 </button>
                 <button
                   onClick={() => { setMode("idle"); setJoinCode(""); setJoinError(false); }}
                   className="px-4 py-3 rounded-xl font-bold text-sm bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700 transition-all"
                 >
-                  Retour
+                  {t.w_back}
                 </button>
               </div>
             </div>
@@ -149,7 +149,7 @@ export function WelcomeScreen() {
         {/* Settings card */}
         <div className="w-64 shrink-0 rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur p-6">
           <h2 className="text-xs font-extrabold uppercase tracking-widest text-slate-400 mb-4 border-b border-slate-800 pb-2">
-            Paramètres généraux
+            {t.s_title}
           </h2>
           <AppSettingsPanel />
         </div>
