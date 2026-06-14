@@ -39,7 +39,7 @@ type LobbyState = {
   players: Player[];
   lastOpponent: number;
 
-  init: () => void;
+  init: (aiCount?: number, startingHp?: number) => void;
   pickOpponent: () => Player | null;
   /** Apply the human fight result to the human's opponent, then resolve all
    *  AI-vs-AI fights and grow every surviving AI board for the next round. */
@@ -50,11 +50,11 @@ export const useLobby = create<LobbyState>((set, get) => ({
   players: [],
   lastOpponent: -1,
 
-  init: () => {
-    const players: Player[] = RIVALS.map((name, i) => ({
+  init: (aiCount = RIVALS.length, startingHp = 100) => {
+    const players: Player[] = RIVALS.slice(0, Math.max(1, Math.min(aiCount, RIVALS.length))).map((name, i) => ({
       id: `ai${i}`,
       name,
-      health: 100,
+      health: startingHp,
       level: 2,
       board: generateBoard(2, 2, (i + 1) * 9176 + 3),
       streak: 0,
@@ -100,7 +100,7 @@ export const useLobby = create<LobbyState>((set, get) => ({
     for (let i = 0; i + 1 < rest.length; i += 2) {
       const a = rest[i];
       const b = rest[i + 1];
-      const r = simulate(a.board, b.board, combatStage * 50 + i + 1);
+      const r = simulate(a.board, b.board);
       const loser = r.winner === "ally" ? b : r.winner === "enemy" ? a : null;
       const winner = r.winner === "ally" ? a : r.winner === "enemy" ? b : null;
       if (loser) {
@@ -113,7 +113,7 @@ export const useLobby = create<LobbyState>((set, get) => ({
     if (rest.length % 2 === 1) {
       const solo = rest[rest.length - 1];
       const ghost = generateBoard(aiLevel(totalRound(combatStage, nextRound)), boardCount(solo.level), combatStage * 777 + 13);
-      const r = simulate(solo.board, ghost, combatStage * 999);
+      const r = simulate(solo.board, ghost);
       if (r.winner === "enemy") solo.health -= stageBaseDamage(combatStage) + r.survivors;
     }
 

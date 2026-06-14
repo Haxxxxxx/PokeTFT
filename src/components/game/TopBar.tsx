@@ -15,8 +15,7 @@ export function TopBar({ timer }: { timer?: React.ReactNode }) {
   const round = useGame((s) => s.round);
   const streak = useGame((s) => s.streak);
   const buyXp = useGame((s) => s.buyXp);
-  const units = useGame((s) => s.units);
-  const boardCount = units.filter((u) => u.pos !== null).length;
+  const boardCount = useGame((s) => s.units.filter((u) => u.pos !== null).length);
 
   const atMax = level >= MAX_LEVEL;
   const base = XP_TO_REACH[level];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
 import { useGame } from "@/game/store/gameStore";
 import { useCombat } from "@/game/store/combatStore";
@@ -46,7 +46,7 @@ function RoundTimer({ seconds }: { seconds: number }) {
   );
 }
 
-export function GameClient() {
+export function GameClient({ playerCount = 8, startingHp = 100 }: { playerCount?: number; startingHp?: number } = {}) {
   const newGame = useGame((s) => s.newGame);
   const moveToBoard = useGame((s) => s.moveToBoard);
   const moveToBench = useGame((s) => s.moveToBench);
@@ -63,24 +63,26 @@ export function GameClient() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const [secs, setSecs] = useState(PLAN_TIME);
+  const deadlineRef = useRef(0);
 
   useEffect(() => {
-    newGame();
-    initLobby();
-  }, [newGame, initLobby]);
+    newGame(startingHp);
+    initLobby(Math.max(1, playerCount - 1), startingHp);
+  }, [newGame, initLobby, playerCount, startingHp]);
 
-  // Reset the planning timer at the start of each round.
-  useEffect(() => { setSecs(PLAN_TIME); }, [stage, round]);
-
-  // Tick the planning timer; auto-start combat at zero.
+  // One effect owns the planning countdown. It re-arms a deadline whenever the
+  // round changes or combat ends, and only ever calls setState from the interval
+  // callback (never synchronously in the effect body).
   useEffect(() => {
     if (combatResult || health <= 0) return;
-    const id = setInterval(() => {
-      setSecs((s) => {
-        if (s <= 1) { startCombatFlow(); return PLAN_TIME; }
-        return s - 1;
-      });
-    }, 1000);
+    deadlineRef.current = performance.now() + PLAN_TIME * 1000;
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((deadlineRef.current - performance.now()) / 1000));
+      setSecs(remaining);
+      if (remaining <= 0) startCombatFlow();
+    };
+    tick();
+    const id = setInterval(tick, 250);
     return () => clearInterval(id);
   }, [combatResult, health, stage, round]);
 

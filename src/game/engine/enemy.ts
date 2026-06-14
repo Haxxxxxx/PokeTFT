@@ -15,13 +15,16 @@ const BY_COST: Record<Cost, string[]> = (() => {
 const COL_ORDER = [3, 2, 4, 1, 5, 0, 6];
 const ROW_ORDER = [1, 0, 2, 3];
 
+const MAX_BOARD = COL_ORDER.length * ROW_ORDER.length;
+
 /** Build a board of `count` mons at shop-`level` quality. */
 export function generateBoard(level: number, count: number, seed: number): UnitInstance[] {
   const rng: Rng = makeRng(seed >>> 0);
   const odds = SHOP_ODDS[Math.min(Math.max(level, 1), 10)];
+  const n = Math.min(count, MAX_BOARD); // never overflow the grid (would stack units)
 
   const board: UnitInstance[] = [];
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < n; i++) {
     let cost = (weightedPick(rng, odds) + 1) as Cost;
     while (BY_COST[cost].length === 0) cost = ((cost % 5) + 1) as Cost;
     const defId = BY_COST[cost][randInt(rng, BY_COST[cost].length)];
@@ -37,9 +40,4 @@ export function generateBoard(level: number, count: number, seed: number): UnitI
     board.push({ iid: `g${seed}_${i}`, defId, star, pos: [col, row], items: [] });
   }
   return board;
-}
-
-/** Legacy helper kept for any direct callers; scales count to stage. */
-export function generateEnemyBoard(stage: number, round: number, seed: number): UnitInstance[] {
-  return generateBoard(Math.min(3 + stage, 9), Math.min(2 + stage, 8), seed + round);
 }
