@@ -20,7 +20,7 @@ export function AppRoot() {
 
   useEffect(() => {
     startServerTime();
-    reconnect(); // re-attach to the room this tab was in after a refresh
+    reconnect();
   }, [reconnect]);
 
   if (!code || !room) return <WelcomeScreen />;

@@ -2,30 +2,32 @@
 
 import { useAppStore } from "@/game/store/appStore";
 import type { Language, AnimationSpeed } from "@/game/store/appStore";
-
-const LANG_OPTIONS: { value: Language; label: string }[] = [
-  { value: "fr", label: "Français" },
-  { value: "en", label: "English" },
-];
-
-const SPEED_OPTIONS: { value: AnimationSpeed; label: string }[] = [
-  { value: "normal", label: "Normal" },
-  { value: "fast", label: "Rapide" },
-];
+import { useT } from "@/lib/i18n";
 
 export function AppSettingsPanel() {
+  const t = useT();
   const settings = useAppStore((s) => s.settings);
   const setSettings = useAppStore((s) => s.setSettings);
+
+  const langOptions: { value: Language; label: string }[] = [
+    { value: "fr", label: t.s_lang_fr },
+    { value: "en", label: t.s_lang_en },
+  ];
+
+  const speedOptions: { value: AnimationSpeed; label: string }[] = [
+    { value: "normal", label: t.s_anim_normal },
+    { value: "fast", label: t.s_anim_fast },
+  ];
 
   return (
     <div className="flex flex-col gap-5">
       {/* Language */}
       <div>
         <h3 className="text-xs font-extrabold uppercase tracking-widest text-slate-400 mb-2">
-          Langue
+          {t.s_lang}
         </h3>
         <div className="flex gap-2">
-          {LANG_OPTIONS.map((opt) => (
+          {langOptions.map((opt) => (
             <button
               key={opt.value}
               onClick={() => setSettings({ language: opt.value })}
@@ -44,7 +46,7 @@ export function AppSettingsPanel() {
       {/* Sound */}
       <div>
         <h3 className="text-xs font-extrabold uppercase tracking-widest text-slate-400 mb-2">
-          Son
+          {t.s_sound}
         </h3>
         <button
           onClick={() => setSettings({ soundEnabled: !settings.soundEnabled })}
@@ -54,17 +56,17 @@ export function AppSettingsPanel() {
               : "bg-slate-800/60 border-slate-700 text-slate-500"
           }`}
         >
-          {settings.soundEnabled ? "🔊 Activé" : "🔇 Désactivé"}
+          {settings.soundEnabled ? t.s_sound_on : t.s_sound_off}
         </button>
       </div>
 
       {/* Animation speed */}
       <div>
         <h3 className="text-xs font-extrabold uppercase tracking-widest text-slate-400 mb-2">
-          Animations
+          {t.s_anim}
         </h3>
         <div className="flex gap-2">
-          {SPEED_OPTIONS.map((opt) => (
+          {speedOptions.map((opt) => (
             <button
               key={opt.value}
               onClick={() => setSettings({ animationSpeed: opt.value })}

@@ -3,7 +3,7 @@ import { ECONOMY, XP_TO_REACH, MAX_LEVEL, boardSizeForLevel, roundKind, advanceR
 import type { UnitInstance } from "../types";
 import { getDef } from "../data/mons";
 import { makeRng, type Rng } from "../engine/rng";
-import { makePool, rollShop, takeFromPool, returnToPool, type Pool } from "../engine/shop";
+import { makePool, makeUnitsByCost, rollShop, takeFromPool, returnToPool, type Pool, type UnitsByCost } from "../engine/shop";
 import { roundIncome, sellValue, interest } from "../engine/economy";
 import { applyCombines, makeInstance } from "../engine/combine";
 import { MEGA_STONE } from "../data/mega";
@@ -26,7 +26,7 @@ export type RoundRecord = { stage: number; round: number; kind: RoundKind; outco
 function advancePartial(state: State, gold: number) {
   const { stage, round } = advanceRound(state.stage, state.round);
   const newXp = state.xp + ECONOMY.passiveXpPerRound;
-  const shop = state.frozen ? state.shop : rollShop(levelFromXp(newXp), state.pool, rng);
+  const shop = state.frozen ? state.shop : rollShop(levelFromXp(newXp), state.pool, rng, state.unitsByCost);
   return { gold, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false };
 }
 
@@ -40,6 +40,7 @@ type State = {
   stage: number;
   round: number;
   pool: Pool;
+  unitsByCost: UnitsByCost;
   units: UnitInstance[];
   shop: (string | null)[];
   frozen: boolean;
@@ -53,7 +54,7 @@ type State = {
   xpProgress: () => { current: number; needed: number | null };
 
   // actions
-  newGame: (startingHp?: number) => void;
+  newGame: (startingHp?: number, allowedIds?: string[]) => void;
   reroll: () => void;
   buyXp: () => void;
   buyUnit: (slot: number) => void;
@@ -84,6 +85,7 @@ export const useGame = create<State>((set, get) => ({
   stage: 1,
   round: 1,
   pool: makePool(),
+  unitsByCost: makeUnitsByCost(),
   units: [],
   shop: [],
   frozen: false,
@@ -100,20 +102,21 @@ export const useGame = create<State>((set, get) => ({
     return { current: xp - base, needed: next - base };
   },
 
-  newGame: (startingHp = ECONOMY.startingHealth) => {
+  newGame: (startingHp = ECONOMY.startingHealth, allowedIds?: string[]) => {
     rng = makeRng(INITIAL_SEED);
-    const pool = makePool();
+    const pool = makePool(allowedIds);
+    const unitsByCost = makeUnitsByCost(allowedIds);
     set({
-      pool, gold: 4, xp: 0, level: 1, health: startingHp,
+      pool, unitsByCost, gold: 4, xp: 0, level: 1, health: startingHp,
       streak: 0, stage: 1, round: 1, units: [], frozen: false, history: [], items: [],
-      shop: rollShop(1, pool, rng),
+      shop: rollShop(1, pool, rng, unitsByCost),
     });
   },
 
   reroll: () => {
-    const { gold, level, pool } = get();
+    const { gold, level, pool, unitsByCost } = get();
     if (gold < ECONOMY.rerollCost) return;
-    set({ gold: gold - ECONOMY.rerollCost, frozen: false, shop: rollShop(level, pool, rng) });
+    set({ gold: gold - ECONOMY.rerollCost, frozen: false, shop: rollShop(level, pool, rng, unitsByCost) });
   },
 
   buyXp: () => {
@@ -243,7 +246,7 @@ export const useGame = create<State>((set, get) => ({
     const state = get();
     const income = ECONOMY.baseIncome + interest(state.gold) + streakGold(streak);
     const newXp = state.xp + ECONOMY.passiveXpPerRound;
-    const shop = state.frozen ? state.shop : rollShop(levelFromXp(newXp), state.pool, rng);
+    const shop = state.frozen ? state.shop : rollShop(levelFromXp(newXp), state.pool, rng, state.unitsByCost);
     set({ gold: state.gold + income, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false });
   },
 

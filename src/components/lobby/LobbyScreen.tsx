@@ -36,7 +36,7 @@ export function LobbyScreen() {
               Poké<span className="text-amber-400">TFT</span>
               <span className="text-slate-500 font-normal text-sm ml-2">— Lobby</span>
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">{players.length} / {maxPlayers} joueurs · empty slots fill with AI</p>
+            <p className="text-xs text-slate-500 mt-0.5">{players.length} / {maxPlayers} players · empty slots play as ghosts</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -76,7 +76,7 @@ export function LobbyScreen() {
             {Array.from({ length: openSlots }).map((_, i) => (
               <div key={`open-${i}`} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed border-slate-800 bg-slate-900/20 text-slate-600">
                 <div className="w-9 h-9 rounded-lg border border-dashed border-slate-700" />
-                <span className="text-xs font-semibold">Open · AI</span>
+                <span className="text-xs font-semibold">Open slot</span>
               </div>
             ))}
           </div>
