@@ -46,6 +46,10 @@ type Combatant = {
   regenPerSec: number;    // leftovers: fraction of maxHp healed per second
   thornsPct: number;      // rocky-helmet: fraction of attacker maxHp on melee contact
   sashReady: boolean;     // focus-sash: survive a lethal blow once at full HP
+  // Cumulative contribution (for the live damage/tank/heal recap).
+  dmgDealt: number;
+  dmgTaken: number;
+  healed: number;
 };
 
 export type FrameUnit = {
@@ -58,6 +62,11 @@ export type FrameUnit = {
   manaFrac: number;
   alive: boolean;
   mega: boolean;
+  /** Cumulative up to this frame — drives the recap. */
+  dmgDealt: number;
+  dmgTaken: number;
+  healed: number;
+  name: string;
 };
 
 export type CombatEvent =
@@ -143,6 +152,9 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
     regenPerSec: has("leftovers") ? 0.05 : 0,
     thornsPct: has("rocky-helmet") ? 0.16 : 0,
     sashReady: has("focus-sash"),
+    dmgDealt: 0,
+    dmgTaken: 0,
+    healed: 0,
   };
 }
 
@@ -161,6 +173,10 @@ function snapshot(units: Combatant[], t: number, events: CombatEvent[]): Frame {
       manaFrac: u.maxMana > 0 ? u.mana / u.maxMana : 0,
       alive: u.alive,
       mega: u.mega,
+      dmgDealt: Math.round(u.dmgDealt),
+      dmgTaken: Math.round(u.dmgTaken),
+      healed: Math.round(u.healed),
+      name: u.name,
     })),
   };
 }
@@ -248,7 +264,9 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
     // Leftovers: steady regen each tick (capped at max HP).
     for (const u of units) {
       if (u.alive && u.regenPerSec > 0 && u.hp < u.maxHp) {
+        const before = u.hp;
         u.hp = Math.min(u.maxHp, u.hp + u.maxHp * u.regenPerSec * DT);
+        u.healed += u.hp - before;
       }
     }
 
@@ -272,24 +290,29 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
   return finalize(units, frames, t);
 }
 
-/** Apply a hit, honouring Focus Sash (survive one lethal blow at full HP). */
-function applyHit(to: Combatant, dmg: number) {
+/** Apply a hit, honouring Focus Sash (survive one lethal blow at full HP).
+ *  Records actual HP lost as the attacker's damage and the victim's tank. */
+function applyHit(from: Combatant | null, to: Combatant, dmg: number) {
+  const before = to.hp;
   const wasFull = to.hp >= to.maxHp;
   to.hp -= dmg;
   if (to.hp <= 0 && to.sashReady && wasFull) {
     to.hp = 1;
     to.sashReady = false;
   }
+  const lost = Math.max(0, before - to.hp);
+  to.dmgTaken += lost;
+  if (from) from.dmgDealt += lost;
 }
 
 function dealDamage(from: Combatant, to: Combatant, rawDmg: number, _kind: string, events: CombatEvent[]) {
   const dmg = Math.round(rawDmg * from.dmgMult); // life-orb boosts damage dealt
-  applyHit(to, dmg);
+  applyHit(from, to, dmg);
   to.mana = Math.min(to.maxMana, to.mana + MANA_ON_HIT);
   events.push({ kind: "attack", from: from.id, to: to.id });
   events.push({ kind: "hit", to: to.id, dmg });
   // Rocky Helmet thorns on melee contact; Life Orb recoil on the attacker.
-  if (to.thornsPct > 0 && from.range <= 1) from.hp -= from.maxHp * to.thornsPct;
+  if (to.thornsPct > 0 && from.range <= 1) applyHit(to, from, from.maxHp * to.thornsPct);
   if (from.lifeOrbSelfPct > 0) from.hp -= from.maxHp * from.lifeOrbSelfPct;
 }
 
@@ -302,7 +325,7 @@ function castAbility(caster: Combatant, target: Combatant, units: Combatant[], e
   const hitOne = (victim: Combatant) => {
     const e = effectiveness(caster.move.type, victim.types);
     const dmg = Math.round(base * e * (100 / (100 + victim.mr)) * caster.dmgMult);
-    applyHit(victim, dmg);
+    applyHit(caster, victim, dmg);
     events.push({ kind: "hit", to: victim.id, dmg, crit: e > 1 });
   };
 
