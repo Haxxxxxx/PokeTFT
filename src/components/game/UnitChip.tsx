@@ -6,8 +6,25 @@ import { COST_COLOR } from "@/game/ui";
 import { useUi } from "@/game/store/uiStore";
 import { useGame } from "@/game/store/gameStore";
 import { MEGA_STONE, canMega, isMegaActive } from "@/game/data/mega";
+import { ITEM_POOL } from "@/game/data/itemPool";
 import { StarIcon, MegaIcon } from "./icons";
 import type { UnitInstance } from "@/game/types";
+
+const ITEM_ICON = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i.icon]));
+
+/** Small icons of the items a unit is holding, pinned to the token corner. */
+function ItemPips({ items, megaReady }: { items: string[]; megaReady: boolean }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="absolute bottom-0.5 right-0.5 flex gap-px pointer-events-none">
+      {items.map((id, i) => id === MEGA_STONE ? (
+        <span key={i} className={megaReady ? "text-fuchsia-300" : "text-slate-400"} title="Mega Stone"><MegaIcon size={11} /></span>
+      ) : (
+        <span key={i} className="text-[10px] leading-none drop-shadow" title={id}>{ITEM_ICON[id] ?? "◆"}</span>
+      ))}
+    </div>
+  );
+}
 
 export function Stars({ star }: { star: number }) {
   return (
@@ -46,7 +63,7 @@ export function UnitChip({ unit, size = 56, interactive = true, shape = "square"
       }
       return;
     }
-    setInspect(unit.defId, unit.star);
+    setInspect(unit.defId, unit.star, unit.iid);
   }
 
   // Double-click a bench unit to quick-deploy it onto the first free board cell.
@@ -91,11 +108,7 @@ export function UnitChip({ unit, size = 56, interactive = true, shape = "square"
         <div className="absolute -top-1 inset-x-0 flex justify-center pointer-events-none">
           <Stars star={unit.star} />
         </div>
-        {heldItems.includes(MEGA_STONE) && (
-          <span className={`absolute bottom-1 right-1 ${megaReady ? "text-fuchsia-300" : "text-slate-500"}`} title="Mega Stone">
-            <MegaIcon size={12} />
-          </span>
-        )}
+        <ItemPips items={heldItems} megaReady={megaReady} />
       </div>
     );
   }
@@ -122,11 +135,7 @@ export function UnitChip({ unit, size = 56, interactive = true, shape = "square"
       <div className="absolute top-0 left-0 right-0">
         <Stars star={unit.star} />
       </div>
-      {heldItems.includes(MEGA_STONE) && (
-        <span className={`absolute bottom-0.5 right-0.5 ${megaReady ? "text-fuchsia-300" : "text-slate-500"}`} title="Mega Stone">
-          <MegaIcon size={12} />
-        </span>
-      )}
+      <ItemPips items={heldItems} megaReady={megaReady} />
     </div>
   );
 }

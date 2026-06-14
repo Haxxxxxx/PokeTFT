@@ -12,6 +12,9 @@ import { ECONOMY, MAX_LEVEL, XP_TO_REACH, streakGold, roundKind, advanceRound } 
 import { interest } from "@/game/engine/economy";
 import { MEGA_STONE } from "@/game/data/mega";
 import { ITEM_POOL } from "@/game/data/itemPool";
+import { AUGMENTS, augmentSlot } from "@/game/data/augments";
+import { useAppStore } from "@/game/store/appStore";
+import { makeRng } from "@/game/engine/rng";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import { MegaIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
@@ -30,6 +33,7 @@ function asUnits(u: unknown): UnitInstance[] {
 }
 import { Board } from "./Board";
 import { Bench } from "./Bench";
+import { UnitChip } from "./UnitChip";
 import { ShopBar } from "./ShopBar";
 import { TraitPanel } from "./TraitPanel";
 import { UnitDetail } from "./UnitDetail";
@@ -74,6 +78,9 @@ export function NetGameClient() {
   const netRound = useGame((s) => s.netRound);
   const importSave = useGame((s) => s.importSave);
   const netCarouselPick = useGame((s) => s.netCarouselPick);
+  const pickAugment = useGame((s) => s.pickAugment);
+  const augments = useGame((s) => s.augments);
+  const lang = useAppStore((s) => s.settings.language);
   const buyXp = useGame((s) => s.buyXp);
   const moveToBoard = useGame((s) => s.moveToBoard);
   const moveToBench = useGame((s) => s.moveToBench);
@@ -93,6 +100,24 @@ export function NetGameClient() {
   const [roundLog, setRoundLog] = useState<{ stage: number; round: number; won: boolean; pve: boolean }[]>([]);
   const [pickedKey, setPickedKey] = useState<string | null>(null);
   const [spectate, setSpectate] = useState<string | null>(null);
+
+  // Scale-to-fit: shrink the whole board so it always fits the viewport, whatever
+  // the user's resolution. offsetWidth/Height are layout (pre-transform) sizes, so
+  // measuring while scaled is stable (no feedback loop).
+  const fitRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const fit = () => {
+      const el = fitRef.current;
+      if (!el) return;
+      const s = Math.min(1, (window.innerWidth - 6) / el.offsetWidth, (window.innerHeight - 6) / el.offsetHeight);
+      setScale(s > 0.2 ? s : 1);
+    };
+    const raf = requestAnimationFrame(fit);
+    window.addEventListener("resize", fit);
+    const id = setInterval(fit, 700); // content height changes across phases
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", fit); clearInterval(id); };
+  }, []);
 
   // server time + a 250ms repaint so the shared timer counts down smoothly
   useEffect(() => {
@@ -165,6 +190,36 @@ export function NetGameClient() {
     return simulate(asBoard(myCombat.selfBoard), asBoard(myCombat.oppBoard));
   }, [phase, meta?.stage, meta?.round, myCombat?.oppUid]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Live replay of the rival I'm spectating (from the host's frozen boards).
+  const spectateCombat = spectate && spectate !== myUid ? room?.combat?.[spectate] : undefined;
+  const spectateCombatResult = useMemo(() => {
+    if (phase !== "combat" || !spectateCombat) return null;
+    return simulate(asBoard(spectateCombat.selfBoard), asBoard(spectateCombat.oppBoard));
+  }, [phase, meta?.stage, meta?.round, spectate, spectateCombat?.oppUid]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Augment round? (stage 2/3/4 round 1). Show the pick until this slot is taken.
+  const augSlotNow = meta && phase === "planning" && me?.alive ? augmentSlot(meta.stage, meta.round) : null;
+  const augOptions = useMemo(() => {
+    if (augSlotNow == null) return [];
+    const owned = new Set(useGame.getState().augments);
+    const pool = AUGMENTS.filter((a) => !owned.has(a.id));
+    let seed = augSlotNow * 9973 + 7;
+    for (let i = 0; i < (myUid?.length ?? 0); i++) seed = (seed * 31 + myUid!.charCodeAt(i)) >>> 0;
+    const r = makeRng(seed >>> 0);
+    const a = [...pool];
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a.slice(0, 3);
+  }, [augSlotNow, myUid]);
+
+  // When you're eliminated, default to watching the current leader.
+  useEffect(() => {
+    if (me && !me.alive && !spectate) {
+      const leader = Object.values(players).filter((p) => p.alive && p.uid !== myUid).sort((a, b) => b.hp - a.hp)[0];
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (leader) setSpectate(leader.uid);
+    }
+  }, [me?.alive, spectate]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const t = useT();
 
   // Record every combat round into the timeline (one entry per round, dedup by key).
@@ -232,9 +287,15 @@ export function NetGameClient() {
   }
 
   const streak = me?.streak ?? 0;
-  // Spectating a rival from the scoreboard → their last-synced board (read-only).
-  // My own combat replay takes priority, so spectate only applies out of combat.
-  const spectateUnits = spectate && spectate !== myUid && phase !== "combat" ? asBoard(players[spectate]?.board) : null;
+  // Show the augment pick this slot until the player has taken it.
+  const showAugment = augSlotNow != null && augments.length === augSlotNow;
+  // Spectating a rival from the scoreboard → watch their board, bench and fights
+  // (read-only). Works while alive (scouting) and after death (keep watching).
+  const spectating = !!spectate && spectate !== myUid && !!players[spectate];
+  const spectateP = spectating ? players[spectate!] : undefined;
+  const spectateUnits = spectating ? asBoard(spectateP?.board) : null;
+  // Their full roster (incl. bench) rides along in the synced economy save.
+  const spectateBench = spectating ? asUnits(spectateP?.save?.units).filter((u) => u.pos === null) : [];
 
   // Forward-looking timeline: the current stage + the next two, each round
   // tagged with its kind (PvE / carousel / PvP) and overlaid with past results.
@@ -252,7 +313,12 @@ export function NetGameClient() {
 
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-      <div className="min-h-screen flex flex-col gap-3 w-full max-w-[1440px] mx-auto p-3 overflow-x-hidden">
+      <div className="w-full min-h-screen flex justify-center items-start overflow-hidden">
+      <div
+        ref={fitRef}
+        style={{ transform: `scale(${scale})`, transformOrigin: "top center" }}
+        className="flex flex-col gap-3 w-full max-w-[1440px] p-3"
+      >
         {/* Round timeline: current stage + the next two, tagged by kind, with
             past results colored win/loss and the current round highlighted. */}
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-700/40 overflow-x-auto">
@@ -318,6 +384,14 @@ export function NetGameClient() {
               <div className={`h-full transition-all ${phase === "combat" ? "bg-rose-400" : "bg-sky-400"}`} style={{ width: `${pct}%` }} />
             </div>
           </div>
+          {augments.length > 0 && (
+            <div className="flex items-center gap-1" title="Augments">
+              {augments.map((id, i) => {
+                const a = AUGMENTS.find((x) => x.id === id);
+                return <span key={i} className="w-7 h-7 rounded-md bg-violet-900/40 border border-violet-500/50 flex items-center justify-center text-sm" title={a ? (lang === "fr" ? `${a.nameFr} — ${a.descFr}` : `${a.name} — ${a.desc}`) : id}>{a?.icon ?? "◆"}</span>;
+              })}
+            </div>
+          )}
           {isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1">{t.net_host_badge}</span>}
           <button onClick={leave} className="ml-auto px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.net_leave}</button>
         </div>
@@ -362,16 +436,26 @@ export function NetGameClient() {
 
           <TraitPanel units={spectateUnits ?? undefined} />
           <div className="flex-1 min-w-[440px] flex flex-col gap-3 items-center">
-            {/* During combat the board is "fighting" — show the replay in its place,
-                but keep the bench + shop below fully interactive. Spectating a
-                rival overrides the planning board (read-only). */}
-            {spectateUnits ? (
+            {/* Spectating a rival overrides the view: their live fight during
+                combat, else their board + bench (read-only). Otherwise my own
+                combat replay during combat, else my board. */}
+            {spectating ? (
               <div className="w-full flex flex-col gap-2">
                 <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                  <span className="text-xs font-bold text-amber-300">Viewing {players[spectate!]?.name ?? "rival"}&apos;s board</span>
-                  <button onClick={() => setSpectate(null)} className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-300">Back to mine</button>
+                  <span className="text-xs font-bold text-amber-300">{t.net_viewing(spectateP?.name ?? "rival")}</span>
+                  <button onClick={() => setSpectate(null)} className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-300">{t.net_back_to_mine}</button>
                 </div>
-                <Board units={spectateUnits} interactive={false} />
+                {phase === "combat" && spectateCombatResult ? (
+                  <CombatStage result={spectateCombatResult} opponentName={spectateCombat?.oppName ?? "Rival"} autoResolve inline syncStart={meta.deadline - COMBAT_MS} syncWindowMs={COMBAT_MS} onResolve={() => {}} />
+                ) : (
+                  <Board units={spectateUnits ?? []} interactive={false} />
+                )}
+                {/* Rival's bench */}
+                <div className="flex gap-1.5 p-2 rounded-xl border border-slate-700/60 bg-slate-900/50 min-h-[64px] flex-wrap justify-center">
+                  {spectateBench.length === 0
+                    ? <span className="text-[11px] text-slate-600 self-center">Empty bench</span>
+                    : spectateBench.map((u) => <UnitChip key={u.iid} unit={u} size={52} interactive={false} />)}
+                </div>
               </div>
             ) : phase === "combat" && combatResult && me?.alive ? (
               <CombatStage
@@ -399,6 +483,7 @@ export function NetGameClient() {
             <SellZone />
           </div>
         </div>
+      </div>
       </div>
 
       {phase === "carousel" && me?.alive && (() => {
@@ -444,10 +529,34 @@ export function NetGameClient() {
         );
       })()}
 
+      {/* Augment pick — 3 TFT-style boosts at the start of stages 2/3/4. */}
+      {showAugment && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+          <h2 className="text-lg font-extrabold text-violet-300 mb-1">{lang === "fr" ? "Augment" : "Augment"} {augSlotNow! + 1}/3</h2>
+          <p className="text-xs text-slate-400 mb-5">{lang === "fr" ? "Choisis un bonus permanent." : "Pick one permanent boost."}</p>
+          <div className="flex gap-3 flex-wrap justify-center max-w-[640px]">
+            {augOptions.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => pickAugment(a.id)}
+                style={{ borderColor: "#a78bfa", boxShadow: "0 0 18px -3px #a78bfa88" }}
+                className="w-[180px] rounded-xl border-2 bg-gradient-to-b from-violet-900/40 to-slate-900/80 hover:-translate-y-1 transition-all p-4 flex flex-col items-center text-center gap-1"
+              >
+                <span className="text-3xl">{a.icon}</span>
+                <span className="text-sm font-bold text-violet-200">{lang === "fr" ? a.nameFr : a.name}</span>
+                <span className="text-[11px] text-slate-300 leading-snug">{lang === "fr" ? a.descFr : a.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Eliminated but the game isn't over — keep watching. Non-blocking banner;
+          the scoreboard stays clickable so you can spectate any survivor. */}
       {!gameOver && me && !me.alive && (
-        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm gap-3">
-          <div className="text-3xl font-extrabold text-rose-400">{t.net_eliminated}</div>
-          <div className="text-slate-300">{t.net_placed(me.place ?? aliveCount + 1)} · {t.net_spectating}</div>
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-2 rounded-full bg-rose-950/80 border border-rose-700/60 backdrop-blur-sm">
+          <span className="text-sm font-extrabold text-rose-300">{t.net_eliminated}</span>
+          <span className="text-xs text-slate-300">{t.net_placed(me.place ?? aliveCount + 1)} · {t.net_spectating}</span>
         </div>
       )}
 

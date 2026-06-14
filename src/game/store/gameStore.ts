@@ -1,13 +1,14 @@
 import { create } from "zustand";
-import { ECONOMY, XP_TO_REACH, MAX_LEVEL, BOARD, boardSizeForLevel, roundKind, advanceRound, stageBaseDamage, streakGold, type Cost, type RoundKind } from "../config";
+import { ECONOMY, XP_TO_REACH, MAX_LEVEL, BOARD, boardSizeForLevel, roundKind, roundsInStage, advanceRound, stageBaseDamage, streakGold, type Cost, type RoundKind } from "../config";
 import type { UnitInstance } from "../types";
 import { getDef } from "../data/mons";
-import { makeRng, type Rng } from "../engine/rng";
+import { makeRng, randInt, type Rng } from "../engine/rng";
 import { makePool, makeUnitsByCost, rollShop, takeFromPool, returnToPool, type Pool, type UnitsByCost } from "../engine/shop";
 import { roundIncome, sellValue, interest } from "../engine/economy";
 import { applyCombines, makeInstance } from "../engine/combine";
 import { MEGA_STONE } from "../data/mega";
 import { ITEM_POOL } from "../data/itemPool";
+import { AUGMENT_BY_ID } from "../data/augments";
 
 const ITEM_IDS = new Set(ITEM_POOL.map((i) => i.id));
 
@@ -69,6 +70,8 @@ type State = {
   history: RoundRecord[];
   /** Unequipped items in the player's inventory (e.g. Mega Stones). */
   items: string[];
+  /** Chosen augment ids (TFT-style persistent boosts). */
+  augments: string[];
 
   // selectors
   benchUnits: () => UnitInstance[];
@@ -92,9 +95,11 @@ type State = {
   netRound: (stage: number, round: number, streak: number) => void;
   /** Multiplayer: take a carousel pick (unit or Mega Stone) without advancing the round. */
   netCarouselPick: (pick: string) => void;
+  /** Pick an augment — applies its effect and persists it. */
+  pickAugment: (id: string) => void;
   /** Multiplayer: snapshot / restore the local economy for reconnect. */
-  exportSave: () => { gold: number; xp: number; level: number; units: UnitInstance[]; shop: (string | null)[]; items: string[] };
-  importSave: (save: { gold: number; xp: number; level: number; units?: UnitInstance[]; shop?: (string | null)[]; items?: string[] }) => void;
+  exportSave: () => { gold: number; xp: number; level: number; units: UnitInstance[]; shop: (string | null)[]; items: string[]; augments: string[] };
+  importSave: (save: { gold: number; xp: number; level: number; units?: UnitInstance[]; shop?: (string | null)[]; items?: string[]; augments?: string[] }) => void;
   grantItem: (itemId: string) => void;
   equipItem: (iid: string, itemId: string) => void;
   unequipItem: (iid: string, itemId: string) => void;
@@ -119,6 +124,7 @@ export const useGame = create<State>((set, get) => ({
   frozen: false,
   history: [],
   items: [],
+  augments: [],
 
   benchUnits: () => get().units.filter((u) => u.pos === null),
   boardUnits: () => get().units.filter((u) => u.pos !== null),
@@ -138,15 +144,16 @@ export const useGame = create<State>((set, get) => ({
     const unitsByCost = makeUnitsByCost(allowedIds);
     set({
       pool, unitsByCost, gold: 4, xp: 0, level: 1, health: startingHp,
-      streak: 0, stage: 1, round: 1, units: [], frozen: false, history: [], items: [],
+      streak: 0, stage: 1, round: 1, units: [], frozen: false, history: [], items: [], augments: [],
       shop: rollShop(1, pool, rng, unitsByCost),
     });
   },
 
   reroll: () => {
-    const { gold, level, pool, unitsByCost } = get();
-    if (gold < ECONOMY.rerollCost) return;
-    set({ gold: gold - ECONOMY.rerollCost, frozen: false, shop: rollShop(level, pool, rng, unitsByCost) });
+    const { gold, level, pool, unitsByCost, augments } = get();
+    const cost = augments.includes("lucky") ? 1 : ECONOMY.rerollCost; // Lucky Rolls augment
+    if (gold < cost) return;
+    set({ gold: gold - cost, frozen: false, shop: rollShop(level, pool, rng, unitsByCost) });
   },
 
   buyXp: () => {
@@ -299,10 +306,29 @@ export const useGame = create<State>((set, get) => ({
   // own — both come from the room; health is room-authoritative, not touched here).
   netRound: (stage, round, streak) => {
     const state = get();
-    const income = ECONOMY.baseIncome + interest(state.gold) + streakGold(streak);
-    const newXp = state.xp + ECONOMY.passiveXpPerRound;
+    // Passive augments: extra gold / XP each round.
+    const augGold = state.augments.includes("rich") ? 1 : 0;
+    const augXp = state.augments.includes("scholar") ? 2 : 0;
+    const income = ECONOMY.baseIncome + interest(state.gold) + streakGold(streak) + augGold;
+    const newXp = state.xp + ECONOMY.passiveXpPerRound + augXp;
     const shop = state.frozen ? state.shop : rollShop(levelFromXp(newXp), state.pool, rng, state.unitsByCost);
-    set({ gold: state.gold + income, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false });
+
+    // PvE loot: if the round we just finished was a PvE round, drop extra gold and
+    // occasionally an item or a free low-cost unit — keeps the economy moving.
+    let bonusGold = 0;
+    let items = state.items;
+    let units = state.units;
+    const prev = round > 1 ? { stage, round: round - 1 } : { stage: stage - 1, round: roundsInStage(stage - 1) };
+    if (prev.stage >= 1 && roundKind(prev.stage, prev.round) === "pve") {
+      bonusGold = 2 + Math.floor(stage / 2);
+      if (rng() < 0.3) items = [...items, ITEM_POOL[randInt(rng, ITEM_POOL.length)].id];
+      const cheap = [...(state.unitsByCost[1] ?? []), ...(state.unitsByCost[2] ?? [])];
+      if (rng() < 0.25 && cheap.length && units.filter((u) => u.pos === null).length < BENCH_SIZE) {
+        units = applyCombines([...units, makeInstance(cheap[randInt(rng, cheap.length)])]);
+      }
+    }
+
+    set({ gold: state.gold + income + bonusGold, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false, items, units });
   },
 
   netCarouselPick: (pick) => {
@@ -314,9 +340,33 @@ export const useGame = create<State>((set, get) => ({
     }
   },
 
+  pickAugment: (id) => {
+    const state = get();
+    if (state.augments.includes(id) || !AUGMENT_BY_ID[id]) return;
+    let { gold, xp, items, units } = state;
+    const benchFree = () => BENCH_SIZE - units.filter((u) => u.pos === null).length;
+    // Instant effects fire on pick; passive ones are applied each round in netRound.
+    switch (id) {
+      case "pumped-up": gold += 8; break;
+      case "training": xp += 4; break;
+      case "mega-gift": items = [...items, MEGA_STONE]; break;
+      case "treasure":
+        for (let i = 0; i < 2; i++) items = [...items, ITEM_POOL[randInt(rng, ITEM_POOL.length)].id];
+        break;
+      case "recruiter": {
+        const cheap = [...(state.unitsByCost[1] ?? []), ...(state.unitsByCost[2] ?? [])];
+        for (let i = 0; i < 2 && benchFree() > 0 && cheap.length; i++) {
+          units = applyCombines([...units, makeInstance(cheap[randInt(rng, cheap.length)])]);
+        }
+        break;
+      }
+    }
+    set({ augments: [...state.augments, id], gold, xp, level: levelFromXp(xp), items, units });
+  },
+
   exportSave: () => {
     const s = get();
-    return { gold: s.gold, xp: s.xp, level: s.level, units: s.units, shop: s.shop, items: s.items };
+    return { gold: s.gold, xp: s.xp, level: s.level, units: s.units, shop: s.shop, items: s.items, augments: s.augments };
   },
 
   importSave: (save) => set({
@@ -327,6 +377,7 @@ export const useGame = create<State>((set, get) => ({
     units: toArray<UnitInstance>(save.units).filter(Boolean).map((u) => ({ ...u!, pos: u!.pos ?? null, items: u!.items ?? [] })),
     shop: toArray<string>(save.shop, ECONOMY.shopSlots),
     items: toArray<string>(save.items).filter(Boolean) as string[],
+    augments: toArray<string>(save.augments).filter(Boolean) as string[],
   }),
 
   // Add an item to the inventory (carousel pick / loot).

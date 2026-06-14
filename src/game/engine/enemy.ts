@@ -1,7 +1,7 @@
 /** Generates an AI board scaled to a level + unit count. Deterministic per seed. */
 
 import type { UnitInstance } from "../types";
-import { SHOP_ODDS, type Cost } from "../config";
+import { SHOP_ODDS, boardSizeForLevel, cumulativeRound, type Cost } from "../config";
 import { UNITS } from "../data/mons";
 import { makeRng, weightedPick, randInt, type Rng } from "./rng";
 
@@ -35,6 +35,45 @@ export function generateBoard(level: number, count: number, seed: number): UnitI
     if (cost <= 2 && rng() < upChance) star = rng() < 0.3 ? 3 : 2;
     else if (cost <= 3 && rng() < upChance * 0.6) star = 2;
 
+    const col = COL_ORDER[i % COL_ORDER.length];
+    const row = ROW_ORDER[Math.floor(i / COL_ORDER.length) % ROW_ORDER.length];
+    board.push({ iid: `g${seed}_${i}`, defId, star, pos: [col, row], items: [] });
+  }
+  return board;
+}
+
+/** An economy-realistic AI board: what a real player could actually field at this
+ *  point in the game. Board size, unit cost, and star level all track a believable
+ *  gold/level curve (no 4-cost 2-stars in the first PvP). Deterministic per seed. */
+export function generatePlayerLikeBoard(stage: number, round: number, difficulty: "easy" | "medium" | "hard" | undefined, seed: number): UnitInstance[] {
+  const rng: Rng = makeRng(seed >>> 0);
+  const cr = cumulativeRound(stage, round);
+
+  // Board size ≈ a real player's level (which lags the cap a little).
+  let size = Math.round(2 + cr * 0.25); // 2-1≈3, 3-1≈5, 4-1≈7, 5-1≈8
+  let costCap = Math.min(stage, 5);      // stage 2 → cost ≤2, ramps to 5
+  // Star-ups only appear once a player could realistically have them.
+  let twoStarChance = stage >= 3 ? Math.min(0.5, (stage - 2) * 0.18) : 0;
+  let threeStarChance = stage >= 5 ? (stage - 4) * 0.06 : 0;
+
+  if (difficulty === "easy") { size -= 1; twoStarChance *= 0.4; threeStarChance = 0; costCap = Math.max(1, costCap - 1); }
+  else if (difficulty === "hard") { size += 1; twoStarChance = Math.min(0.6, twoStarChance + 0.12); threeStarChance += 0.04; costCap = Math.min(5, costCap + 1); }
+  size = Math.max(1, Math.min(size, Math.min(boardSizeForLevel(9), MAX_BOARD)));
+
+  // Cost weights favour cheap units, hard-capped at costCap (cheaper than the cap
+  // is far more common — mirrors a real shop where 1-cost units dominate).
+  const weights: number[] = [];
+  for (let c = 1; c <= 5; c++) weights.push(c <= costCap ? Math.pow(0.55, c - 1) : 0);
+
+  const board: UnitInstance[] = [];
+  for (let i = 0; i < size; i++) {
+    let cost = (weightedPick(rng, weights) + 1) as Cost;
+    while (BY_COST[cost].length === 0) cost = (((cost % 5)) + 1) as Cost;
+    const defId = BY_COST[cost][randInt(rng, BY_COST[cost].length)];
+    let star: 1 | 2 | 3 = 1;
+    // Cheaper units star up first, exactly like a real player's roster.
+    if (cost <= 2 && rng() < threeStarChance) star = 3;
+    else if (cost <= 3 && rng() < twoStarChance) star = 2;
     const col = COL_ORDER[i % COL_ORDER.length];
     const row = ROW_ORDER[Math.floor(i / COL_ORDER.length) % ROW_ORDER.length];
     board.push({ iid: `g${seed}_${i}`, defId, star, pos: [col, row], items: [] });
