@@ -121,6 +121,7 @@ export type Dict = {
   sh_drag_sell: string;
   sh_view_details: string;
   sh_max: string;
+  sh_odds: string;
   // Combat stage
   cs_your_team: string;
   cs_vs: string;
@@ -267,6 +268,7 @@ export const FR: Dict = {
   sh_drag_sell: "Glisser pour vendre",
   sh_view_details: "Voir les détails",
   sh_max: "MAX",
+  sh_odds: "Chances",
   cs_your_team: "Votre équipe",
   cs_vs: "VS",
   cs_overtime: "PROLONGATION",
@@ -411,6 +413,7 @@ export const EN: Dict = {
   sh_drag_sell: "Drag here to sell",
   sh_view_details: "View details",
   sh_max: "MAX",
+  sh_odds: "Odds",
   cs_your_team: "Your Team",
   cs_vs: "VS",
   cs_overtime: "OVERTIME",

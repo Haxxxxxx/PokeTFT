@@ -18,9 +18,9 @@ export function Bench() {
       {Array.from({ length: BENCH_SIZE }).map((_, i) => (
         <div
           key={i}
-          className="w-[60px] h-[60px] rounded-md border border-slate-700/50 bg-slate-800/30 flex items-center justify-center"
+          className="w-[72px] h-[72px] rounded-md border border-slate-700/50 bg-slate-800/30 flex items-center justify-center"
         >
-          {bench[i] && <UnitChip unit={bench[i]} />}
+          {bench[i] && <UnitChip unit={bench[i]} size={68} />}
         </div>
       ))}
     </div>

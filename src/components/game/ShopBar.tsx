@@ -6,7 +6,7 @@ import { getDef, spriteUrl } from "@/game/data/mons";
 import { computeTraits } from "@/game/engine/synergies";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
-import { ECONOMY, COPIES_TO_STAR } from "@/game/config";
+import { ECONOMY, COPIES_TO_STAR, SHOP_ODDS, type Cost } from "@/game/config";
 import { RerollIcon, SnowIcon, CoinIcon, InfoIcon, StarIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
 import { useT } from "@/lib/i18n";
@@ -33,6 +33,7 @@ function ownedByDef(units: UnitInstance[]): Map<string, Owned> {
 export function ShopBar() {
   const shop = useGame((s) => s.shop);
   const gold = useGame((s) => s.gold);
+  const level = useGame((s) => s.level);
   const units = useGame((s) => s.units);
   const buyUnit = useGame((s) => s.buyUnit);
   const reroll = useGame((s) => s.reroll);
@@ -46,16 +47,42 @@ export function ShopBar() {
     computeTraits(units.filter((u) => u.pos !== null)).filter((t) => t.tier > 0).map((t) => t.key),
   );
 
+  const odds = SHOP_ODDS[Math.min(Math.max(1, level), 10)];
+
   return (
     <div className="flex items-stretch gap-2">
-      <div className="flex flex-col gap-1.5 justify-center pr-1">
+      {/* Rarity drop-rate recap for the current level. */}
+      <div className="flex flex-col justify-center rounded-lg bg-slate-900/70 border border-slate-700/50 px-2 py-1.5 w-[118px] shrink-0">
+        <div className="text-[8px] uppercase tracking-wider text-slate-500 mb-1 text-center">{t.sh_odds} · Lv {level}</div>
+        <div className="flex flex-col gap-[3px]">
+          {odds.map((pct, idx) => {
+            const c = COST_COLOR[(idx + 1) as Cost];
+            return (
+              <div key={idx} className={`flex items-center gap-1 ${pct === 0 ? "opacity-35" : ""}`}>
+                <span className="text-[9px] font-extrabold w-2 text-center" style={{ color: c }}>{idx + 1}</span>
+                <span className="flex-1 h-2 rounded-full bg-slate-800 overflow-hidden">
+                  <span className="block h-full rounded-full transition-all" style={{ width: `${pct}%`, background: c }} />
+                </span>
+                <span className="text-[9px] tabular-nums text-slate-400 w-6 text-right">{pct}%</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5 justify-center pr-1 w-[110px] shrink-0">
+        {/* Reroll — bigger, with your current gold shown alongside the cost. */}
         <button
           onClick={() => { reroll(); sfx.reroll(); }}
           disabled={gold < ECONOMY.rerollCost}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-700/80 hover:bg-slate-600 disabled:opacity-40 text-xs font-semibold"
+          className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg bg-slate-700/80 hover:bg-slate-600 disabled:opacity-40 transition-colors"
         >
-          <RerollIcon size={13} /> {t.sh_reroll}
-          <span className="inline-flex items-center gap-0.5 text-amber-300"><CoinIcon size={11} />{ECONOMY.rerollCost}</span>
+          <span className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-100"><RerollIcon size={16} /> {t.sh_reroll}</span>
+          <span className="inline-flex items-center gap-1 text-[11px] text-slate-300">
+            <span className="inline-flex items-center gap-0.5"><CoinIcon size={11} />{ECONOMY.rerollCost}</span>
+            <span className="text-slate-600">·</span>
+            <span className="inline-flex items-center gap-0.5 font-extrabold text-amber-300"><CoinIcon size={12} />{gold}</span>
+          </span>
         </button>
         <button
           onClick={() => { toggleFreeze(); if (!frozen) sfx.freeze(); }}
