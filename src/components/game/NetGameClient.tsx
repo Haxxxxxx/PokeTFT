@@ -114,15 +114,28 @@ export function NetGameClient() {
   const [pickedKey, setPickedKey] = useState<string | null>(null);
   const [spectate, setSpectate] = useState<string | null>(null);
 
-  // Scale-to-fit against a FIXED design canvas (1440x880). Scaling off constants
-  // — not measured content — means it only changes when the window resizes, so it
-  // stays rock-stable across phases (no jump when combat/carousel swap in).
+  // Scale-to-fit the WHOLE page onto any screen. The combat phase (battlefield +
+  // damage recap) is taller than the planning phase, so we measure the ACTUAL
+  // content height via a ResizeObserver and refit whenever it changes (window
+  // resize OR phase swap). A constant canvas height made combat overflow the
+  // viewport — forcing a scroll and clipping the top bar. offsetWidth/Height are
+  // layout sizes (unaffected by the transform), so there's no feedback loop.
+  const contentRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   useEffect(() => {
-    const fit = () => setScale(Math.min(1, (window.innerWidth - 8) / DESIGN_W, (window.innerHeight - 8) / DESIGN_H));
-    const raf = requestAnimationFrame(fit);
+    const el = contentRef.current;
+    if (!el) return;
+    const fit = () => {
+      const cw = el.offsetWidth || DESIGN_W;
+      const ch = el.offsetHeight || DESIGN_H;
+      const s = Math.min(1, (window.innerWidth - 8) / cw, (window.innerHeight - 8) / ch);
+      setScale(s > 0 ? s : 1);
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
     window.addEventListener("resize", fit);
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", fit); };
+    return () => { ro.disconnect(); window.removeEventListener("resize", fit); };
   }, []);
 
   // server time + a 250ms repaint so the shared timer counts down smoothly
@@ -354,7 +367,8 @@ export function NetGameClient() {
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
       <div className="fixed inset-0 flex justify-center items-center overflow-hidden">
       <div
-        style={{ width: DESIGN_W, minHeight: DESIGN_H, transform: `scale(${scale})`, transformOrigin: "center" }}
+        ref={contentRef}
+        style={{ width: DESIGN_W, minHeight: DESIGN_H, transform: `scale(${scale})`, transformOrigin: "center", transition: "transform 140ms ease-out" }}
         className="flex flex-col gap-3 p-3 shrink-0"
       >
         {/* Round timeline: current stage + the next two, tagged by kind, with
