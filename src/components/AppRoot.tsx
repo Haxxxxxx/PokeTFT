@@ -16,5 +16,5 @@ export function AppRoot() {
   // Match the game roster to the players actually in the lobby (filled slots),
   // not the slot capacity.
   const activePlayers = Math.max(2, slots.filter((sl) => sl.type !== "empty").length);
-  return <GameClient playerCount={activePlayers} startingHp={rules.startingHp} />;
+  return <GameClient playerCount={activePlayers} startingHp={rules.startingHp} generations={rules.generations} />;
 }

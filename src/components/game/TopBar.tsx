@@ -5,6 +5,7 @@ import { advanceFlow } from "@/game/store/flow";
 import { ECONOMY, MAX_LEVEL, XP_TO_REACH, boardSizeForLevel, streakGold, roundKind } from "@/game/config";
 import { interest } from "@/game/engine/economy";
 import { CoinIcon, SwordIcon, PawIcon, GiftIcon } from "./icons";
+import { useT } from "@/lib/i18n";
 
 export function TopBar({ timer }: { timer?: React.ReactNode }) {
   const gold = useGame((s) => s.gold);
@@ -17,26 +18,27 @@ export function TopBar({ timer }: { timer?: React.ReactNode }) {
   const buyXp = useGame((s) => s.buyXp);
   const boardCount = useGame((s) => s.units.filter((u) => u.pos !== null).length);
 
+  const t = useT();
   const atMax = level >= MAX_LEVEL;
   const base = XP_TO_REACH[level];
   const needed = atMax ? null : XP_TO_REACH[level + 1] - base;
   const current = xp - base;
   const kind = roundKind(stage, round);
-  const kindLabel = kind === "pve" ? "Battle Wild" : kind === "carousel" ? "Carousel" : "Start Combat";
+  const kindLabel = kind === "pve" ? t.t_pve : kind === "carousel" ? t.t_carousel : t.t_pvp;
 
   return (
     <div className="flex items-center gap-5 flex-wrap p-3 rounded-xl bg-slate-900/70 border border-slate-700/50">
-      <Stat label="Stage" value={`${stage}-${round}`} />
-      <Stat label="Health" value={`${health}`} accent="#ff6b6b" />
-      <Stat label="Gold" accent="#fbbf24" value={<span className="inline-flex items-center gap-1"><CoinIcon size={13} />{gold}</span>} />
-      <Stat label="Interest" value={`+${interest(gold)}`} />
-      <Stat label="Streak" value={`${streak >= 0 ? "Win" : "Loss"} ${Math.abs(streak)} (+${streakGold(streak)})`} />
-      <Stat label="Board" value={`${boardCount} / ${boardSizeForLevel(level)}`} />
+      <Stat label={t.t_stage} value={`${stage}-${round}`} />
+      <Stat label={t.t_health} value={`${health}`} accent="#ff6b6b" />
+      <Stat label={t.t_gold} accent="#fbbf24" value={<span className="inline-flex items-center gap-1"><CoinIcon size={13} />{gold}</span>} />
+      <Stat label={t.t_interest} value={`+${interest(gold)}`} />
+      <Stat label="Streak" value={`${streak >= 0 ? t.t_streak_win : t.t_streak_loss} ${Math.abs(streak)} (+${streakGold(streak)})`} />
+      <Stat label={t.t_board} value={`${boardCount} / ${boardSizeForLevel(level)}`} />
 
       <div className="flex flex-col gap-1 min-w-[170px]">
         <div className="flex justify-between text-[11px] text-slate-400">
-          <span className="font-semibold text-slate-200">Level {level}</span>
-          <span>{needed === null ? "MAX" : `${current} / ${needed} XP`}</span>
+          <span className="font-semibold text-slate-200">{t.t_level} {level}</span>
+          <span>{needed === null ? t.t_max : `${current} / ${needed} XP`}</span>
         </div>
         <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
           <div className="h-full bg-sky-400 transition-all" style={{ width: needed === null ? "100%" : `${(current / needed) * 100}%` }} />
@@ -46,7 +48,7 @@ export function TopBar({ timer }: { timer?: React.ReactNode }) {
           disabled={gold < ECONOMY.buyXpCost || atMax}
           className="inline-flex items-center justify-center gap-1.5 px-2 py-1 rounded-md bg-sky-700/90 hover:bg-sky-600 disabled:opacity-40 text-[11px] font-semibold"
         >
-          Buy XP
+          {t.t_buy_xp}
           <span className="inline-flex items-center gap-0.5 text-amber-200"><CoinIcon size={11} />{ECONOMY.buyXpCost}</span>
           <span className="text-sky-200">+{ECONOMY.buyXpAmount}</span>
         </button>

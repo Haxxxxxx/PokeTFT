@@ -94,6 +94,27 @@ const RAW: RawTrait[] = [
     key: "fairy", label: "Fairy", description: "Fairy magic blunts the biggest threats.",
     tiers: [{ count: 2, effect: "Take 25% less damage from the highest-cost enemy." }],
   },
+  {
+    key: "fighting", label: "Fighting", description: "Fighting mons beat down all defenses.",
+    tiers: [
+      { count: 2, effect: "Attacks ignore 20% of the target's Armor." },
+      { count: 4, effect: "Attacks ignore 40% of Armor and deal +15% damage." },
+    ],
+  },
+  {
+    key: "dark", label: "Dark", description: "Dark mons strike when least expected.",
+    tiers: [
+      { count: 2, effect: "Deal +20% bonus damage to the lowest-HP enemy." },
+      { count: 4, effect: "+20% bonus damage and execute targets below 15% HP." },
+    ],
+  },
+  {
+    key: "steel", label: "Steel", description: "Steel mons are fortresses of iron.",
+    tiers: [
+      { count: 2, effect: "Gain +30 Armor and +30 Magic Resist." },
+      { count: 4, effect: "+60 Armor & MR; incoming crits deal no bonus damage." },
+    ],
+  },
 
   // ───────────── Role / class traits ─────────────
   {
@@ -136,6 +157,10 @@ const RAW: RawTrait[] = [
   {
     key: "kanto-mythic", label: "Mythic", description: "Mew and Mewtwo bend the rules.",
     tiers: [{ count: 1, effect: "Unlock a unique, game-warping power for the Mythic mon." }],
+  },
+  {
+    key: "mythic", label: "Mythic", description: "Mythical mons defy the laws of nature.",
+    tiers: [{ count: 1, effect: "This mon gains +20% to all stats and ignores type immunities." }],
   },
 ];
 

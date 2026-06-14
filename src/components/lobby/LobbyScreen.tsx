@@ -5,6 +5,7 @@ import { usePreLobby } from "@/game/store/preLobbyStore";
 import { PlayerSlot } from "./PlayerSlot";
 import { LobbyCodeBadge } from "./LobbyCodeBadge";
 import { GameRulesPanel } from "./GameRulesPanel";
+import { useT } from "@/lib/i18n";
 
 export function LobbyScreen() {
   const slots = usePreLobby((s) => s.slots);
@@ -21,6 +22,7 @@ export function LobbyScreen() {
     if (usePreLobby.getState().lobbyCode === "------") generateCode();
   }, [generateCode]);
 
+  const t = useT();
   const active = slots.filter((s) => s.type !== "empty");
   const canStart = readyToStart();
 
@@ -28,7 +30,7 @@ export function LobbyScreen() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <div className="w-10 h-10 rounded-full border-4 border-amber-500 border-t-transparent animate-spin" />
-        <p className="text-slate-400 text-sm font-semibold">Démarrage de la partie…</p>
+        <p className="text-slate-400 text-sm font-semibold">{t.l_starting}</p>
       </div>
     );
   }
@@ -45,7 +47,7 @@ export function LobbyScreen() {
               <span className="text-slate-500 font-normal text-sm ml-2">— Lobby</span>
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              {active.length} / {rules.maxPlayers} joueur{active.length > 1 ? "s" : ""}
+              {t.l_players(active.length, rules.maxPlayers)}
             </p>
           </div>
         </div>
@@ -59,7 +61,7 @@ export function LobbyScreen() {
           {/* Max player selector */}
           {isHost && (
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-800 bg-slate-900/40">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0">Slots</span>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0">{t.l_slots}</span>
               <div className="flex gap-1.5 ml-auto">
                 {[2, 3, 4, 5, 6, 7, 8].map((n) => (
                   <button
@@ -94,13 +96,11 @@ export function LobbyScreen() {
                 bg-amber-500 hover:bg-amber-400 text-black
                 disabled:opacity-30 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
             >
-              ⚔ Lancer la partie
+              {t.l_start}
             </button>
             {!canStart && (
               <p className="text-xs text-slate-600">
-                {active.length < 2
-                  ? "Il faut au moins 2 joueurs."
-                  : "Attente que tous les joueurs soient prêts."}
+                {active.length < 2 ? t.l_need_more : t.l_wait_ready}
               </p>
             )}
           </div>
@@ -109,7 +109,7 @@ export function LobbyScreen() {
         {/* Rules panel (right) */}
         <div className="w-72 shrink-0 rounded-xl border border-slate-800 bg-slate-900/60 backdrop-blur p-4 overflow-y-auto max-h-[calc(100vh-160px)]">
           <h2 className="text-xs font-extrabold uppercase tracking-widest text-slate-400 mb-4 border-b border-slate-800 pb-2">
-            Règles de partie
+            {t.l_rules}
           </h2>
           <GameRulesPanel isHost={isHost} />
         </div>
