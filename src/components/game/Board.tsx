@@ -1,51 +1,46 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
-import type { ReactNode } from "react";
 import { BOARD } from "@/game/config";
+import { hexToPixel } from "@/game/engine/hex";
 import { useGame } from "@/game/store/gameStore";
 import { UnitChip } from "./UnitChip";
 import type { UnitInstance } from "@/game/types";
 
-// Pointy-top hex tile (same silhouette as the combat field) so the board reads
-// as a hexagonal trapeze, not a grid of squares.
+// Same tessellation + silhouette as the combat field (the look the design is
+// modeled on): pointy-top hexes, odd rows shifted, rows overlapping by 1/4.
+const TILE_W = 66;
+const TILE_H = 74;
 const HEX_CLIP = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
 
-function HexTile({ filled, isOver, children }: { filled: boolean; isOver?: boolean; children?: ReactNode }) {
-  return (
-    <div
-      className="w-[64px] h-[68px] flex items-center justify-center transition-colors"
-      style={{
-        clipPath: HEX_CLIP,
-        background: isOver ? "rgba(52,211,153,0.18)" : "rgba(30,41,59,0.35)",
-        boxShadow: `inset 0 0 0 2px ${isOver ? "rgba(52,211,153,0.7)" : filled ? "rgba(148,163,184,0.25)" : "rgba(100,116,139,0.28)"}`,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
+// Board pixel extent for BOARD.cols x BOARD.rows.
+const FIELD_W = BOARD.cols * TILE_W + TILE_W / 2;
+const FIELD_H = (BOARD.rows - 1) * TILE_H * 0.75 + TILE_H;
 
-function DroppableCell({ col, row, unit }: { col: number; row: number; unit?: UnitInstance }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `cell-${col}-${row}` });
-  const offset = row % 2 === 1 ? 34 : 0;
+function HexCell({ c, r, unit, interactive }: { c: number; r: number; unit?: UnitInstance; interactive: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `cell-${c}-${r}`, disabled: !interactive });
+  const { x, y } = hexToPixel({ c, r }, TILE_W, TILE_H);
   return (
-    <div ref={setNodeRef} style={{ marginLeft: offset, marginTop: -10 }}>
-      <HexTile filled={!!unit} isOver={isOver}>
-        {unit && <UnitChip unit={unit} />}
-      </HexTile>
-    </div>
-  );
-}
-
-function StaticCell({ row, unit }: { row: number; unit?: UnitInstance }) {
-  const offset = row % 2 === 1 ? 34 : 0;
-  return (
-    <div style={{ marginLeft: offset, marginTop: -10 }}>
-      <HexTile filled={!!unit}>
-        {unit && <UnitChip unit={unit} interactive={false} />}
-      </HexTile>
-    </div>
+    <>
+      <div
+        ref={interactive ? setNodeRef : undefined}
+        className="absolute transition-colors"
+        style={{
+          left: x - TILE_W / 2,
+          top: y - TILE_H / 2,
+          width: TILE_W - 3,
+          height: TILE_H - 3,
+          clipPath: HEX_CLIP,
+          background: isOver ? "rgba(52,211,153,0.22)" : "rgba(52,211,153,0.05)",
+          boxShadow: `inset 0 0 0 1px ${isOver ? "rgba(52,211,153,0.65)" : "rgba(52,211,153,0.16)"}`,
+        }}
+      />
+      {unit && (
+        <div className="absolute flex items-center justify-center" style={{ left: x - TILE_W / 2, top: y - TILE_H / 2, width: TILE_W, height: TILE_H }}>
+          <UnitChip unit={unit} size={TILE_W - 16} interactive={interactive} />
+        </div>
+      )}
+    </>
   );
 }
 
@@ -56,18 +51,22 @@ export function Board({ units, interactive = true }: { units?: UnitInstance[]; i
   const unitAt = (c: number, r: number) => board.find((u) => u.pos?.[0] === c && u.pos?.[1] === r);
 
   return (
-    <div className="flex flex-col items-start px-4 pt-4 pb-1 rounded-xl bg-gradient-to-b from-slate-900/60 to-slate-950/60 border border-slate-700/50">
-      {Array.from({ length: BOARD.rows }).map((_, row) => (
-        <div key={row} className="flex gap-1">
-          {Array.from({ length: BOARD.cols }).map((_, col) =>
-            interactive ? (
-              <DroppableCell key={col} col={col} row={row} unit={unitAt(col, row)} />
-            ) : (
-              <StaticCell key={col} row={row} unit={unitAt(col, row)} />
-            ),
-          )}
-        </div>
-      ))}
+    <div
+      className="relative rounded-2xl border border-slate-700/50"
+      style={{
+        width: FIELD_W + 28,
+        height: FIELD_H + 28,
+        padding: 14,
+        background: "radial-gradient(120% 90% at 50% 35%, #16213c 0%, #0a1020 78%)",
+      }}
+    >
+      <div className="absolute" style={{ left: 14, top: 14, width: FIELD_W, height: FIELD_H }}>
+        {Array.from({ length: BOARD.rows }).flatMap((_, r) =>
+          Array.from({ length: BOARD.cols }).map((_, c) => (
+            <HexCell key={`${c}-${r}`} c={c} r={r} unit={unitAt(c, r)} interactive={interactive} />
+          )),
+        )}
+      </div>
     </div>
   );
 }
