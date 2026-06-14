@@ -197,13 +197,18 @@ export async function startCombat(code: string, room: Room): Promise<void> {
   await update(gamePath(code), u);
 }
 
-/** Host: planning → carousel. Offers each human a free pick (+ a Mega Stone). */
+/** Host: planning → carousel. Offers each human a free pick (a held item + units). */
 export async function startCarousel(code: string, room: Room): Promise<void> {
   if (!(await claimTransition(code, "planning", room.meta.deadline))) return;
+  // Item rewards: a Mega Stone plus any held items the lobby enabled.
+  const itemPool = [MEGA_STONE, ...(room.rules?.itemsEnabled ?? [])];
   const carousel: Record<string, string[]> = {};
   for (const p of alivePlayers(room)) {
     if (p.isBot) continue;
-    carousel[p.uid] = [MEGA_STONE, ...pickCarouselOptions(room.meta.stage, room.meta.stage * 31 + room.meta.round * 7 + p.uid.length, 4)];
+    const salt = room.meta.stage * 31 + room.meta.round * 7 + p.uid.length;
+    // Rotate which item is offered per player/round so it varies but stays sync-free (host-written).
+    const item = itemPool[(salt + room.meta.round) % itemPool.length];
+    carousel[p.uid] = [item, ...pickCarouselOptions(room.meta.stage, salt, 4)];
   }
   await update(gamePath(code), {
     "meta/phase": "carousel", "meta/deadline": serverNow() + CAROUSEL_MS,

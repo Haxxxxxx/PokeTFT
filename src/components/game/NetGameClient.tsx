@@ -11,6 +11,7 @@ import { getDef, spriteUrl, unitsForGenerations } from "@/game/data/mons";
 import { ECONOMY, MAX_LEVEL, XP_TO_REACH, streakGold, roundKind, advanceRound } from "@/game/config";
 import { interest } from "@/game/engine/economy";
 import { MEGA_STONE } from "@/game/data/mega";
+import { ITEM_POOL } from "@/game/data/itemPool";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import { MegaIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
@@ -20,6 +21,8 @@ import type { UnitInstance, PokeType } from "@/game/types";
 function normUnit(u: UnitInstance): UnitInstance {
   return u.items && u.pos !== undefined ? u : { ...u, pos: u.pos ?? null, items: u.items ?? [] };
 }
+
+const ITEM_DEF_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 
 function asUnits(u: unknown): UnitInstance[] {
   if (!u) return [];
@@ -390,6 +393,12 @@ export function NetGameClient() {
                   <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); }} style={{ borderColor: "#f0abfc", boxShadow: "0 0 18px -2px #f0abfc88" }} className="w-[130px] rounded-xl border-2 bg-gradient-to-b from-fuchsia-900/40 to-slate-900/80 hover:-translate-y-1 transition-all p-3 flex flex-col items-center justify-center">
                     <span className="text-fuchsia-300"><MegaIcon size={48} /></span>
                     <span className="text-sm font-semibold mt-1 text-fuchsia-200">Mega Stone</span>
+                  </button>
+                ) : ITEM_DEF_BY_ID[pick] ? (
+                  <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); }} style={{ borderColor: "#fbbf24", boxShadow: "0 0 16px -2px #fbbf2466" }} className="w-[130px] rounded-xl border-2 bg-gradient-to-b from-amber-900/30 to-slate-900/80 hover:-translate-y-1 transition-all p-3 flex flex-col items-center justify-center text-center">
+                    <span className="text-3xl">{ITEM_DEF_BY_ID[pick].icon}</span>
+                    <span className="text-sm font-semibold mt-1 text-amber-200">{ITEM_DEF_BY_ID[pick].name}</span>
+                    <span className="text-[9px] text-slate-400 leading-tight mt-1">{ITEM_DEF_BY_ID[pick].effect}</span>
                   </button>
                 ) : (() => {
                   const def = getDef(pick);

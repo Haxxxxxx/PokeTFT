@@ -7,6 +7,9 @@ import { makePool, makeUnitsByCost, rollShop, takeFromPool, returnToPool, type P
 import { roundIncome, sellValue, interest } from "../engine/economy";
 import { applyCombines, makeInstance } from "../engine/combine";
 import { MEGA_STONE } from "../data/mega";
+import { ITEM_POOL } from "../data/itemPool";
+
+const ITEM_IDS = new Set(ITEM_POOL.map((i) => i.id));
 
 export const BENCH_SIZE = 9;
 const INITIAL_SEED = 1337;
@@ -304,7 +307,8 @@ export const useGame = create<State>((set, get) => ({
 
   netCarouselPick: (pick) => {
     const state = get();
-    if (pick === MEGA_STONE) { set({ items: [...state.items, MEGA_STONE] }); return; }
+    // Item picks (Mega Stone or any held item) go to the inventory; otherwise a unit.
+    if (pick === MEGA_STONE || ITEM_IDS.has(pick)) { set({ items: [...state.items, pick] }); return; }
     if (state.units.filter((u) => u.pos === null).length < BENCH_SIZE) {
       set({ units: applyCombines([...state.units, makeInstance(pick)]) });
     }

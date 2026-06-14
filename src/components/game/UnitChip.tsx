@@ -35,7 +35,8 @@ export function UnitChip({ unit, size = 56, interactive = true, shape = "square"
   // RTDB strips empty arrays, so a rehydrated unit can arrive without `items`.
   const heldItems = unit.items ?? [];
   const megaReady = isMegaActive(unit.defId, heldItems);
-  const canEquipArmed = interactive && armedItem === MEGA_STONE && canMega(unit.defId) && heldItems.length < 3;
+  // Any held item can be equipped (max 3); the Mega Stone also needs a Mega-capable mon.
+  const canEquipArmed = interactive && !!armedItem && heldItems.length < 3 && (armedItem === MEGA_STONE ? canMega(unit.defId) : true);
 
   function onClick() {
     if (interactive && armedItem) {

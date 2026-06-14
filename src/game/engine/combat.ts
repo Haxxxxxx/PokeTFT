@@ -40,6 +40,12 @@ type Combatant = {
   moveCd: number;
   targetId: string | null;
   alive: boolean;
+  // Held-item effects (precomputed, deterministic).
+  dmgMult: number;        // life-orb: +30% damage dealt
+  lifeOrbSelfPct: number; // life-orb: self HP cost per attack (fraction of maxHp)
+  regenPerSec: number;    // leftovers: fraction of maxHp healed per second
+  thornsPct: number;      // rocky-helmet: fraction of attacker maxHp on melee contact
+  sashReady: boolean;     // focus-sash: survive a lethal blow once at full HP
 };
 
 export type FrameUnit = {
@@ -93,7 +99,19 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
   const mega = isMegaActive(u.defId, u.items) ? megaFormFor(u.defId) : undefined;
   const types = mega?.addType && !def.types.includes(mega.addType) ? [...def.types, mega.addType] : def.types;
   const hp = mega ? Math.round(s.hp[i] * mega.hpMult) : s.hp[i];
-  const ad = mega ? Math.round(s.ad[i] * mega.adMult) : s.ad[i];
+  let ad = mega ? Math.round(s.ad[i] * mega.adMult) : s.ad[i];
+
+  // Held-item stat modifiers (deterministic; items synced on the unit).
+  const items = u.items ?? [];
+  const has = (id: string) => items.includes(id);
+  const notFinalEvo = u.star < def.dex.length; // eviolite only for non-final forms
+  let apMult = mega ? mega.apMult : 1;
+  let armor = mega ? s.armor + mega.armorBonus : s.armor;
+  let mr = mega ? s.magicResist + mega.mrBonus : s.magicResist;
+  if (has("choice-band")) ad = Math.round(ad * 1.5);
+  if (has("choice-specs")) apMult *= 1.5;
+  if (has("assault-vest")) mr = Math.round(mr * 1.5);
+  if (has("eviolite") && notFinalEvo) { armor = Math.round(armor * 1.5); mr = Math.round(mr * 1.5); }
 
   return {
     id: `${team}-${u.iid}`,
@@ -108,18 +126,23 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
     maxHp: hp,
     ad,
     attackSpeed: s.attackSpeed,
-    armor: mega ? s.armor + mega.armorBonus : s.armor,
-    mr: mega ? s.magicResist + mega.mrBonus : s.magicResist,
+    armor,
+    mr,
     range: s.range,
     mana: s.startMana,
     maxMana: s.maxMana,
-    apMult: mega ? mega.apMult : 1,
+    apMult,
     mega: !!mega,
     pos,
     atkCd: 0,
     moveCd: 0,
     targetId: null,
     alive: true,
+    dmgMult: has("life-orb") ? 1.3 : 1,
+    lifeOrbSelfPct: has("life-orb") ? 0.10 : 0,
+    regenPerSec: has("leftovers") ? 0.05 : 0,
+    thornsPct: has("rocky-helmet") ? 0.16 : 0,
+    sashReady: has("focus-sash"),
   };
 }
 
@@ -222,6 +245,13 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
       }
     }
 
+    // Leftovers: steady regen each tick (capped at max HP).
+    for (const u of units) {
+      if (u.alive && u.regenPerSec > 0 && u.hp < u.maxHp) {
+        u.hp = Math.min(u.maxHp, u.hp + u.maxHp * u.regenPerSec * DT);
+      }
+    }
+
     // Overtime: a ramping storm chips every survivor so stalemates can't run
     // to the time limit. Damage % per second grows the longer overtime lasts.
     if (t > OVERTIME_START) {
@@ -242,12 +272,25 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
   return finalize(units, frames, t);
 }
 
-function dealDamage(from: Combatant, to: Combatant, rawDmg: number, _kind: string, events: CombatEvent[]) {
-  const dmg = Math.round(rawDmg);
+/** Apply a hit, honouring Focus Sash (survive one lethal blow at full HP). */
+function applyHit(to: Combatant, dmg: number) {
+  const wasFull = to.hp >= to.maxHp;
   to.hp -= dmg;
+  if (to.hp <= 0 && to.sashReady && wasFull) {
+    to.hp = 1;
+    to.sashReady = false;
+  }
+}
+
+function dealDamage(from: Combatant, to: Combatant, rawDmg: number, _kind: string, events: CombatEvent[]) {
+  const dmg = Math.round(rawDmg * from.dmgMult); // life-orb boosts damage dealt
+  applyHit(to, dmg);
   to.mana = Math.min(to.maxMana, to.mana + MANA_ON_HIT);
   events.push({ kind: "attack", from: from.id, to: to.id });
   events.push({ kind: "hit", to: to.id, dmg });
+  // Rocky Helmet thorns on melee contact; Life Orb recoil on the attacker.
+  if (to.thornsPct > 0 && from.range <= 1) from.hp -= from.maxHp * to.thornsPct;
+  if (from.lifeOrbSelfPct > 0) from.hp -= from.maxHp * from.lifeOrbSelfPct;
 }
 
 function castAbility(caster: Combatant, target: Combatant, units: Combatant[], events: CombatEvent[]) {
@@ -258,8 +301,8 @@ function castAbility(caster: Combatant, target: Combatant, units: Combatant[], e
 
   const hitOne = (victim: Combatant) => {
     const e = effectiveness(caster.move.type, victim.types);
-    const dmg = Math.round(base * e * (100 / (100 + victim.mr)));
-    victim.hp -= dmg;
+    const dmg = Math.round(base * e * (100 / (100 + victim.mr)) * caster.dmgMult);
+    applyHit(victim, dmg);
     events.push({ kind: "hit", to: victim.id, dmg, crit: e > 1 });
   };
 
