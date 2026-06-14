@@ -39,13 +39,16 @@ function randomId(): string {
   return "u-" + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
 }
 
-/** A stable per-browser client id (persisted in localStorage). */
+/**
+ * A per-TAB client id (sessionStorage, not localStorage) so two tabs of the
+ * same browser are two distinct players — survives a refresh within the tab.
+ */
 export function ensureAuth(): Promise<string> {
   if (typeof window === "undefined") return Promise.resolve("srv-" + randomId());
-  let id = window.localStorage.getItem("poketft_uid");
+  let id = window.sessionStorage.getItem("poketft_uid");
   if (!id) {
     id = randomId();
-    window.localStorage.setItem("poketft_uid", id);
+    window.sessionStorage.setItem("poketft_uid", id);
   }
   return Promise.resolve(id);
 }
