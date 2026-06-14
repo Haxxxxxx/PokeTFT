@@ -19,7 +19,9 @@ export function Stars({ star }: { star: number }) {
   );
 }
 
-export function UnitChip({ unit, size = 56, interactive = true }: { unit: UnitInstance; size?: number; interactive?: boolean }) {
+const HEX_CLIP = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
+
+export function UnitChip({ unit, size = 56, interactive = true, shape = "square" }: { unit: UnitInstance; size?: number; interactive?: boolean; shape?: "square" | "hex" }) {
   const def = getDef(unit.defId);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: unit.iid, disabled: !interactive });
   const setInspect = useUi((s) => s.setInspect);
@@ -51,6 +53,52 @@ export function UnitChip({ unit, size = 56, interactive = true }: { unit: UnitIn
     if (interactive && unit.pos === null) deployUnit(unit.iid);
   }
 
+  const ring = megaReady ? "#f0abfc" : color;
+  const title = megaReady ? `${def.stageNames[unit.star - 1]} · Mega ready` : `${def.stageNames[unit.star - 1]} · click for details`;
+  const sprite = (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={spriteUrl(dex)}
+      alt={def.name}
+      width={size - 8}
+      height={size - 8}
+      className="image-render-pixel pointer-events-none"
+      style={{ imageRendering: "pixelated" }}
+      draggable={false}
+    />
+  );
+
+  // Hex token (on the board) — the colored token follows the hexagonal cell.
+  if (shape === "hex") {
+    return (
+      <div
+        ref={interactive ? setNodeRef : undefined}
+        {...(interactive ? listeners : {})}
+        {...(interactive ? attributes : {})}
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+        style={{ width: size, height: size, opacity: isDragging ? 0.4 : 1 }}
+        className={`relative select-none touch-none ${interactive ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${canEquipArmed ? "animate-pulse" : ""}`}
+        title={title}
+      >
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ clipPath: HEX_CLIP, background: "rgba(15,23,42,0.85)", boxShadow: `inset 0 0 0 2px ${ring}, inset 0 0 10px ${ring}55` }}
+        >
+          {sprite}
+        </div>
+        <div className="absolute -top-1 inset-x-0 flex justify-center pointer-events-none">
+          <Stars star={unit.star} />
+        </div>
+        {heldItems.includes(MEGA_STONE) && (
+          <span className={`absolute bottom-1 right-1 ${megaReady ? "text-fuchsia-300" : "text-slate-500"}`} title="Mega Stone">
+            <MegaIcon size={12} />
+          </span>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       ref={interactive ? setNodeRef : undefined}
@@ -60,25 +108,16 @@ export function UnitChip({ unit, size = 56, interactive = true }: { unit: UnitIn
       onDoubleClick={onDoubleClick}
       style={{
         width: size, height: size,
-        borderColor: megaReady ? "#f0abfc" : color,
+        borderColor: ring,
         boxShadow: megaReady ? "0 0 8px #f0abfcaa" : `0 0 6px ${color}66`,
         opacity: isDragging ? 0.4 : 1,
       }}
       className={`relative rounded-md border-2 bg-slate-900/80 select-none touch-none flex items-center justify-center
         ${interactive ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
         ${canEquipArmed ? "ring-2 ring-fuchsia-400 animate-pulse" : ""}`}
-      title={megaReady ? `${def.stageNames[unit.star - 1]} · Mega ready` : `${def.stageNames[unit.star - 1]} · click for details`}
+      title={title}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={spriteUrl(dex)}
-        alt={def.name}
-        width={size - 8}
-        height={size - 8}
-        className="image-render-pixel pointer-events-none"
-        style={{ imageRendering: "pixelated" }}
-        draggable={false}
-      />
+      {sprite}
       <div className="absolute top-0 left-0 right-0">
         <Stars star={unit.star} />
       </div>

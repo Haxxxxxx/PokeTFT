@@ -49,6 +49,16 @@ function SellZone() {
   );
 }
 
+/** Dropping a bench unit onto the shop sells it (id "sell-shop"). */
+function ShopSellDrop({ children }: { children: ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: "sell-shop" });
+  return (
+    <div ref={setNodeRef} className={`flex-1 rounded-xl transition-shadow ${isOver ? "ring-2 ring-rose-400/80 ring-inset" : ""}`}>
+      {children}
+    </div>
+  );
+}
+
 export function NetGameClient() {
   const room = useRoom((s) => s.room);
   const myUid = useRoom((s) => s.myUid);
@@ -186,7 +196,7 @@ export function NetGameClient() {
     const over = e.over?.id;
     if (!over) return;
     const t = String(over);
-    if (t === "sell") sell(iid);
+    if (t === "sell" || t === "sell-shop") sell(iid);
     else if (t === "bench") moveToBench(iid);
     else if (t.startsWith("cell-")) {
       if (phase !== "planning") return; // can't move onto the board mid-combat
@@ -216,7 +226,7 @@ export function NetGameClient() {
 
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-      <div className="flex flex-col gap-3 w-full max-w-[1440px] mx-auto p-3 overflow-x-hidden">
+      <div className="min-h-screen flex flex-col gap-3 w-full max-w-[1440px] mx-auto p-3 overflow-x-hidden">
         {/* Round timeline: current stage + the next two, tagged by kind, with
             past results colored win/loss and the current round highlighted. */}
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-700/40 overflow-x-auto">
@@ -286,7 +296,7 @@ export function NetGameClient() {
           <button onClick={leave} className="ml-auto px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">Leave</button>
         </div>
 
-        <div className="flex flex-wrap gap-3 items-start justify-center">
+        <div className="flex flex-wrap gap-3 items-start justify-center flex-1">
           {/* Scoreboard */}
           <div className="w-[190px] shrink-0 p-2 rounded-xl bg-slate-900/70 border border-slate-700/50">
             <h2 className="text-[10px] uppercase tracking-wider text-slate-500 px-1 mb-1.5">Trainers · {aliveCount} left</h2>
@@ -350,15 +360,18 @@ export function NetGameClient() {
             ) : (
               <Board />
             )}
-            <Bench />
             <ItemTray />
           </div>
           <UnitDetail />
         </div>
 
-        <div className="flex gap-3">
-          <div className="flex-1"><ShopBar /></div>
-          <SellZone />
+        {/* Bottom bar: bench + shop, pinned to the bottom of the screen. */}
+        <div className="flex flex-col items-center gap-2">
+          <Bench />
+          <div className="flex gap-3 w-full max-w-[1180px]">
+            <ShopSellDrop><ShopBar /></ShopSellDrop>
+            <SellZone />
+          </div>
         </div>
       </div>
 

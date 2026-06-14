@@ -9,8 +9,8 @@ import type { UnitInstance } from "@/game/types";
 
 // Same tessellation + silhouette as the combat field (the look the design is
 // modeled on): pointy-top hexes, odd rows shifted, rows overlapping by 1/4.
-const TILE_W = 66;
-const TILE_H = 74;
+const TILE_W = 88;
+const TILE_H = 98;
 const HEX_CLIP = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
 
 // Board pixel extent for BOARD.cols x BOARD.rows.
@@ -36,8 +36,10 @@ function HexCell({ c, r, unit, interactive }: { c: number; r: number; unit?: Uni
         }}
       />
       {unit && (
-        <div className="absolute flex items-center justify-center" style={{ left: x - TILE_W / 2, top: y - TILE_H / 2, width: TILE_W, height: TILE_H }}>
-          <UnitChip unit={unit} size={TILE_W - 16} interactive={interactive} />
+        <div className="absolute flex items-center justify-center pointer-events-none" style={{ left: x - TILE_W / 2, top: y - TILE_H / 2, width: TILE_W, height: TILE_H }}>
+          <div className="pointer-events-auto">
+            <UnitChip unit={unit} size={TILE_W - 18} interactive={interactive} shape="hex" />
+          </div>
         </div>
       )}
     </>
