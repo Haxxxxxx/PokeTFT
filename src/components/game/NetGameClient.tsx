@@ -22,6 +22,8 @@ import { UnitDetail } from "./UnitDetail";
 import { ItemTray } from "./ItemTray";
 import { CombatStage } from "./CombatStage";
 import { CoinIcon, TrophyIcon } from "./icons";
+import { useT } from "@/lib/i18n";
+import { sfx } from "@/lib/audio";
 
 function asBoard(b: unknown): UnitInstance[] {
   if (!b) return [];
@@ -30,10 +32,11 @@ function asBoard(b: unknown): UnitInstance[] {
 }
 
 function SellZone() {
+  const t = useT();
   const { setNodeRef, isOver } = useDroppable({ id: "sell" });
   return (
     <div ref={setNodeRef} className={`flex items-center justify-center px-5 rounded-xl border-2 border-dashed text-xs font-bold uppercase tracking-wide transition-colors ${isOver ? "border-rose-400 bg-rose-500/20 text-rose-200" : "border-slate-700 text-slate-500"}`}>
-      Drag here to sell
+      {t.sh_drag_sell}
     </div>
   );
 }
@@ -131,6 +134,18 @@ export function NetGameClient() {
     return simulate(asBoard(myCombat.selfBoard), asBoard(myCombat.oppBoard));
   }, [phase, meta?.stage, meta?.round, myCombat?.oppUid]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const t = useT();
+
+  // Play victory/defeat sound when the game ends
+  const prevPhase = useRef<string | null>(null);
+  useEffect(() => {
+    if (phase === "over" && prevPhase.current !== "over") {
+      if (iWon) sfx.victory(); else sfx.defeat();
+    }
+    prevPhase.current = phase ?? null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
   if (!room || !meta || !myUid) return null;
 
   const secondsLeft = Math.max(0, Math.ceil((meta.deadline - serverNow()) / 1000));
@@ -142,15 +157,19 @@ export function NetGameClient() {
   const gameOver = phase === "over";
   const iWon = gameOver && me?.alive && aliveCount === 1;
 
+  const phaseLabel = phase === "combat" ? t.net_phase_combat
+    : phase === "over" ? t.net_phase_over
+    : t.net_phase_planning;
+
   function onDragEnd(e: DragEndEvent) {
     if (phase !== "planning") return;
     const iid = String(e.active.id);
     const over = e.over?.id;
     if (!over) return;
-    const t = String(over);
-    if (t === "sell") sell(iid);
-    else if (t === "bench") moveToBench(iid);
-    else if (t.startsWith("cell-")) { const [, c, r] = t.split("-"); moveToBoard(iid, Number(c), Number(r)); }
+    const target = String(over);
+    if (target === "sell") sell(iid);
+    else if (target === "bench") moveToBench(iid);
+    else if (target.startsWith("cell-")) { const [, c, r] = target.split("-"); moveToBoard(iid, Number(c), Number(r)); }
   }
 
   return (
@@ -158,28 +177,28 @@ export function NetGameClient() {
       <div className="flex flex-col gap-3 max-w-[1440px] mx-auto p-4">
         {/* Top bar */}
         <div className="flex items-center gap-5 flex-wrap p-3 rounded-xl bg-slate-900/70 border border-slate-700/50">
-          <Stat label="Stage" value={`${meta.stage}-${meta.round}`} />
-          <Stat label="HP" value={`${Math.max(0, me?.hp ?? 0)}`} accent="#ff6b6b" />
-          <Stat label="Gold" accent="#fbbf24" value={<span className="inline-flex items-center gap-1"><CoinIcon size={13} />{gold}</span>} />
-          <Stat label="Level" value={`${level}`} />
-          <Stat label="Alive" value={`${aliveCount}`} />
+          <Stat label={t.net_stage} value={`${meta.stage}-${meta.round}`} />
+          <Stat label={t.net_hp} value={`${Math.max(0, me?.hp ?? 0)}`} accent="#ff6b6b" />
+          <Stat label={t.net_gold} accent="#fbbf24" value={<span className="inline-flex items-center gap-1"><CoinIcon size={13} />{gold}</span>} />
+          <Stat label={t.net_level} value={`${level}`} />
+          <Stat label={t.net_alive(aliveCount)} value="" />
           <div className="flex flex-col gap-1 min-w-[200px]">
             <div className="flex justify-between text-[11px]">
-              <span className={`font-bold uppercase ${phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{phase}</span>
+              <span className={`font-bold uppercase ${phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{phaseLabel}</span>
               <span className="tabular-nums text-slate-300">{secondsLeft}s</span>
             </div>
             <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
               <div className={`h-full transition-all ${phase === "combat" ? "bg-rose-400" : "bg-sky-400"}`} style={{ width: `${pct}%` }} />
             </div>
           </div>
-          {isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1">Host</span>}
-          <button onClick={leave} className="ml-auto px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">Leave</button>
+          {isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1">{t.net_host_badge}</span>}
+          <button onClick={leave} className="ml-auto px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.net_leave}</button>
         </div>
 
         <div className="flex gap-3 items-start">
           {/* Scoreboard */}
           <div className="w-[190px] shrink-0 p-2 rounded-xl bg-slate-900/70 border border-slate-700/50">
-            <h2 className="text-[10px] uppercase tracking-wider text-slate-500 px-1 mb-1.5">Trainers · {aliveCount} left</h2>
+            <h2 className="text-[10px] uppercase tracking-wider text-slate-500 px-1 mb-1.5">{t.net_trainers(aliveCount)}</h2>
             <div className="flex flex-col gap-1">
               {ladder.map((p, i) => {
                 const dex = asBoard(p.board)[0] ? getDef(asBoard(p.board)[0].defId).dex[asBoard(p.board)[0].star - 1] : null;
@@ -194,7 +213,7 @@ export function NetGameClient() {
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className={`block text-[11px] font-semibold truncate ${p.uid === myUid ? "text-amber-300" : "text-slate-200"}`}>
-                        {p.name}{!p.connected && " ·offline"}
+                        {p.name}{!p.connected && t.net_offline}
                       </span>
                       <span className="flex items-center gap-1">
                         <span className="flex-1 h-1.5 rounded-full bg-slate-700 overflow-hidden">
@@ -230,8 +249,8 @@ export function NetGameClient() {
 
       {!gameOver && me && !me.alive && (
         <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm gap-3">
-          <div className="text-3xl font-extrabold text-rose-400">Eliminated</div>
-          <div className="text-slate-300">You placed #{me.place ?? aliveCount + 1} · spectating</div>
+          <div className="text-3xl font-extrabold text-rose-400">{t.net_eliminated}</div>
+          <div className="text-slate-300">{t.net_placed(me.place ?? aliveCount + 1)} · {t.net_spectating}</div>
         </div>
       )}
 
@@ -239,10 +258,10 @@ export function NetGameClient() {
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm gap-4">
           <div className={`celebrate-pop flex flex-col items-center gap-3 ${iWon ? "text-amber-300" : "text-slate-200"}`}>
             {iWon && <TrophyIcon size={56} />}
-            <div className="text-4xl font-extrabold">{iWon ? "Victory Royale" : "Game Over"}</div>
+            <div className="text-4xl font-extrabold">{iWon ? t.net_victory : t.net_gameover}</div>
           </div>
-          <div className="text-slate-300">You placed #{me?.place ?? 1}</div>
-          <button onClick={leave} className="px-6 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold">Back to menu</button>
+          <div className="text-slate-300">{t.net_placed(me?.place ?? 1)}</div>
+          <button onClick={leave} className="px-6 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold">{t.net_back_menu}</button>
         </div>
       )}
     </DndContext>

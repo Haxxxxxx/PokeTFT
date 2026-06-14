@@ -9,6 +9,8 @@ import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import { ECONOMY, COPIES_TO_STAR } from "@/game/config";
 import { RerollIcon, SnowIcon, CoinIcon, InfoIcon, StarIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
+import { useT } from "@/lib/i18n";
+import { sfx, playCry } from "@/lib/audio";
 
 /** Copies a unit instance is worth toward star-ups (1 / 3 / 9). */
 function copiesOf(star: number): number {
@@ -38,6 +40,7 @@ export function ShopBar() {
   const toggleFreeze = useGame((s) => s.toggleFreeze);
   const setInspect = useUi((s) => s.setInspect);
 
+  const t = useT();
   const owned = ownedByDef(units);
   const activeTraits = new Set(
     computeTraits(units.filter((u) => u.pos !== null)).filter((t) => t.tier > 0).map((t) => t.key),
@@ -47,19 +50,19 @@ export function ShopBar() {
     <div className="flex items-stretch gap-2">
       <div className="flex flex-col gap-1.5 justify-center pr-1">
         <button
-          onClick={reroll}
+          onClick={() => { reroll(); sfx.reroll(); }}
           disabled={gold < ECONOMY.rerollCost}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-700/80 hover:bg-slate-600 disabled:opacity-40 text-xs font-semibold"
         >
-          <RerollIcon size={13} /> Reroll
+          <RerollIcon size={13} /> {t.sh_reroll}
           <span className="inline-flex items-center gap-0.5 text-amber-300"><CoinIcon size={11} />{ECONOMY.rerollCost}</span>
         </button>
         <button
-          onClick={toggleFreeze}
+          onClick={() => { toggleFreeze(); if (!frozen) sfx.freeze(); }}
           className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors
             ${frozen ? "bg-sky-600 text-white" : "bg-slate-700/80 hover:bg-slate-600 text-slate-200"}`}
         >
-          <SnowIcon size={13} /> {frozen ? "Frozen" : "Freeze"}
+          <SnowIcon size={13} /> {frozen ? t.sh_frozen : t.sh_freeze}
         </button>
       </div>
 
@@ -81,7 +84,14 @@ export function ShopBar() {
           return (
             <button
               key={i}
-              onClick={() => buyUnit(i)}
+              onClick={() => {
+                const starsBefore = units.filter((u) => u.star > 1).map((u) => `${u.defId}-${u.star}`).join();
+                buyUnit(i);
+                // Detect combine by checking if new 2★/3★ appeared
+                const starsAfter = useGame.getState().units.filter((u) => u.star > 1).map((u) => `${u.defId}-${u.star}`).join();
+                if (starsAfter !== starsBefore) sfx.combine();
+                else { sfx.buy(); playCry(def.dex[0]); }
+              }}
               disabled={!affordable}
               style={{
                 borderColor: color,
@@ -96,8 +106,8 @@ export function ShopBar() {
                 tabIndex={0}
                 onClick={(e) => { e.stopPropagation(); setInspect(def.id, own?.topStar === 3 ? 3 : 1); }}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setInspect(def.id, 1); } }}
-                aria-label="View details"
-                title="View details"
+                aria-label={t.sh_view_details}
+                title={t.sh_view_details}
                 className="absolute top-1 left-1 text-slate-500 hover:text-sky-300 opacity-60 group-hover:opacity-100 transition-opacity cursor-help"
               >
                 <InfoIcon size={13} />
@@ -112,7 +122,7 @@ export function ShopBar() {
               {own && (
                 <span className="absolute top-1 left-1/2 -translate-x-1/2 inline-flex items-center gap-0.5 rounded-full bg-emerald-500/90 px-1.5 text-[9px] font-bold text-black leading-tight">
                   {own.topStar > 1 && <StarIcon size={8} />}
-                  {nextThreshold !== null ? `${copies}/${nextThreshold}` : "MAX"}
+                  {nextThreshold !== null ? `${copies}/${nextThreshold}` : t.sh_max}
                 </span>
               )}
 

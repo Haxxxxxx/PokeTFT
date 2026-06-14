@@ -2,6 +2,8 @@
 
 import { memo, useEffect, useRef, useState } from "react";
 import { spriteUrl } from "@/game/data/mons";
+import { useT } from "@/lib/i18n";
+import { sfx } from "@/lib/audio";
 import { hexToPixel, fieldPixelSize, hexDistance, FIELD } from "@/game/engine/hex";
 import { TYPE_COLOR } from "@/game/ui";
 import type { CombatResult, FrameUnit } from "@/game/engine/combat";
@@ -35,6 +37,7 @@ export function CombatStage({
   const frames = result.frames;
   const last = frames.length - 1;
   const totalTime = frames[last].t;
+  const t = useT();
   const [idx, setIdx] = useState(0);
   const [finished, setFinished] = useState(false);
   const [speed, setSpeed] = useState(1.5);
@@ -58,6 +61,13 @@ export function CombatStage({
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, [last]);
+
+  // Play sound when combat ends
+  useEffect(() => {
+    if (!finished) return;
+    if (won) sfx.victory(); else sfx.defeat();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finished]);
 
   const { w, h } = fieldPixelSize(TILE_W, TILE_H);
   const fi = Math.min(Math.floor(idx), last);
@@ -88,9 +98,9 @@ export function CombatStage({
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4">
       <div className="flex items-center gap-6 mb-2 text-sm font-bold">
-        <span className="text-emerald-400">Your Team · {aliveAlly}</span>
+        <span className="text-emerald-400">{t.cs_your_team} · {aliveAlly}</span>
         <span className={a.overtime ? "text-rose-400 animate-pulse" : "text-slate-500"}>
-          {a.overtime ? "OVERTIME" : "VS"}
+          {a.overtime ? t.cs_overtime : t.cs_vs}
         </span>
         <span className="text-rose-400">{opponentName} · {aliveEnemy}</span>
       </div>
@@ -212,23 +222,23 @@ export function CombatStage({
               </button>
             ))}
             <button onClick={() => { setIdx(last); setFinished(true); }} className="px-3 py-1 rounded-md bg-slate-700 hover:bg-slate-600 text-xs font-semibold ml-2">
-              Skip
+              Skip →
             </button>
           </>
         ) : (
           <div className="flex flex-col items-center gap-2">
             <div className={`text-xl font-extrabold ${won ? "text-emerald-400" : result.winner === "draw" ? "text-slate-300" : "text-rose-400"}`}>
-              {won ? "Victory" : result.winner === "draw" ? "Draw" : "Defeat"}
+              {won ? t.cs_victory : result.winner === "draw" ? t.cs_draw : t.cs_defeat}
               {result.winner === "enemy" && <span className="text-sm text-slate-400 font-medium"> · {result.survivors} survived</span>}
             </div>
             {autoResolve ? (
-              <span className="text-xs text-slate-500">Waiting for the next round…</span>
+              <span className="text-xs text-slate-500">…</span>
             ) : (
               <button
                 onClick={() => onResolve(won, result.winner === "enemy" ? result.survivors : 0)}
                 className="px-6 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold"
               >
-                Continue
+                {t.cs_continue}
               </button>
             )}
           </div>

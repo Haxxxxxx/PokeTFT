@@ -11,13 +11,8 @@ import {
   HeartIcon, SwordIcon, DpsIcon, SpeedIcon, ShieldIcon, MagicIcon,
   TargetIcon, ManaIcon, TierIcon, StarIcon, CoinIcon, CloseIcon, InfoIcon, MegaIcon,
 } from "./icons";
-
-const COST_LABEL: Record<number, string> = { 1: "Common", 2: "Uncommon", 3: "Rare", 4: "Epic", 5: "Legendary" };
-const SHAPE_DESC: Record<string, string> = {
-  single: "Strikes its current target.",
-  splash: "Strikes the target and adjacent enemies.",
-  line: "Pierces every enemy in a line.",
-};
+import { useT } from "@/lib/i18n";
+import { playCry } from "@/lib/audio";
 
 /** Docked detail panel — sits to the right of the board, not a modal. */
 export function UnitDetail() {
@@ -40,17 +35,17 @@ export function UnitDetail() {
 }
 
 function EmptyState() {
+  const t = useT();
   return (
     <div className="rounded-2xl border border-slate-700/50 bg-slate-900/50 p-6 text-center">
       <div className="flex justify-center text-slate-600 mb-2"><InfoIcon size={22} /></div>
-      <p className="text-xs text-slate-500 leading-relaxed">
-        Click a mon on the board, bench, or shop to inspect its stats and ability.
-      </p>
+      <p className="text-xs text-slate-500 leading-relaxed">{t.ud_click_hint}</p>
     </div>
   );
 }
 
 function Card() {
+  const t = useT();
   const inspect = useUi((s) => s.inspect)!;
   const clear = useUi((s) => s.clearInspect);
   const def = getDef(inspect.defId);
@@ -59,7 +54,9 @@ function Card() {
   const s = def.stats;
   const color = COST_COLOR[def.cost];
   const dps = Math.round(s.ad[i] * s.attackSpeed);
-  const rangeLabel = s.range <= 1 ? "Melee" : `${s.range} hexes`;
+  const rangeLabel = s.range <= 1 ? t.ud_melee : t.ud_hexes(s.range);
+  const costLabel: Record<number, string> = { 1: t.ud_cost_common, 2: t.ud_cost_uncommon, 3: t.ud_cost_rare, 4: t.ud_cost_epic, 5: t.ud_cost_legendary };
+  const shapeDesc: Record<string, string> = { single: t.ud_shape_single, splash: t.ud_shape_splash, line: t.ud_shape_line };
 
   return (
     <div
@@ -80,7 +77,7 @@ function Card() {
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-[11px] font-medium mt-0.5" style={{ color }}>
-            {COST_LABEL[def.cost]}
+            {costLabel[def.cost]}
             <span className="text-slate-600">·</span>
             <span className="inline-flex items-center gap-1 text-amber-300/90"><CoinIcon size={11} />{def.cost}</span>
           </div>
@@ -100,31 +97,37 @@ function Card() {
 
       {/* Stats grid */}
       <div className="grid grid-cols-3 gap-px bg-white/5">
-        <StatCell icon={<HeartIcon />} label="Health" value={s.hp[i]} tint="#ff6b6b" />
-        <StatCell icon={<SwordIcon />} label="Attack" value={s.ad[i]} tint="#ffb454" />
-        <StatCell icon={<DpsIcon />} label="DPS" value={dps} tint="#ff8e8e" />
-        <StatCell icon={<SpeedIcon />} label="Atk Spd" value={s.attackSpeed.toFixed(2)} tint="#f5d76e" />
-        <StatCell icon={<ShieldIcon />} label="Armor" value={s.armor} tint="#9aa4b2" />
-        <StatCell icon={<MagicIcon />} label="Mag Res" value={s.magicResist} tint="#a78bfa" />
-        <StatCell icon={<TargetIcon />} label="Range" value={rangeLabel} tint="#5eead4" />
-        <StatCell icon={<ManaIcon />} label="Mana" value={`${s.startMana}/${s.maxMana}`} tint="#38bdf8" />
-        <StatCell icon={<TierIcon />} label="Tier" value={`${star}/3`} tint="#fbbf24" />
+        <StatCell icon={<HeartIcon />} label={t.ud_stat_health} value={s.hp[i]} tint="#ff6b6b" />
+        <StatCell icon={<SwordIcon />} label={t.ud_stat_attack} value={s.ad[i]} tint="#ffb454" />
+        <StatCell icon={<DpsIcon />} label={t.ud_stat_dps} value={dps} tint="#ff8e8e" />
+        <StatCell icon={<SpeedIcon />} label={t.ud_stat_aspd} value={s.attackSpeed.toFixed(2)} tint="#f5d76e" />
+        <StatCell icon={<ShieldIcon />} label={t.ud_stat_armor} value={s.armor} tint="#9aa4b2" />
+        <StatCell icon={<MagicIcon />} label={t.ud_stat_mr} value={s.magicResist} tint="#a78bfa" />
+        <StatCell icon={<TargetIcon />} label={t.ud_stat_range} value={rangeLabel} tint="#5eead4" />
+        <StatCell icon={<ManaIcon />} label={t.ud_stat_mana} value={`${s.startMana}/${s.maxMana}`} tint="#38bdf8" />
+        <StatCell icon={<TierIcon />} label={t.ud_stat_tier} value={`${star}/3`} tint="#fbbf24" />
       </div>
 
       {/* Ability */}
       <div className="p-3">
         <div className="flex items-center gap-2 mb-1.5">
-          <span className="text-[10px] uppercase tracking-widest text-slate-500">Ability</span>
+          <span className="text-[10px] uppercase tracking-widest text-slate-500">{t.ud_ability}</span>
           <Badge color={TYPE_COLOR[def.move.type]} text={traitLabel(def.move.type)} solid />
-          <span className="ml-auto text-[10px] text-slate-400">Mana {s.maxMana}</span>
+          <span className="ml-auto text-[10px] text-slate-400">{t.ud_mana_label} {s.maxMana}</span>
         </div>
-        <h3 className="font-bold text-sky-300 text-sm">{def.move.name}</h3>
+        <h3
+          className="font-bold text-sky-300 text-sm cursor-pointer hover:text-sky-200 transition-colors"
+          onClick={() => playCry(def.dex[i])}
+          title="▶ cri"
+        >
+          {def.move.name}
+        </h3>
         <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-          Deals <b className="text-amber-300">{def.move.power[i]}</b> {def.move.type} damage.{" "}
-          {SHAPE_DESC[def.move.shape]} Type-effectiveness multiplies the damage.
+          {t.ud_deals(def.move.power[i], def.move.type)}{" "}
+          {shapeDesc[def.move.shape]} {t.ud_type_eff}
         </p>
         <div className="flex items-center gap-2 mt-2.5 text-[10px]">
-          <span className="text-slate-500 uppercase tracking-wide">Per star</span>
+          <span className="text-slate-500 uppercase tracking-wide">{t.ud_per_star}</span>
           <div className="flex items-center gap-1">
             {def.move.power.map((p, idx) => (
               <span key={idx} className={`px-1.5 py-0.5 rounded ${idx === i ? "bg-sky-500/20 text-sky-200 font-semibold" : "text-slate-500"}`}>
