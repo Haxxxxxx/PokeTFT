@@ -9,6 +9,7 @@
 import type { UnitInstance, PokeType, Move } from "../types";
 import { getDef } from "../data/mons";
 import { effectiveness } from "../data/typeChart";
+import { isMegaActive, megaFormFor } from "../data/mega";
 import { allyToField, enemyToField, neighbors, hexDistance, hexKey, type Hex } from "./hex";
 
 export type Team = "ally" | "enemy";
@@ -31,6 +32,9 @@ type Combatant = {
   range: number;
   mana: number;
   maxMana: number;
+  /** Ability-power multiplier (Mega boosts this). */
+  apMult: number;
+  mega: boolean;
   pos: Hex;
   atkCd: number;
   moveCd: number;
@@ -47,6 +51,7 @@ export type FrameUnit = {
   hpFrac: number;
   manaFrac: number;
   alive: boolean;
+  mega: boolean;
 };
 
 export type CombatEvent =
@@ -83,24 +88,33 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
   const s = def.stats;
   const local = u.pos!;
   const pos = team === "ally" ? allyToField(local[0], local[1]) : enemyToField(local[0], local[1]);
+
+  // Mega Evolution applies at combat start when the mon holds a Mega Stone.
+  const mega = isMegaActive(u.defId, u.items) ? megaFormFor(u.defId) : undefined;
+  const types = mega?.addType && !def.types.includes(mega.addType) ? [...def.types, mega.addType] : def.types;
+  const hp = mega ? Math.round(s.hp[i] * mega.hpMult) : s.hp[i];
+  const ad = mega ? Math.round(s.ad[i] * mega.adMult) : s.ad[i];
+
   return {
     id: `${team}-${u.iid}`,
     team,
     defId: def.id,
     star: u.star,
-    name: def.stageNames[i],
-    dex: def.dex[i],
-    types: def.types,
+    name: mega ? mega.name : def.stageNames[i],
+    dex: mega ? mega.megaDex : def.dex[i],
+    types,
     move: def.move,
-    hp: s.hp[i],
-    maxHp: s.hp[i],
-    ad: s.ad[i],
+    hp,
+    maxHp: hp,
+    ad,
     attackSpeed: s.attackSpeed,
-    armor: s.armor,
-    mr: s.magicResist,
+    armor: mega ? s.armor + mega.armorBonus : s.armor,
+    mr: mega ? s.magicResist + mega.mrBonus : s.magicResist,
     range: s.range,
     mana: s.startMana,
     maxMana: s.maxMana,
+    apMult: mega ? mega.apMult : 1,
+    mega: !!mega,
     pos,
     atkCd: 0,
     moveCd: 0,
@@ -123,6 +137,7 @@ function snapshot(units: Combatant[], t: number, events: CombatEvent[]): Frame {
       hpFrac: Math.max(0, u.hp / u.maxHp),
       manaFrac: u.maxMana > 0 ? u.mana / u.maxMana : 0,
       alive: u.alive,
+      mega: u.mega,
     })),
   };
 }
@@ -237,7 +252,7 @@ function dealDamage(from: Combatant, to: Combatant, rawDmg: number, _kind: strin
 
 function castAbility(caster: Combatant, target: Combatant, units: Combatant[], events: CombatEvent[]) {
   const i = caster.star - 1;
-  const base = caster.move.power[i];
+  const base = caster.move.power[i] * caster.apMult;
   const eff = effectiveness(caster.move.type, target.types);
   events.push({ kind: "cast", from: caster.id, to: target.id, moveType: caster.move.type, eff });
 

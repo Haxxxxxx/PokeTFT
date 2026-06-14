@@ -10,6 +10,10 @@ type UiState = {
   /** Which player's board we're viewing. null = your own (interactive). */
   viewPlayerId: string | null;
   setView: (playerId: string | null) => void;
+
+  /** An inventory item the player has "picked up" to equip on the next unit click. */
+  armedItem: string | null;
+  armItem: (itemId: string | null) => void;
 };
 
 export const useUi = create<UiState>((set) => ({
@@ -19,4 +23,7 @@ export const useUi = create<UiState>((set) => ({
 
   viewPlayerId: null,
   setView: (playerId) => set({ viewPlayerId: playerId }),
+
+  armedItem: null,
+  armItem: (itemId) => set((s) => ({ armedItem: s.armedItem === itemId ? null : itemId })),
 }));

@@ -4,11 +4,12 @@ import { useEffect } from "react";
 import { useUi } from "@/game/store/uiStore";
 import { getDef, spriteUrl } from "@/game/data/mons";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
+import { megaFormFor } from "@/game/data/mega";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import type { PokeType } from "@/game/types";
 import {
   HeartIcon, SwordIcon, DpsIcon, SpeedIcon, ShieldIcon, MagicIcon,
-  TargetIcon, ManaIcon, TierIcon, StarIcon, CoinIcon, CloseIcon, InfoIcon,
+  TargetIcon, ManaIcon, TierIcon, StarIcon, CoinIcon, CloseIcon, InfoIcon, MegaIcon,
 } from "./icons";
 
 const COST_LABEL: Record<number, string> = { 1: "Common", 2: "Uncommon", 3: "Rare", 4: "Epic", 5: "Legendary" };
@@ -133,6 +134,25 @@ function Card() {
           </div>
         </div>
       </div>
+
+      {/* Mega Evolution callout */}
+      {megaFormFor(def.id) && (
+        <div className="mx-3 mb-3 p-2.5 rounded-lg border border-fuchsia-500/40 bg-fuchsia-500/10 flex items-center gap-3">
+          <div className="rounded-lg bg-black/30 p-1 border border-fuchsia-500/40">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={spriteUrl(megaFormFor(def.id)!.megaDex)} alt="" width={44} height={44} style={{ imageRendering: "pixelated" }} />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-fuchsia-200 text-xs font-bold">
+              <MegaIcon size={13} /> {megaFormFor(def.id)!.name}
+            </div>
+            <p className="text-[10px] text-slate-300 leading-snug mt-0.5">
+              Holds a <span className="text-fuchsia-300 font-semibold">Mega Stone</span> → Mega Evolves at combat start
+              (+{Math.round((megaFormFor(def.id)!.hpMult - 1) * 100)}% HP, +{Math.round((megaFormFor(def.id)!.adMult - 1) * 100)}% ATK, +{Math.round((megaFormFor(def.id)!.apMult - 1) * 100)}% ability).
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
