@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { usePreLobby } from "@/game/store/preLobbyStore";
 import { PlayerSlot } from "./PlayerSlot";
 import { LobbyCodeBadge } from "./LobbyCodeBadge";
@@ -13,6 +14,12 @@ export function LobbyScreen() {
   const readyToStart = usePreLobby((s) => s.readyToStart);
   const startGame = usePreLobby((s) => s.startGame);
   const phase = usePreLobby((s) => s.phase);
+  const generateCode = usePreLobby((s) => s.generateCode);
+
+  // Randomise the lobby code on the client only (avoids an SSR hydration mismatch).
+  useEffect(() => {
+    if (usePreLobby.getState().lobbyCode === "------") generateCode();
+  }, [generateCode]);
 
   const active = slots.filter((s) => s.type !== "empty");
   const canStart = readyToStart();

@@ -68,7 +68,9 @@ const DEFAULT_RULES: GameRules = {
 };
 
 export const usePreLobby = create<PreLobbyState>((set, get) => ({
-  lobbyCode: randomCode(),
+  // Deterministic placeholder for SSR; randomised on the client after mount
+  // (LobbyScreen calls generateCode) to avoid a hydration mismatch.
+  lobbyCode: "------",
   isHost: true,
   slots: makeSlots(),
   rules: { ...DEFAULT_RULES },
