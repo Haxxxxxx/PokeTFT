@@ -33,16 +33,20 @@
 - Fonction `unitsForGenerations(gens)` filtre par numéro Pokédex de la forme de base
 - `makePool()` et `rollShop()` paramétrés pour accepter une liste d'IDs autorisés
 - `GameClient` reçoit les `generations` de l'`AppRoot` et les passe à `newGame()`
-- Comportement : sélectionner Gen II seul = shop vide (aucun Pokémon Gen II défini encore)
+- Comportement : sélectionner plusieurs gens = pool fusionné, mons des gens actives apparaissent en shop
 
-### Roster Gen I complet (42 unités)
-- **1-cost** : Charmander, Bulbasaur, Squirtle, Caterpie, Weedle, Pidgey, Poliwag, Rattata, Jigglypuff, Zubat
-- **2-cost** : Geodude, Machop, Abra, Oddish, Gastly, Growlithe, Ponyta, Magnemite, Psyduck, Koffing, Paras, Drowzee
-- **3-cost** : Magikarp, Eevee, Scyther, Cubone, Onix, Electabuzz, Jynx, Rhyhorn, Hitmonlee
-- **4-cost** : Dratini, Lapras, Snorlax, Aerodactyl, Omanyte, Porygon
-- **5-cost** : Articuno, Zapdos, Moltres, Mewtwo, Mew
-- Traits couverts : Fire, Water, Electric, Grass, Psychic, Poison, Rock, Flying, Dragon, Ghost, Ground, Bug, Normal, Ice, Fairy, Fighting
-- Rôles couverts : Starter, Evolver, Swarm, Eeveelution, Fossil, Pseudo-Legend, Legendary, Mythic
+### Roster — 140 unités Gen I–IX
+- **Gen I (42)** : Starters Kanto, Caterpie, Weedle, Pidgey, Poliwag, Rattata, Jigglypuff, Zubat, Geodude, Machop, Abra, Oddish, Gastly, Growlithe, Ponyta, Magnemite, Psyduck, Koffing, Paras, Drowzee, Magikarp, Eevee, Scyther, Cubone, Onix, Electabuzz, Jynx, Rhyhorn, Hitmonlee, Dratini, Lapras, Snorlax, Aerodactyl, Omanyte, Porygon, Articuno, Zapdos, Moltres, Mewtwo, Mew
+- **Gen II (13)** : Chikorita/Cyndaquil/Totodile, Mareep, Snubbull, Murkrow, Heracross, Houndour, Misdreavus, Tyranitar, Steelix, Lugia, Ho-Oh, Celebi
+- **Gen III (14)** : Treecko/Torchic/Mudkip, Ralts, Electrike, Aron, Flygon, Absol, Mawile, Metagross, Salamence, Kyogre, Groudon, Rayquaza
+- **Gen IV (15)** : Turtwig/Chimchar/Piplup, Shinx, Riolu, Buizel, Garchomp, Electivire, Togekiss, Weavile, Roserade, Dialga, Palkia, Giratina, Arceus
+- **Gen V (13)** : Snivy/Tepig/Oshawott, Sandile, Joltik, Chandelure, Haxorus, Excadrill, Hydreigon, Reshiram, Zekrom, Kyurem, Victini
+- **Gen VI (10)** : Chespin/Fennekin/Froakie, Fletchling, Litleo, Goomy, Pancham, Aegislash, Xerneas, Yveltal, Zygarde
+- **Gen VII (11)** : Rowlet/Litten/Popplio, Rockruff, Wishiwashi, Jangmo-o, Mimikyu, Silvally, Solgaleo, Lunala, Necrozma
+- **Gen VIII (10)** : Grookey/Scorbunny/Sobble, Yamper, Snom, Rookidee, Dreepy, Zacian, Zamazenta, Eternatus
+- **Gen IX (10)** : Sprigatito/Fuecoco/Quaxly, Pawmi, Nacli, Frigibax, Palafin, Koraidon, Miraidon, Terapagos
+- Traits type : tous les 18 couverts (Fighting, Dark, Steel ajoutés)
+- Rôles : Starter, Evolver, Swarm, Eeveelution, Fossil, Pseudo-Legend, Legendary, Mythic
 
 ### Jeu — Économie & Progression
 - Revenus de base : 5 gold/round + intérêts (1 par tranche de 10 gold, cap 5)
@@ -144,9 +148,9 @@
   - Exemples : Restes → régénération HP/round, Orbe Vie → +30% dégâts −10% HP/attaque, Veste Assaut → +MR +immunité aux dégâts magiques, Casque Rocher → riposte aux attaquants
   - Fichier cible : `src/game/engine/combat.ts` (initialisation des unités + résolution des attaques)
 
-- **Roster Gen II–IX vide** — le lobby propose les générations mais aucune unité n'est définie
-  - Sélectionner Gen II seul = shop vide (comportement correct, données manquantes)
-  - Fichier cible : `src/game/data/mons.ts` (ajouter les Pokémon de chaque génération)
+- **Roster Gen II–IX partiel** — ~12–15 unités par génération définies, couverture des 5 tiers de coût
+  - Toutes les générations sont jouables ; mons des gens sélectionnées apparaissent en shop
+  - Manque : la majorité du roster officiel (seuls les représentants clés sont définis)
 
 ### Priorité moyenne — expérience incomplète
 

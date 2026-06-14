@@ -9,7 +9,7 @@ export type PokeType =
 /** Role traits = TFT "classes". A mon can have one or more. */
 export type RoleTrait =
   | "starter" | "legendary" | "pseudo-legendary" | "eeveelution"
-  | "fossil" | "swarm" | "evolver" | "kanto-mythic";
+  | "fossil" | "swarm" | "evolver" | "kanto-mythic" | "mythic";
 
 export type StatBlock = {
   /** Per-star stats: index 0 = ⭐, 1 = ⭐⭐, 2 = ⭐⭐⭐. */
