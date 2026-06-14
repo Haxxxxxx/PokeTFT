@@ -1,10 +1,47 @@
 {
   "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && $uid === auth.uid",
+        "username":      { ".validate": "newData.isString() && newData.val().length <= 16" },
+        "usernameLower": { ".validate": "newData.isString() && newData.val().length <= 16" },
+        "friends": {
+          "$fid": { ".write": "auth != null && ($uid === auth.uid || $fid === auth.uid)" }
+        }
+      }
+    },
+    "usernames": {
+      "$lower": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((newData.exists() && newData.val() === auth.uid && (!data.exists() || data.val() === auth.uid)) || (!newData.exists() && data.val() === auth.uid))"
+      }
+    },
     "games": {
       "$code": {
-        ".read": true,
-        ".write": true,
-        ".indexOn": ["updatedAt"]
+        ".read": "auth != null",
+        ".indexOn": ["updatedAt"],
+        ".write": "auth != null && (!data.exists() || (!newData.exists() && data.child('meta/hostUid').val() === auth.uid))",
+
+        "meta": {
+          ".write": "auth != null && (!data.parent().child('meta/hostUid').exists() || data.parent().child('meta/hostUid').val() === auth.uid || newData.child('hostUid').val() === auth.uid)",
+          "phase": { ".validate": "newData.val().matches(/^(lobby|planning|combat|carousel|over)$/)" },
+          "stage": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 50" },
+          "round": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 12" }
+        },
+
+        "combat":   { ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
+        "carousel": { ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
+        "rules":    { ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
+
+        "players": {
+          "$uid": {
+            ".write": "auth != null && ($uid === auth.uid || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)",
+            "name":  { ".validate": "newData.isString() && newData.val().length <= 24" },
+            "hp":    { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500" },
+            "level": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 20" }
+          }
+        }
       }
     }
   }

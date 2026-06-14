@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { usePreLobby } from "@/game/store/preLobbyStore";
 import { useRoom } from "@/game/net/roomStore";
+import { useAuth } from "@/game/net/authStore";
 import { AppSettingsPanel } from "./AppSettingsPanel";
+import { FriendsPanel } from "@/components/social/FriendsPanel";
+import { ProfileEditor } from "@/components/social/ProfileEditor";
 import { useT } from "@/lib/i18n";
 
 type Mode = "idle" | "create" | "join";
@@ -15,10 +18,14 @@ export function WelcomeScreen() {
   const join = useRoom((s) => s.join);
   const status = useRoom((s) => s.status);
   const netError = useRoom((s) => s.error);
-  const [username, setUsername] = useState("");
+  const profile = useAuth((s) => s.profile);
+  const signOut = useAuth((s) => s.signOut);
+  const isGuest = useAuth((s) => s.user?.isAnonymous ?? false);
+  const [username, setUsername] = useState(profile?.username ?? "");
   const [mode, setMode] = useState<Mode>("idle");
   const [joinCode, setJoinCode] = useState("");
   const [joinError, setJoinError] = useState(false);
+  const [editProfile, setEditProfile] = useState(false);
 
   const trimmed = username.trim();
   const canProceed = trimmed.length > 0;
@@ -57,20 +64,33 @@ export function WelcomeScreen() {
             <p className="text-slate-500 text-sm">{t.w_subtitle}</p>
           </div>
 
-          {/* Username */}
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
-              {t.w_username_label}
-            </label>
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && mode === "idle") setMode("create"); }}
-              placeholder={t.w_username_placeholder}
-              maxLength={24}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-base font-semibold text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
-            />
-          </div>
+          {/* Account / display name */}
+          {isGuest ? (
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-extrabold uppercase tracking-widest text-slate-400">{t.w_username_label}</label>
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && mode === "idle") setMode("create"); }}
+                placeholder={t.w_username_placeholder}
+                maxLength={24}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-base font-semibold text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
+              />
+              <button onClick={signOut} className="self-start text-[11px] text-slate-500 hover:text-sky-300">Sign in to an account →</button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-800 border border-slate-700">
+              <span className="w-9 h-9 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0">
+                {profile?.photoURL
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={profile.photoURL} alt="" width={30} height={30} style={{ imageRendering: "pixelated" }} />
+                  : <span className="text-sm font-extrabold text-slate-500">{(profile?.username || "?").slice(0, 1).toUpperCase()}</span>}
+              </span>
+              <span className="flex-1 text-sm text-slate-300">Playing as <span className="text-amber-300 font-bold">{profile?.username}</span></span>
+              <button onClick={() => setEditProfile(true)} className="text-[11px] text-sky-400 hover:text-sky-300 font-semibold">Edit</button>
+              <button onClick={signOut} className="text-[11px] text-slate-500 hover:text-rose-400">Sign out</button>
+            </div>
+          )}
 
           {/* Mode buttons */}
           {mode === "idle" && (
@@ -158,14 +178,18 @@ export function WelcomeScreen() {
           )}
         </div>
 
-        {/* Settings card */}
-        <div className="w-64 shrink-0 rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur p-6">
-          <h2 className="text-xs font-extrabold uppercase tracking-widest text-slate-400 mb-4 border-b border-slate-800 pb-2">
-            {t.s_title}
-          </h2>
-          <AppSettingsPanel />
+        {/* Right column: friends + settings */}
+        <div className="w-72 shrink-0 flex flex-col gap-4">
+          <FriendsPanel />
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur p-6">
+            <h2 className="text-xs font-extrabold uppercase tracking-widest text-slate-400 mb-4 border-b border-slate-800 pb-2">
+              {t.s_title}
+            </h2>
+            <AppSettingsPanel />
+          </div>
         </div>
       </div>
+      {editProfile && <ProfileEditor onClose={() => setEditProfile(false)} />}
     </div>
   );
 }
