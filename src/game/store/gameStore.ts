@@ -38,7 +38,7 @@ type State = {
   xpProgress: () => { current: number; needed: number | null };
 
   // actions
-  newGame: () => void;
+  newGame: (startingHp?: number) => void;
   reroll: () => void;
   buyXp: () => void;
   buyUnit: (slot: number) => void;
@@ -76,11 +76,11 @@ export const useGame = create<State>((set, get) => ({
     return { current: xp - base, needed: next - base };
   },
 
-  newGame: () => {
+  newGame: (startingHp = ECONOMY.startingHealth) => {
     rng = makeRng(INITIAL_SEED);
     const pool = makePool();
     set({
-      pool, gold: 4, xp: 0, level: 1, health: ECONOMY.startingHealth,
+      pool, gold: 4, xp: 0, level: 1, health: startingHp,
       streak: 0, stage: 1, round: 1, units: [], frozen: false,
       shop: rollShop(1, pool, rng),
     });
