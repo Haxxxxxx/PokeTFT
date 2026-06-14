@@ -95,6 +95,24 @@ export function NetGameClient() {
   const [pickedKey, setPickedKey] = useState<string | null>(null);
   const [spectate, setSpectate] = useState<string | null>(null);
 
+  // Scale-to-fit: shrink the whole board so it always fits the viewport, whatever
+  // the user's resolution. offsetWidth/Height are layout (pre-transform) sizes, so
+  // measuring while scaled is stable (no feedback loop).
+  const fitRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const fit = () => {
+      const el = fitRef.current;
+      if (!el) return;
+      const s = Math.min(1, (window.innerWidth - 6) / el.offsetWidth, (window.innerHeight - 6) / el.offsetHeight);
+      setScale(s > 0.2 ? s : 1);
+    };
+    const raf = requestAnimationFrame(fit);
+    window.addEventListener("resize", fit);
+    const id = setInterval(fit, 700); // content height changes across phases
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", fit); clearInterval(id); };
+  }, []);
+
   // server time + a 250ms repaint so the shared timer counts down smoothly
   useEffect(() => {
     startServerTime();
@@ -273,7 +291,12 @@ export function NetGameClient() {
 
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-      <div className="min-h-screen flex flex-col gap-3 w-full max-w-[1440px] mx-auto p-3 overflow-x-hidden">
+      <div className="w-full min-h-screen flex justify-center items-start overflow-hidden">
+      <div
+        ref={fitRef}
+        style={{ transform: `scale(${scale})`, transformOrigin: "top center" }}
+        className="flex flex-col gap-3 w-full max-w-[1440px] p-3"
+      >
         {/* Round timeline: current stage + the next two, tagged by kind, with
             past results colored win/loss and the current round highlighted. */}
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-700/40 overflow-x-auto">
@@ -430,6 +453,7 @@ export function NetGameClient() {
             <SellZone />
           </div>
         </div>
+      </div>
       </div>
 
       {phase === "carousel" && me?.alive && (() => {
