@@ -1,5 +1,6 @@
 import type { UnitDef, StatBlock, Move, PokeType, RoleTrait } from "../types";
 import type { Cost } from "../config";
+import { GEN_DEX_RANGES } from "./generations";
 
 /** Sprite URL from national dex id (PokéAPI's public sprite repo). */
 export function spriteUrl(dex: number): string {
@@ -172,4 +173,12 @@ export function getDef(id: string): UnitDef {
   const d = UNITS_BY_ID[id];
   if (!d) throw new Error(`Unknown unit def: ${id}`);
   return d;
+}
+
+/** Returns unit IDs whose base-form dex number falls within the given generations. */
+export function unitsForGenerations(gens: number[]): string[] {
+  const ranges = gens.map((g) => GEN_DEX_RANGES[g]).filter(Boolean) as [number, number][];
+  return UNITS
+    .filter((u) => ranges.some(([s, e]) => u.dex[0] >= s && u.dex[0] <= e))
+    .map((u) => u.id);
 }

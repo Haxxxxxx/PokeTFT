@@ -5,28 +5,39 @@ import { weightedPick, type Rng } from "./rng";
 /** Shared pool: defId -> remaining copies in the global bag. */
 export type Pool = Record<string, number>;
 
-export function makePool(): Pool {
+/** Units available per cost tier for shop rolls. */
+export type UnitsByCost = Record<Cost, string[]>;
+
+/** Build the eligible unit list per cost tier from an optional allowed-IDs set.
+ *  If allowedIds is omitted, all units are included. */
+export function makeUnitsByCost(allowedIds?: string[]): UnitsByCost {
+  const allowed = allowedIds ? new Set(allowedIds) : null;
+  const m: UnitsByCost = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+  for (const u of UNITS) {
+    if (!allowed || allowed.has(u.id)) m[u.cost].push(u.id);
+  }
+  return m;
+}
+
+/** Build the shared pool for the given allowed units (or all units if omitted). */
+export function makePool(allowedIds?: string[]): Pool {
+  const allowed = allowedIds ? new Set(allowedIds) : null;
   const pool: Pool = {};
-  for (const u of UNITS) pool[u.id] = POOL_SIZE[u.cost];
+  for (const u of UNITS) {
+    if (!allowed || allowed.has(u.id)) pool[u.id] = POOL_SIZE[u.cost];
+  }
   return pool;
 }
 
-const UNITS_BY_COST: Record<Cost, string[]> = (() => {
-  const m = { 1: [], 2: [], 3: [], 4: [], 5: [] } as Record<Cost, string[]>;
-  for (const u of UNITS) m[u.cost].push(u.id);
-  return m;
-})();
-
 /** Roll one shop of 5 slots for a player at `level`, drawing from the shared pool. */
-export function rollShop(level: number, pool: Pool, rng: Rng): (string | null)[] {
+export function rollShop(level: number, pool: Pool, rng: Rng, unitsByCost: UnitsByCost): (string | null)[] {
   const odds = SHOP_ODDS[Math.min(level, 10)];
   const slots: (string | null)[] = [];
 
   for (let i = 0; i < ECONOMY.shopSlots; i++) {
     const cost = (weightedPick(rng, odds) + 1) as Cost;
-    const candidates = UNITS_BY_COST[cost];
-    // Weight each candidate by its remaining copies in the bag.
-    const weights = candidates.map((id) => pool[id]);
+    const candidates = unitsByCost[cost];
+    const weights = candidates.map((id) => pool[id] ?? 0);
     const total = weights.reduce((s, w) => s + w, 0);
     if (total <= 0) {
       slots.push(null);

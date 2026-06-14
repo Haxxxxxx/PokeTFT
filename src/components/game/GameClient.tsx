@@ -8,6 +8,7 @@ import { useLobby } from "@/game/store/lobbyStore";
 import { useUi } from "@/game/store/uiStore";
 import { useCarousel } from "@/game/store/carouselStore";
 import { advanceFlow, resolveCombatFlow, resolveCarouselFlow } from "@/game/store/flow";
+import { unitsForGenerations } from "@/game/data/mons";
 import { TopBar } from "./TopBar";
 import { Board } from "./Board";
 import { Bench } from "./Bench";
@@ -51,7 +52,7 @@ function RoundTimer({ seconds }: { seconds: number }) {
   );
 }
 
-export function GameClient({ playerCount = 8, startingHp = 100 }: { playerCount?: number; startingHp?: number } = {}) {
+export function GameClient({ playerCount = 8, startingHp = 100, generations = [1] }: { playerCount?: number; startingHp?: number; generations?: number[] } = {}) {
   const newGame = useGame((s) => s.newGame);
   const moveToBoard = useGame((s) => s.moveToBoard);
   const moveToBench = useGame((s) => s.moveToBench);
@@ -72,16 +73,18 @@ export function GameClient({ playerCount = 8, startingHp = 100 }: { playerCount?
   const deadlineRef = useRef(0);
 
   const resetGame = () => {
-    newGame(startingHp);
+    newGame(startingHp, unitsForGenerations(generations));
     initLobby(Math.max(1, playerCount - 1), startingHp);
     setView(null);
     setSecs(PLAN_TIME);
   };
 
   useEffect(() => {
-    newGame(startingHp);
+    newGame(startingHp, unitsForGenerations(generations));
     initLobby(Math.max(1, playerCount - 1), startingHp);
-  }, [newGame, initLobby, playerCount, startingHp]);
+  // generations is an array — JSON-compare via join to avoid stale closures on array identity
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newGame, initLobby, playerCount, startingHp, generations.join(",")]);
 
   // One effect owns the planning countdown. It re-arms a fresh deadline whenever
   // the round changes, combat ends, or a carousel opens, and only calls setState
