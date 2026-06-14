@@ -2,27 +2,28 @@
 
 import { useEffect } from "react";
 import { useRoom } from "@/game/net/roomStore";
+import { startServerTime } from "@/game/net/serverTime";
 import { WelcomeScreen } from "@/components/welcome/WelcomeScreen";
 import { LobbyScreen } from "@/components/lobby/LobbyScreen";
-import { GameClient } from "@/components/game/GameClient";
+import { NetGameClient } from "@/components/game/NetGameClient";
 
 /**
  * Top-level switch driven by the networked room:
- *  - no room  → Welcome (host / join by code)
- *  - lobby    → Lobby (live players, ready, host start)
- *  - playing  → the game
+ *  - no room        → Welcome (host / join by code)
+ *  - phase "lobby"  → Lobby (live players, ready, host start)
+ *  - else           → the live multiplayer match (planning / combat / over)
  */
 export function AppRoot() {
   const code = useRoom((s) => s.code);
   const room = useRoom((s) => s.room);
   const reconnect = useRoom((s) => s.reconnect);
 
-  // After a refresh, re-attach to the room this tab was in.
-  useEffect(() => { reconnect(); }, [reconnect]);
+  useEffect(() => {
+    startServerTime();
+    reconnect(); // re-attach to the room this tab was in after a refresh
+  }, [reconnect]);
 
   if (!code || !room) return <WelcomeScreen />;
-  if (room.meta?.phase === "playing") {
-    return <GameClient playerCount={room.rules?.maxPlayers ?? 8} startingHp={room.rules?.startingHp ?? 100} />;
-  }
-  return <LobbyScreen />;
+  if (room.meta?.phase === "lobby") return <LobbyScreen />;
+  return <NetGameClient />;
 }

@@ -1,10 +1,10 @@
 import { create } from "zustand";
-import { ECONOMY, XP_TO_REACH, MAX_LEVEL, boardSizeForLevel, roundKind, advanceRound, stageBaseDamage, type Cost, type RoundKind } from "../config";
+import { ECONOMY, XP_TO_REACH, MAX_LEVEL, boardSizeForLevel, roundKind, advanceRound, stageBaseDamage, streakGold, type Cost, type RoundKind } from "../config";
 import type { UnitInstance } from "../types";
 import { getDef } from "../data/mons";
 import { makeRng, type Rng } from "../engine/rng";
 import { makePool, rollShop, takeFromPool, returnToPool, type Pool } from "../engine/shop";
-import { roundIncome, sellValue } from "../engine/economy";
+import { roundIncome, sellValue, interest } from "../engine/economy";
 import { applyCombines, makeInstance } from "../engine/combine";
 import { MEGA_STONE } from "../data/mega";
 
@@ -64,6 +64,8 @@ type State = {
   endRound: (won: boolean, survivors?: number) => void;
   pveReward: (won: boolean) => void;
   carouselTake: (defId: string) => void;
+  /** Multiplayer: grant a planning round's economy (income/xp/shop) for a host-driven round. */
+  netRound: (stage: number, round: number, streak: number) => void;
   grantItem: (itemId: string) => void;
   equipItem: (iid: string, itemId: string) => void;
   unequipItem: (iid: string, itemId: string) => void;
@@ -233,6 +235,16 @@ export const useGame = create<State>((set, get) => ({
       items,
       history: [...state.history, record],
     });
+  },
+
+  // Multiplayer: economy for a host-driven planning round (no stage/round of its
+  // own — both come from the room; health is room-authoritative, not touched here).
+  netRound: (stage, round, streak) => {
+    const state = get();
+    const income = ECONOMY.baseIncome + interest(state.gold) + streakGold(streak);
+    const newXp = state.xp + ECONOMY.passiveXpPerRound;
+    const shop = state.frozen ? state.shop : rollShop(levelFromXp(newXp), state.pool, rng);
+    set({ gold: state.gold + income, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false });
   },
 
   // Add an item to the inventory (carousel pick / loot).

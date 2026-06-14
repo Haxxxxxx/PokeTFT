@@ -7,7 +7,7 @@ import {
 import { db, ensureAuth } from "./firebase";
 import type { UnitInstance } from "../types";
 
-export type RoomPhase = "lobby" | "playing" | "over";
+export type RoomPhase = "lobby" | "planning" | "combat" | "over";
 
 export type RoomPlayer = {
   uid: string;
@@ -15,12 +15,13 @@ export type RoomPlayer = {
   isHost: boolean;
   connected: boolean;
   ready: boolean;
-  /** Live game state (synced once the match starts). */
+  /** Live game state (synced during the match). */
   hp: number;
   level: number;
   alive: boolean;
   place: number | null;
-  /** Locked board for the current combat round (Phase C). */
+  streak: number;
+  /** The player's current on-board units (synced during planning). */
   board?: UnitInstance[];
 };
 
@@ -29,7 +30,19 @@ export type RoomMeta = {
   phase: RoomPhase;
   stage: number;
   round: number;
+  /** Server-time ms at which the current phase ends. */
+  deadline: number;
   updatedAt: number | object;
+};
+
+/** Per-player combat assignment + result for the current round (host-written). */
+export type CombatAssign = {
+  oppUid: string;
+  oppName: string;
+  ghost: boolean;
+  won: boolean;
+  survivors: number;
+  dmg: number;
 };
 
 export type Room = {
@@ -37,6 +50,7 @@ export type Room = {
   meta: RoomMeta;
   rules: { startingHp: number; maxPlayers: number };
   players: Record<string, RoomPlayer>;
+  combat?: Record<string, CombatAssign>;
 };
 
 type Status = "idle" | "connecting" | "connected" | "error";
@@ -81,7 +95,7 @@ function roomRef(code: string): DatabaseReference {
 }
 
 function newPlayer(uid: string, name: string, isHost: boolean, startingHp: number): RoomPlayer {
-  return { uid, name, isHost, connected: true, ready: isHost, hp: startingHp, level: 1, alive: true, place: null };
+  return { uid, name, isHost, connected: true, ready: isHost, hp: startingHp, level: 1, alive: true, place: null, streak: 0 };
 }
 
 export const useRoom = create<RoomState>((setState, getState) => ({
@@ -99,7 +113,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       const maxPlayers = rules?.maxPlayers ?? 8;
       const code = genCode();
       await set(roomRef(code), {
-        meta: { hostUid: uid, phase: "lobby", stage: 1, round: 1, updatedAt: serverTimestamp() },
+        meta: { hostUid: uid, phase: "lobby", stage: 1, round: 1, deadline: 0, updatedAt: serverTimestamp() },
         rules: { startingHp, maxPlayers },
         players: { [uid]: newPlayer(uid, name || "Host", true, startingHp) },
       });
@@ -215,6 +229,7 @@ function subscribe(code: string, uid: string, setState: (p: Partial<RoomState>) 
         meta: val.meta,
         rules: val.rules ?? { startingHp: 100, maxPlayers: 8 },
         players: val.players ?? {},
+        combat: val.combat ?? {},
       },
     });
   });

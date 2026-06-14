@@ -24,10 +24,13 @@ export function CombatStage({
   result,
   opponentName,
   onResolve,
+  autoResolve = false,
 }: {
   result: CombatResult;
   opponentName: string;
   onResolve: (won: boolean, survivors: number) => void;
+  /** Multiplayer: the host clock advances the round, so hide the Continue button. */
+  autoResolve?: boolean;
 }) {
   const frames = result.frames;
   const last = frames.length - 1;
@@ -218,12 +221,16 @@ export function CombatStage({
               {won ? "Victory" : result.winner === "draw" ? "Draw" : "Defeat"}
               {result.winner === "enemy" && <span className="text-sm text-slate-400 font-medium"> · {result.survivors} survived</span>}
             </div>
-            <button
-              onClick={() => onResolve(won, result.winner === "enemy" ? result.survivors : 0)}
-              className="px-6 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold"
-            >
-              Continue
-            </button>
+            {autoResolve ? (
+              <span className="text-xs text-slate-500">Waiting for the next round…</span>
+            ) : (
+              <button
+                onClick={() => onResolve(won, result.winner === "enemy" ? result.survivors : 0)}
+                className="px-6 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold"
+              >
+                Continue
+              </button>
+            )}
           </div>
         )}
       </div>

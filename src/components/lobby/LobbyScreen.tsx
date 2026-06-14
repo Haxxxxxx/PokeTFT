@@ -1,6 +1,7 @@
 "use client";
 
 import { useRoom } from "@/game/net/roomStore";
+import { beginMatch } from "@/game/net/match";
 import { LobbyCodeBadge } from "./LobbyCodeBadge";
 
 const HP_OPTIONS = [50, 75, 100, 125, 150, 200];
@@ -10,7 +11,6 @@ export function LobbyScreen() {
   const myUid = useRoom((s) => s.myUid);
   const setReady = useRoom((s) => s.setReady);
   const setRules = useRoom((s) => s.setRules);
-  const setMeta = useRoom((s) => s.setMeta);
   const leave = useRoom((s) => s.leave);
 
   if (!room) return null;
@@ -97,7 +97,7 @@ export function LobbyScreen() {
               <>
                 <button
                   disabled={!canStart}
-                  onClick={() => setMeta({ phase: "playing" })}
+                  onClick={() => beginMatch(room.code, room)}
                   className="w-full max-w-sm py-3 rounded-xl font-extrabold text-sm tracking-wide transition-all
                     bg-amber-500 hover:bg-amber-400 text-black
                     disabled:opacity-30 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
