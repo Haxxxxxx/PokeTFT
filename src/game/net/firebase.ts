@@ -1,15 +1,17 @@
 /**
- * Firebase client (PokéTFT Arena) — Realtime Database.
+ * Firebase client (PokéTFT Arena) — Realtime Database + Anonymous Auth.
  * Config values are public-safe identifiers (not secrets).
  *
- * Identity: we use a persistent client id (localStorage) instead of Firebase
- * Auth for now — anonymous auth needs a one-time console enable. The /games
- * rules are currently open for the testing phase; lock them back to
- * `auth != null` once anonymous sign-in is enabled in the Firebase console.
+ * Identity: we prefer Firebase Anonymous Auth (server-issued `auth.uid`, which
+ * the RTDB rules can bind writes to). If anonymous sign-in isn't enabled yet
+ * (one-time Firebase console toggle), we fall back to a per-tab sessionStorage
+ * id so the game keeps working — but the locked `auth != null` rules can only
+ * be deployed once anonymous auth is live for every client.
  */
 
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getDatabase, type Database } from "firebase/database";
+import { getAuth, signInAnonymously, type Auth } from "firebase/auth";
 
 const config = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "AIzaSyCtPKFSNFcu3DGIr3tMgsVMr1Dm0_K7yCA",
@@ -23,6 +25,7 @@ const config = {
 
 let app: FirebaseApp | null = null;
 let dbInstance: Database | null = null;
+let authInstance: Auth | null = null;
 
 function ensureApp(): FirebaseApp {
   if (app) return app;
@@ -35,20 +38,41 @@ export function db(): Database {
   return dbInstance;
 }
 
+export function auth(): Auth {
+  if (!authInstance) authInstance = getAuth(ensureApp());
+  return authInstance;
+}
+
 function randomId(): string {
   return "u-" + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
 }
 
-/**
- * A per-TAB client id (sessionStorage, not localStorage) so two tabs of the
- * same browser are two distinct players — survives a refresh within the tab.
- */
-export function ensureAuth(): Promise<string> {
-  if (typeof window === "undefined") return Promise.resolve("srv-" + randomId());
+/** Per-tab fallback id (sessionStorage) when Anonymous Auth isn't available. */
+function fallbackId(): string {
+  if (typeof window === "undefined") return "srv-" + randomId();
   let id = window.sessionStorage.getItem("poketft_uid");
   if (!id) {
     id = randomId();
     window.sessionStorage.setItem("poketft_uid", id);
   }
-  return Promise.resolve(id);
+  return id;
+}
+
+/**
+ * Resolve this player's identity for room operations. If the user is already
+ * signed in (Google / email account, or a prior guest session), use that uid.
+ * Otherwise sign in anonymously as a guest. Falls back to a per-tab id only if
+ * anonymous auth is unavailable.
+ */
+export async function ensureAuth(): Promise<string> {
+  if (typeof window === "undefined") return "srv-" + randomId();
+  const a = auth();
+  if (a.currentUser) return a.currentUser.uid;
+  try {
+    const cred = await signInAnonymously(a);
+    return cred.user.uid;
+  } catch (e) {
+    console.warn("[auth] anonymous sign-in unavailable, using fallback id:", (e as Error)?.message);
+    return fallbackId();
+  }
 }

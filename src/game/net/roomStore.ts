@@ -5,6 +5,7 @@ import {
   ref, set, update, get, onValue, onDisconnect, remove, serverTimestamp, type DatabaseReference,
 } from "firebase/database";
 import { db, ensureAuth } from "./firebase";
+import { setCurrentGame } from "./users";
 import type { UnitInstance } from "../types";
 
 export type RoomPhase = "lobby" | "planning" | "combat" | "carousel" | "over";
@@ -170,6 +171,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       // Drop our player entry if we disconnect.
       onDisconnect(ref(db(), `games/${code}/players/${uid}/connected`)).set(false);
       setState({ code, myUid: uid, status: "connected" });
+      setCurrentGame(uid, code);
       rememberRoom(code);
       return code;
     } catch (e) {
@@ -206,6 +208,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       subscribe(code, uid, setState);
       onDisconnect(ref(db(), `games/${code}/players/${uid}/connected`)).set(false);
       setState({ code, myUid: uid, status: "connected" });
+      setCurrentGame(uid, code);
       rememberRoom(code);
       return true;
     } catch (e) {
@@ -272,6 +275,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       subscribe(code, uid, setState);
       onDisconnect(ref(db(), `games/${code}/players/${uid}/connected`)).set(false);
       setState({ code, myUid: uid, status: "connected" });
+      setCurrentGame(uid, code);
     } catch {
       forgetRoom();
     }
@@ -280,6 +284,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
   leave: () => {
     const { code, myUid, room } = getState();
     if (unsub) { unsub(); unsub = null; }
+    if (myUid) setCurrentGame(myUid, null);
     if (code && myUid) {
       // If I'm the last connected human, delete the whole room so abandoned games
       // don't accumulate in RTDB. Otherwise just drop my player node.
