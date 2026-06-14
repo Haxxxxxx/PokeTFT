@@ -6,6 +6,7 @@ import { startServerTime } from "@/game/net/serverTime";
 import { WelcomeScreen } from "@/components/welcome/WelcomeScreen";
 import { LobbyScreen } from "@/components/lobby/LobbyScreen";
 import { NetGameClient } from "@/components/game/NetGameClient";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 /**
  * Top-level switch driven by the networked room:
@@ -23,7 +24,9 @@ export function AppRoot() {
     reconnect();
   }, [reconnect]);
 
-  if (!code || !room) return <WelcomeScreen />;
-  if (room.meta?.phase === "lobby") return <LobbyScreen />;
-  return <NetGameClient />;
+  return (
+    <ErrorBoundary>
+      {!code || !room ? <WelcomeScreen /> : room.meta?.phase === "lobby" ? <LobbyScreen /> : <NetGameClient />}
+    </ErrorBoundary>
+  );
 }

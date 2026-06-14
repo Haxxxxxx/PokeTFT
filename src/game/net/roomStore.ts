@@ -118,6 +118,12 @@ let unsub: (() => void) | null = null;
  *  game looks like a freeze with no signal. */
 const onWriteErr = (e: unknown) => console.error("[rtdb-write]", e);
 
+/** A room read is only usable if it has the core shape. Guards against malformed
+ *  or partially-written nodes crashing the client on join/reconnect. */
+function isValidRoom(d: unknown): d is Room {
+  return !!d && typeof d === "object" && !!(d as Room).meta && typeof (d as Room).meta === "object" && !!(d as Room).players;
+}
+
 const ROOM_KEY = "poketft_room";
 function rememberRoom(code: string) {
   if (typeof window !== "undefined") window.sessionStorage.setItem(ROOM_KEY, code);
@@ -182,7 +188,11 @@ export const useRoom = create<RoomState>((setState, getState) => ({
         setState({ status: "error", error: "Lobby not found" });
         return false;
       }
-      const data = snap.val() as Room;
+      const data = snap.val();
+      if (!isValidRoom(data)) {
+        setState({ status: "error", error: "Lobby not found" });
+        return false;
+      }
       const count = Object.values(data.players ?? {}).filter((p) => p.connected).length;
       if (count >= (data.rules?.maxPlayers ?? 8)) {
         setState({ status: "error", error: "Lobby is full" });
@@ -251,7 +261,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
     try {
       const uid = await ensureAuth();
       const snap = await get(roomRef(code));
-      if (!snap.exists()) { forgetRoom(); return; }
+      if (!snap.exists() || !isValidRoom(snap.val())) { forgetRoom(); return; }
       const data = snap.val() as Room;
       if (!data.players?.[uid]) {
         // We're no longer in this room (removed, or it moved on) — drop it.
@@ -268,9 +278,15 @@ export const useRoom = create<RoomState>((setState, getState) => ({
   },
 
   leave: () => {
-    const { code, myUid } = getState();
+    const { code, myUid, room } = getState();
     if (unsub) { unsub(); unsub = null; }
-    if (code && myUid) remove(ref(db(), `games/${code}/players/${myUid}`));
+    if (code && myUid) {
+      // If I'm the last connected human, delete the whole room so abandoned games
+      // don't accumulate in RTDB. Otherwise just drop my player node.
+      const otherHumans = Object.values(room?.players ?? {}).filter((p) => p.connected && !p.isBot && p.uid !== myUid);
+      if (otherHumans.length === 0) remove(roomRef(code)).catch(onWriteErr);
+      else remove(ref(db(), `games/${code}/players/${myUid}`)).catch(onWriteErr);
+    }
     forgetRoom();
     setState({ code: null, myUid: null, room: null, status: "idle", error: null });
   },
@@ -285,6 +301,7 @@ function subscribe(code: string, uid: string, setState: (p: Partial<RoomState>) 
       return;
     }
     const val = snap.val();
+    if (!val || typeof val !== "object" || !val.meta) return; // ignore malformed snapshots
     setState({
       room: {
         code,
