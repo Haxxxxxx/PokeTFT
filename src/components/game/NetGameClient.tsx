@@ -476,6 +476,7 @@ export function NetGameClient() {
               <CombatStage
                 result={combatResult}
                 opponentName={myCombat?.oppName ?? "Rival"}
+                pve={!!myCombat?.pve}
                 autoResolve
                 inline
                 syncStart={meta.deadline - COMBAT_MS}
@@ -507,9 +508,14 @@ export function NetGameClient() {
         const picked = pickedKey === key;
         if (!opts) return null;
         return (
-          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4">
-            <h2 className="text-lg font-extrabold text-amber-300 mb-1">Carousel</h2>
-            <p className="text-xs text-slate-400 mb-5">{picked ? "Picked — waiting for the round to continue…" : "Pick one free reward for your bench."}</p>
+          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4" style={{ background: "radial-gradient(58% 58% at 50% 38%, rgba(146,64,14,0.32), rgba(2,6,23,0.93))", backdropFilter: "blur(7px)" }}>
+            <div className="celebrate-pop flex flex-col items-center">
+              <div className="flex items-center gap-2.5 mb-1">
+                <span className="text-2xl">🎡</span>
+                <h2 className="text-2xl font-extrabold text-amber-300 tracking-tight">{lang === "fr" ? "Carrousel" : "Carousel"}</h2>
+              </div>
+              <p className="text-xs text-slate-300/80">{picked ? (lang === "fr" ? "Choisi — en attente du tour…" : "Picked — waiting for the round…") : (lang === "fr" ? "Choisis une récompense gratuite." : "Pick one free reward.")}</p>
+              <div className="text-[11px] tabular-nums font-bold text-amber-200/70 mt-0.5 mb-5">{secondsLeft}s</div>
             {!picked && (
               <div className="flex gap-3 flex-wrap justify-center max-w-[760px]">
                 {opts.map((pick, i) => pick === MEGA_STONE ? (
@@ -540,16 +546,21 @@ export function NetGameClient() {
                 })())}
               </div>
             )}
+            </div>
           </div>
         );
       })()}
 
       {/* Augment pick — 3 TFT-style boosts at the start of stages 2/3/4. */}
       {showAugment && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4">
-          <h2 className="text-lg font-extrabold text-violet-300 mb-1">{lang === "fr" ? "Augment" : "Augment"} {augSlotNow! + 1}/3</h2>
-          <p className="text-xs text-slate-400 mb-5">{lang === "fr" ? "Choisis un bonus permanent." : "Pick one permanent boost."}</p>
-          <div className="flex gap-3 flex-wrap justify-center max-w-[640px]">
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4" style={{ background: "radial-gradient(58% 58% at 50% 38%, rgba(76,29,149,0.4), rgba(2,6,23,0.93))", backdropFilter: "blur(7px)" }}>
+          <div className="celebrate-pop flex flex-col items-center">
+            <div className="flex items-center gap-2.5 mb-1">
+              <span className="text-2xl">✨</span>
+              <h2 className="text-2xl font-extrabold text-violet-300 tracking-tight">Augment {augSlotNow! + 1}/3</h2>
+            </div>
+            <p className="text-xs text-slate-300/80 mb-5">{lang === "fr" ? "Choisis un bonus permanent." : "Pick one permanent boost."}</p>
+            <div className="flex gap-3 flex-wrap justify-center max-w-[640px]">
             {augOptions.map((a) => (
               <button
                 key={a.id}
@@ -562,6 +573,7 @@ export function NetGameClient() {
                 <span className="text-[11px] text-slate-300 leading-snug">{lang === "fr" ? a.descFr : a.desc}</span>
               </button>
             ))}
+            </div>
           </div>
         </div>
       )}

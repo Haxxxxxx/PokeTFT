@@ -29,6 +29,7 @@ export function CombatStage({
   onResolve,
   autoResolve = false,
   inline = false,
+  pve = false,
   syncStart,
   syncWindowMs,
 }: {
@@ -37,6 +38,8 @@ export function CombatStage({
   onResolve: (won: boolean, survivors: number) => void;
   /** Multiplayer: the host clock advances the round, so hide the Continue button. */
   autoResolve?: boolean;
+  /** PvE (wild Pokémon) round — shown with a distinct banner. */
+  pve?: boolean;
   /** Render in-flow (inside the board column) instead of a fullscreen overlay,
    *  so the bench + shop stay reachable during the fight. */
   inline?: boolean;
@@ -138,9 +141,10 @@ export function CombatStage({
             {a.overtime ? t.cs_overtime : t.cs_vs}
           </span>
         </div>
-        <div className="flex-1 flex items-center justify-end gap-2 px-3 py-1.5 rounded-lg bg-rose-950/40 border border-rose-800/50">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-rose-400/80 leading-tight text-right truncate">{opponentName}</span>
-          <span className="text-2xl font-extrabold tabular-nums text-rose-300">{aliveEnemy}</span>
+        <div className={`flex-1 flex items-center justify-end gap-2 px-3 py-1.5 rounded-lg border ${pve ? "bg-emerald-950/40 border-emerald-800/50" : "bg-rose-950/40 border-rose-800/50"}`}>
+          {pve && <span className="text-sm">🌿</span>}
+          <span className={`text-[11px] font-bold uppercase tracking-wide leading-tight text-right truncate ${pve ? "text-emerald-400/80" : "text-rose-400/80"}`}>{opponentName}</span>
+          <span className={`text-2xl font-extrabold tabular-nums ${pve ? "text-emerald-300" : "text-rose-300"}`}>{aliveEnemy}</span>
         </div>
       </div>
 
