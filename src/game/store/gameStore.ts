@@ -1,8 +1,8 @@
 import { create } from "zustand";
-import { ECONOMY, XP_TO_REACH, MAX_LEVEL, BOARD, boardSizeForLevel, roundKind, advanceRound, stageBaseDamage, streakGold, type Cost, type RoundKind } from "../config";
+import { ECONOMY, XP_TO_REACH, MAX_LEVEL, BOARD, boardSizeForLevel, roundKind, roundsInStage, advanceRound, stageBaseDamage, streakGold, type Cost, type RoundKind } from "../config";
 import type { UnitInstance } from "../types";
 import { getDef } from "../data/mons";
-import { makeRng, type Rng } from "../engine/rng";
+import { makeRng, randInt, type Rng } from "../engine/rng";
 import { makePool, makeUnitsByCost, rollShop, takeFromPool, returnToPool, type Pool, type UnitsByCost } from "../engine/shop";
 import { roundIncome, sellValue, interest } from "../engine/economy";
 import { applyCombines, makeInstance } from "../engine/combine";
@@ -302,7 +302,23 @@ export const useGame = create<State>((set, get) => ({
     const income = ECONOMY.baseIncome + interest(state.gold) + streakGold(streak);
     const newXp = state.xp + ECONOMY.passiveXpPerRound;
     const shop = state.frozen ? state.shop : rollShop(levelFromXp(newXp), state.pool, rng, state.unitsByCost);
-    set({ gold: state.gold + income, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false });
+
+    // PvE loot: if the round we just finished was a PvE round, drop extra gold and
+    // occasionally an item or a free low-cost unit — keeps the economy moving.
+    let bonusGold = 0;
+    let items = state.items;
+    let units = state.units;
+    const prev = round > 1 ? { stage, round: round - 1 } : { stage: stage - 1, round: roundsInStage(stage - 1) };
+    if (prev.stage >= 1 && roundKind(prev.stage, prev.round) === "pve") {
+      bonusGold = 2 + Math.floor(stage / 2);
+      if (rng() < 0.3) items = [...items, ITEM_POOL[randInt(rng, ITEM_POOL.length)].id];
+      const cheap = [...(state.unitsByCost[1] ?? []), ...(state.unitsByCost[2] ?? [])];
+      if (rng() < 0.25 && cheap.length && units.filter((u) => u.pos === null).length < BENCH_SIZE) {
+        units = applyCombines([...units, makeInstance(cheap[randInt(rng, cheap.length)])]);
+      }
+    }
+
+    set({ gold: state.gold + income + bonusGold, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false, items, units });
   },
 
   netCarouselPick: (pick) => {
