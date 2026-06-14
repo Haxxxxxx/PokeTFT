@@ -14,6 +14,7 @@ import { MEGA_STONE } from "@/game/data/mega";
 import { ITEM_POOL } from "@/game/data/itemPool";
 import { AUGMENTS, augmentSlot } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
+import { useUi } from "@/game/store/uiStore";
 import { makeRng } from "@/game/engine/rng";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import { MegaIcon } from "./icons";
@@ -82,6 +83,7 @@ export function NetGameClient() {
   const augments = useGame((s) => s.augments);
   const lang = useAppStore((s) => s.settings.language);
   const buyXp = useGame((s) => s.buyXp);
+  const reroll = useGame((s) => s.reroll);
   const moveToBoard = useGame((s) => s.moveToBoard);
   const moveToBench = useGame((s) => s.moveToBench);
   const sell = useGame((s) => s.sell);
@@ -210,6 +212,23 @@ export function NetGameClient() {
     for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
     return a.slice(0, 3);
   }, [augSlotNow, myUid]);
+
+  // Planning hotkeys: R reroll · L buy XP · S sell the inspected unit.
+  useEffect(() => {
+    if (phase !== "planning") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "r") { e.preventDefault(); reroll(); }
+      else if (k === "l") { e.preventDefault(); buyXp(); }
+      else if (k === "s") {
+        const iid = useUi.getState().inspect?.iid;
+        if (iid) { e.preventDefault(); sell(iid); useUi.getState().clearInspect(); }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase, reroll, buyXp, sell]);
 
   // When you're eliminated, default to watching the current leader.
   useEffect(() => {
@@ -551,6 +570,16 @@ export function NetGameClient() {
         </div>
       )}
 
+      {/* Shortcut hints (planning only). */}
+      {phase === "planning" && me?.alive && (
+        <div className="fixed bottom-2 left-2 z-30 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900/85 border border-slate-700/60 backdrop-blur-sm">
+          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mr-0.5">{lang === "fr" ? "Raccourcis" : "Keys"}</span>
+          <Kbd k="R" label={lang === "fr" ? "Reroll" : "Reroll"} />
+          <Kbd k="L" label="XP" />
+          <Kbd k="S" label={lang === "fr" ? "Vendre" : "Sell"} />
+        </div>
+      )}
+
       {/* Eliminated but the game isn't over — keep watching. Non-blocking banner;
           the scoreboard stays clickable so you can spectate any survivor. */}
       {!gameOver && me && !me.alive && (
@@ -571,6 +600,15 @@ export function NetGameClient() {
         </div>
       )}
     </DndContext>
+  );
+}
+
+function Kbd({ k, label }: { k: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1">
+      <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-600 text-[10px] font-bold text-slate-200 leading-none">{k}</kbd>
+      <span className="text-[10px] text-slate-400">{label}</span>
+    </span>
   );
 }
 
