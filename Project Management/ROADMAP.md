@@ -63,22 +63,21 @@
 **Statut** : langue/son/animations réinitialisés au rechargement  
 **Solution** : ajouter middleware `persist` (localStorage) dans `src/game/store/appStore.ts`
 
-### Localisation partielle
-**Statut** : FR/EN câblé sur welcome/lobby/topbar — reste de l'UI (NetGameClient, CombatStage, Scoreboard, UnitDetail…) en dur en anglais  
-**Solution** : étendre `src/lib/i18n.ts` avec les clés manquantes + câbler `useT()` dans les composants restants
+### ~~Localisation partielle~~ ✅ IMPLÉMENTÉ
+~FR/EN câblé sur welcome/lobby/topbar uniquement~  
+**Réalisé** : i18n étendu à ~115 clés, câblé dans LobbyScreen, NetGameClient, ShopBar, CombatStage, UnitDetail. Toute l'UI principale bascule en FR/EN en temps réel.
 
-### Système audio
-**Statut** : toggle son présent, aucun fichier audio ni Web Audio API  
-**À implémenter** : effets sonores (achat, combinaison, attaque, victoire/défaite, reroll) via `Howler.js` ou Web Audio natif
+### ~~Système audio~~ ✅ IMPLÉMENTÉ
+~Toggle son présent, aucun fichier audio~  
+**Réalisé** (`src/lib/audio.ts`) :
+- Cris Pokémon via PokeAPI CDN (`/cries/pokemon/latest/{id}.ogg`)
+- Sons UI Web Audio (oscillateurs) : buy, reroll, combine ★, freeze, victory, defeat
+- Cliquable sur le nom de l'ability dans UnitDetail
 
-### Vitesse d'animation étendue
-**Statut** : « Rapide » affecte uniquement la vitesse de lecture du combat  
-**À étendre** : animations de board (placement d'unité), transitions de phase, animations de shop
-
-### Roster Gen II–IX incomplet
-**Statut** : 12–15 représentants par génération ; seuls les Pokémon clés sont définis  
-**Manquant** : ~900 Pokémon non implémentés (roster officiel complet > 1000 entrées)  
-**Fichier cible** : `src/game/data/mons.ts`
+### Roster Gen II–IX partiellement complet
+**Statut** : 206 unités (18–23/gen), toutes générations jouables avec couverture des 5 tiers de coût  
+**Manquant** : ~800 Pokémon pour atteindre le roster officiel complet (> 1000 entrées)  
+**Fichier cible** : `src/game/data/mons.ts` (ajouter par priorité gameplay — types/rôles sous-représentés)
 
 ---
 
@@ -88,20 +87,11 @@
 - Pas d'animation sur le dépôt/déplacement d'unités hors combat
 - Suggestion : transition CSS `translate` sur les UnitChips lors des drags
 
-### Timeline — preview contenu
-- La timeline affiche les icônes (PvP/PvE/Carousel) mais pas les adversaires PvE ni les unités carousel à venir
-
 ### Historique de partie
 - Aucun récap post-game (traits actifs, unités posées, gold dépensé, matchups)
 
 ### Scoreboard enrichi
 - Afficher le board complet d'un autre joueur (mode spectateur en mode réseau)
-
-### Mode spectateur multijoueur
-- Observer un match en cours depuis la room sans y participer
-
-### Tutoriel / onboarding
-- Aucune aide en jeu : explication du shop, board, synergies, économie
 
 ### Responsive / mobile
 - UI conçue pour desktop large ; pas d'adaptation tactile

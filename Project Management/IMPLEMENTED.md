@@ -178,23 +178,24 @@
 
 ---
 
-## Roster — 140 unités Gen I–IX
+## Roster — 206 unités Gen I–IX
 
-| Génération | # | Exemples notables |
+| Génération | # | Notables |
 |---|---|---|
-| Gen I — Kanto | 42 | Starters Kanto, Magikarp, Eevee, Scyther, oiseaux légendaires, Mewtwo, Mew |
-| Gen II — Johto | 13 | Starters Johto, Mareep, Tyranitar, Steelix, Lugia, Ho-Oh, Celebi |
-| Gen III — Hoenn | 14 | Starters Hoenn, Ralts, Mawile, Metagross, Salamence, Kyogre, Groudon, Rayquaza |
-| Gen IV — Sinnoh | 15 | Starters Sinnoh, Riolu, Garchomp, Togekiss, Weavile, Dialga, Palkia, Giratina, Arceus |
-| Gen V — Unova | 13 | Starters Unova, Chandelure, Haxorus, Hydreigon, Reshiram, Zekrom, Kyurem, Victini |
-| Gen VI — Kalos | 10 | Starters Kalos, Aegislash, Goomy, Xerneas, Yveltal, Zygarde |
-| Gen VII — Alola | 11 | Starters Alola, Mimikyu, Jangmo-o, Solgaleo, Lunala, Necrozma |
-| Gen VIII — Galar | 10 | Starters Galar, Dreepy, Corviknight, Zacian, Zamazenta, Eternatus |
-| Gen IX — Paldea | 10 | Starters Paldea, Frigibax, Palafin, Koraidon, Miraidon, Terapagos |
+| Gen I — Kanto | 42 | Starters, Magikarp, Eevee, Scyther, Onix, Electabuzz, Jynx, Hitmonlee, Rhyhorn, Omanyte, Porygon, oiseaux légendaires, Mewtwo, Mew |
+| Gen II — Johto | 23 | Starters, Togepi, Marill, Hoppip, Espeon, Umbreon, Miltank, Heracross, Scizor, Tyranitar, Steelix, Lugia, Ho-Oh, Celebi, Raikou, Entei, Suicune |
+| Gen III — Hoenn | 22 | Starters, Ralts, Zigzagoon, Wingull, Shroomish, Sableye, Feebas, Mawile, Flygon, Metagross, Salamence, Kyogre, Groudon, Rayquaza, Latias, Latios |
+| Gen IV — Sinnoh | 23 | Starters, Starly, Shinx, Riolu, Cranidos, Shellos, Garchomp, Spiritomb, Hippopotas, Rotom, Froslass, Electivire, Togekiss, Weavile, Dialga, Palkia, Giratina, Arceus, Heatran |
+| Gen V — Unova | 21 | Starters, Pidove, Blitzle, Darumaka, Foongus, Chandelure, Haxorus, Excadrill, Mienfoo, Golurk, Hydreigon, Reshiram, Zekrom, Kyurem, Victini, Cobalion, Thundurus |
+| Gen VI — Kalos | 18 | Starters, Bunnelby, Skiddo, Fletchling, Klefki, Sylveon, Phantump, Tyrunt, Aegislash, Noibat, Goomy, Pancham, Xerneas, Yveltal, Zygarde, Diancie |
+| Gen VII — Alola | 19 | Starters, Grubbin, Yungoos, Mudbray, Wimpod, Rockruff, Mimikyu, Dhelmise, Jangmo-o, Tapu Koko, Tapu Lele, Silvally, Solgaleo, Lunala, Necrozma, Marshadow |
+| Gen VIII — Galar | 18 | Starters, Wooloo, Applin, Yamper, Clobbopus, Sinistea, Snom, Cramorant, Dracozolt, Rookidee, Dreepy, Urshifu, Zacian, Zamazenta, Eternatus, Calyrex |
+| Gen IX — Paldea | 18 | Starters, Lechonk, Tadbulb, Pawmi, Maschiff, Nacli, Charcadet, Rellor, Frigibax, Palafin, Great Tusk, Iron Valiant, Ogerpon, Koraidon, Miraidon, Terapagos |
 
-- **18 types** couverts (Fighting, Dark, Steel ajoutés)
+- **18 types** couverts : tous les types canoniques
 - **Traits** : 18 types × seuils + 7 rôles (Starter, Evolver, Swarm, Eeveelution, Fossil, Pseudo-Legend, Legendary, Mythic)
 - **Mega Evolution** : 9 formes actives
+- Chaque génération couvre les 5 tiers de coût (1-cost communs → 5-cost légendaires)
 
 ---
 
