@@ -114,6 +114,10 @@ type RoomState = {
 
 let unsub: (() => void) | null = null;
 
+/** Surface (don't swallow) RTDB write rejections — a silent failure during a
+ *  game looks like a freeze with no signal. */
+const onWriteErr = (e: unknown) => console.error("[rtdb-write]", e);
+
 const ROOM_KEY = "poketft_room";
 function rememberRoom(code: string) {
   if (typeof window !== "undefined") window.sessionStorage.setItem(ROOM_KEY, code);
@@ -212,31 +216,31 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       uid: id, name: `AI ${difficulty}`, isHost: false, connected: true, ready: true,
       isBot: true, botDifficulty: difficulty,
       hp: room.rules?.startingHp ?? 100, level: 1, alive: true, place: null, streak: 0,
-    });
+    }).catch(onWriteErr);
   },
 
   removePlayer: (uid) => {
     const { code } = getState();
     if (!code) return;
-    remove(ref(db(), `games/${code}/players/${uid}`));
+    remove(ref(db(), `games/${code}/players/${uid}`)).catch(onWriteErr);
   },
 
   updateMe: (patch) => {
     const { code, myUid } = getState();
     if (!code || !myUid) return;
-    update(ref(db(), `games/${code}/players/${myUid}`), patch);
+    update(ref(db(), `games/${code}/players/${myUid}`), patch).catch(onWriteErr);
   },
 
   setMeta: (patch) => {
     const { code } = getState();
     if (!code) return;
-    update(ref(db(), `games/${code}/meta`), { ...patch, updatedAt: serverTimestamp() });
+    update(ref(db(), `games/${code}/meta`), { ...patch, updatedAt: serverTimestamp() }).catch(onWriteErr);
   },
 
   setRules: (patch) => {
     const { code } = getState();
     if (!code) return;
-    update(ref(db(), `games/${code}/rules`), patch);
+    update(ref(db(), `games/${code}/rules`), patch).catch(onWriteErr);
   },
 
   reconnect: async () => {
