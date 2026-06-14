@@ -37,6 +37,9 @@ export type Dict = {
   l_wait_ready: string;
   l_starting: string;
   l_rules: string;
+  l_code: string;
+  l_copy: string;
+  l_lobby: string;
   // Lobby (networked)
   l_net_players: (n: number, max: number) => string;
   l_net_open_slot: string;
@@ -185,6 +188,9 @@ export const FR: Dict = {
   l_wait_ready: "Attente que tous les joueurs soient prêts.",
   l_starting: "Démarrage de la partie…",
   l_rules: "Règles de partie",
+  l_code: "Code lobby",
+  l_copy: "Copier",
+  l_lobby: "Salon",
   l_net_players: (n, max) => `${n} / ${max} joueur${n > 1 ? "s" : ""} · slots vides jouent comme fantômes`,
   l_net_open_slot: "Slot libre",
   l_net_add_ai: "Ajouter IA",
@@ -325,6 +331,9 @@ export const EN: Dict = {
   l_wait_ready: "Waiting for all players to be ready.",
   l_starting: "Starting game…",
   l_rules: "Game rules",
+  l_code: "Lobby code",
+  l_copy: "Copy",
+  l_lobby: "Lobby",
   l_net_players: (n, max) => `${n} / ${max} player${n > 1 ? "s" : ""} · empty slots play as ghosts`,
   l_net_open_slot: "Open slot",
   l_net_add_ai: "Add AI",
