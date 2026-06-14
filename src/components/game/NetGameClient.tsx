@@ -12,6 +12,9 @@ import { ECONOMY, MAX_LEVEL, XP_TO_REACH, streakGold, roundKind, advanceRound } 
 import { interest } from "@/game/engine/economy";
 import { MEGA_STONE } from "@/game/data/mega";
 import { ITEM_POOL } from "@/game/data/itemPool";
+import { AUGMENTS, augmentSlot } from "@/game/data/augments";
+import { useAppStore } from "@/game/store/appStore";
+import { makeRng } from "@/game/engine/rng";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import { MegaIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
@@ -75,6 +78,9 @@ export function NetGameClient() {
   const netRound = useGame((s) => s.netRound);
   const importSave = useGame((s) => s.importSave);
   const netCarouselPick = useGame((s) => s.netCarouselPick);
+  const pickAugment = useGame((s) => s.pickAugment);
+  const augments = useGame((s) => s.augments);
+  const lang = useAppStore((s) => s.settings.language);
   const buyXp = useGame((s) => s.buyXp);
   const moveToBoard = useGame((s) => s.moveToBoard);
   const moveToBench = useGame((s) => s.moveToBench);
@@ -191,6 +197,20 @@ export function NetGameClient() {
     return simulate(asBoard(spectateCombat.selfBoard), asBoard(spectateCombat.oppBoard));
   }, [phase, meta?.stage, meta?.round, spectate, spectateCombat?.oppUid]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Augment round? (stage 2/3/4 round 1). Show the pick until this slot is taken.
+  const augSlotNow = meta && phase === "planning" && me?.alive ? augmentSlot(meta.stage, meta.round) : null;
+  const augOptions = useMemo(() => {
+    if (augSlotNow == null) return [];
+    const owned = new Set(useGame.getState().augments);
+    const pool = AUGMENTS.filter((a) => !owned.has(a.id));
+    let seed = augSlotNow * 9973 + 7;
+    for (let i = 0; i < (myUid?.length ?? 0); i++) seed = (seed * 31 + myUid!.charCodeAt(i)) >>> 0;
+    const r = makeRng(seed >>> 0);
+    const a = [...pool];
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a.slice(0, 3);
+  }, [augSlotNow, myUid]);
+
   // When you're eliminated, default to watching the current leader.
   useEffect(() => {
     if (me && !me.alive && !spectate) {
@@ -267,6 +287,8 @@ export function NetGameClient() {
   }
 
   const streak = me?.streak ?? 0;
+  // Show the augment pick this slot until the player has taken it.
+  const showAugment = augSlotNow != null && augments.length === augSlotNow;
   // Spectating a rival from the scoreboard → watch their board, bench and fights
   // (read-only). Works while alive (scouting) and after death (keep watching).
   const spectating = !!spectate && spectate !== myUid && !!players[spectate];
@@ -362,6 +384,14 @@ export function NetGameClient() {
               <div className={`h-full transition-all ${phase === "combat" ? "bg-rose-400" : "bg-sky-400"}`} style={{ width: `${pct}%` }} />
             </div>
           </div>
+          {augments.length > 0 && (
+            <div className="flex items-center gap-1" title="Augments">
+              {augments.map((id, i) => {
+                const a = AUGMENTS.find((x) => x.id === id);
+                return <span key={i} className="w-7 h-7 rounded-md bg-violet-900/40 border border-violet-500/50 flex items-center justify-center text-sm" title={a ? (lang === "fr" ? `${a.nameFr} — ${a.descFr}` : `${a.name} — ${a.desc}`) : id}>{a?.icon ?? "◆"}</span>;
+              })}
+            </div>
+          )}
           {isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1">{t.net_host_badge}</span>}
           <button onClick={leave} className="ml-auto px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.net_leave}</button>
         </div>
@@ -498,6 +528,28 @@ export function NetGameClient() {
           </div>
         );
       })()}
+
+      {/* Augment pick — 3 TFT-style boosts at the start of stages 2/3/4. */}
+      {showAugment && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+          <h2 className="text-lg font-extrabold text-violet-300 mb-1">{lang === "fr" ? "Augment" : "Augment"} {augSlotNow! + 1}/3</h2>
+          <p className="text-xs text-slate-400 mb-5">{lang === "fr" ? "Choisis un bonus permanent." : "Pick one permanent boost."}</p>
+          <div className="flex gap-3 flex-wrap justify-center max-w-[640px]">
+            {augOptions.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => pickAugment(a.id)}
+                style={{ borderColor: "#a78bfa", boxShadow: "0 0 18px -3px #a78bfa88" }}
+                className="w-[180px] rounded-xl border-2 bg-gradient-to-b from-violet-900/40 to-slate-900/80 hover:-translate-y-1 transition-all p-4 flex flex-col items-center text-center gap-1"
+              >
+                <span className="text-3xl">{a.icon}</span>
+                <span className="text-sm font-bold text-violet-200">{lang === "fr" ? a.nameFr : a.name}</span>
+                <span className="text-[11px] text-slate-300 leading-snug">{lang === "fr" ? a.descFr : a.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Eliminated but the game isn't over — keep watching. Non-blocking banner;
           the scoreboard stays clickable so you can spectate any survivor. */}
