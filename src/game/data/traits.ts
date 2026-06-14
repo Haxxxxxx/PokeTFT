@@ -5,12 +5,12 @@ type RawTrait = Omit<TraitDef, "breakpoints">;
 const RAW: RawTrait[] = [
   // ───────────── Type / origin traits ─────────────
   {
-    key: "fire", label: "Fire", description: "Fire mons burn with raw offense.",
+    key: "fire", label: "Fire", description: "Fire mons burn enemies with their abilities.",
     tiers: [
-      { count: 2, effect: "Fire mons: +15% Attack Damage.", buff: { adMult: 1.15 } },
-      { count: 4, effect: "Fire mons: +32% Attack Damage.", buff: { adMult: 1.32 } },
-      { count: 6, effect: "Fire mons: +55% Attack Damage.", buff: { adMult: 1.55 } },
-      { count: 8, effect: "Fire mons: +85% Attack Damage.", buff: { adMult: 1.85 } },
+      { count: 2, effect: "+15% Attack Damage · abilities burn (3% HP/s).", buff: { adMult: 1.15, burnDps: 0.03 } },
+      { count: 4, effect: "+32% Attack Damage · burn 5% HP/s.", buff: { adMult: 1.32, burnDps: 0.05 } },
+      { count: 6, effect: "+55% Attack Damage · burn 7% HP/s.", buff: { adMult: 1.55, burnDps: 0.07 } },
+      { count: 8, effect: "+85% Attack Damage · burn 10% HP/s.", buff: { adMult: 1.85, burnDps: 0.1 } },
     ],
   },
   {
@@ -75,8 +75,8 @@ const RAW: RawTrait[] = [
     ],
   },
   {
-    key: "ghost", label: "Ghost", description: "Ghosts phase out of reach.",
-    tiers: [{ count: 2, effect: "Ghosts: +30 Armor & MR, +15% Attack Speed.", buff: { armorAdd: 30, mrAdd: 30, asMult: 1.15 } }],
+    key: "ghost", label: "Ghost", description: "Ghosts phase through defenses.",
+    tiers: [{ count: 2, effect: "Ghosts: +15% Attack Speed · ignore 40% of armor.", buff: { mrAdd: 20, asMult: 1.15, armorPen: 0.4 } }],
   },
   {
     key: "ground", label: "Ground", description: "Ground mons are heavy and durable.",
@@ -86,10 +86,10 @@ const RAW: RawTrait[] = [
     ],
   },
   {
-    key: "bug", label: "Bug", description: "Bugs swarm with relentless speed.",
+    key: "bug", label: "Bug", description: "Bugs swarm fast and drain life.",
     tiers: [
-      { count: 3, effect: "Bug mons: +22% Attack Speed.", buff: { asMult: 1.22 } },
-      { count: 6, effect: "Bug mons: +45% Attack Speed.", buff: { asMult: 1.45 } },
+      { count: 3, effect: "+22% Attack Speed · 15% lifesteal.", buff: { asMult: 1.22, lifeSteal: 0.15 } },
+      { count: 6, effect: "+45% Attack Speed · 30% lifesteal.", buff: { asMult: 1.45, lifeSteal: 0.3 } },
     ],
   },
   {
@@ -101,8 +101,8 @@ const RAW: RawTrait[] = [
     ],
   },
   {
-    key: "ice", label: "Ice", description: "Ice mons wield chilling magic.",
-    tiers: [{ count: 2, effect: "Ice mons: +30% Ability Power, +20 MR.", buff: { apMult: 1.3, mrAdd: 20 } }],
+    key: "ice", label: "Ice", description: "Ice mons freeze foes with their abilities.",
+    tiers: [{ count: 2, effect: "Ice mons: +30% Ability Power · 35% to freeze on ability.", buff: { apMult: 1.3, mrAdd: 20, freezeChance: 0.35 } }],
   },
   {
     key: "fairy", label: "Fairy", description: "Fairy magic blunts incoming damage for the team.",
@@ -112,25 +112,25 @@ const RAW: RawTrait[] = [
     ],
   },
   {
-    key: "fighting", label: "Fighting", description: "Fighting mons beat down with brute force.",
+    key: "fighting", label: "Fighting", description: "Fighting mons stagger foes with their blows.",
     tiers: [
-      { count: 2, effect: "Fighting mons: +22% Attack Damage.", buff: { adMult: 1.22 } },
-      { count: 4, effect: "Fighting mons: +45% Attack Damage.", buff: { adMult: 1.45 } },
+      { count: 2, effect: "+22% Attack Damage · 25% to stun on ability.", buff: { adMult: 1.22, stunChance: 0.25 } },
+      { count: 4, effect: "+45% Attack Damage · 40% to stun on ability.", buff: { adMult: 1.45, stunChance: 0.4 } },
     ],
   },
   {
-    key: "dark", label: "Dark", description: "Dark mons hit hard from the shadows.",
+    key: "dark", label: "Dark", description: "Dark mons land vicious critical strikes.",
     tiers: [
-      { count: 2, effect: "Dark mons: +22% Attack Damage.", buff: { adMult: 1.22 } },
-      { count: 4, effect: "Dark mons: +45% Attack Damage.", buff: { adMult: 1.45 } },
+      { count: 2, effect: "+18% Attack Damage · +20% crit chance.", buff: { adMult: 1.18, critAdd: 0.2 } },
+      { count: 4, effect: "+35% Attack Damage · +40% crit chance.", buff: { adMult: 1.35, critAdd: 0.4 } },
     ],
   },
   {
     key: "steel", label: "Steel", description: "Steel mons are fortresses of iron.",
     tiers: [
-      { count: 2, effect: "Steel mons: +30 Armor & MR.", buff: { armorAdd: 30, mrAdd: 30 } },
-      { count: 4, effect: "Steel mons: +65 Armor & MR, +12% HP.", buff: { armorAdd: 65, mrAdd: 65, hpMult: 1.12 } },
-      { count: 6, effect: "Steel mons: +110 Armor & MR, +25% HP.", buff: { armorAdd: 110, mrAdd: 110, hpMult: 1.25 } },
+      { count: 2, effect: "Steel mons: +30 Armor & MR · immune to status.", buff: { armorAdd: 30, mrAdd: 30, statusImmune: true } },
+      { count: 4, effect: "+65 Armor & MR, +12% HP · immune to status.", buff: { armorAdd: 65, mrAdd: 65, hpMult: 1.12, statusImmune: true } },
+      { count: 6, effect: "+110 Armor & MR, +25% HP · immune to status.", buff: { armorAdd: 110, mrAdd: 110, hpMult: 1.25, statusImmune: true } },
     ],
   },
 

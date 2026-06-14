@@ -167,7 +167,7 @@ export function LobbyScreen() {
       {/* Rules modal (host) */}
       {showRules && isHost && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setShowRules(false)}>
-          <div className="w-full max-w-[380px] max-h-[85vh] overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-[460px] max-h-[85vh] overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
               <h2 className="text-xs font-extrabold uppercase tracking-widest text-slate-400">{t.l_rules}</h2>
               <button onClick={() => setShowRules(false)} className="text-slate-500 hover:text-slate-300 text-xl leading-none">×</button>
