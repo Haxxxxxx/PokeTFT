@@ -3,7 +3,7 @@ import { db } from "./firebase";
 import { serverNow } from "./serverTime";
 import { simulate } from "../engine/combat";
 import { makeRng } from "../engine/rng";
-import { generateBoard, generateCreepBoard, pickCarouselOptions } from "../engine/enemy";
+import { generatePlayerLikeBoard, generateCreepBoard, pickCarouselOptions } from "../engine/enemy";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
 import type { UnitInstance } from "../types";
@@ -24,13 +24,10 @@ function gamePath(code: string) {
 /** A bot's board for a round, scaled by stage progress and difficulty. */
 function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string): UnitInstance[] {
   const cr = cumulativeRound(stage, round);
-  let level = Math.min(2 + Math.floor(cr / 3), 9);
-  if (difficulty === "easy") level = Math.max(1, level - 2);
-  else if (difficulty === "hard") level = Math.min(9, level + 1);
-  const count = Math.min(level, 8);
   let seed = 0;
   for (let i = 0; i < salt.length; i++) seed = (seed * 31 + salt.charCodeAt(i)) >>> 0;
-  return generateBoard(level, count, seed + cr);
+  // Economy-realistic: a board a real player could actually build at this round.
+  return generatePlayerLikeBoard(stage, round, difficulty, seed + cr);
 }
 
 /** Deterministic shuffle for pairings. */
