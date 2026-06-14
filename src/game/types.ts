@@ -66,10 +66,26 @@ export type UnitInstance = {
   items: string[];
 };
 
-/** One activation tier of a trait: how many units, and what it grants. */
+/** Concrete combat buff a trait tier grants. Applied at combat start. `scope`
+ *  "self" = units carrying the trait; "team" = every ally unit. */
+export type TraitBuff = {
+  scope?: "self" | "team";
+  hpMult?: number;
+  adMult?: number;
+  apMult?: number;
+  asMult?: number;
+  armorAdd?: number;
+  mrAdd?: number;
+  regenPerSec?: number;
+  shieldPct?: number;
+  manaAdd?: number;
+};
+
+/** One activation tier of a trait: how many units, what it grants (text + buff). */
 export type TraitTier = {
   count: number;
   effect: string;
+  buff?: TraitBuff;
 };
 
 /** A trait synergy, e.g. Fire 2/4/6, with a concrete effect at each tier. */

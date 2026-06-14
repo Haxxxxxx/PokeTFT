@@ -10,6 +10,8 @@ import type { UnitInstance, PokeType, Move } from "../types";
 import { getDef } from "../data/mons";
 import { effectiveness } from "../data/typeChart";
 import { isMegaActive, megaFormFor } from "../data/mega";
+import { computeTraits } from "./synergies";
+import { TRAITS_BY_KEY } from "../data/traits";
 import { allyToField, enemyToField, neighbors, hexDistance, hexKey, type Hex } from "./hex";
 
 export type Team = "ally" | "enemy";
@@ -46,6 +48,10 @@ type Combatant = {
   regenPerSec: number;    // leftovers: fraction of maxHp healed per second
   thornsPct: number;      // rocky-helmet: fraction of attacker maxHp on melee contact
   sashReady: boolean;     // focus-sash: survive a lethal blow once at full HP
+  // Cumulative contribution (for the live damage/tank/heal recap).
+  dmgDealt: number;
+  dmgTaken: number;
+  healed: number;
 };
 
 export type FrameUnit = {
@@ -58,6 +64,11 @@ export type FrameUnit = {
   manaFrac: number;
   alive: boolean;
   mega: boolean;
+  /** Cumulative up to this frame — drives the recap. */
+  dmgDealt: number;
+  dmgTaken: number;
+  healed: number;
+  name: string;
 };
 
 export type CombatEvent =
@@ -143,7 +154,36 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
     regenPerSec: has("leftovers") ? 0.05 : 0,
     thornsPct: has("rocky-helmet") ? 0.16 : 0,
     sashReady: has("focus-sash"),
+    dmgDealt: 0,
+    dmgTaken: 0,
+    healed: 0,
   };
+}
+
+/** Apply each active trait tier's buff to one team's combatants, deterministically.
+ *  "self" buffs hit units carrying the trait; "team" buffs hit the whole side. */
+function applyTraitBuffs(units: Combatant[], board: UnitInstance[], team: Team) {
+  const traits = computeTraits(board.filter((u) => u.pos !== null));
+  for (const tr of traits) {
+    if (tr.tier <= 0) continue;
+    const buff = TRAITS_BY_KEY[tr.key]?.tiers[tr.tier - 1]?.buff;
+    if (!buff) continue;
+    for (const c of units) {
+      if (c.team !== team) continue;
+      const def = getDef(c.defId);
+      const carries = (def.types as string[]).includes(tr.key) || (def.roles as string[]).includes(tr.key);
+      if (buff.scope !== "team" && !carries) continue;
+      if (buff.hpMult) { c.maxHp = Math.round(c.maxHp * buff.hpMult); c.hp = c.maxHp; }
+      if (buff.shieldPct) { const extra = Math.round(c.maxHp * buff.shieldPct); c.maxHp += extra; c.hp += extra; }
+      if (buff.adMult) c.ad = Math.round(c.ad * buff.adMult);
+      if (buff.apMult) c.apMult *= buff.apMult;
+      if (buff.asMult) c.attackSpeed *= buff.asMult;
+      if (buff.armorAdd) c.armor += buff.armorAdd;
+      if (buff.mrAdd) c.mr += buff.mrAdd;
+      if (buff.regenPerSec) c.regenPerSec += buff.regenPerSec;
+      if (buff.manaAdd) c.mana = Math.min(c.maxMana, c.mana + buff.manaAdd);
+    }
+  }
 }
 
 function snapshot(units: Combatant[], t: number, events: CombatEvent[]): Frame {
@@ -161,6 +201,10 @@ function snapshot(units: Combatant[], t: number, events: CombatEvent[]): Frame {
       manaFrac: u.maxMana > 0 ? u.mana / u.maxMana : 0,
       alive: u.alive,
       mega: u.mega,
+      dmgDealt: Math.round(u.dmgDealt),
+      dmgTaken: Math.round(u.dmgTaken),
+      healed: Math.round(u.healed),
+      name: u.name,
     })),
   };
 }
@@ -170,6 +214,9 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
     ...allies.filter((u) => u.pos).map((u) => toCombatant(u, "ally")),
     ...enemies.filter((u) => u.pos).map((u) => toCombatant(u, "enemy")),
   ];
+  // Trait synergies — applied as deterministic stat buffs at combat start.
+  applyTraitBuffs(units, allies, "ally");
+  applyTraitBuffs(units, enemies, "enemy");
   const byId = new Map(units.map((u) => [u.id, u]));
   const frames: Frame[] = [snapshot(units, 0, [])];
 
@@ -248,7 +295,9 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
     // Leftovers: steady regen each tick (capped at max HP).
     for (const u of units) {
       if (u.alive && u.regenPerSec > 0 && u.hp < u.maxHp) {
+        const before = u.hp;
         u.hp = Math.min(u.maxHp, u.hp + u.maxHp * u.regenPerSec * DT);
+        u.healed += u.hp - before;
       }
     }
 
@@ -272,24 +321,29 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
   return finalize(units, frames, t);
 }
 
-/** Apply a hit, honouring Focus Sash (survive one lethal blow at full HP). */
-function applyHit(to: Combatant, dmg: number) {
+/** Apply a hit, honouring Focus Sash (survive one lethal blow at full HP).
+ *  Records actual HP lost as the attacker's damage and the victim's tank. */
+function applyHit(from: Combatant | null, to: Combatant, dmg: number) {
+  const before = to.hp;
   const wasFull = to.hp >= to.maxHp;
   to.hp -= dmg;
   if (to.hp <= 0 && to.sashReady && wasFull) {
     to.hp = 1;
     to.sashReady = false;
   }
+  const lost = Math.max(0, before - to.hp);
+  to.dmgTaken += lost;
+  if (from) from.dmgDealt += lost;
 }
 
 function dealDamage(from: Combatant, to: Combatant, rawDmg: number, _kind: string, events: CombatEvent[]) {
   const dmg = Math.round(rawDmg * from.dmgMult); // life-orb boosts damage dealt
-  applyHit(to, dmg);
+  applyHit(from, to, dmg);
   to.mana = Math.min(to.maxMana, to.mana + MANA_ON_HIT);
   events.push({ kind: "attack", from: from.id, to: to.id });
   events.push({ kind: "hit", to: to.id, dmg });
   // Rocky Helmet thorns on melee contact; Life Orb recoil on the attacker.
-  if (to.thornsPct > 0 && from.range <= 1) from.hp -= from.maxHp * to.thornsPct;
+  if (to.thornsPct > 0 && from.range <= 1) applyHit(to, from, from.maxHp * to.thornsPct);
   if (from.lifeOrbSelfPct > 0) from.hp -= from.maxHp * from.lifeOrbSelfPct;
 }
 
@@ -302,7 +356,7 @@ function castAbility(caster: Combatant, target: Combatant, units: Combatant[], e
   const hitOne = (victim: Combatant) => {
     const e = effectiveness(caster.move.type, victim.types);
     const dmg = Math.round(base * e * (100 / (100 + victim.mr)) * caster.dmgMult);
-    applyHit(victim, dmg);
+    applyHit(caster, victim, dmg);
     events.push({ kind: "hit", to: victim.id, dmg, crit: e > 1 });
   };
 

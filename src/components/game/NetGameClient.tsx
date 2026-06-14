@@ -14,6 +14,7 @@ import { MEGA_STONE } from "@/game/data/mega";
 import { ITEM_POOL } from "@/game/data/itemPool";
 import { AUGMENTS, augmentSlot } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
+import { useUi } from "@/game/store/uiStore";
 import { makeRng } from "@/game/engine/rng";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import { MegaIcon } from "./icons";
@@ -26,6 +27,10 @@ function normUnit(u: UnitInstance): UnitInstance {
 }
 
 const ITEM_DEF_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
+
+// Fixed design canvas the game is laid out on; scaled uniformly to fit any screen.
+const DESIGN_W = 1440;
+const DESIGN_H = 880;
 
 function asUnits(u: unknown): UnitInstance[] {
   if (!u) return [];
@@ -82,6 +87,7 @@ export function NetGameClient() {
   const augments = useGame((s) => s.augments);
   const lang = useAppStore((s) => s.settings.language);
   const buyXp = useGame((s) => s.buyXp);
+  const reroll = useGame((s) => s.reroll);
   const moveToBoard = useGame((s) => s.moveToBoard);
   const moveToBench = useGame((s) => s.moveToBench);
   const sell = useGame((s) => s.sell);
@@ -101,22 +107,15 @@ export function NetGameClient() {
   const [pickedKey, setPickedKey] = useState<string | null>(null);
   const [spectate, setSpectate] = useState<string | null>(null);
 
-  // Scale-to-fit: shrink the whole board so it always fits the viewport, whatever
-  // the user's resolution. offsetWidth/Height are layout (pre-transform) sizes, so
-  // measuring while scaled is stable (no feedback loop).
-  const fitRef = useRef<HTMLDivElement>(null);
+  // Scale-to-fit against a FIXED design canvas (1440x880). Scaling off constants
+  // — not measured content — means it only changes when the window resizes, so it
+  // stays rock-stable across phases (no jump when combat/carousel swap in).
   const [scale, setScale] = useState(1);
   useEffect(() => {
-    const fit = () => {
-      const el = fitRef.current;
-      if (!el) return;
-      const s = Math.min(1, (window.innerWidth - 6) / el.offsetWidth, (window.innerHeight - 6) / el.offsetHeight);
-      setScale(s > 0.2 ? s : 1);
-    };
+    const fit = () => setScale(Math.min(1, (window.innerWidth - 8) / DESIGN_W, (window.innerHeight - 8) / DESIGN_H));
     const raf = requestAnimationFrame(fit);
     window.addEventListener("resize", fit);
-    const id = setInterval(fit, 700); // content height changes across phases
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", fit); clearInterval(id); };
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", fit); };
   }, []);
 
   // server time + a 250ms repaint so the shared timer counts down smoothly
@@ -210,6 +209,23 @@ export function NetGameClient() {
     for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
     return a.slice(0, 3);
   }, [augSlotNow, myUid]);
+
+  // Planning hotkeys: R reroll · L buy XP · S sell the inspected unit.
+  useEffect(() => {
+    if (phase !== "planning") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "r") { e.preventDefault(); reroll(); }
+      else if (k === "l") { e.preventDefault(); buyXp(); }
+      else if (k === "s") {
+        const iid = useUi.getState().inspect?.iid;
+        if (iid) { e.preventDefault(); sell(iid); useUi.getState().clearInspect(); }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase, reroll, buyXp, sell]);
 
   // When you're eliminated, default to watching the current leader.
   useEffect(() => {
@@ -313,11 +329,10 @@ export function NetGameClient() {
 
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-      <div className="w-full min-h-screen flex justify-center items-start overflow-hidden">
+      <div className="fixed inset-0 flex justify-center items-center overflow-hidden">
       <div
-        ref={fitRef}
-        style={{ transform: `scale(${scale})`, transformOrigin: "top center" }}
-        className="flex flex-col gap-3 w-full max-w-[1440px] p-3"
+        style={{ width: DESIGN_W, minHeight: DESIGN_H, transform: `scale(${scale})`, transformOrigin: "center" }}
+        className="flex flex-col gap-3 p-3 shrink-0"
       >
         {/* Round timeline: current stage + the next two, tagged by kind, with
             past results colored win/loss and the current round highlighted. */}
@@ -461,6 +476,7 @@ export function NetGameClient() {
               <CombatStage
                 result={combatResult}
                 opponentName={myCombat?.oppName ?? "Rival"}
+                pve={!!myCombat?.pve}
                 autoResolve
                 inline
                 syncStart={meta.deadline - COMBAT_MS}
@@ -492,9 +508,14 @@ export function NetGameClient() {
         const picked = pickedKey === key;
         if (!opts) return null;
         return (
-          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4">
-            <h2 className="text-lg font-extrabold text-amber-300 mb-1">Carousel</h2>
-            <p className="text-xs text-slate-400 mb-5">{picked ? "Picked — waiting for the round to continue…" : "Pick one free reward for your bench."}</p>
+          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4" style={{ background: "radial-gradient(58% 58% at 50% 38%, rgba(146,64,14,0.32), rgba(2,6,23,0.93))", backdropFilter: "blur(7px)" }}>
+            <div className="celebrate-pop flex flex-col items-center">
+              <div className="flex items-center gap-2.5 mb-1">
+                <span className="text-2xl">🎡</span>
+                <h2 className="text-2xl font-extrabold text-amber-300 tracking-tight">{lang === "fr" ? "Carrousel" : "Carousel"}</h2>
+              </div>
+              <p className="text-xs text-slate-300/80">{picked ? (lang === "fr" ? "Choisi — en attente du tour…" : "Picked — waiting for the round…") : (lang === "fr" ? "Choisis une récompense gratuite." : "Pick one free reward.")}</p>
+              <div className="text-[11px] tabular-nums font-bold text-amber-200/70 mt-0.5 mb-5">{secondsLeft}s</div>
             {!picked && (
               <div className="flex gap-3 flex-wrap justify-center max-w-[760px]">
                 {opts.map((pick, i) => pick === MEGA_STONE ? (
@@ -525,16 +546,21 @@ export function NetGameClient() {
                 })())}
               </div>
             )}
+            </div>
           </div>
         );
       })()}
 
       {/* Augment pick — 3 TFT-style boosts at the start of stages 2/3/4. */}
       {showAugment && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4">
-          <h2 className="text-lg font-extrabold text-violet-300 mb-1">{lang === "fr" ? "Augment" : "Augment"} {augSlotNow! + 1}/3</h2>
-          <p className="text-xs text-slate-400 mb-5">{lang === "fr" ? "Choisis un bonus permanent." : "Pick one permanent boost."}</p>
-          <div className="flex gap-3 flex-wrap justify-center max-w-[640px]">
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4" style={{ background: "radial-gradient(58% 58% at 50% 38%, rgba(76,29,149,0.4), rgba(2,6,23,0.93))", backdropFilter: "blur(7px)" }}>
+          <div className="celebrate-pop flex flex-col items-center">
+            <div className="flex items-center gap-2.5 mb-1">
+              <span className="text-2xl">✨</span>
+              <h2 className="text-2xl font-extrabold text-violet-300 tracking-tight">Augment {augSlotNow! + 1}/3</h2>
+            </div>
+            <p className="text-xs text-slate-300/80 mb-5">{lang === "fr" ? "Choisis un bonus permanent." : "Pick one permanent boost."}</p>
+            <div className="flex gap-3 flex-wrap justify-center max-w-[640px]">
             {augOptions.map((a) => (
               <button
                 key={a.id}
@@ -547,7 +573,18 @@ export function NetGameClient() {
                 <span className="text-[11px] text-slate-300 leading-snug">{lang === "fr" ? a.descFr : a.desc}</span>
               </button>
             ))}
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* Shortcut hints (planning only). */}
+      {phase === "planning" && me?.alive && (
+        <div className="fixed bottom-2 left-2 z-30 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900/85 border border-slate-700/60 backdrop-blur-sm">
+          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mr-0.5">{lang === "fr" ? "Raccourcis" : "Keys"}</span>
+          <Kbd k="R" label={lang === "fr" ? "Reroll" : "Reroll"} />
+          <Kbd k="L" label="XP" />
+          <Kbd k="S" label={lang === "fr" ? "Vendre" : "Sell"} />
         </div>
       )}
 
@@ -571,6 +608,15 @@ export function NetGameClient() {
         </div>
       )}
     </DndContext>
+  );
+}
+
+function Kbd({ k, label }: { k: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1">
+      <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-600 text-[10px] font-bold text-slate-200 leading-none">{k}</kbd>
+      <span className="text-[10px] text-slate-400">{label}</span>
+    </span>
   );
 }
 

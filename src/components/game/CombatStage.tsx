@@ -29,6 +29,7 @@ export function CombatStage({
   onResolve,
   autoResolve = false,
   inline = false,
+  pve = false,
   syncStart,
   syncWindowMs,
 }: {
@@ -37,6 +38,8 @@ export function CombatStage({
   onResolve: (won: boolean, survivors: number) => void;
   /** Multiplayer: the host clock advances the round, so hide the Continue button. */
   autoResolve?: boolean;
+  /** PvE (wild Pokémon) round — shown with a distinct banner. */
+  pve?: boolean;
   /** Render in-flow (inside the board column) instead of a fullscreen overlay,
    *  so the bench + shop stay reachable during the fight. */
   inline?: boolean;
@@ -138,9 +141,10 @@ export function CombatStage({
             {a.overtime ? t.cs_overtime : t.cs_vs}
           </span>
         </div>
-        <div className="flex-1 flex items-center justify-end gap-2 px-3 py-1.5 rounded-lg bg-rose-950/40 border border-rose-800/50">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-rose-400/80 leading-tight text-right truncate">{opponentName}</span>
-          <span className="text-2xl font-extrabold tabular-nums text-rose-300">{aliveEnemy}</span>
+        <div className={`flex-1 flex items-center justify-end gap-2 px-3 py-1.5 rounded-lg border ${pve ? "bg-emerald-950/40 border-emerald-800/50" : "bg-rose-950/40 border-rose-800/50"}`}>
+          {pve && <span className="text-sm">🌿</span>}
+          <span className={`text-[11px] font-bold uppercase tracking-wide leading-tight text-right truncate ${pve ? "text-emerald-400/80" : "text-rose-400/80"}`}>{opponentName}</span>
+          <span className={`text-2xl font-extrabold tabular-nums ${pve ? "text-emerald-300" : "text-rose-300"}`}>{aliveEnemy}</span>
         </div>
       </div>
 
@@ -247,6 +251,9 @@ export function CombatStage({
         </div>
       </div>
 
+      {/* Live damage / tank / heal recap for your team. */}
+      <CombatRecap units={a.units} label={t.cs_your_team} />
+
       {/* Controls */}
       <div className="flex items-center gap-2 mt-3 min-h-[40px]">
         {!finished ? (
@@ -287,6 +294,37 @@ export function CombatStage({
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Compact per-mon contribution recap (your team): damage dealt, tank, heal. */
+function CombatRecap({ units, label }: { units: FrameUnit[]; label: string }) {
+  const mine = units.filter((u) => u.team === "ally" && (u.dmgDealt + u.dmgTaken + u.healed) > 0);
+  if (mine.length === 0) return null;
+  const max = Math.max(1, ...mine.map((u) => Math.max(u.dmgDealt, u.dmgTaken)));
+  const sorted = [...mine].sort((a, b) => b.dmgDealt - a.dmgDealt);
+  return (
+    <div className="mt-2 w-full max-w-[440px] rounded-lg bg-slate-900/60 border border-slate-700/40 p-2">
+      <div className="flex items-center justify-between text-[9px] uppercase tracking-wider text-slate-500 mb-1 px-0.5">
+        <span>{label}</span>
+        <span className="flex gap-2"><span className="text-rose-400">DMG</span><span className="text-sky-400">TANK</span><span className="text-emerald-400">HEAL</span></span>
+      </div>
+      <div className="flex flex-col gap-1">
+        {sorted.map((u) => (
+          <div key={u.id} className={`flex items-center gap-1.5 ${u.alive ? "" : "opacity-50"}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={spriteUrl(u.dex)} alt="" width={18} height={18} style={{ imageRendering: "pixelated" }} />
+            <div className="flex-1 flex flex-col gap-px min-w-0">
+              <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden"><div className="h-full bg-rose-500" style={{ width: `${(u.dmgDealt / max) * 100}%` }} /></div>
+              <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden"><div className="h-full bg-sky-500" style={{ width: `${(u.dmgTaken / max) * 100}%` }} /></div>
+            </div>
+            <span className="w-9 text-right text-[10px] tabular-nums text-rose-300">{u.dmgDealt}</span>
+            <span className="w-9 text-right text-[10px] tabular-nums text-sky-300">{u.dmgTaken}</span>
+            <span className="w-9 text-right text-[10px] tabular-nums text-emerald-300">{u.healed}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

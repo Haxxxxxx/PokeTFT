@@ -83,9 +83,15 @@ export function generatePlayerLikeBoard(stage: number, round: number, difficulty
 
 /** A wild/creep board for PvE rounds — weak in the opening, ramping by stage.
  *  Stage 1 should be comfortably winnable so the player can build economy. */
-export function generateCreepBoard(stage: number, seed: number): UnitInstance[] {
+export function generateCreepBoard(stage: number, round: number, seed: number): UnitInstance[] {
+  // Stage 1 stays deliberately soft so newcomers win the opening PvE and build
+  // economy: one weak creep at 1-1, ramping by round. Later stages scale up.
+  if (stage === 1) {
+    const count = Math.min(round, 3); // 1-1 → 1, 1-2 → 2, 1-3 → 3
+    return generateBoard(1, count, seed * 13 + 101);
+  }
   const level = Math.min(1 + Math.floor(stage / 2), 6);
-  const count = Math.min(stage, 5);
+  const count = Math.min(stage + 1, 6);
   return generateBoard(level, count, seed * 13 + 101);
 }
 

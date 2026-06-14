@@ -18,3 +18,14 @@ export const TYPE_COLOR: Record<PokeType, string> = {
   rock: "#c7b78b", ghost: "#5269ac", dragon: "#0a6dc4", dark: "#5a5366",
   steel: "#5a8ea1", fairy: "#ec8fe6",
 };
+
+/** Glyph per trait (link) — types + role traits. Used by the synergy UI. */
+export const TRAIT_ICON: Record<string, string> = {
+  // types
+  normal: "●", fire: "🔥", water: "💧", electric: "⚡", grass: "🌿", ice: "❄",
+  fighting: "🥊", poison: "☠", ground: "⛰", flying: "🪶", psychic: "🌀", bug: "🐛",
+  rock: "🪨", ghost: "👻", dragon: "🐉", dark: "🌑", steel: "⚙", fairy: "✦",
+  // roles
+  starter: "🌱", evolver: "🔄", swarm: "🐝", eeveelution: "🦊", fossil: "🦴",
+  "pseudo-legendary": "💎", legendary: "🦅", "kanto-mythic": "🧬", mythic: "🌟",
+};
