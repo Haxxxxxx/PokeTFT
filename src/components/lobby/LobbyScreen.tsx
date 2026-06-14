@@ -1,17 +1,45 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRoom } from "@/game/net/roomStore";
+import { usePreLobby } from "@/game/store/preLobbyStore";
 import { beginMatch } from "@/game/net/match";
 import { LobbyCodeBadge } from "./LobbyCodeBadge";
-
-const HP_OPTIONS = [50, 75, 100, 125, 150, 200];
+import { GameRulesPanel } from "./GameRulesPanel";
 
 export function LobbyScreen() {
   const room = useRoom((s) => s.room);
   const myUid = useRoom((s) => s.myUid);
   const setReady = useRoom((s) => s.setReady);
   const setRules = useRoom((s) => s.setRules);
+  const addBot = useRoom((s) => s.addBot);
+  const removePlayer = useRoom((s) => s.removePlayer);
   const leave = useRoom((s) => s.leave);
+  const preRules = usePreLobby((s) => s.rules);
+  const setPreRules = usePreLobby((s) => s.setRules);
+
+  const isHost = room?.meta?.hostUid === myUid;
+
+  // Host: push the rules I edit (regions / items / HP) to the room so the match
+  // and the other players use them.
+  useEffect(() => {
+    if (!room || !isHost) return;
+    setRules({ startingHp: preRules.startingHp, generations: preRules.generations, itemsEnabled: preRules.itemsEnabled });
+  }, [isHost, room, setRules, preRules.startingHp, preRules.generations, preRules.itemsEnabled]);
+
+  // Non-host: mirror the room's rules into my local store so the panel shows
+  // the host's actual selections (read-only).
+  const roomGenKey = (room?.rules?.generations ?? [1]).join(",");
+  const roomItemKey = (room?.rules?.itemsEnabled ?? []).join(",");
+  const roomHp = room?.rules?.startingHp;
+  useEffect(() => {
+    if (!room || isHost) return;
+    setPreRules({
+      startingHp: room.rules?.startingHp ?? 100,
+      generations: room.rules?.generations ?? [1],
+      itemsEnabled: room.rules?.itemsEnabled ?? [],
+    });
+  }, [isHost, room, setPreRules, roomHp, roomGenKey, roomItemKey]);
 
   if (!room) return null;
 
@@ -19,7 +47,6 @@ export function LobbyScreen() {
     .filter((p) => p.connected)
     .sort((a, b) => Number(b.isHost) - Number(a.isHost) || a.name.localeCompare(b.name));
   const me = myUid ? room.players?.[myUid] : undefined;
-  const isHost = room.meta?.hostUid === myUid;
   const maxPlayers = room.rules?.maxPlayers ?? 8;
   const openSlots = Math.max(0, maxPlayers - players.length);
   const allReady = players.every((p) => p.ready);
@@ -58,25 +85,45 @@ export function LobbyScreen() {
                   p.ready ? "border-emerald-700/60 bg-emerald-950/20" : "border-slate-700 bg-slate-900/50"
                 }`}
               >
-                <div className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-sm font-extrabold text-slate-300">
-                  {p.name.slice(0, 1).toUpperCase()}
+                <div className={`w-9 h-9 rounded-lg border flex items-center justify-center text-sm font-extrabold ${p.isBot ? "bg-violet-950/50 border-violet-700 text-violet-300" : "bg-slate-800 border-slate-700 text-slate-300"}`}>
+                  {p.isBot ? "AI" : p.name.slice(0, 1).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-bold text-slate-100 truncate">{p.name}</span>
                     {p.isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1">Host</span>}
                     {p.uid === myUid && <span className="text-[9px] font-bold uppercase bg-sky-600 text-white rounded px-1">You</span>}
+                    {p.isBot && <span className="text-[9px] font-bold uppercase bg-violet-600 text-white rounded px-1">Bot</span>}
                   </div>
                   <span className={`text-[11px] font-semibold ${p.ready ? "text-emerald-400" : "text-slate-500"}`}>
-                    {p.ready ? "Ready" : "Not ready"}
+                    {p.isBot ? p.botDifficulty : p.ready ? "Ready" : "Not ready"}
                   </span>
                 </div>
+                {isHost && p.isBot && (
+                  <button onClick={() => removePlayer(p.uid)} title="Remove bot" className="text-slate-500 hover:text-rose-400 text-lg leading-none">×</button>
+                )}
               </div>
             ))}
             {Array.from({ length: openSlots }).map((_, i) => (
-              <div key={`open-${i}`} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed border-slate-800 bg-slate-900/20 text-slate-600">
-                <div className="w-9 h-9 rounded-lg border border-dashed border-slate-700" />
-                <span className="text-xs font-semibold">Open slot</span>
+              <div key={`open-${i}`} className="flex items-center gap-2 px-3 py-3 rounded-xl border border-dashed border-slate-800 bg-slate-900/20">
+                {isHost && i === 0 ? (
+                  <>
+                    <span className="text-[10px] uppercase tracking-wide text-slate-500 shrink-0">Add AI</span>
+                    <div className="flex gap-1 ml-auto">
+                      {(["easy", "medium", "hard"] as const).map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => addBot(d)}
+                          className="px-2 py-1 rounded-md bg-violet-900/50 hover:bg-violet-800 border border-violet-700 text-[10px] font-bold text-violet-200 capitalize"
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-xs font-semibold text-slate-600">Open slot</span>
+                )}
               </div>
             ))}
           </div>
@@ -110,13 +157,10 @@ export function LobbyScreen() {
           </div>
         </div>
 
-        {/* Host settings */}
-        <div className="w-72 shrink-0 rounded-xl border border-slate-800 bg-slate-900/60 backdrop-blur p-4 flex flex-col gap-5">
-          <h2 className="text-xs font-extrabold uppercase tracking-widest text-slate-400 border-b border-slate-800 pb-2">
-            Game settings {!isHost && <span className="text-slate-600">(host only)</span>}
-          </h2>
+        {/* Settings */}
+        <div className="w-72 shrink-0 rounded-xl border border-slate-800 bg-slate-900/60 backdrop-blur p-4 flex flex-col gap-5 overflow-y-auto max-h-[calc(100vh-140px)]">
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Players</h3>
+            <h3 className="text-xs font-extrabold uppercase tracking-widest text-slate-400 mb-2">Players</h3>
             <div className="flex flex-wrap gap-1.5">
               {[2, 3, 4, 5, 6, 7, 8].map((n) => (
                 <button
@@ -132,22 +176,8 @@ export function LobbyScreen() {
               ))}
             </div>
           </div>
-          <div>
-            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Starting HP</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {HP_OPTIONS.map((hp) => (
-                <button
-                  key={hp}
-                  disabled={!isHost}
-                  onClick={() => setRules({ startingHp: hp })}
-                  className={`px-2.5 h-8 rounded-md border text-xs font-bold transition-all disabled:opacity-30 ${
-                    (room.rules?.startingHp ?? 100) === hp ? "bg-amber-500 border-amber-400 text-black" : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500"
-                  }`}
-                >
-                  {hp}
-                </button>
-              ))}
-            </div>
+          <div className="border-t border-slate-800 pt-4">
+            <GameRulesPanel isHost={isHost} />
           </div>
         </div>
       </div>

@@ -26,7 +26,10 @@ export function WelcomeScreen() {
 
   async function handleCreate() {
     if (!canProceed || busy) return;
-    await host(trimmed, { startingHp: rules.startingHp, maxPlayers: rules.maxPlayers });
+    await host(trimmed, {
+      startingHp: rules.startingHp, maxPlayers: rules.maxPlayers,
+      generations: rules.generations, itemsEnabled: rules.itemsEnabled,
+    });
   }
 
   async function handleJoin() {

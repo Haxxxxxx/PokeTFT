@@ -67,6 +67,9 @@ type State = {
   carouselTake: (defId: string) => void;
   /** Multiplayer: grant a planning round's economy (income/xp/shop) for a host-driven round. */
   netRound: (stage: number, round: number, streak: number) => void;
+  /** Multiplayer: snapshot / restore the local economy for reconnect. */
+  exportSave: () => { gold: number; xp: number; level: number; units: UnitInstance[]; shop: (string | null)[]; items: string[] };
+  importSave: (save: { gold: number; xp: number; level: number; units?: UnitInstance[]; shop?: (string | null)[]; items?: string[] }) => void;
   grantItem: (itemId: string) => void;
   equipItem: (iid: string, itemId: string) => void;
   unequipItem: (iid: string, itemId: string) => void;
@@ -249,6 +252,16 @@ export const useGame = create<State>((set, get) => ({
     const shop = state.frozen ? state.shop : rollShop(levelFromXp(newXp), state.pool, rng, state.unitsByCost);
     set({ gold: state.gold + income, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false });
   },
+
+  exportSave: () => {
+    const s = get();
+    return { gold: s.gold, xp: s.xp, level: s.level, units: s.units, shop: s.shop, items: s.items };
+  },
+
+  importSave: (save) => set({
+    gold: save.gold, xp: save.xp, level: save.level,
+    units: save.units ?? [], shop: save.shop ?? [], items: save.items ?? [],
+  }),
 
   // Add an item to the inventory (carousel pick / loot).
   grantItem: (itemId) => set({ items: [...get().items, itemId] }),
