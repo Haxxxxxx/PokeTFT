@@ -5,6 +5,8 @@ import { useAppStore } from "@/game/store/appStore";
 export type Dict = {
   // Welcome
   w_subtitle: string;
+  w_hero_title: string;
+  w_how_to_play: string;
   w_username_label: string;
   w_username_placeholder: string;
   w_create: string;
@@ -153,6 +155,8 @@ export type Dict = {
 
 export const FR: Dict = {
   w_subtitle: "Teamfight Tactics — édition Pokémon",
+  w_hero_title: "Prêt au combat ?",
+  w_how_to_play: "Comment jouer",
   w_username_label: "Ton pseudo",
   w_username_placeholder: "Choisis un pseudo…",
   w_create: "⚔ Créer une partie",
@@ -291,6 +295,8 @@ export const FR: Dict = {
 
 export const EN: Dict = {
   w_subtitle: "Teamfight Tactics — Pokémon edition",
+  w_hero_title: "Ready to battle?",
+  w_how_to_play: "How to play",
   w_username_label: "Your username",
   w_username_placeholder: "Choose a username…",
   w_create: "⚔ Create a game",

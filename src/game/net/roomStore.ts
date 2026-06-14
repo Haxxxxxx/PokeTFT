@@ -97,6 +97,8 @@ type RoomState = {
   room: Room | null;
   status: Status;
   error: string | null;
+  /** True while reconnect() is re-attaching to a saved room after a refresh. */
+  reconnecting: boolean;
 
   host: (name: string, rules?: Partial<RoomRules>) => Promise<string | null>;
   join: (code: string, name: string) => Promise<boolean>;
@@ -154,6 +156,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
   room: null,
   status: "idle",
   error: null,
+  reconnecting: false,
 
   host: async (name, rules) => {
     setState({ status: "connecting", error: null });
@@ -261,23 +264,26 @@ export const useRoom = create<RoomState>((setState, getState) => ({
     if (getState().code) return; // already connected
     const code = window.sessionStorage.getItem(ROOM_KEY);
     if (!code) return;
+    setState({ reconnecting: true });
     try {
       const uid = await ensureAuth();
       const snap = await get(roomRef(code));
-      if (!snap.exists() || !isValidRoom(snap.val())) { forgetRoom(); return; }
+      if (!snap.exists() || !isValidRoom(snap.val())) { forgetRoom(); setState({ reconnecting: false }); return; }
       const data = snap.val() as Room;
       if (!data.players?.[uid]) {
         // We're no longer in this room (removed, or it moved on) — drop it.
         forgetRoom();
+        setState({ reconnecting: false });
         return;
       }
       await update(ref(db(), `games/${code}/players/${uid}`), { connected: true });
       subscribe(code, uid, setState);
       onDisconnect(ref(db(), `games/${code}/players/${uid}/connected`)).set(false);
-      setState({ code, myUid: uid, status: "connected" });
+      setState({ code, myUid: uid, status: "connected", reconnecting: false });
       setCurrentGame(uid, code);
     } catch {
       forgetRoom();
+      setState({ reconnecting: false });
     }
   },
 
