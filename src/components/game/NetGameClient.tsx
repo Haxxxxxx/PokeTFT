@@ -28,6 +28,10 @@ function normUnit(u: UnitInstance): UnitInstance {
 
 const ITEM_DEF_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 
+// Fixed design canvas the game is laid out on; scaled uniformly to fit any screen.
+const DESIGN_W = 1440;
+const DESIGN_H = 880;
+
 function asUnits(u: unknown): UnitInstance[] {
   if (!u) return [];
   return (Array.isArray(u) ? u : Object.values(u as Record<string, UnitInstance>)).map(normUnit);
@@ -103,22 +107,15 @@ export function NetGameClient() {
   const [pickedKey, setPickedKey] = useState<string | null>(null);
   const [spectate, setSpectate] = useState<string | null>(null);
 
-  // Scale-to-fit: shrink the whole board so it always fits the viewport, whatever
-  // the user's resolution. offsetWidth/Height are layout (pre-transform) sizes, so
-  // measuring while scaled is stable (no feedback loop).
-  const fitRef = useRef<HTMLDivElement>(null);
+  // Scale-to-fit against a FIXED design canvas (1440x880). Scaling off constants
+  // — not measured content — means it only changes when the window resizes, so it
+  // stays rock-stable across phases (no jump when combat/carousel swap in).
   const [scale, setScale] = useState(1);
   useEffect(() => {
-    const fit = () => {
-      const el = fitRef.current;
-      if (!el) return;
-      const s = Math.min(1, (window.innerWidth - 6) / el.offsetWidth, (window.innerHeight - 6) / el.offsetHeight);
-      setScale(s > 0.2 ? s : 1);
-    };
+    const fit = () => setScale(Math.min(1, (window.innerWidth - 8) / DESIGN_W, (window.innerHeight - 8) / DESIGN_H));
     const raf = requestAnimationFrame(fit);
     window.addEventListener("resize", fit);
-    const id = setInterval(fit, 700); // content height changes across phases
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", fit); clearInterval(id); };
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", fit); };
   }, []);
 
   // server time + a 250ms repaint so the shared timer counts down smoothly
@@ -332,11 +329,10 @@ export function NetGameClient() {
 
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-      <div className="w-full min-h-screen flex justify-center items-start overflow-hidden">
+      <div className="fixed inset-0 flex justify-center items-center overflow-hidden">
       <div
-        ref={fitRef}
-        style={{ transform: `scale(${scale})`, transformOrigin: "top center" }}
-        className="flex flex-col gap-3 w-full max-w-[1440px] p-3"
+        style={{ width: DESIGN_W, minHeight: DESIGN_H, transform: `scale(${scale})`, transformOrigin: "center" }}
+        className="flex flex-col gap-3 p-3 shrink-0"
       >
         {/* Round timeline: current stage + the next two, tagged by kind, with
             past results colored win/loss and the current round highlighted. */}
