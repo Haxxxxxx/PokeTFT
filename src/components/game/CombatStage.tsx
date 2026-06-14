@@ -4,6 +4,7 @@ import { memo, useEffect, useRef, useState } from "react";
 import { spriteUrl } from "@/game/data/mons";
 import { hexToPixel, fieldPixelSize, hexDistance, FIELD } from "@/game/engine/hex";
 import { TYPE_COLOR } from "@/game/ui";
+import { serverNow } from "@/game/net/serverTime";
 import type { CombatResult, FrameUnit } from "@/game/engine/combat";
 
 const TILE_W = 54;
@@ -26,6 +27,8 @@ export function CombatStage({
   onResolve,
   autoResolve = false,
   inline = false,
+  syncStart,
+  syncWindowMs,
 }: {
   result: CombatResult;
   opponentName: string;
@@ -35,10 +38,19 @@ export function CombatStage({
   /** Render in-flow (inside the board column) instead of a fullscreen overlay,
    *  so the bench + shop stay reachable during the fight. */
   inline?: boolean;
+  /** Multiplayer: server-time ms the combat phase started. When set (with
+   *  syncWindowMs), the replay is driven by the SHARED clock — every client
+   *  plays in lockstep and always finishes within the round, so local speed
+   *  controls can't desync what people see. The result itself is already
+   *  host-authoritative; this just keeps the visuals aligned. */
+  syncStart?: number;
+  /** Multiplayer: length of the combat phase in ms (COMBAT_MS). */
+  syncWindowMs?: number;
 }) {
   const frames = result.frames;
   const last = frames.length - 1;
   const totalTime = frames[last].t;
+  const clockDriven = syncStart != null && syncWindowMs != null;
   const [idx, setIdx] = useState(0);
   const [finished, setFinished] = useState(false);
   const [speed, setSpeed] = useState(1.5);
@@ -48,7 +60,19 @@ export function CombatStage({
 
   useEffect(() => {
     let raf = 0;
-    const loop = (ts: number) => {
+    // Lockstep playback: map elapsed shared-clock time onto the frame timeline,
+    // finishing at 85% of the window so the result banner shows before the
+    // round transitions. Identical on every client (deterministic frames +
+    // constant window), so nobody sees a different ending.
+    const loopSynced = () => {
+      const playWindow = (syncWindowMs! / 1000) * 0.85;
+      const elapsed = (serverNow() - syncStart!) / 1000;
+      const p = Math.max(0, Math.min(1, elapsed / playWindow));
+      setIdx(p * last);
+      if (p >= 1) { setFinished(true); return; }
+      raf = requestAnimationFrame(loopSynced);
+    };
+    const loopLocal = (ts: number) => {
       if (lastTs.current == null) lastTs.current = ts;
       const dtReal = (ts - lastTs.current) / 1000;
       lastTs.current = ts;
@@ -57,11 +81,11 @@ export function CombatStage({
         if (next >= last) { setFinished(true); return last; }
         return next;
       });
-      raf = requestAnimationFrame(loop);
+      raf = requestAnimationFrame(loopLocal);
     };
-    raf = requestAnimationFrame(loop);
+    raf = requestAnimationFrame(clockDriven ? loopSynced : loopLocal);
     return () => cancelAnimationFrame(raf);
-  }, [last]);
+  }, [last, clockDriven, syncStart, syncWindowMs]);
 
   const { w, h } = fieldPixelSize(TILE_W, TILE_H);
   const fi = Math.min(Math.floor(idx), last);
@@ -216,6 +240,10 @@ export function CombatStage({
       {/* Controls */}
       <div className="flex items-center gap-2 mt-3 min-h-[40px]">
         {!finished ? (
+          clockDriven ? (
+            // Lockstep with the shared clock — no local speed/skip (would desync visuals).
+            <span className="text-xs text-slate-500">Resolving combat…</span>
+          ) : (
           <>
             {[1, 1.5, 2, 4].map((sp) => (
               <button
@@ -230,6 +258,7 @@ export function CombatStage({
               Skip
             </button>
           </>
+          )
         ) : (
           <div className="flex flex-col items-center gap-2">
             <div className={`text-xl font-extrabold ${won ? "text-emerald-400" : result.winner === "draw" ? "text-slate-300" : "text-rose-400"}`}>

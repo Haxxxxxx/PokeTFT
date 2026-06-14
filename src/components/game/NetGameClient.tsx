@@ -68,7 +68,7 @@ export function NetGameClient() {
   const lastRoundKey = useRef<string | null>(null);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const actedDeadline = useRef(-1);
-  const [roundLog, setRoundLog] = useState<{ stage: number; round: number; won: boolean }[]>([]);
+  const [roundLog, setRoundLog] = useState<{ stage: number; round: number; won: boolean; pve: boolean }[]>([]);
   const [pickedKey, setPickedKey] = useState<string | null>(null);
 
   // server time + a 250ms repaint so the shared timer counts down smoothly
@@ -142,15 +142,16 @@ export function NetGameClient() {
     return simulate(asBoard(myCombat.selfBoard), asBoard(myCombat.oppBoard));
   }, [phase, meta?.stage, meta?.round, myCombat?.oppUid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Record PvP results into the round timeline (one entry per round, dedup by key).
+  // Record every combat round into the timeline (one entry per round, dedup by key).
+  // PvE rounds count too (win/loss vs wild Pokémon) so feedback starts at 1-1.
   useEffect(() => {
-    if (phase === "combat" && myCombat && !myCombat.pve && meta) {
+    if (phase === "combat" && myCombat && meta) {
       const key = `${meta.stage}-${meta.round}`;
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setRoundLog((h) => {
         const last = h[h.length - 1];
         if (last && `${last.stage}-${last.round}` === key) return h;
-        return [...h, { stage: meta.stage, round: meta.round, won: myCombat.won }];
+        return [...h, { stage: meta.stage, round: meta.round, won: myCombat.won, pve: !!myCombat.pve }];
       });
     }
   }, [phase, meta?.stage, meta?.round, myCombat?.oppUid, myCombat?.pve, meta]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -198,7 +199,11 @@ export function NetGameClient() {
             <span className="text-[10px] uppercase tracking-wider text-slate-500 shrink-0">Rounds</span>
             <div className="flex items-center gap-1">
               {roundLog.map((h, i) => (
-                <span key={i} title={`${h.stage}-${h.round}`} className={`w-6 h-6 rounded-md flex items-center justify-center text-[8px] font-bold ${h.won ? "bg-emerald-500/90 text-black" : "bg-rose-500/90 text-black"}`}>
+                <span
+                  key={i}
+                  title={`${h.stage}-${h.round} · ${h.pve ? "PvE" : "PvP"} · ${h.won ? "Win" : "Loss"}`}
+                  className={`w-6 h-6 rounded-md flex items-center justify-center text-[8px] font-bold ${h.won ? "bg-emerald-500/90 text-black" : "bg-rose-500/90 text-black"} ${h.pve ? "ring-1 ring-amber-300/70 ring-inset" : ""}`}
+                >
                   {h.stage}-{h.round}
                 </span>
               ))}
@@ -286,7 +291,15 @@ export function NetGameClient() {
             {/* During combat the board is "fighting" — show the replay in its place,
                 but keep the bench + shop below fully interactive. */}
             {phase === "combat" && combatResult && me?.alive ? (
-              <CombatStage result={combatResult} opponentName={myCombat?.oppName ?? "Rival"} autoResolve inline onResolve={() => {}} />
+              <CombatStage
+                result={combatResult}
+                opponentName={myCombat?.oppName ?? "Rival"}
+                autoResolve
+                inline
+                syncStart={meta.deadline - COMBAT_MS}
+                syncWindowMs={COMBAT_MS}
+                onResolve={() => {}}
+              />
             ) : (
               <Board />
             )}
