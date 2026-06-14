@@ -41,3 +41,27 @@ export function generateBoard(level: number, count: number, seed: number): UnitI
   }
   return board;
 }
+
+/** A wild/creep board for PvE rounds — weak in the opening, ramping by stage.
+ *  Stage 1 should be comfortably winnable so the player can build economy. */
+export function generateCreepBoard(stage: number, seed: number): UnitInstance[] {
+  const level = Math.min(1 + Math.floor(stage / 2), 6);
+  const count = Math.min(stage, 5);
+  return generateBoard(level, count, seed * 13 + 101);
+}
+
+/** Free unit choices offered on a carousel round. */
+export function pickCarouselOptions(stage: number, seed: number, n = 5): string[] {
+  const rng: Rng = makeRng((seed * 277 + stage * 51) >>> 0);
+  const level = Math.min(3 + stage, 9);
+  const odds = SHOP_ODDS[Math.min(Math.max(level, 1), 10)];
+  const out: string[] = [];
+  let guard = 0;
+  while (out.length < n && guard++ < 100) {
+    let cost = (weightedPick(rng, odds) + 1) as Cost;
+    while (BY_COST[cost].length === 0) cost = ((cost % 5) + 1) as Cost;
+    const id = BY_COST[cost][randInt(rng, BY_COST[cost].length)];
+    if (!out.includes(id)) out.push(id);
+  }
+  return out;
+}

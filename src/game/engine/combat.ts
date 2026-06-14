@@ -55,7 +55,7 @@ export type CombatEvent =
   | { kind: "hit"; to: string; dmg: number; crit?: boolean }
   | { kind: "death"; id: string };
 
-export type Frame = { t: number; units: FrameUnit[]; events: CombatEvent[] };
+export type Frame = { t: number; overtime: boolean; units: FrameUnit[]; events: CombatEvent[] };
 
 export type CombatResult = {
   winner: Team | "draw";
@@ -67,7 +67,8 @@ export type CombatResult = {
 
 // Tuning.
 const DT = 1 / 16; // 16 sim steps per second
-const MAX_TIME = 25;
+const MAX_TIME = 35;
+const OVERTIME_START = 15; // after this, a ramping storm forces a finish
 const MANA_PER_ATTACK = 10;
 const MANA_ON_HIT = 3;
 const MOVE_TIME = 0.3; // seconds per hex step
@@ -111,6 +112,7 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
 function snapshot(units: Combatant[], t: number, events: CombatEvent[]): Frame {
   return {
     t,
+    overtime: t > OVERTIME_START,
     events,
     units: units.map((u) => ({
       id: u.id,
@@ -203,6 +205,16 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
           u.moveCd = MOVE_TIME;
         }
       }
+    }
+
+    // Overtime: a ramping storm chips every survivor so stalemates can't run
+    // to the time limit. Damage % per second grows the longer overtime lasts.
+    if (t > OVERTIME_START) {
+      const pctPerSec = 0.05 + 0.06 * (t - OVERTIME_START);
+      for (const u of units) {
+        if (u.alive) u.hp -= u.maxHp * pctPerSec * DT;
+      }
+      cleanupDeaths(units, occupied, events);
     }
 
     frames.push(snapshot(units, t, events));

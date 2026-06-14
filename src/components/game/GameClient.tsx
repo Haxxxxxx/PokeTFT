@@ -6,7 +6,8 @@ import { useGame } from "@/game/store/gameStore";
 import { useCombat } from "@/game/store/combatStore";
 import { useLobby } from "@/game/store/lobbyStore";
 import { useUi } from "@/game/store/uiStore";
-import { startCombatFlow, resolveCombatFlow } from "@/game/store/flow";
+import { useCarousel } from "@/game/store/carouselStore";
+import { advanceFlow, resolveCombatFlow, resolveCarouselFlow } from "@/game/store/flow";
 import { TopBar } from "./TopBar";
 import { Board } from "./Board";
 import { Bench } from "./Bench";
@@ -14,7 +15,10 @@ import { ShopBar } from "./ShopBar";
 import { TraitPanel } from "./TraitPanel";
 import { UnitDetail } from "./UnitDetail";
 import { Scoreboard } from "./Scoreboard";
+import { Timeline } from "./Timeline";
+import { Carousel } from "./Carousel";
 import { CombatStage } from "./CombatStage";
+import { TrophyIcon } from "./icons";
 
 const PLAN_TIME = 30;
 
@@ -58,6 +62,7 @@ export function GameClient({ playerCount = 8, startingHp = 100 }: { playerCount?
   const players = useLobby((s) => s.players);
   const combatResult = useCombat((s) => s.result);
   const opponentName = useCombat((s) => s.opponentName);
+  const carouselActive = useCarousel((s) => s.options !== null);
   const viewId = useUi((s) => s.viewPlayerId);
   const setView = useUi((s) => s.setView);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -65,26 +70,37 @@ export function GameClient({ playerCount = 8, startingHp = 100 }: { playerCount?
   const [secs, setSecs] = useState(PLAN_TIME);
   const deadlineRef = useRef(0);
 
+  const resetGame = () => {
+    newGame(startingHp);
+    initLobby(Math.max(1, playerCount - 1), startingHp);
+    setView(null);
+    setSecs(PLAN_TIME);
+  };
+
   useEffect(() => {
     newGame(startingHp);
     initLobby(Math.max(1, playerCount - 1), startingHp);
   }, [newGame, initLobby, playerCount, startingHp]);
 
-  // One effect owns the planning countdown. It re-arms a deadline whenever the
-  // round changes or combat ends, and only ever calls setState from the interval
-  // callback (never synchronously in the effect body).
+  // One effect owns the planning countdown. It re-arms a fresh deadline whenever
+  // the round changes, combat ends, or a carousel opens, and only calls setState
+  // from the interval callback (never synchronously in the effect body).
   useEffect(() => {
     if (combatResult || health <= 0) return;
     deadlineRef.current = performance.now() + PLAN_TIME * 1000;
     const tick = () => {
       const remaining = Math.max(0, Math.ceil((deadlineRef.current - performance.now()) / 1000));
       setSecs(remaining);
-      if (remaining <= 0) startCombatFlow();
+      if (remaining <= 0) {
+        const opts = useCarousel.getState().options;
+        if (opts && opts.length) resolveCarouselFlow(opts[0]); // auto-pick first
+        else advanceFlow();
+      }
     };
     tick();
     const id = setInterval(tick, 250);
     return () => clearInterval(id);
-  }, [combatResult, health, stage, round]);
+  }, [combatResult, health, stage, round, carouselActive]);
 
   function onDragEnd(e: DragEndEvent) {
     const iid = String(e.active.id);
@@ -100,12 +116,16 @@ export function GameClient({ playerCount = 8, startingHp = 100 }: { playerCount?
   }
 
   const spectated = viewId ? players.find((p) => p.id === viewId) : null;
-  const aliveCount = (health > 0 ? 1 : 0) + players.filter((p) => p.alive).length;
+  const aliveAi = players.filter((p) => p.alive).length;
+  const aliveCount = (health > 0 ? 1 : 0) + aliveAi;
   const gameOver = health <= 0;
+  const victory = health > 0 && aliveAi === 0 && players.length > 0;
+  const inTopFour = health > 0 && aliveCount > 1 && aliveCount <= 4;
 
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
       <div className="flex flex-col gap-3 max-w-[1440px] mx-auto p-4">
+        <Timeline />
         <TopBar timer={<RoundTimer seconds={secs} />} />
         <div className="flex gap-3 items-start">
           <Scoreboard />
@@ -143,6 +163,15 @@ export function GameClient({ playerCount = 8, startingHp = 100 }: { playerCount?
         )}
       </div>
 
+      {/* Top-4 milestone (pops in when you reach the final four) */}
+      {inTopFour && (
+        <div key="top4" className="celebrate-pop fixed top-3 left-1/2 -translate-x-1/2 z-40 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500 text-black text-sm font-extrabold shadow-lg">
+          <TrophyIcon size={15} /> Top 4
+        </div>
+      )}
+
+      {carouselActive && <Carousel />}
+
       {combatResult && (
         <CombatStage
           result={combatResult}
@@ -151,12 +180,15 @@ export function GameClient({ playerCount = 8, startingHp = 100 }: { playerCount?
         />
       )}
 
-      {gameOver && (
+      {(gameOver || victory) && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm gap-4">
-          <div className="text-3xl font-extrabold text-rose-400">You were knocked out</div>
-          <div className="text-slate-300">You placed #{aliveCount + 1}</div>
+          <div className={`celebrate-pop flex flex-col items-center gap-3 ${victory ? "text-amber-300" : "text-rose-400"}`}>
+            {victory && <TrophyIcon size={56} />}
+            <div className="text-4xl font-extrabold">{victory ? "Victory Royale" : "You were knocked out"}</div>
+          </div>
+          <div className="text-slate-300 text-lg">{victory ? "Last trainer standing — you win!" : `You placed #${aliveCount + 1}`}</div>
           <button
-            onClick={() => { newGame(); initLobby(); setView(null); setSecs(PLAN_TIME); }}
+            onClick={resetGame}
             className="px-6 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold"
           >
             Play again

@@ -97,12 +97,30 @@ export type RoundKind = "pvp" | "pve" | "carousel";
 
 export function roundKind(stage: number, round: number): RoundKind {
   if (stage === 1) {
-    // 1-1..1-3 PvE creeps, 1-4 carousel
+    // 1-1..1-3 PvE creeps, 1-4 carousel (TFT-style short opener)
     return round === 4 ? "carousel" : "pve";
   }
   if (round === 4) return "carousel";
   if (round === 7) return "pve";
   return "pvp";
+}
+
+/** Stage 1 is a short 4-round opener; every later stage is the full 7. */
+export function roundsInStage(stage: number): number {
+  return stage === 1 ? 4 : 7;
+}
+
+/** The next round position, rolling over to the next stage when a stage ends. */
+export function advanceRound(stage: number, round: number): { stage: number; round: number } {
+  if (round >= roundsInStage(stage)) return { stage: stage + 1, round: 1 };
+  return { stage, round: round + 1 };
+}
+
+/** Total rounds elapsed up to and including (stage, round). Drives AI scaling. */
+export function cumulativeRound(stage: number, round: number): number {
+  let total = 0;
+  for (let s = 1; s < stage; s++) total += roundsInStage(s);
+  return total + round;
 }
 
 /** HP damage taken on a lost PvP round = stageBase + surviving enemy units. */
