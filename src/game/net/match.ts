@@ -165,7 +165,7 @@ export async function startCombat(code: string, room: Room): Promise<void> {
     // Everyone fights wild creeps — no HP loss, a breather to build.
     for (const p of alive) {
       const self = board(room.players[p.uid]);
-      const creeps = generateCreepBoard(stage, stage * 97 + room.meta.round * 13 + p.uid.length);
+      const creeps = generateCreepBoard(stage, room.meta.round, stage * 97 + room.meta.round * 13 + p.uid.length);
       const r = simulate(self, creeps);
       combat[p.uid] = { oppUid: p.uid, oppName: "Wild Pokémon", ghost: true, pve: true, won: r.winner === "ally", survivors: 0, dmg: 0, selfBoard: self, oppBoard: creeps };
     }

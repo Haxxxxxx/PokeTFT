@@ -32,7 +32,7 @@ export function advanceFlow(): void {
   // An empty board simply loses the fight (no soft-lock) — fair for PvP, harmless
   // for PvE since PvE never costs HP.
   if (kind === "pve") {
-    const creeps = generateCreepBoard(game.stage, game.stage * 17 + game.round);
+    const creeps = generateCreepBoard(game.stage, game.round, game.stage * 17 + game.round);
     useCombat.getState().start(board, creeps, "pve", null, "Wild Pokémon");
     return;
   }

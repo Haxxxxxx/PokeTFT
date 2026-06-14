@@ -142,9 +142,18 @@ export const useGame = create<State>((set, get) => ({
     rng = makeRng((Math.floor(Math.random() * 0x7fffffff) ^ Date.now()) >>> 0);
     const pool = makePool(allowedIds);
     const unitsByCost = makeUnitsByCost(allowedIds);
+    // Free starter unit, auto-placed on the front row, so the opening PvE round
+    // is never an empty board (the main reason new players lost at 1-1).
+    const starters = unitsByCost[1] ?? [];
+    const units: UnitInstance[] = [];
+    if (starters.length) {
+      const id = starters[randInt(rng, starters.length)];
+      takeFromPool(pool, id);
+      units.push({ ...makeInstance(id), pos: [3, BOARD.rows - 1] });
+    }
     set({
       pool, unitsByCost, gold: 4, xp: 0, level: 1, health: startingHp,
-      streak: 0, stage: 1, round: 1, units: [], frozen: false, history: [], items: [], augments: [],
+      streak: 0, stage: 1, round: 1, units, frozen: false, history: [], items: [], augments: [],
       shop: rollShop(1, pool, rng, unitsByCost),
     });
   },
