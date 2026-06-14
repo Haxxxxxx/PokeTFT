@@ -5,8 +5,11 @@ import { computeTraits } from "@/game/engine/synergies";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { TYPE_COLOR } from "@/game/ui";
 
-export function TraitPanel() {
-  const units = useGame((s) => s.units);
+import type { UnitInstance } from "@/game/types";
+
+export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {}) {
+  const storeUnits = useGame((s) => s.units);
+  const units = override ?? storeUnits;
   const board = units.filter((u) => u.pos !== null);
   const traits = computeTraits(board);
 

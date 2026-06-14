@@ -1,11 +1,12 @@
 "use client";
 
 import { useGame } from "@/game/store/gameStore";
+import { startCombatFlow } from "@/game/store/flow";
 import { ECONOMY, MAX_LEVEL, XP_TO_REACH, boardSizeForLevel, streakGold } from "@/game/config";
 import { interest } from "@/game/engine/economy";
-import { CoinIcon } from "./icons";
+import { CoinIcon, SwordIcon } from "./icons";
 
-export function TopBar() {
+export function TopBar({ timer }: { timer?: React.ReactNode }) {
   const gold = useGame((s) => s.gold);
   const level = useGame((s) => s.level);
   const xp = useGame((s) => s.xp);
@@ -14,8 +15,8 @@ export function TopBar() {
   const round = useGame((s) => s.round);
   const streak = useGame((s) => s.streak);
   const buyXp = useGame((s) => s.buyXp);
-  const endRound = useGame((s) => s.endRound);
-  const boardCount = useGame((s) => s.units.filter((u) => u.pos !== null).length);
+  const units = useGame((s) => s.units);
+  const boardCount = units.filter((u) => u.pos !== null).length;
 
   const atMax = level >= MAX_LEVEL;
   const base = XP_TO_REACH[level];
@@ -50,12 +51,14 @@ export function TopBar() {
         </button>
       </div>
 
-      <div className="ml-auto flex gap-2">
-        <button onClick={() => endRound(true)} className="px-3 py-2 rounded-md bg-emerald-700 hover:bg-emerald-600 text-xs font-bold">
-          Win round
-        </button>
-        <button onClick={() => endRound(false)} className="px-3 py-2 rounded-md bg-rose-800 hover:bg-rose-700 text-xs font-bold">
-          Lose round
+      <div className="ml-auto flex items-center gap-4">
+        {timer}
+        <button
+          onClick={() => startCombatFlow()}
+          disabled={boardCount === 0}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:hover:bg-amber-500 text-black text-sm font-extrabold"
+        >
+          <SwordIcon size={15} /> Start Combat
         </button>
       </div>
     </div>

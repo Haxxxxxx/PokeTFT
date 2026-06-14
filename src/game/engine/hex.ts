@@ -46,15 +46,18 @@ export function neighbors({ c, r }: Hex): Hex[] {
   return out;
 }
 
+// Pointy-top hexes: rows overlap vertically by 1/4 of tile height.
+const ROW_STEP = 0.75;
+
 /** Pixel center of a hex cell, given tile width/height. */
 export function hexToPixel({ c, r }: Hex, tileW: number, tileH: number): { x: number; y: number } {
   const x = c * tileW + (r & 1 ? tileW / 2 : 0) + tileW / 2;
-  const y = r * tileH * 0.82 + tileH / 2;
+  const y = r * tileH * ROW_STEP + tileH / 2;
   return { x, y };
 }
 
 export function fieldPixelSize(tileW: number, tileH: number): { w: number; h: number } {
-  return { w: FIELD.cols * tileW + tileW / 2, h: FIELD.rows * tileH * 0.82 + tileH * 0.2 };
+  return { w: FIELD.cols * tileW + tileW / 2, h: (FIELD.rows - 1) * tileH * ROW_STEP + tileH };
 }
 
 export function hexKey({ c, r }: Hex): string {

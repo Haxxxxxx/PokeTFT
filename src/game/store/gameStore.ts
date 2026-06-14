@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { ECONOMY, XP_TO_REACH, MAX_LEVEL, boardSizeForLevel, roundKind, type Cost } from "../config";
+import { ECONOMY, XP_TO_REACH, MAX_LEVEL, boardSizeForLevel, roundKind, stageBaseDamage, type Cost } from "../config";
 import type { UnitInstance } from "../types";
 import { getDef } from "../data/mons";
 import { makeRng, type Rng } from "../engine/rng";
@@ -46,7 +46,7 @@ type State = {
   moveToBoard: (iid: string, col: number, row: number) => void;
   moveToBench: (iid: string) => void;
   toggleFreeze: () => void;
-  endRound: (won: boolean) => void;
+  endRound: (won: boolean, survivors?: number) => void;
 };
 
 // Module-level RNG so the store stays serialisable; reseeded on newGame.
@@ -157,12 +157,16 @@ export const useGame = create<State>((set, get) => ({
 
   toggleFreeze: () => set({ frozen: !get().frozen }),
 
-  endRound: (won) => {
+  endRound: (won, survivors = 0) => {
     const state = get();
     const newStreak = won
       ? state.streak >= 0 ? state.streak + 1 : 1
       : state.streak <= 0 ? state.streak - 1 : -1;
     const income = roundIncome(state.gold, newStreak);
+
+    // HP damage on a loss = stage base + surviving enemy units.
+    const damage = won ? 0 : stageBaseDamage(state.stage) + survivors;
+    const health = Math.max(0, state.health - damage);
 
     // advance round / stage
     let stage = state.stage;
@@ -177,6 +181,7 @@ export const useGame = create<State>((set, get) => ({
       xp: newXp,
       level: levelFromXp(newXp),
       streak: newStreak,
+      health,
       stage, round, shop, frozen: false,
     });
   },

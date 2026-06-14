@@ -1,0 +1,45 @@
+/** Generates an AI board scaled to a level + unit count. Deterministic per seed. */
+
+import type { UnitInstance } from "../types";
+import { SHOP_ODDS, type Cost } from "../config";
+import { UNITS } from "../data/mons";
+import { makeRng, weightedPick, randInt, type Rng } from "./rng";
+
+const BY_COST: Record<Cost, string[]> = (() => {
+  const m = { 1: [], 2: [], 3: [], 4: [], 5: [] } as Record<Cost, string[]>;
+  for (const u of UNITS) m[u.cost].push(u.id);
+  return m;
+})();
+
+// Center-out columns, front row first so small teams meet in the middle.
+const COL_ORDER = [3, 2, 4, 1, 5, 0, 6];
+const ROW_ORDER = [1, 0, 2, 3];
+
+/** Build a board of `count` mons at shop-`level` quality. */
+export function generateBoard(level: number, count: number, seed: number): UnitInstance[] {
+  const rng: Rng = makeRng(seed >>> 0);
+  const odds = SHOP_ODDS[Math.min(Math.max(level, 1), 10)];
+
+  const board: UnitInstance[] = [];
+  for (let i = 0; i < count; i++) {
+    let cost = (weightedPick(rng, odds) + 1) as Cost;
+    while (BY_COST[cost].length === 0) cost = ((cost % 5) + 1) as Cost;
+    const defId = BY_COST[cost][randInt(rng, BY_COST[cost].length)];
+
+    // Higher level → better odds of upgraded mons (cheap units star up first).
+    let star: 1 | 2 | 3 = 1;
+    const upChance = Math.max(0, (level - 3) * 0.12);
+    if (cost <= 2 && rng() < upChance) star = rng() < 0.3 ? 3 : 2;
+    else if (cost <= 3 && rng() < upChance * 0.6) star = 2;
+
+    const col = COL_ORDER[i % COL_ORDER.length];
+    const row = ROW_ORDER[Math.floor(i / COL_ORDER.length) % ROW_ORDER.length];
+    board.push({ iid: `g${seed}_${i}`, defId, star, pos: [col, row], items: [] });
+  }
+  return board;
+}
+
+/** Legacy helper kept for any direct callers; scales count to stage. */
+export function generateEnemyBoard(stage: number, round: number, seed: number): UnitInstance[] {
+  return generateBoard(Math.min(3 + stage, 9), Math.min(2 + stage, 8), seed + round);
+}

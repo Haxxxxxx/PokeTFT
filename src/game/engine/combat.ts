@@ -10,7 +10,6 @@ import type { UnitInstance, PokeType, Move } from "../types";
 import { getDef } from "../data/mons";
 import { effectiveness } from "../data/typeChart";
 import { allyToField, enemyToField, neighbors, hexDistance, hexKey, type Hex } from "./hex";
-import { makeRng, type Rng } from "./rng";
 
 export type Team = "ally" | "enemy";
 
@@ -126,8 +125,7 @@ function snapshot(units: Combatant[], t: number, events: CombatEvent[]): Frame {
   };
 }
 
-export function simulate(allies: UnitInstance[], enemies: UnitInstance[], seed = 1): CombatResult {
-  const rng: Rng = makeRng(seed);
+export function simulate(allies: UnitInstance[], enemies: UnitInstance[], _seed = 1): CombatResult {
   const units: Combatant[] = [
     ...allies.filter((u) => u.pos).map((u) => toCombatant(u, "ally")),
     ...enemies.filter((u) => u.pos).map((u) => toCombatant(u, "enemy")),
@@ -150,15 +148,30 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[], seed =
       u.atkCd = Math.max(0, u.atkCd - DT);
       u.moveCd = Math.max(0, u.moveCd - DT);
 
-      // (Re)acquire target: nearest enemy, tiebreak by id for determinism.
+      // Keep the current target until it dies (stickiness avoids jitter), then
+      // re-acquire: prefer the nearest foe, but break ties toward the foe with
+      // the fewest current attackers so a team spreads its aggro instead of
+      // dogpiling a single unit.
       let target = u.targetId ? byId.get(u.targetId) : undefined;
       if (!target || !target.alive) {
         const foes = enemiesOf(u);
         if (foes.length === 0) continue;
+
+        const load = new Map<string, number>();
+        for (const ally of units) {
+          if (ally.alive && ally.team === u.team && ally.targetId) {
+            load.set(ally.targetId, (load.get(ally.targetId) ?? 0) + 1);
+          }
+        }
+
         target = foes.reduce((best, f) => {
           const d = hexDistance(u.pos, f.pos);
           const bd = hexDistance(u.pos, best.pos);
-          return d < bd || (d === bd && f.id < best.id) ? f : best;
+          if (d !== bd) return d < bd ? f : best;
+          const lf = load.get(f.id) ?? 0;
+          const lb = load.get(best.id) ?? 0;
+          if (lf !== lb) return lf < lb ? f : best;
+          return f.id < best.id ? f : best;
         });
         u.targetId = target.id;
       }

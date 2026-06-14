@@ -17,21 +17,21 @@ export function Stars({ star }: { star: number }) {
   );
 }
 
-export function UnitChip({ unit, size = 56 }: { unit: UnitInstance; size?: number }) {
+export function UnitChip({ unit, size = 56, interactive = true }: { unit: UnitInstance; size?: number; interactive?: boolean }) {
   const def = getDef(unit.defId);
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: unit.iid });
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: unit.iid, disabled: !interactive });
   const setInspect = useUi((s) => s.setInspect);
   const dex = def.dex[unit.star - 1];
   const color = COST_COLOR[def.cost];
 
   return (
     <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
+      ref={interactive ? setNodeRef : undefined}
+      {...(interactive ? listeners : {})}
+      {...(interactive ? attributes : {})}
       onClick={() => setInspect(unit.defId, unit.star)}
       style={{ width: size, height: size, borderColor: color, boxShadow: `0 0 6px ${color}66`, opacity: isDragging ? 0.4 : 1 }}
-      className="relative rounded-md border-2 bg-slate-900/80 cursor-grab active:cursor-grabbing select-none touch-none flex items-center justify-center"
+      className={`relative rounded-md border-2 bg-slate-900/80 select-none touch-none flex items-center justify-center ${interactive ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
       title={`${def.stageNames[unit.star - 1]} · click for details`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}

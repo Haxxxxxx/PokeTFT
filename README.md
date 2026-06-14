@@ -52,9 +52,10 @@ src/
 
 ## Roadmap
 - [x] **Phase 0** — scaffold, config, types, Gen 1 roster
-- [x] **Phase 1** — board + shop + economy + auto-evolution + traits (current)
-- [ ] **Phase 2** — deterministic auto-combat engine (hex pathing, moves, type-effectiveness) + Pixi replay
-- [ ] **Phase 3** — full loop vs 7 AI trainers, carousel, PvE rounds, lobby + responsive phone team view
+- [x] **Phase 1** — board + shop + economy + auto-evolution + traits
+- [x] **Phase 2** — deterministic auto-combat engine (hex pathing, moves, type-effectiveness) + replay
+- [x] **Phase 3** — 8-trainer lobby, AI-vs-AI off-screen rounds, HP ladder, spectate any board, round timer, polished combat visuals (current)
+- [ ] **Phase 3b** — lobby code + responsive phone team-view companion
 - [ ] **Phase 4** — items/held-items, augments, evolution animations, more mons
 - [ ] **Phase 5** — online multiplayer (server-authoritative)
 
@@ -63,5 +64,6 @@ src/
 - **Buy XP (4🪙)** to level up → bigger board
 - **Drag** mons between bench ↔ board hexes (drag onto an occupied hex to swap)
 - **Drag to the SELL zone** to refund
-- Buy 3 of the same mon → it **auto-evolves** to the next stage ⭐⭐ (9 → ⭐⭐⭐)
-- **Win/Lose round** buttons advance the economy (real combat lands in Phase 2)
+- Buy 3 of the same mon → it **auto-evolves** to the next evolution (9 → final stage)
+- **Click a mon** (or the info icon on a shop card) → docked detail panel on the right
+- **Start Combat** → a deterministic auto-battle plays out vs a stage-scaled AI board, with type-effectiveness damage; result applies streak + HP loss

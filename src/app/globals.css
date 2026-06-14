@@ -24,3 +24,36 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes combat-float {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-26px); opacity: 0; }
+}
+.combat-float {
+  animation: combat-float 0.7s ease-out forwards;
+}
+
+@keyframes combat-cast {
+  0% { transform: scale(0.4); opacity: 0.9; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+.combat-cast {
+  animation: combat-cast 0.5s ease-out forwards;
+}
+
+@keyframes combat-hitflash {
+  0% { opacity: 0.65; }
+  100% { opacity: 0; }
+}
+.combat-hitflash {
+  animation: combat-hitflash 0.18s ease-out forwards;
+  mix-blend-mode: overlay;
+}
+
+@keyframes combat-die {
+  0% { opacity: 0.9; transform: scale(1) translateY(0); }
+  100% { opacity: 0.12; transform: scale(0.85) translateY(4px); }
+}
+.combat-die {
+  animation: combat-die 0.4s ease-out forwards;
+}
