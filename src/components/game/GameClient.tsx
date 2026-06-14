@@ -46,7 +46,7 @@ function RoundTimer({ seconds }: { seconds: number }) {
   );
 }
 
-export function GameClient() {
+export function GameClient({ playerCount = 8, startingHp = 100 }: { playerCount?: number; startingHp?: number } = {}) {
   const newGame = useGame((s) => s.newGame);
   const moveToBoard = useGame((s) => s.moveToBoard);
   const moveToBench = useGame((s) => s.moveToBench);
@@ -66,9 +66,9 @@ export function GameClient() {
   const deadlineRef = useRef(0);
 
   useEffect(() => {
-    newGame();
-    initLobby();
-  }, [newGame, initLobby]);
+    newGame(startingHp);
+    initLobby(Math.max(1, playerCount - 1), startingHp);
+  }, [newGame, initLobby, playerCount, startingHp]);
 
   // One effect owns the planning countdown. It re-arms a deadline whenever the
   // round changes or combat ends, and only ever calls setState from the interval

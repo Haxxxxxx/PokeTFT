@@ -39,7 +39,7 @@ type LobbyState = {
   players: Player[];
   lastOpponent: number;
 
-  init: () => void;
+  init: (aiCount?: number, startingHp?: number) => void;
   pickOpponent: () => Player | null;
   /** Apply the human fight result to the human's opponent, then resolve all
    *  AI-vs-AI fights and grow every surviving AI board for the next round. */
@@ -50,11 +50,11 @@ export const useLobby = create<LobbyState>((set, get) => ({
   players: [],
   lastOpponent: -1,
 
-  init: () => {
-    const players: Player[] = RIVALS.map((name, i) => ({
+  init: (aiCount = RIVALS.length, startingHp = 100) => {
+    const players: Player[] = RIVALS.slice(0, Math.max(1, Math.min(aiCount, RIVALS.length))).map((name, i) => ({
       id: `ai${i}`,
       name,
-      health: 100,
+      health: startingHp,
       level: 2,
       board: generateBoard(2, 2, (i + 1) * 9176 + 3),
       streak: 0,
