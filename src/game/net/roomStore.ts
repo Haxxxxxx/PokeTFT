@@ -7,7 +7,7 @@ import {
 import { db, ensureAuth } from "./firebase";
 import type { UnitInstance } from "../types";
 
-export type RoomPhase = "lobby" | "planning" | "combat" | "over";
+export type RoomPhase = "lobby" | "planning" | "combat" | "carousel" | "over";
 
 export type BotDifficulty = "easy" | "medium" | "hard";
 
@@ -26,6 +26,8 @@ export type RoomPlayer = {
   alive: boolean;
   place: number | null;
   streak: number;
+  /** Previous round's opponent uid (for rematch avoidance). */
+  lastOpp?: string;
   /** The player's current on-board units (synced during planning). */
   board?: UnitInstance[];
   /** Full economy snapshot for reconnect (synced during planning). */
@@ -50,6 +52,8 @@ export type CombatAssign = {
   oppUid: string;
   oppName: string;
   ghost: boolean;
+  /** PvE round — fight wild creeps, no HP loss. */
+  pve?: boolean;
   won: boolean;
   survivors: number;
   dmg: number;
@@ -80,6 +84,8 @@ export type Room = {
   rules: RoomRules;
   players: Record<string, RoomPlayer>;
   combat?: Record<string, CombatAssign>;
+  /** Carousel round: per-player free-pick options (unit ids / mega-stone). */
+  carousel?: Record<string, string[]>;
 };
 
 type Status = "idle" | "connecting" | "connected" | "error";
@@ -282,6 +288,7 @@ function subscribe(code: string, uid: string, setState: (p: Partial<RoomState>) 
         rules: val.rules ?? { startingHp: 100, maxPlayers: 8 },
         players: val.players ?? {},
         combat: val.combat ?? {},
+        carousel: val.carousel ?? {},
       },
     });
   });

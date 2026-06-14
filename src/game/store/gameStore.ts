@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { ECONOMY, XP_TO_REACH, MAX_LEVEL, boardSizeForLevel, roundKind, advanceRound, stageBaseDamage, streakGold, type Cost, type RoundKind } from "../config";
+import { ECONOMY, XP_TO_REACH, MAX_LEVEL, BOARD, boardSizeForLevel, roundKind, advanceRound, stageBaseDamage, streakGold, type Cost, type RoundKind } from "../config";
 import type { UnitInstance } from "../types";
 import { getDef } from "../data/mons";
 import { makeRng, type Rng } from "../engine/rng";
@@ -7,9 +7,31 @@ import { makePool, makeUnitsByCost, rollShop, takeFromPool, returnToPool, type P
 import { roundIncome, sellValue, interest } from "../engine/economy";
 import { applyCombines, makeInstance } from "../engine/combine";
 import { MEGA_STONE } from "../data/mega";
+import { ITEM_POOL } from "../data/itemPool";
+
+const ITEM_IDS = new Set(ITEM_POOL.map((i) => i.id));
 
 export const BENCH_SIZE = 9;
 const INITIAL_SEED = 1337;
+
+/** RTDB returns arrays that have null/empty leading slots as objects keyed by
+ *  index (and strips empty arrays to undefined). Coerce back to a dense array
+ *  of the given length so `.map`/`.filter` never blow up after a reconnect. */
+function toArray<T>(v: unknown, len?: number): (T | null)[] {
+  let out: (T | null)[];
+  if (Array.isArray(v)) out = v as (T | null)[];
+  else if (v && typeof v === "object") {
+    const obj = v as Record<string, T>;
+    const keys = Object.keys(obj).map(Number).filter((k) => !Number.isNaN(k));
+    const max = keys.length ? Math.max(...keys) : -1;
+    out = Array.from({ length: max + 1 }, (_, i) => (i in obj ? obj[i] : null));
+  } else out = [];
+  if (len != null) {
+    out = out.slice(0, len);
+    while (out.length < len) out.push(null);
+  }
+  return out;
+}
 
 function levelFromXp(xp: number): number {
   let lvl = 1;
@@ -60,6 +82,7 @@ type State = {
   buyUnit: (slot: number) => void;
   sell: (iid: string) => void;
   moveToBoard: (iid: string, col: number, row: number) => void;
+  deployUnit: (iid: string) => void;
   moveToBench: (iid: string) => void;
   toggleFreeze: () => void;
   endRound: (won: boolean, survivors?: number) => void;
@@ -67,6 +90,8 @@ type State = {
   carouselTake: (defId: string) => void;
   /** Multiplayer: grant a planning round's economy (income/xp/shop) for a host-driven round. */
   netRound: (stage: number, round: number, streak: number) => void;
+  /** Multiplayer: take a carousel pick (unit or Mega Stone) without advancing the round. */
+  netCarouselPick: (pick: string) => void;
   /** Multiplayer: snapshot / restore the local economy for reconnect. */
   exportSave: () => { gold: number; xp: number; level: number; units: UnitInstance[]; shop: (string | null)[]; items: string[] };
   importSave: (save: { gold: number; xp: number; level: number; units?: UnitInstance[]; shop?: (string | null)[]; items?: string[] }) => void;
@@ -106,7 +131,9 @@ export const useGame = create<State>((set, get) => ({
   },
 
   newGame: (startingHp = ECONOMY.startingHealth, allowedIds?: string[]) => {
-    rng = makeRng(INITIAL_SEED);
+    // Fresh, independent randomness each game (and per player) — not a fixed seed,
+    // so every player's shop rolls differently.
+    rng = makeRng((Math.floor(Math.random() * 0x7fffffff) ^ Date.now()) >>> 0);
     const pool = makePool(allowedIds);
     const unitsByCost = makeUnitsByCost(allowedIds);
     set({
@@ -135,12 +162,16 @@ export const useGame = create<State>((set, get) => ({
     if (!defId) return;
     const cost = getDef(defId).cost as Cost;
     if (state.gold < cost) return;
-    if (state.benchUnits().length >= BENCH_SIZE) return;
     // Never buy more copies than the shared pool actually has left.
     if ((state.pool[defId] ?? 0) <= 0) return;
 
-    takeFromPool(state.pool, defId);
+    // Combine first, THEN gate on bench size: a 3rd copy that merges into a
+    // star-up frees its bench slots, so a full bench can still accept it.
     const units = applyCombines([...state.units, makeInstance(defId)]);
+    const benchAfter = units.filter((u) => u.pos === null).length;
+    if (benchAfter > BENCH_SIZE) return;
+
+    takeFromPool(state.pool, defId);
     const shop = [...state.shop];
     shop[slot] = null;
     set({ gold: state.gold - cost, units, shop, pool: { ...state.pool } });
@@ -178,6 +209,27 @@ export const useGame = create<State>((set, get) => ({
       return u;
     });
     set({ units });
+  },
+
+  // Quick-deploy a bench unit onto the first free board cell (front rows first),
+  // respecting the level cap. Used by double-click / the auto-deploy button.
+  deployUnit: (iid) => {
+    const state = get();
+    const unit = state.units.find((u) => u.iid === iid);
+    if (!unit || unit.pos !== null) return;
+    const cap = boardSizeForLevel(state.level);
+    const onBoard = state.boardUnits();
+    if (onBoard.length >= cap) return;
+    const taken = new Set(onBoard.map((u) => `${u.pos![0]}-${u.pos![1]}`));
+    // Front row (closest to the enemy) is the highest row index in player space.
+    for (let row = BOARD.rows - 1; row >= 0; row--) {
+      for (let col = 0; col < BOARD.cols; col++) {
+        if (!taken.has(`${col}-${row}`)) {
+          set({ units: state.units.map((u) => (u.iid === iid ? { ...u, pos: [col, row] as [number, number] } : u)) });
+          return;
+        }
+      }
+    }
   },
 
   moveToBench: (iid) => {
@@ -253,6 +305,15 @@ export const useGame = create<State>((set, get) => ({
     set({ gold: state.gold + income, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false });
   },
 
+  netCarouselPick: (pick) => {
+    const state = get();
+    // Item picks (Mega Stone or any held item) go to the inventory; otherwise a unit.
+    if (pick === MEGA_STONE || ITEM_IDS.has(pick)) { set({ items: [...state.items, pick] }); return; }
+    if (state.units.filter((u) => u.pos === null).length < BENCH_SIZE) {
+      set({ units: applyCombines([...state.units, makeInstance(pick)]) });
+    }
+  },
+
   exportSave: () => {
     const s = get();
     return { gold: s.gold, xp: s.xp, level: s.level, units: s.units, shop: s.shop, items: s.items };
@@ -260,7 +321,12 @@ export const useGame = create<State>((set, get) => ({
 
   importSave: (save) => set({
     gold: save.gold, xp: save.xp, level: save.level,
-    units: save.units ?? [], shop: save.shop ?? [], items: save.items ?? [],
+    // RTDB mangles arrays (objects for sparse, undefined for empty) and strips
+    // null values — so bench units lose `pos: null` and any unit can lose its
+    // empty `items`. Coerce back to dense arrays and restore both fields.
+    units: toArray<UnitInstance>(save.units).filter(Boolean).map((u) => ({ ...u!, pos: u!.pos ?? null, items: u!.items ?? [] })),
+    shop: toArray<string>(save.shop, ECONOMY.shopSlots),
+    items: toArray<string>(save.items).filter(Boolean) as string[],
   }),
 
   // Add an item to the inventory (carousel pick / loot).

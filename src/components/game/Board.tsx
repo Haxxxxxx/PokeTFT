@@ -2,34 +2,47 @@
 
 import { useDroppable } from "@dnd-kit/core";
 import { BOARD } from "@/game/config";
+import { hexToPixel } from "@/game/engine/hex";
 import { useGame } from "@/game/store/gameStore";
 import { UnitChip } from "./UnitChip";
 import type { UnitInstance } from "@/game/types";
 
-function DroppableCell({ col, row, unit }: { col: number; row: number; unit?: UnitInstance }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `cell-${col}-${row}` });
-  const offset = row % 2 === 1 ? 32 : 0;
-  return (
-    <div
-      ref={setNodeRef}
-      style={{ marginLeft: offset }}
-      className={`w-[64px] h-[64px] rounded-md border flex items-center justify-center transition-colors
-        ${isOver ? "border-emerald-400 bg-emerald-400/10" : "border-slate-700/60 bg-slate-800/30"}`}
-    >
-      {unit && <UnitChip unit={unit} />}
-    </div>
-  );
-}
+// Same tessellation + silhouette as the combat field (the look the design is
+// modeled on): pointy-top hexes, odd rows shifted, rows overlapping by 1/4.
+const TILE_W = 88;
+const TILE_H = 98;
+const HEX_CLIP = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
 
-function StaticCell({ row, unit }: { row: number; unit?: UnitInstance }) {
-  const offset = row % 2 === 1 ? 32 : 0;
+// Board pixel extent for BOARD.cols x BOARD.rows.
+const FIELD_W = BOARD.cols * TILE_W + TILE_W / 2;
+const FIELD_H = (BOARD.rows - 1) * TILE_H * 0.75 + TILE_H;
+
+function HexCell({ c, r, unit, interactive }: { c: number; r: number; unit?: UnitInstance; interactive: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `cell-${c}-${r}`, disabled: !interactive });
+  const { x, y } = hexToPixel({ c, r }, TILE_W, TILE_H);
   return (
-    <div
-      style={{ marginLeft: offset }}
-      className="w-[64px] h-[64px] rounded-md border border-slate-700/40 bg-slate-800/20 flex items-center justify-center"
-    >
-      {unit && <UnitChip unit={unit} interactive={false} />}
-    </div>
+    <>
+      <div
+        ref={interactive ? setNodeRef : undefined}
+        className="absolute transition-colors"
+        style={{
+          left: x - TILE_W / 2,
+          top: y - TILE_H / 2,
+          width: TILE_W - 3,
+          height: TILE_H - 3,
+          clipPath: HEX_CLIP,
+          background: isOver ? "rgba(52,211,153,0.22)" : "rgba(52,211,153,0.05)",
+          boxShadow: `inset 0 0 0 1px ${isOver ? "rgba(52,211,153,0.65)" : "rgba(52,211,153,0.16)"}`,
+        }}
+      />
+      {unit && (
+        <div className="absolute flex items-center justify-center pointer-events-none" style={{ left: x - TILE_W / 2, top: y - TILE_H / 2, width: TILE_W, height: TILE_H }}>
+          <div className="pointer-events-auto">
+            <UnitChip unit={unit} size={TILE_W - 18} interactive={interactive} shape="hex" />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -40,18 +53,22 @@ export function Board({ units, interactive = true }: { units?: UnitInstance[]; i
   const unitAt = (c: number, r: number) => board.find((u) => u.pos?.[0] === c && u.pos?.[1] === r);
 
   return (
-    <div className="flex flex-col gap-1.5 p-3 rounded-xl bg-gradient-to-b from-slate-900/60 to-slate-950/60 border border-slate-700/50">
-      {Array.from({ length: BOARD.rows }).map((_, row) => (
-        <div key={row} className="flex gap-1.5">
-          {Array.from({ length: BOARD.cols }).map((_, col) =>
-            interactive ? (
-              <DroppableCell key={col} col={col} row={row} unit={unitAt(col, row)} />
-            ) : (
-              <StaticCell key={col} row={row} unit={unitAt(col, row)} />
-            ),
-          )}
-        </div>
-      ))}
+    <div
+      className="relative rounded-2xl border border-slate-700/50"
+      style={{
+        width: FIELD_W + 28,
+        height: FIELD_H + 28,
+        padding: 14,
+        background: "radial-gradient(120% 90% at 50% 35%, #16213c 0%, #0a1020 78%)",
+      }}
+    >
+      <div className="absolute" style={{ left: 14, top: 14, width: FIELD_W, height: FIELD_H }}>
+        {Array.from({ length: BOARD.rows }).flatMap((_, r) =>
+          Array.from({ length: BOARD.cols }).map((_, c) => (
+            <HexCell key={`${c}-${r}`} c={c} r={r} unit={unitAt(c, r)} interactive={interactive} />
+          )),
+        )}
+      </div>
     </div>
   );
 }

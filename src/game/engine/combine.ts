@@ -44,7 +44,7 @@ export function applyCombines(units: UnitInstance[]): UnitInstance[] {
         defId: a.defId,
         star: (a.star + 1) as 1 | 2 | 3,
         pos: placed ? placed.pos : null,
-        items: components.flatMap((u) => u.items).slice(0, 3),
+        items: components.flatMap((u) => u.items ?? []).slice(0, 3),
       };
       const removeIids = new Set(components.map((u) => u.iid));
       working = working.filter((u) => !removeIids.has(u.iid));

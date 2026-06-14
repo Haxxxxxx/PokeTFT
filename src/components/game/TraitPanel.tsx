@@ -1,17 +1,31 @@
 "use client";
 
+import { useMemo } from "react";
 import { useGame } from "@/game/store/gameStore";
 import { computeTraits } from "@/game/engine/synergies";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
-import { TYPE_COLOR } from "@/game/ui";
+import { TYPE_COLOR, COST_COLOR } from "@/game/ui";
+import { getDef, spriteUrl } from "@/game/data/mons";
 
 import type { UnitInstance } from "@/game/types";
 
 export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {}) {
   const storeUnits = useGame((s) => s.units);
+  const unitsByCost = useGame((s) => s.unitsByCost);
   const units = override ?? storeUnits;
   const board = units.filter((u) => u.pos !== null);
   const traits = computeTraits(board);
+
+  // Full roster of the active generations, for the "who has this trait" tooltip.
+  const rosterIds = useMemo(
+    () => [1, 2, 3, 4, 5].flatMap((c) => unitsByCost[c as 1 | 2 | 3 | 4 | 5] ?? []),
+    [unitsByCost],
+  );
+  const membersFor = (key: string) =>
+    rosterIds
+      .map(getDef)
+      .filter((d) => (d.types as string[]).includes(key) || ((d.roles as string[] | undefined) ?? []).includes(key))
+      .sort((a, b) => a.cost - b.cost);
 
   return (
     <div className="w-[220px] shrink-0 p-3 rounded-xl bg-slate-900/70 border border-slate-700/50">
@@ -72,6 +86,35 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
                     );
                   })}
                 </div>
+
+                {/* Roster: which mons carry this trait (active generations). */}
+                {(() => {
+                  const members = membersFor(t.key);
+                  if (members.length === 0) return null;
+                  const onBoard = new Set(board.map((u) => u.defId));
+                  return (
+                    <div className="mt-2.5 pt-2 border-t border-slate-700/60">
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">{members.length} mons</div>
+                      <div className="flex flex-wrap gap-1 max-h-[132px] overflow-y-auto">
+                        {members.map((d) => {
+                          const owned = onBoard.has(d.id);
+                          return (
+                            <span
+                              key={d.id}
+                              title={`${d.name} · ${d.cost}g`}
+                              style={{ borderColor: COST_COLOR[d.cost] }}
+                              className={`relative w-7 h-7 rounded-md border bg-black/40 flex items-center justify-center overflow-hidden ${owned ? "" : "opacity-45 grayscale"}`}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={spriteUrl(d.dex[0])} alt={d.name} width={24} height={24} style={{ imageRendering: "pixelated" }} draggable={false} />
+                              {owned && <span className="absolute inset-x-0 bottom-0 h-[2px]" style={{ background: color }} />}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           );

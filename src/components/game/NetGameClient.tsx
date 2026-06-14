@@ -5,14 +5,28 @@ import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, useDrop
 import { useGame } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
-import { startCombat, endCombat, heartbeat, maybeClaimHost, syncBoard, PLAN_MS, COMBAT_MS } from "@/game/net/match";
+import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate } from "@/game/engine/combat";
 import { getDef, spriteUrl, unitsForGenerations } from "@/game/data/mons";
-import type { UnitInstance } from "@/game/types";
+import { ECONOMY, MAX_LEVEL, XP_TO_REACH, streakGold, roundKind, advanceRound } from "@/game/config";
+import { interest } from "@/game/engine/economy";
+import { MEGA_STONE } from "@/game/data/mega";
+import { ITEM_POOL } from "@/game/data/itemPool";
+import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
+import { MegaIcon } from "./icons";
+import type { UnitInstance, PokeType } from "@/game/types";
+
+// RTDB drops null values + empty arrays, so a synced unit can come back missing
+// `pos` (bench units) or `items`. Restore both invariants at the boundary.
+function normUnit(u: UnitInstance): UnitInstance {
+  return u.items && u.pos !== undefined ? u : { ...u, pos: u.pos ?? null, items: u.items ?? [] };
+}
+
+const ITEM_DEF_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 
 function asUnits(u: unknown): UnitInstance[] {
   if (!u) return [];
-  return (Array.isArray(u) ? u : Object.values(u as Record<string, UnitInstance>)) as UnitInstance[];
+  return (Array.isArray(u) ? u : Object.values(u as Record<string, UnitInstance>)).map(normUnit);
 }
 import { Board } from "./Board";
 import { Bench } from "./Bench";
@@ -26,7 +40,7 @@ import { CoinIcon, TrophyIcon } from "./icons";
 function asBoard(b: unknown): UnitInstance[] {
   if (!b) return [];
   const arr = Array.isArray(b) ? b : Object.values(b as Record<string, UnitInstance>);
-  return (arr as UnitInstance[]).filter((u) => u && u.pos);
+  return (arr as UnitInstance[]).filter((u) => u && u.pos).map(normUnit);
 }
 
 function SellZone() {
@@ -34,6 +48,16 @@ function SellZone() {
   return (
     <div ref={setNodeRef} className={`flex items-center justify-center px-5 rounded-xl border-2 border-dashed text-xs font-bold uppercase tracking-wide transition-colors ${isOver ? "border-rose-400 bg-rose-500/20 text-rose-200" : "border-slate-700 text-slate-500"}`}>
       Drag here to sell
+    </div>
+  );
+}
+
+/** Dropping a bench unit onto the shop sells it (id "sell-shop"). */
+function ShopSellDrop({ children }: { children: ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: "sell-shop" });
+  return (
+    <div ref={setNodeRef} className={`flex-1 rounded-xl transition-shadow ${isOver ? "ring-2 ring-rose-400/80 ring-inset" : ""}`}>
+      {children}
     </div>
   );
 }
@@ -46,12 +70,15 @@ export function NetGameClient() {
   const newGame = useGame((s) => s.newGame);
   const netRound = useGame((s) => s.netRound);
   const importSave = useGame((s) => s.importSave);
+  const netCarouselPick = useGame((s) => s.netCarouselPick);
+  const buyXp = useGame((s) => s.buyXp);
   const moveToBoard = useGame((s) => s.moveToBoard);
   const moveToBench = useGame((s) => s.moveToBench);
   const sell = useGame((s) => s.sell);
   const units = useGame((s) => s.units);
   const gold = useGame((s) => s.gold);
   const level = useGame((s) => s.level);
+  const xp = useGame((s) => s.xp);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [, setTick] = useState(0);
@@ -60,6 +87,9 @@ export function NetGameClient() {
   const lastRoundKey = useRef<string | null>(null);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const actedDeadline = useRef(-1);
+  const [roundLog, setRoundLog] = useState<{ stage: number; round: number; won: boolean; pve: boolean }[]>([]);
+  const [pickedKey, setPickedKey] = useState<string | null>(null);
+  const [spectate, setSpectate] = useState<string | null>(null);
 
   // server time + a 250ms repaint so the shared timer counts down smoothly
   useEffect(() => {
@@ -81,8 +111,9 @@ export function NetGameClient() {
       heartbeat(r.code);
       if (serverNow() >= r.meta.deadline && actedDeadline.current !== r.meta.deadline) {
         actedDeadline.current = r.meta.deadline;
-        if (r.meta.phase === "planning") startCombat(r.code, r);
+        if (r.meta.phase === "planning") resolveRoundStart(r.code, r);
         else if (r.meta.phase === "combat") endCombat(r.code, r);
+        else if (r.meta.phase === "carousel") endCarousel(r.code, r);
       }
     }, 700);
     return () => clearInterval(id);
@@ -131,9 +162,27 @@ export function NetGameClient() {
     return simulate(asBoard(myCombat.selfBoard), asBoard(myCombat.oppBoard));
   }, [phase, meta?.stage, meta?.round, myCombat?.oppUid]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Record every combat round into the timeline (one entry per round, dedup by key).
+  // PvE rounds count too (win/loss vs wild Pokémon) so feedback starts at 1-1.
+  useEffect(() => {
+    if (phase === "combat" && myCombat && meta) {
+      const key = `${meta.stage}-${meta.round}`;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setRoundLog((h) => {
+        const last = h[h.length - 1];
+        if (last && `${last.stage}-${last.round}` === key) return h;
+        return [...h, { stage: meta.stage, round: meta.round, won: myCombat.won, pve: !!myCombat.pve }];
+      });
+    }
+  }, [phase, meta?.stage, meta?.round, myCombat?.oppUid, myCombat?.pve, meta]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!room || !meta || !myUid) return null;
 
   const secondsLeft = Math.max(0, Math.ceil((meta.deadline - serverNow()) / 1000));
+  const atMax = level >= MAX_LEVEL;
+  const xpBase = XP_TO_REACH[level];
+  const xpNeed = atMax ? 1 : XP_TO_REACH[level + 1] - xpBase;
+  const xpCur = xp - xpBase;
   const totalMs = phase === "combat" ? COMBAT_MS : PLAN_MS;
   const pct = Math.max(0, Math.min(100, ((meta.deadline - serverNow()) / totalMs) * 100));
   const isHost = meta.hostUid === myUid;
@@ -143,26 +192,100 @@ export function NetGameClient() {
   const iWon = gameOver && me?.alive && aliveCount === 1;
 
   function onDragEnd(e: DragEndEvent) {
-    if (phase !== "planning") return;
+    // Bench management + selling stay available during combat (no effect on the
+    // frozen, already-resolved fight). Board placement is locked while fighting.
+    if (phase !== "planning" && phase !== "combat") return;
     const iid = String(e.active.id);
     const over = e.over?.id;
     if (!over) return;
     const t = String(over);
-    if (t === "sell") sell(iid);
+    if (t === "sell" || t === "sell-shop") sell(iid);
     else if (t === "bench") moveToBench(iid);
-    else if (t.startsWith("cell-")) { const [, c, r] = t.split("-"); moveToBoard(iid, Number(c), Number(r)); }
+    else if (t.startsWith("cell-")) {
+      if (phase !== "planning") return; // can't move onto the board mid-combat
+      const [, c, r] = t.split("-");
+      moveToBoard(iid, Number(c), Number(r));
+    }
+  }
+
+  const streak = me?.streak ?? 0;
+  // Spectating a rival from the scoreboard → their last-synced board (read-only).
+  // My own combat replay takes priority, so spectate only applies out of combat.
+  const spectateUnits = spectate && spectate !== myUid && phase !== "combat" ? asBoard(players[spectate]?.board) : null;
+
+  // Forward-looking timeline: the current stage + the next two, each round
+  // tagged with its kind (PvE / carousel / PvP) and overlaid with past results.
+  const resultByKey = new Map(roundLog.map((h) => [`${h.stage}-${h.round}`, h.won]));
+  const schedule: { stage: number; round: number; kind: ReturnType<typeof roundKind> }[] = [];
+  {
+    let s = meta.stage, r = 1; // start at round 1 of the current stage
+    for (let i = 0; i < 40; i++) {
+      schedule.push({ stage: s, round: r, kind: roundKind(s, r) });
+      const nx = advanceRound(s, r);
+      if (nx.stage > meta.stage + 2) break;
+      s = nx.stage; r = nx.round;
+    }
   }
 
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-      <div className="flex flex-col gap-3 max-w-[1440px] mx-auto p-4">
+      <div className="min-h-screen flex flex-col gap-3 w-full max-w-[1440px] mx-auto p-3 overflow-x-hidden">
+        {/* Round timeline: current stage + the next two, tagged by kind, with
+            past results colored win/loss and the current round highlighted. */}
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-700/40 overflow-x-auto">
+          <span className="text-[10px] uppercase tracking-wider text-slate-500 shrink-0">Timeline</span>
+          <div className="flex items-center gap-1">
+            {schedule.map(({ stage, round, kind }) => {
+              const key = `${stage}-${round}`;
+              const result = resultByKey.get(key);
+              const isCurrent = stage === meta.stage && round === meta.round;
+              const isPast = result !== undefined;
+              // Color: past → win/loss; else by kind.
+              const bg = isPast
+                ? (result ? "bg-emerald-500/90 text-black" : "bg-rose-500/90 text-black")
+                : kind === "carousel" ? "bg-fuchsia-600/40 text-fuchsia-100"
+                : kind === "pve" ? "bg-amber-600/30 text-amber-100"
+                : "bg-slate-700/60 text-slate-300";
+              const label = kind === "carousel" ? "◆" : `${stage}-${round}`;
+              return (
+                <span
+                  key={key}
+                  title={`${key} · ${kind}${isPast ? (result ? " · Win" : " · Loss") : ""}`}
+                  className={`relative w-7 h-6 shrink-0 rounded-md flex items-center justify-center text-[8px] font-bold ${bg} ${isCurrent ? "ring-2 ring-sky-400 scale-110" : ""} ${round === 1 ? "ml-1.5" : ""}`}
+                >
+                  {label}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Top bar */}
         <div className="flex items-center gap-5 flex-wrap p-3 rounded-xl bg-slate-900/70 border border-slate-700/50">
           <Stat label="Stage" value={`${meta.stage}-${meta.round}`} />
           <Stat label="HP" value={`${Math.max(0, me?.hp ?? 0)}`} accent="#ff6b6b" />
           <Stat label="Gold" accent="#fbbf24" value={<span className="inline-flex items-center gap-1"><CoinIcon size={13} />{gold}</span>} />
-          <Stat label="Level" value={`${level}`} />
+          <Stat label="Interest" value={`+${interest(gold)}`} />
+          <Stat label="Streak" value={`${streak >= 0 ? "W" : "L"}${Math.abs(streak)} (+${streakGold(streak)})`} />
           <Stat label="Alive" value={`${aliveCount}`} />
+
+          {/* Level + XP + Buy XP */}
+          <div className="flex flex-col gap-1 min-w-[150px]">
+            <div className="flex justify-between text-[11px] text-slate-400">
+              <span className="font-semibold text-slate-200">Level {level}</span>
+              <span>{atMax ? "MAX" : `${xpCur}/${xpNeed} XP`}</span>
+            </div>
+            <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
+              <div className="h-full bg-sky-400 transition-all" style={{ width: atMax ? "100%" : `${(xpCur / xpNeed) * 100}%` }} />
+            </div>
+            <button
+              onClick={buyXp}
+              disabled={phase !== "planning" || gold < ECONOMY.buyXpCost || atMax}
+              className="inline-flex items-center justify-center gap-1.5 px-2 py-1 rounded-md bg-sky-700/90 hover:bg-sky-600 disabled:opacity-40 text-[11px] font-semibold"
+            >
+              Buy XP <span className="inline-flex items-center gap-0.5 text-amber-200"><CoinIcon size={11} />{ECONOMY.buyXpCost}</span> <span className="text-sky-200">+{ECONOMY.buyXpAmount}</span>
+            </button>
+          </div>
           <div className="flex flex-col gap-1 min-w-[200px]">
             <div className="flex justify-between text-[11px]">
               <span className={`font-bold uppercase ${phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{phase}</span>
@@ -176,7 +299,7 @@ export function NetGameClient() {
           <button onClick={leave} className="ml-auto px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">Leave</button>
         </div>
 
-        <div className="flex gap-3 items-start">
+        <div className="flex flex-wrap gap-3 items-start justify-center flex-1">
           {/* Scoreboard */}
           <div className="w-[190px] shrink-0 p-2 rounded-xl bg-slate-900/70 border border-slate-700/50">
             <h2 className="text-[10px] uppercase tracking-wider text-slate-500 px-1 mb-1.5">Trainers · {aliveCount} left</h2>
@@ -184,7 +307,12 @@ export function NetGameClient() {
               {ladder.map((p, i) => {
                 const dex = asBoard(p.board)[0] ? getDef(asBoard(p.board)[0].defId).dex[asBoard(p.board)[0].star - 1] : null;
                 return (
-                  <div key={p.uid} className={`flex items-center gap-2 px-1.5 py-1 rounded-lg ${p.uid === myUid ? "bg-slate-700/70 ring-1 ring-sky-500/50" : ""} ${!p.alive ? "opacity-40" : ""}`}>
+                  <div
+                    key={p.uid}
+                    onClick={() => setSpectate(p.uid === myUid ? null : (spectate === p.uid ? null : p.uid))}
+                    title={p.uid === myUid ? "Your board" : `View ${p.name}'s board`}
+                    className={`flex items-center gap-2 px-1.5 py-1 rounded-lg cursor-pointer hover:bg-slate-700/50 ${p.uid === myUid ? "bg-slate-700/70 ring-1 ring-sky-500/50" : ""} ${spectate === p.uid ? "ring-1 ring-amber-400/70 bg-amber-500/10" : ""} ${!p.alive ? "opacity-40" : ""}`}
+                  >
                     <span className="w-4 text-[10px] text-slate-500 font-bold text-center">{p.place ?? i + 1}</span>
                     <span className="w-7 h-7 rounded-md bg-black/40 border border-slate-700 flex items-center justify-center shrink-0 overflow-hidden">
                       {dex ? (
@@ -209,24 +337,89 @@ export function NetGameClient() {
             </div>
           </div>
 
-          <TraitPanel />
-          <div className="flex-1 flex flex-col gap-3 items-center">
-            <Board />
-            <Bench />
+          <TraitPanel units={spectateUnits ?? undefined} />
+          <div className="flex-1 min-w-[440px] flex flex-col gap-3 items-center">
+            {/* During combat the board is "fighting" — show the replay in its place,
+                but keep the bench + shop below fully interactive. Spectating a
+                rival overrides the planning board (read-only). */}
+            {spectateUnits ? (
+              <div className="w-full flex flex-col gap-2">
+                <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                  <span className="text-xs font-bold text-amber-300">Viewing {players[spectate!]?.name ?? "rival"}&apos;s board</span>
+                  <button onClick={() => setSpectate(null)} className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-300">Back to mine</button>
+                </div>
+                <Board units={spectateUnits} interactive={false} />
+              </div>
+            ) : phase === "combat" && combatResult && me?.alive ? (
+              <CombatStage
+                result={combatResult}
+                opponentName={myCombat?.oppName ?? "Rival"}
+                autoResolve
+                inline
+                syncStart={meta.deadline - COMBAT_MS}
+                syncWindowMs={COMBAT_MS}
+                onResolve={() => {}}
+              />
+            ) : (
+              <Board />
+            )}
             <ItemTray />
           </div>
           <UnitDetail />
         </div>
 
-        <div className="flex gap-3">
-          <div className="flex-1"><ShopBar /></div>
-          <SellZone />
+        {/* Bottom bar: bench + shop, pinned to the bottom of the screen. */}
+        <div className="flex flex-col items-center gap-2">
+          <Bench />
+          <div className="flex gap-3 w-full max-w-[1180px]">
+            <ShopSellDrop><ShopBar /></ShopSellDrop>
+            <SellZone />
+          </div>
         </div>
       </div>
 
-      {combatResult && me?.alive && (
-        <CombatStage result={combatResult} opponentName={myCombat?.oppName ?? "Rival"} autoResolve onResolve={() => {}} />
-      )}
+      {phase === "carousel" && me?.alive && (() => {
+        const opts = room.carousel?.[myUid];
+        const key = `${meta.stage}-${meta.round}`;
+        const picked = pickedKey === key;
+        if (!opts) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+            <h2 className="text-lg font-extrabold text-amber-300 mb-1">Carousel</h2>
+            <p className="text-xs text-slate-400 mb-5">{picked ? "Picked — waiting for the round to continue…" : "Pick one free reward for your bench."}</p>
+            {!picked && (
+              <div className="flex gap-3 flex-wrap justify-center max-w-[760px]">
+                {opts.map((pick, i) => pick === MEGA_STONE ? (
+                  <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); }} style={{ borderColor: "#f0abfc", boxShadow: "0 0 18px -2px #f0abfc88" }} className="w-[130px] rounded-xl border-2 bg-gradient-to-b from-fuchsia-900/40 to-slate-900/80 hover:-translate-y-1 transition-all p-3 flex flex-col items-center justify-center">
+                    <span className="text-fuchsia-300"><MegaIcon size={48} /></span>
+                    <span className="text-sm font-semibold mt-1 text-fuchsia-200">Mega Stone</span>
+                  </button>
+                ) : ITEM_DEF_BY_ID[pick] ? (
+                  <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); }} style={{ borderColor: "#fbbf24", boxShadow: "0 0 16px -2px #fbbf2466" }} className="w-[130px] rounded-xl border-2 bg-gradient-to-b from-amber-900/30 to-slate-900/80 hover:-translate-y-1 transition-all p-3 flex flex-col items-center justify-center text-center">
+                    <span className="text-3xl">{ITEM_DEF_BY_ID[pick].icon}</span>
+                    <span className="text-sm font-semibold mt-1 text-amber-200">{ITEM_DEF_BY_ID[pick].name}</span>
+                    <span className="text-[9px] text-slate-400 leading-tight mt-1">{ITEM_DEF_BY_ID[pick].effect}</span>
+                  </button>
+                ) : (() => {
+                  const def = getDef(pick);
+                  const color = COST_COLOR[def.cost];
+                  return (
+                    <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); }} style={{ borderColor: color, boxShadow: `0 0 16px -2px ${color}66` }} className="w-[130px] rounded-xl border-2 bg-slate-900/80 hover:bg-slate-800 hover:-translate-y-1 transition-all p-3 flex flex-col items-center">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={spriteUrl(def.dex[0])} alt={def.name} width={56} height={56} style={{ imageRendering: "pixelated" }} draggable={false} />
+                      <span className="text-sm font-semibold mt-1">{def.name}</span>
+                      <span style={{ color }} className="inline-flex items-center gap-0.5 text-[11px] font-bold"><CoinIcon size={11} />{def.cost}</span>
+                      <div className="flex flex-wrap gap-0.5 justify-center mt-1.5">
+                        {def.types.map((ty) => <span key={ty} style={{ background: TYPE_COLOR[ty as PokeType] }} className="text-[8px] px-1 rounded text-black/80 font-bold uppercase">{ty.slice(0, 3)}</span>)}
+                      </div>
+                    </button>
+                  );
+                })())}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {!gameOver && me && !me.alive && (
         <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm gap-3">
