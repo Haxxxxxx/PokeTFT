@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePreLobby } from "@/game/store/preLobbyStore";
+import { useRoom } from "@/game/net/roomStore";
 import { AppSettingsPanel } from "./AppSettingsPanel";
 import { useT } from "@/lib/i18n";
 
@@ -9,7 +10,11 @@ type Mode = "idle" | "create" | "join";
 
 export function WelcomeScreen() {
   const t = useT();
-  const enterLobby = usePreLobby((s) => s.enterLobby);
+  const rules = usePreLobby((s) => s.rules);
+  const host = useRoom((s) => s.host);
+  const join = useRoom((s) => s.join);
+  const status = useRoom((s) => s.status);
+  const netError = useRoom((s) => s.error);
   const [username, setUsername] = useState("");
   const [mode, setMode] = useState<Mode>("idle");
   const [joinCode, setJoinCode] = useState("");
@@ -17,19 +22,20 @@ export function WelcomeScreen() {
 
   const trimmed = username.trim();
   const canProceed = trimmed.length > 0;
+  const busy = status === "connecting";
 
-  function handleCreate() {
-    if (!canProceed) return;
-    enterLobby(trimmed, true);
+  async function handleCreate() {
+    if (!canProceed || busy) return;
+    await host(trimmed, { startingHp: rules.startingHp, maxPlayers: rules.maxPlayers });
   }
 
-  function handleJoin() {
+  async function handleJoin() {
     if (!canProceed || joinCode.trim().length < 6) {
       setJoinError(true);
       return;
     }
     setJoinError(false);
-    enterLobby(trimmed, false);
+    await join(joinCode.trim(), trimmed);
   }
 
   return (
@@ -93,9 +99,10 @@ export function WelcomeScreen() {
               <div className="flex gap-3">
                 <button
                   onClick={handleCreate}
-                  className="flex-1 py-3 rounded-xl font-extrabold text-sm bg-amber-500 hover:bg-amber-400 text-black border border-amber-400 transition-all"
+                  disabled={busy}
+                  className="flex-1 py-3 rounded-xl font-extrabold text-sm bg-amber-500 hover:bg-amber-400 text-black border border-amber-400 transition-all disabled:opacity-40"
                 >
-                  {t.w_create_btn}
+                  {busy ? "…" : t.w_create_btn}
                 </button>
                 <button
                   onClick={() => setMode("idle")}
@@ -104,6 +111,7 @@ export function WelcomeScreen() {
                   {t.w_back}
                 </button>
               </div>
+              {netError && <p className="text-xs text-rose-400">{netError}</p>}
             </div>
           )}
 
@@ -130,10 +138,10 @@ export function WelcomeScreen() {
               <div className="flex gap-3">
                 <button
                   onClick={handleJoin}
-                  disabled={!canProceed}
+                  disabled={!canProceed || busy}
                   className="flex-1 py-3 rounded-xl font-extrabold text-sm bg-sky-600 hover:bg-sky-500 text-white border border-sky-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  {t.w_join_btn}
+                  {busy ? "…" : t.w_join_btn}
                 </button>
                 <button
                   onClick={() => { setMode("idle"); setJoinCode(""); setJoinError(false); }}
@@ -142,6 +150,7 @@ export function WelcomeScreen() {
                   {t.w_back}
                 </button>
               </div>
+              {netError && <p className="text-xs text-rose-400">{netError}</p>}
             </div>
           )}
         </div>

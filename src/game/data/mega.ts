@@ -41,11 +41,11 @@ export function canMega(defId: string): boolean {
   return defId in MEGA_FORMS;
 }
 
-export function hasMegaStone(items: string[]): boolean {
-  return items.includes(MEGA_STONE);
+export function hasMegaStone(items: string[] | undefined): boolean {
+  return !!items && items.includes(MEGA_STONE);
 }
 
 /** A mon Mega-evolves when it is mega-capable AND holds a Mega Stone. */
-export function isMegaActive(defId: string, items: string[]): boolean {
+export function isMegaActive(defId: string, items: string[] | undefined): boolean {
   return canMega(defId) && hasMegaStone(items);
 }

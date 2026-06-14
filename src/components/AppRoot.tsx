@@ -1,20 +1,29 @@
 "use client";
 
-import { usePreLobby } from "@/game/store/preLobbyStore";
+import { useEffect } from "react";
+import { useRoom } from "@/game/net/roomStore";
+import { startServerTime } from "@/game/net/serverTime";
 import { WelcomeScreen } from "@/components/welcome/WelcomeScreen";
 import { LobbyScreen } from "@/components/lobby/LobbyScreen";
-import { GameClient } from "@/components/game/GameClient";
+import { NetGameClient } from "@/components/game/NetGameClient";
 
+/**
+ * Top-level switch driven by the networked room:
+ *  - no room        → Welcome (host / join by code)
+ *  - phase "lobby"  → Lobby (live players, ready, host start)
+ *  - else           → the live multiplayer match (planning / combat / over)
+ */
 export function AppRoot() {
-  const phase = usePreLobby((s) => s.phase);
-  const rules = usePreLobby((s) => s.rules);
-  const slots = usePreLobby((s) => s.slots);
+  const code = useRoom((s) => s.code);
+  const room = useRoom((s) => s.room);
+  const reconnect = useRoom((s) => s.reconnect);
 
-  if (phase === "welcome") return <WelcomeScreen />;
-  if (phase === "lobby") return <LobbyScreen />;
+  useEffect(() => {
+    startServerTime();
+    reconnect();
+  }, [reconnect]);
 
-  // Match the game roster to the players actually in the lobby (filled slots),
-  // not the slot capacity.
-  const activePlayers = Math.max(2, slots.filter((sl) => sl.type !== "empty").length);
-  return <GameClient playerCount={activePlayers} startingHp={rules.startingHp} generations={rules.generations} />;
+  if (!code || !room) return <WelcomeScreen />;
+  if (room.meta?.phase === "lobby") return <LobbyScreen />;
+  return <NetGameClient />;
 }
