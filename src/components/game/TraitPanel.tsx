@@ -65,7 +65,14 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
                 <div className="flex items-center gap-2 mb-1.5">
                   <span style={{ borderColor: color }} className="w-5 h-5 rounded border flex items-center justify-center text-[12px] leading-none">{TRAIT_ICON[t.key] ?? "◆"}</span>
                   <span className="font-bold text-sm">{t.label}</span>
-                  <span className="ml-auto text-[11px] text-slate-400">{t.count} active</span>
+                  <span className="ml-auto text-[11px] font-bold tabular-nums" style={{ color }}>{t.count}{nextBp ? `/${nextBp}` : ""}</span>
+                </div>
+                {/* Progress toward the next breakpoint. */}
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="flex-1 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${Math.min(100, (t.count / (nextBp ?? t.count)) * 100)}%`, background: color }} />
+                  </div>
+                  <span className="text-[9px] text-slate-500">{nextBp ? `${nextBp - t.count} to ${nextBp}` : "MAX"}</span>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-snug mb-2">{desc}</p>
                 <div className="flex flex-col gap-1.5">
@@ -93,9 +100,12 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
                   const members = membersFor(t.key);
                   if (members.length === 0) return null;
                   const onBoard = new Set(board.map((u) => u.defId));
+                  const ownedCount = members.filter((d) => onBoard.has(d.id)).length;
                   return (
                     <div className="mt-2.5 pt-2 border-t border-slate-700/60">
-                      <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">{members.length} mons</div>
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">
+                        <span style={{ color }} className="font-bold">{ownedCount}</span> / {members.length} mons on board
+                      </div>
                       <div className="flex flex-wrap gap-1 max-h-[132px] overflow-y-auto">
                         {members.map((d) => {
                           const owned = onBoard.has(d.id);
