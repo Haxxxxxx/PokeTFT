@@ -124,6 +124,9 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
       dmg: bWon || draw ? 0 : stageBaseDamage(stage) + r.survivors,
       selfBoard: bb,
       oppBoard: ba,
+      // B is the "enemy" side of the canonical simulate(ba, bb): B replays the
+      // exact same call and mirrors the view, so both screens share one outcome.
+      flip: true,
     };
   }
 }

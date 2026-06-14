@@ -58,6 +58,11 @@ export type CombatAssign = {
   ghost: boolean;
   /** PvE round — fight wild creeps, no HP loss. */
   pve?: boolean;
+  /** True for the "enemy"-side player of a PvP pair. Both players replay the SAME
+   *  canonical simulate(attacker, defender); the flipped side mirrors the view so
+   *  their team still shows at the bottom. Guarantees identical outcomes on every
+   *  screen (no per-perspective re-sim divergence). */
+  flip?: boolean;
   won: boolean;
   survivors: number;
   dmg: number;

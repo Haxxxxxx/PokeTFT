@@ -214,14 +214,19 @@ export function NetGameClient() {
   // result shown always matches the host's authoritative outcome.
   const combatResult = useMemo(() => {
     if (phase !== "combat" || !myCombat) return null;
-    return simulate(asBoard(myCombat.selfBoard), asBoard(myCombat.oppBoard));
+    // Both paired players run the IDENTICAL canonical call simulate(attacker,
+    // defender): the flipped (enemy-side) player passes opp,self so the args
+    // match the host's a,b. Guarantees the same frames + outcome on every screen.
+    const [p1, p2] = myCombat.flip ? [myCombat.oppBoard, myCombat.selfBoard] : [myCombat.selfBoard, myCombat.oppBoard];
+    return simulate(asBoard(p1), asBoard(p2));
   }, [phase, meta?.stage, meta?.round, myCombat?.oppUid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Live replay of the rival I'm spectating (from the host's frozen boards).
   const spectateCombat = spectate && spectate !== myUid ? room?.combat?.[spectate] : undefined;
   const spectateCombatResult = useMemo(() => {
     if (phase !== "combat" || !spectateCombat) return null;
-    return simulate(asBoard(spectateCombat.selfBoard), asBoard(spectateCombat.oppBoard));
+    const [p1, p2] = spectateCombat.flip ? [spectateCombat.oppBoard, spectateCombat.selfBoard] : [spectateCombat.selfBoard, spectateCombat.oppBoard];
+    return simulate(asBoard(p1), asBoard(p2));
   }, [phase, meta?.stage, meta?.round, spectate, spectateCombat?.oppUid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Augment round? (stage 2/3/4 round 1). Show the pick until this slot is taken.
@@ -368,7 +373,7 @@ export function NetGameClient() {
       <div className="fixed inset-0 flex justify-center items-center overflow-hidden">
       <div
         ref={contentRef}
-        style={{ width: DESIGN_W, minHeight: DESIGN_H, transform: `scale(${scale})`, transformOrigin: "center", transition: "transform 140ms ease-out" }}
+        style={{ width: DESIGN_W, transform: `scale(${scale})`, transformOrigin: "center", transition: "transform 140ms ease-out" }}
         className="flex flex-col gap-3 p-3 shrink-0"
       >
         {/* Round timeline: current stage + the next two, tagged by kind, with
@@ -448,7 +453,7 @@ export function NetGameClient() {
           <button onClick={leave} className="ml-auto px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.net_leave}</button>
         </div>
 
-        <div className="flex flex-wrap gap-3 items-start justify-center flex-1">
+        <div className="flex flex-wrap gap-3 items-start justify-center">
           {/* Scoreboard */}
           <div className="w-[190px] shrink-0 p-2 rounded-xl bg-slate-900/70 border border-slate-700/50">
             <h2 className="text-[10px] uppercase tracking-wider text-slate-500 px-1 mb-1.5">{t.net_trainers(aliveCount)}</h2>
@@ -501,7 +506,7 @@ export function NetGameClient() {
                   <button onClick={() => setSpectate(null)} className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-300">{t.net_back_to_mine}</button>
                 </div>
                 {phase === "combat" && spectateCombatResult ? (
-                  <CombatStage result={spectateCombatResult} opponentName={spectateCombat?.oppName ?? "Rival"} autoResolve inline syncStart={meta.deadline - COMBAT_MS} syncWindowMs={COMBAT_MS} onResolve={() => {}} />
+                  <CombatStage result={spectateCombatResult} flip={!!spectateCombat?.flip} opponentName={spectateCombat?.oppName ?? "Rival"} autoResolve inline syncStart={meta.deadline - COMBAT_MS} syncWindowMs={COMBAT_MS} onResolve={() => {}} />
                 ) : (
                   <Board units={spectateUnits ?? []} interactive={false} />
                 )}
@@ -515,6 +520,7 @@ export function NetGameClient() {
             ) : phase === "combat" && combatResult && me?.alive ? (
               <CombatStage
                 result={combatResult}
+                flip={!!myCombat?.flip}
                 opponentName={myCombat?.oppName ?? "Rival"}
                 pve={!!myCombat?.pve}
                 autoResolve

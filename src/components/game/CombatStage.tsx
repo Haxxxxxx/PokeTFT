@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 import { sfx } from "@/lib/audio";
@@ -8,6 +8,26 @@ import { hexToPixel, fieldPixelSize, hexDistance, FIELD } from "@/game/engine/he
 import { TYPE_COLOR } from "@/game/ui";
 import { serverNow } from "@/game/net/serverTime";
 import type { CombatResult, FrameUnit } from "@/game/engine/combat";
+
+/** Mirror a replay through the field centre (180° rotation) and swap teams, so
+ *  the "enemy"-side player of a shared canonical sim still sees THEIR team at the
+ *  bottom. Pure view transform — the underlying sim is byte-identical on both
+ *  screens, which is what guarantees matching outcomes. */
+function mirrorResult(r: CombatResult): CombatResult {
+  return {
+    ...r,
+    winner: r.winner === "ally" ? "enemy" : r.winner === "enemy" ? "ally" : "draw",
+    frames: r.frames.map((f) => ({
+      ...f,
+      units: f.units.map((u) => ({
+        ...u,
+        team: u.team === "ally" ? "enemy" : "ally",
+        c: FIELD.cols - 1 - u.c,
+        r: FIELD.rows - 1 - u.r,
+      })),
+    })),
+  };
+}
 
 const TILE_W = 80;
 const TILE_H = 76;
@@ -24,7 +44,8 @@ function hpColor(f: number): string {
 }
 
 export function CombatStage({
-  result,
+  result: rawResult,
+  flip = false,
   opponentName,
   onResolve,
   autoResolve = false,
@@ -34,6 +55,8 @@ export function CombatStage({
   syncWindowMs,
 }: {
   result: CombatResult;
+  /** Mirror the view (this player is the canonical sim's "enemy" side). */
+  flip?: boolean;
   opponentName: string;
   onResolve: (won: boolean, survivors: number) => void;
   /** Multiplayer: the host clock advances the round, so hide the Continue button. */
@@ -52,6 +75,7 @@ export function CombatStage({
   /** Multiplayer: length of the combat phase in ms (COMBAT_MS). */
   syncWindowMs?: number;
 }) {
+  const result = useMemo(() => (flip ? mirrorResult(rawResult) : rawResult), [rawResult, flip]);
   const frames = result.frames;
   const last = frames.length - 1;
   const totalTime = frames[last].t;
