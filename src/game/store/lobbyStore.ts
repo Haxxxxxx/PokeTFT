@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { UnitInstance } from "../types";
-import { stageBaseDamage } from "../config";
+import { stageBaseDamage, cumulativeRound } from "../config";
 import { simulate, type CombatResult } from "../engine/combat";
 import { generateBoard } from "../engine/enemy";
 
@@ -18,16 +18,16 @@ export type Player = {
 
 const RIVALS = ["Brock", "Misty", "Surge", "Erika", "Koga", "Sabrina", "Blaine"];
 
-/** AI economy curve: level + board size grow with the total round number. */
+/** AI economy curve: level + board size grow with the total round number.
+ *  Tuned to track a developing human (~equal level on the same timeline):
+ *  cr5→3, cr12→5, cr19→6, cr26→8, cr33→9. */
 function aiLevel(totalRound: number): number {
-  return Math.min(2 + Math.floor(totalRound / 2.2), 9);
+  return Math.min(2 + Math.floor(totalRound / 4), 9);
 }
 function boardCount(level: number): number {
   return Math.min(level, 8);
 }
-function totalRound(stage: number, round: number): number {
-  return (stage - 1) * 7 + round;
-}
+const totalRound = cumulativeRound;
 
 function freshBoard(player: Player, stage: number, round: number, salt: number): UnitInstance[] {
   const level = aiLevel(totalRound(stage, round));
@@ -44,6 +44,8 @@ type LobbyState = {
   /** Apply the human fight result to the human's opponent, then resolve all
    *  AI-vs-AI fights and grow every surviving AI board for the next round. */
   resolveRound: (opponentId: string, result: CombatResult, combatStage: number, nextStage: number, nextRound: number) => void;
+  /** Non-combat round (PvE / carousel): just grow every living AI board. */
+  advanceOnly: (nextStage: number, nextRound: number) => void;
 };
 
 export const useLobby = create<LobbyState>((set, get) => ({
@@ -134,6 +136,18 @@ export const useLobby = create<LobbyState>((set, get) => ({
       p.board = freshBoard(p, nextStage, nextRound, players.indexOf(p) + 1);
     }
 
+    set({ players });
+  },
+
+  advanceOnly: (nextStage, nextRound) => {
+    const players = get().players.map((p) => {
+      if (!p.alive) return p;
+      return {
+        ...p,
+        level: aiLevel(totalRound(nextStage, nextRound)),
+        board: freshBoard(p, nextStage, nextRound, p.id.length + nextRound),
+      };
+    });
     set({ players });
   },
 }));

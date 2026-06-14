@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { ECONOMY, XP_TO_REACH, MAX_LEVEL, boardSizeForLevel, roundKind, stageBaseDamage, type Cost } from "../config";
+import { ECONOMY, XP_TO_REACH, MAX_LEVEL, boardSizeForLevel, roundKind, advanceRound, stageBaseDamage, type Cost, type RoundKind } from "../config";
 import type { UnitInstance } from "../types";
 import { getDef } from "../data/mons";
 import { makeRng, type Rng } from "../engine/rng";
@@ -18,6 +18,17 @@ function levelFromXp(xp: number): number {
   return lvl;
 }
 
+export type RoundOutcome = "win" | "loss" | "pve" | "carousel";
+export type RoundRecord = { stage: number; round: number; kind: RoundKind; outcome: RoundOutcome };
+
+/** Shared round-advance: passive XP, income, next round/stage, fresh shop. */
+function advancePartial(state: State, gold: number) {
+  const { stage, round } = advanceRound(state.stage, state.round);
+  const newXp = state.xp + ECONOMY.passiveXpPerRound;
+  const shop = state.frozen ? state.shop : rollShop(levelFromXp(newXp), state.pool, rng);
+  return { gold, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false };
+}
+
 type State = {
   seed: number;
   gold: number;
@@ -31,6 +42,7 @@ type State = {
   units: UnitInstance[];
   shop: (string | null)[];
   frozen: boolean;
+  history: RoundRecord[];
 
   // selectors
   benchUnits: () => UnitInstance[];
@@ -47,6 +59,8 @@ type State = {
   moveToBench: (iid: string) => void;
   toggleFreeze: () => void;
   endRound: (won: boolean, survivors?: number) => void;
+  pveReward: (won: boolean) => void;
+  carouselTake: (defId: string) => void;
 };
 
 // Module-level RNG so the store stays serialisable; reseeded on newGame.
@@ -65,6 +79,7 @@ export const useGame = create<State>((set, get) => ({
   units: [],
   shop: [],
   frozen: false,
+  history: [],
 
   benchUnits: () => get().units.filter((u) => u.pos === null),
   boardUnits: () => get().units.filter((u) => u.pos !== null),
@@ -81,7 +96,7 @@ export const useGame = create<State>((set, get) => ({
     const pool = makePool();
     set({
       pool, gold: 4, xp: 0, level: 1, health: startingHp,
-      streak: 0, stage: 1, round: 1, units: [], frozen: false,
+      streak: 0, stage: 1, round: 1, units: [], frozen: false, history: [],
       shop: rollShop(1, pool, rng),
     });
   },
@@ -171,21 +186,40 @@ export const useGame = create<State>((set, get) => ({
     const damage = won ? 0 : stageBaseDamage(state.stage) + survivors;
     const health = Math.max(0, state.health - damage);
 
-    // advance round / stage
-    let stage = state.stage;
-    let round = state.round + 1;
-    if (round > 7) { round = 1; stage += 1; }
-
-    const newXp = state.xp + ECONOMY.passiveXpPerRound;
-    const shop = state.frozen ? state.shop : rollShop(levelFromXp(newXp), state.pool, rng);
-
+    const record: RoundRecord = { stage: state.stage, round: state.round, kind: "pvp", outcome: won ? "win" : "loss" };
     set({
-      gold: state.gold + income,
-      xp: newXp,
-      level: levelFromXp(newXp),
+      ...advancePartial(state, state.gold + income),
       streak: newStreak,
       health,
-      stage, round, shop, frozen: false,
+      history: [...state.history, record],
+    });
+  },
+
+  // PvE round: keep your streak, take no HP damage, earn loot gold on a win.
+  pveReward: (won) => {
+    const state = get();
+    const income = roundIncome(state.gold, state.streak);
+    const loot = won ? 3 : 1;
+    const record: RoundRecord = { stage: state.stage, round: state.round, kind: "pve", outcome: "pve" };
+    set({
+      ...advancePartial(state, state.gold + income + loot),
+      history: [...state.history, record],
+    });
+  },
+
+  // Carousel: take one free unit to the bench (if room), then advance the round.
+  carouselTake: (defId) => {
+    const state = get();
+    let units = state.units;
+    if (state.units.filter((u) => u.pos === null).length < BENCH_SIZE) {
+      units = applyCombines([...state.units, makeInstance(defId)]);
+    }
+    const income = roundIncome(state.gold, state.streak);
+    const record: RoundRecord = { stage: state.stage, round: state.round, kind: "carousel", outcome: "carousel" };
+    set({
+      ...advancePartial(state, state.gold + income),
+      units,
+      history: [...state.history, record],
     });
   },
 }));

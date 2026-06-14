@@ -1,10 +1,10 @@
 "use client";
 
 import { useGame } from "@/game/store/gameStore";
-import { startCombatFlow } from "@/game/store/flow";
-import { ECONOMY, MAX_LEVEL, XP_TO_REACH, boardSizeForLevel, streakGold } from "@/game/config";
+import { advanceFlow } from "@/game/store/flow";
+import { ECONOMY, MAX_LEVEL, XP_TO_REACH, boardSizeForLevel, streakGold, roundKind } from "@/game/config";
 import { interest } from "@/game/engine/economy";
-import { CoinIcon, SwordIcon } from "./icons";
+import { CoinIcon, SwordIcon, PawIcon, GiftIcon } from "./icons";
 
 export function TopBar({ timer }: { timer?: React.ReactNode }) {
   const gold = useGame((s) => s.gold);
@@ -21,6 +21,8 @@ export function TopBar({ timer }: { timer?: React.ReactNode }) {
   const base = XP_TO_REACH[level];
   const needed = atMax ? null : XP_TO_REACH[level + 1] - base;
   const current = xp - base;
+  const kind = roundKind(stage, round);
+  const kindLabel = kind === "pve" ? "Battle Wild" : kind === "carousel" ? "Carousel" : "Start Combat";
 
   return (
     <div className="flex items-center gap-5 flex-wrap p-3 rounded-xl bg-slate-900/70 border border-slate-700/50">
@@ -53,11 +55,12 @@ export function TopBar({ timer }: { timer?: React.ReactNode }) {
       <div className="ml-auto flex items-center gap-4">
         {timer}
         <button
-          onClick={() => startCombatFlow()}
-          disabled={boardCount === 0}
+          onClick={() => advanceFlow()}
+          disabled={kind !== "carousel" && boardCount === 0}
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:hover:bg-amber-500 text-black text-sm font-extrabold"
         >
-          <SwordIcon size={15} /> Start Combat
+          {kind === "pve" ? <PawIcon size={15} /> : kind === "carousel" ? <GiftIcon size={15} /> : <SwordIcon size={15} />}
+          {kindLabel}
         </button>
       </div>
     </div>

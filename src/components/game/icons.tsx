@@ -69,6 +69,15 @@ export const SnowIcon = (p: P) => (
 export const RerollIcon = (p: P) => (
   <Svg {...p}><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /><path d="M3 21v-5h5" /></Svg>
 );
+export const PawIcon = (p: P) => (
+  <Svg {...p}><circle cx="6.5" cy="11" r="1.7" /><circle cx="10.5" cy="7.5" r="1.7" /><circle cx="14.5" cy="7.5" r="1.7" /><circle cx="18" cy="11" r="1.7" /><path d="M8 16.5c0-2 1.8-3.5 4-3.5s4 1.5 4 3.5c0 1.8-1.6 2.7-4 2.7s-4-.9-4-2.7Z" /></Svg>
+);
+export const GiftIcon = (p: P) => (
+  <Svg {...p}><path d="M20 12v8H4v-8M2 8h20v4H2zM12 8v12M12 8s-1.5-4-4-4a2 2 0 0 0 0 4M12 8s1.5-4 4-4a2 2 0 0 1 0 4" /></Svg>
+);
+export const TrophyIcon = (p: P) => (
+  <Svg {...p}><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4ZM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" /></Svg>
+);
 export const PokeballIcon = ({ size = 18, ...p }: P) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" {...p}>
     <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="1.6" />

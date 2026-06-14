@@ -86,13 +86,15 @@ export function CombatStage({
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4">
       <div className="flex items-center gap-6 mb-2 text-sm font-bold">
         <span className="text-emerald-400">Your Team · {aliveAlly}</span>
-        <span className="text-slate-500">VS</span>
+        <span className={a.overtime ? "text-rose-400 animate-pulse" : "text-slate-500"}>
+          {a.overtime ? "OVERTIME" : "VS"}
+        </span>
         <span className="text-rose-400">{opponentName} · {aliveEnemy}</span>
       </div>
 
       {/* Combat timer */}
       <div className="w-[300px] h-1.5 rounded-full bg-slate-800 overflow-hidden mb-3">
-        <div className="h-full bg-slate-400/70" style={{ width: `${(a.t / totalTime) * 100}%` }} />
+        <div className={`h-full ${a.overtime ? "bg-rose-500" : "bg-slate-400/70"}`} style={{ width: `${(a.t / totalTime) * 100}%` }} />
       </div>
 
       {/* Battlefield */}
