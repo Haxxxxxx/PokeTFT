@@ -304,14 +304,16 @@ function CombatRecap({ units, label }: { units: FrameUnit[]; label: string }) {
   const mine = units.filter((u) => u.team === "ally" && (u.dmgDealt + u.dmgTaken + u.healed) > 0);
   if (mine.length === 0) return null;
   const max = Math.max(1, ...mine.map((u) => Math.max(u.dmgDealt, u.dmgTaken)));
-  const sorted = [...mine].sort((a, b) => b.dmgDealt - a.dmgDealt);
+  // Top contributors only, capped so the recap can't balloon the combat column
+  // (and push the whole page taller than the viewport).
+  const sorted = [...mine].sort((a, b) => b.dmgDealt - a.dmgDealt).slice(0, 6);
   return (
     <div className="mt-2 w-full max-w-[600px] rounded-lg bg-slate-900/60 border border-slate-700/40 p-2">
       <div className="flex items-center justify-between text-[9px] uppercase tracking-wider text-slate-500 mb-1 px-0.5">
         <span>{label}</span>
         <span className="flex gap-2"><span className="text-rose-400">DMG</span><span className="text-sky-400">TANK</span><span className="text-emerald-400">HEAL</span></span>
       </div>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-0.5">
         {sorted.map((u) => (
           <div key={u.id} className={`flex items-center gap-1.5 ${u.alive ? "" : "opacity-50"}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}

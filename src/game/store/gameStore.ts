@@ -379,7 +379,9 @@ export const useGame = create<State>((set, get) => ({
   },
 
   importSave: (save) => set({
-    gold: save.gold, xp: save.xp, level: save.level,
+    // Derive level from XP so it always matches (a stale/dropped synced `level`
+    // can't stick after a reconnect and show the wrong level all game).
+    gold: save.gold, xp: save.xp, level: levelFromXp(save.xp ?? 0),
     // RTDB mangles arrays (objects for sparse, undefined for empty) and strips
     // null values — so bench units lose `pos: null` and any unit can lose its
     // empty `items`. Coerce back to dense arrays and restore both fields.
