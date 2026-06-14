@@ -25,12 +25,16 @@ export function CombatStage({
   opponentName,
   onResolve,
   autoResolve = false,
+  inline = false,
 }: {
   result: CombatResult;
   opponentName: string;
   onResolve: (won: boolean, survivors: number) => void;
   /** Multiplayer: the host clock advances the round, so hide the Continue button. */
   autoResolve?: boolean;
+  /** Render in-flow (inside the board column) instead of a fullscreen overlay,
+   *  so the bench + shop stay reachable during the fight. */
+  inline?: boolean;
 }) {
   const frames = result.frames;
   const last = frames.length - 1;
@@ -86,17 +90,28 @@ export function CombatStage({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4">
-      <div className="flex items-center gap-6 mb-2 text-sm font-bold">
-        <span className="text-emerald-400">Your Team · {aliveAlly}</span>
-        <span className={a.overtime ? "text-rose-400 animate-pulse" : "text-slate-500"}>
-          {a.overtime ? "OVERTIME" : "VS"}
-        </span>
-        <span className="text-rose-400">{opponentName} · {aliveEnemy}</span>
+    <div className={inline
+      ? "w-full flex flex-col items-center rounded-2xl border border-slate-700/50 bg-slate-950/60 p-3"
+      : "fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4"}>
+      {/* Scoreboard header: both teams + survivor counts */}
+      <div className="flex items-stretch gap-3 mb-2 w-full max-w-[440px]">
+        <div className="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50">
+          <span className="text-2xl font-extrabold tabular-nums text-emerald-300">{aliveAlly}</span>
+          <span className="text-[11px] font-bold uppercase tracking-wide text-emerald-400/80 leading-tight">Your<br />Team</span>
+        </div>
+        <div className="flex flex-col items-center justify-center px-1">
+          <span className={`text-xs font-extrabold ${a.overtime ? "text-rose-400 animate-pulse" : "text-slate-500"}`}>
+            {a.overtime ? "OVERTIME" : "VS"}
+          </span>
+        </div>
+        <div className="flex-1 flex items-center justify-end gap-2 px-3 py-1.5 rounded-lg bg-rose-950/40 border border-rose-800/50">
+          <span className="text-[11px] font-bold uppercase tracking-wide text-rose-400/80 leading-tight text-right truncate">{opponentName}</span>
+          <span className="text-2xl font-extrabold tabular-nums text-rose-300">{aliveEnemy}</span>
+        </div>
       </div>
 
       {/* Combat timer */}
-      <div className="w-[300px] h-1.5 rounded-full bg-slate-800 overflow-hidden mb-3">
+      <div className="w-full max-w-[440px] h-1.5 rounded-full bg-slate-800 overflow-hidden mb-3">
         <div className={`h-full ${a.overtime ? "bg-rose-500" : "bg-slate-400/70"}`} style={{ width: `${(a.t / totalTime) * 100}%` }} />
       </div>
 

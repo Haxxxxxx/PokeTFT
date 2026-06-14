@@ -67,6 +67,8 @@ type State = {
   carouselTake: (defId: string) => void;
   /** Multiplayer: grant a planning round's economy (income/xp/shop) for a host-driven round. */
   netRound: (stage: number, round: number, streak: number) => void;
+  /** Multiplayer: take a carousel pick (unit or Mega Stone) without advancing the round. */
+  netCarouselPick: (pick: string) => void;
   /** Multiplayer: snapshot / restore the local economy for reconnect. */
   exportSave: () => { gold: number; xp: number; level: number; units: UnitInstance[]; shop: (string | null)[]; items: string[] };
   importSave: (save: { gold: number; xp: number; level: number; units?: UnitInstance[]; shop?: (string | null)[]; items?: string[] }) => void;
@@ -106,7 +108,9 @@ export const useGame = create<State>((set, get) => ({
   },
 
   newGame: (startingHp = ECONOMY.startingHealth, allowedIds?: string[]) => {
-    rng = makeRng(INITIAL_SEED);
+    // Fresh, independent randomness each game (and per player) — not a fixed seed,
+    // so every player's shop rolls differently.
+    rng = makeRng((Math.floor(Math.random() * 0x7fffffff) ^ Date.now()) >>> 0);
     const pool = makePool(allowedIds);
     const unitsByCost = makeUnitsByCost(allowedIds);
     set({
@@ -135,12 +139,16 @@ export const useGame = create<State>((set, get) => ({
     if (!defId) return;
     const cost = getDef(defId).cost as Cost;
     if (state.gold < cost) return;
-    if (state.benchUnits().length >= BENCH_SIZE) return;
     // Never buy more copies than the shared pool actually has left.
     if ((state.pool[defId] ?? 0) <= 0) return;
 
-    takeFromPool(state.pool, defId);
+    // Combine first, THEN gate on bench size: a 3rd copy that merges into a
+    // star-up frees its bench slots, so a full bench can still accept it.
     const units = applyCombines([...state.units, makeInstance(defId)]);
+    const benchAfter = units.filter((u) => u.pos === null).length;
+    if (benchAfter > BENCH_SIZE) return;
+
+    takeFromPool(state.pool, defId);
     const shop = [...state.shop];
     shop[slot] = null;
     set({ gold: state.gold - cost, units, shop, pool: { ...state.pool } });
@@ -251,6 +259,14 @@ export const useGame = create<State>((set, get) => ({
     const newXp = state.xp + ECONOMY.passiveXpPerRound;
     const shop = state.frozen ? state.shop : rollShop(levelFromXp(newXp), state.pool, rng, state.unitsByCost);
     set({ gold: state.gold + income, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false });
+  },
+
+  netCarouselPick: (pick) => {
+    const state = get();
+    if (pick === MEGA_STONE) { set({ items: [...state.items, MEGA_STONE] }); return; }
+    if (state.units.filter((u) => u.pos === null).length < BENCH_SIZE) {
+      set({ units: applyCombines([...state.units, makeInstance(pick)]) });
+    }
   },
 
   exportSave: () => {

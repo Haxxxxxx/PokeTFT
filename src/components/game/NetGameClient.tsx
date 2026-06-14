@@ -5,10 +5,15 @@ import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, useDrop
 import { useGame } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
-import { startCombat, endCombat, heartbeat, maybeClaimHost, syncBoard, PLAN_MS, COMBAT_MS } from "@/game/net/match";
+import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate } from "@/game/engine/combat";
 import { getDef, spriteUrl, unitsForGenerations } from "@/game/data/mons";
-import type { UnitInstance } from "@/game/types";
+import { ECONOMY, MAX_LEVEL, XP_TO_REACH, streakGold } from "@/game/config";
+import { interest } from "@/game/engine/economy";
+import { MEGA_STONE } from "@/game/data/mega";
+import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
+import { MegaIcon } from "./icons";
+import type { UnitInstance, PokeType } from "@/game/types";
 
 function asUnits(u: unknown): UnitInstance[] {
   if (!u) return [];
@@ -46,12 +51,15 @@ export function NetGameClient() {
   const newGame = useGame((s) => s.newGame);
   const netRound = useGame((s) => s.netRound);
   const importSave = useGame((s) => s.importSave);
+  const netCarouselPick = useGame((s) => s.netCarouselPick);
+  const buyXp = useGame((s) => s.buyXp);
   const moveToBoard = useGame((s) => s.moveToBoard);
   const moveToBench = useGame((s) => s.moveToBench);
   const sell = useGame((s) => s.sell);
   const units = useGame((s) => s.units);
   const gold = useGame((s) => s.gold);
   const level = useGame((s) => s.level);
+  const xp = useGame((s) => s.xp);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [, setTick] = useState(0);
@@ -60,6 +68,8 @@ export function NetGameClient() {
   const lastRoundKey = useRef<string | null>(null);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const actedDeadline = useRef(-1);
+  const [roundLog, setRoundLog] = useState<{ stage: number; round: number; won: boolean }[]>([]);
+  const [pickedKey, setPickedKey] = useState<string | null>(null);
 
   // server time + a 250ms repaint so the shared timer counts down smoothly
   useEffect(() => {
@@ -81,8 +91,9 @@ export function NetGameClient() {
       heartbeat(r.code);
       if (serverNow() >= r.meta.deadline && actedDeadline.current !== r.meta.deadline) {
         actedDeadline.current = r.meta.deadline;
-        if (r.meta.phase === "planning") startCombat(r.code, r);
+        if (r.meta.phase === "planning") resolveRoundStart(r.code, r);
         else if (r.meta.phase === "combat") endCombat(r.code, r);
+        else if (r.meta.phase === "carousel") endCarousel(r.code, r);
       }
     }, 700);
     return () => clearInterval(id);
@@ -131,9 +142,26 @@ export function NetGameClient() {
     return simulate(asBoard(myCombat.selfBoard), asBoard(myCombat.oppBoard));
   }, [phase, meta?.stage, meta?.round, myCombat?.oppUid]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Record PvP results into the round timeline (one entry per round, dedup by key).
+  useEffect(() => {
+    if (phase === "combat" && myCombat && !myCombat.pve && meta) {
+      const key = `${meta.stage}-${meta.round}`;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setRoundLog((h) => {
+        const last = h[h.length - 1];
+        if (last && `${last.stage}-${last.round}` === key) return h;
+        return [...h, { stage: meta.stage, round: meta.round, won: myCombat.won }];
+      });
+    }
+  }, [phase, meta?.stage, meta?.round, myCombat?.oppUid, myCombat?.pve, meta]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!room || !meta || !myUid) return null;
 
   const secondsLeft = Math.max(0, Math.ceil((meta.deadline - serverNow()) / 1000));
+  const atMax = level >= MAX_LEVEL;
+  const xpBase = XP_TO_REACH[level];
+  const xpNeed = atMax ? 1 : XP_TO_REACH[level + 1] - xpBase;
+  const xpCur = xp - xpBase;
   const totalMs = phase === "combat" ? COMBAT_MS : PLAN_MS;
   const pct = Math.max(0, Math.min(100, ((meta.deadline - serverNow()) / totalMs) * 100));
   const isHost = meta.hostUid === myUid;
@@ -143,26 +171,70 @@ export function NetGameClient() {
   const iWon = gameOver && me?.alive && aliveCount === 1;
 
   function onDragEnd(e: DragEndEvent) {
-    if (phase !== "planning") return;
+    // Bench management + selling stay available during combat (no effect on the
+    // frozen, already-resolved fight). Board placement is locked while fighting.
+    if (phase !== "planning" && phase !== "combat") return;
     const iid = String(e.active.id);
     const over = e.over?.id;
     if (!over) return;
     const t = String(over);
     if (t === "sell") sell(iid);
     else if (t === "bench") moveToBench(iid);
-    else if (t.startsWith("cell-")) { const [, c, r] = t.split("-"); moveToBoard(iid, Number(c), Number(r)); }
+    else if (t.startsWith("cell-")) {
+      if (phase !== "planning") return; // can't move onto the board mid-combat
+      const [, c, r] = t.split("-");
+      moveToBoard(iid, Number(c), Number(r));
+    }
   }
+
+  const streak = me?.streak ?? 0;
 
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
       <div className="flex flex-col gap-3 max-w-[1440px] mx-auto p-4">
+        {/* Round timeline (win/loss history) */}
+        {roundLog.length > 0 && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-700/40 overflow-x-auto">
+            <span className="text-[10px] uppercase tracking-wider text-slate-500 shrink-0">Rounds</span>
+            <div className="flex items-center gap-1">
+              {roundLog.map((h, i) => (
+                <span key={i} title={`${h.stage}-${h.round}`} className={`w-6 h-6 rounded-md flex items-center justify-center text-[8px] font-bold ${h.won ? "bg-emerald-500/90 text-black" : "bg-rose-500/90 text-black"}`}>
+                  {h.stage}-{h.round}
+                </span>
+              ))}
+              {phase !== "over" && (
+                <span className="w-6 h-6 rounded-md border-2 border-sky-400 flex items-center justify-center text-[8px] font-bold text-sky-300">{meta.stage}-{meta.round}</span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Top bar */}
         <div className="flex items-center gap-5 flex-wrap p-3 rounded-xl bg-slate-900/70 border border-slate-700/50">
           <Stat label="Stage" value={`${meta.stage}-${meta.round}`} />
           <Stat label="HP" value={`${Math.max(0, me?.hp ?? 0)}`} accent="#ff6b6b" />
           <Stat label="Gold" accent="#fbbf24" value={<span className="inline-flex items-center gap-1"><CoinIcon size={13} />{gold}</span>} />
-          <Stat label="Level" value={`${level}`} />
+          <Stat label="Interest" value={`+${interest(gold)}`} />
+          <Stat label="Streak" value={`${streak >= 0 ? "W" : "L"}${Math.abs(streak)} (+${streakGold(streak)})`} />
           <Stat label="Alive" value={`${aliveCount}`} />
+
+          {/* Level + XP + Buy XP */}
+          <div className="flex flex-col gap-1 min-w-[150px]">
+            <div className="flex justify-between text-[11px] text-slate-400">
+              <span className="font-semibold text-slate-200">Level {level}</span>
+              <span>{atMax ? "MAX" : `${xpCur}/${xpNeed} XP`}</span>
+            </div>
+            <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
+              <div className="h-full bg-sky-400 transition-all" style={{ width: atMax ? "100%" : `${(xpCur / xpNeed) * 100}%` }} />
+            </div>
+            <button
+              onClick={buyXp}
+              disabled={phase !== "planning" || gold < ECONOMY.buyXpCost || atMax}
+              className="inline-flex items-center justify-center gap-1.5 px-2 py-1 rounded-md bg-sky-700/90 hover:bg-sky-600 disabled:opacity-40 text-[11px] font-semibold"
+            >
+              Buy XP <span className="inline-flex items-center gap-0.5 text-amber-200"><CoinIcon size={11} />{ECONOMY.buyXpCost}</span> <span className="text-sky-200">+{ECONOMY.buyXpAmount}</span>
+            </button>
+          </div>
           <div className="flex flex-col gap-1 min-w-[200px]">
             <div className="flex justify-between text-[11px]">
               <span className={`font-bold uppercase ${phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{phase}</span>
@@ -211,7 +283,13 @@ export function NetGameClient() {
 
           <TraitPanel />
           <div className="flex-1 flex flex-col gap-3 items-center">
-            <Board />
+            {/* During combat the board is "fighting" — show the replay in its place,
+                but keep the bench + shop below fully interactive. */}
+            {phase === "combat" && combatResult && me?.alive ? (
+              <CombatStage result={combatResult} opponentName={myCombat?.oppName ?? "Rival"} autoResolve inline onResolve={() => {}} />
+            ) : (
+              <Board />
+            )}
             <Bench />
             <ItemTray />
           </div>
@@ -224,9 +302,42 @@ export function NetGameClient() {
         </div>
       </div>
 
-      {combatResult && me?.alive && (
-        <CombatStage result={combatResult} opponentName={myCombat?.oppName ?? "Rival"} autoResolve onResolve={() => {}} />
-      )}
+      {phase === "carousel" && me?.alive && (() => {
+        const opts = room.carousel?.[myUid];
+        const key = `${meta.stage}-${meta.round}`;
+        const picked = pickedKey === key;
+        if (!opts) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+            <h2 className="text-lg font-extrabold text-amber-300 mb-1">Carousel</h2>
+            <p className="text-xs text-slate-400 mb-5">{picked ? "Picked — waiting for the round to continue…" : "Pick one free reward for your bench."}</p>
+            {!picked && (
+              <div className="flex gap-3 flex-wrap justify-center max-w-[760px]">
+                {opts.map((pick, i) => pick === MEGA_STONE ? (
+                  <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); }} style={{ borderColor: "#f0abfc", boxShadow: "0 0 18px -2px #f0abfc88" }} className="w-[130px] rounded-xl border-2 bg-gradient-to-b from-fuchsia-900/40 to-slate-900/80 hover:-translate-y-1 transition-all p-3 flex flex-col items-center justify-center">
+                    <span className="text-fuchsia-300"><MegaIcon size={48} /></span>
+                    <span className="text-sm font-semibold mt-1 text-fuchsia-200">Mega Stone</span>
+                  </button>
+                ) : (() => {
+                  const def = getDef(pick);
+                  const color = COST_COLOR[def.cost];
+                  return (
+                    <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); }} style={{ borderColor: color, boxShadow: `0 0 16px -2px ${color}66` }} className="w-[130px] rounded-xl border-2 bg-slate-900/80 hover:bg-slate-800 hover:-translate-y-1 transition-all p-3 flex flex-col items-center">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={spriteUrl(def.dex[0])} alt={def.name} width={56} height={56} style={{ imageRendering: "pixelated" }} draggable={false} />
+                      <span className="text-sm font-semibold mt-1">{def.name}</span>
+                      <span style={{ color }} className="inline-flex items-center gap-0.5 text-[11px] font-bold"><CoinIcon size={11} />{def.cost}</span>
+                      <div className="flex flex-wrap gap-0.5 justify-center mt-1.5">
+                        {def.types.map((ty) => <span key={ty} style={{ background: TYPE_COLOR[ty as PokeType] }} className="text-[8px] px-1 rounded text-black/80 font-bold uppercase">{ty.slice(0, 3)}</span>)}
+                      </div>
+                    </button>
+                  );
+                })())}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {!gameOver && me && !me.alive && (
         <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm gap-3">

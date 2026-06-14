@@ -3,13 +3,15 @@ import { db } from "./firebase";
 import { serverNow } from "./serverTime";
 import { simulate } from "../engine/combat";
 import { makeRng } from "../engine/rng";
-import { generateBoard } from "../engine/enemy";
-import { advanceRound, stageBaseDamage, cumulativeRound } from "../config";
+import { generateBoard, generateCreepBoard, pickCarouselOptions } from "../engine/enemy";
+import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
+import { MEGA_STONE } from "../data/mega";
 import type { UnitInstance } from "../types";
 import type { Room, RoomPlayer, CombatAssign, BotDifficulty } from "./roomStore";
 
 export const PLAN_MS = 30_000;
 export const COMBAT_MS = 16_000;
+export const CAROUSEL_MS = 22_000;
 /** If the host's heartbeat is older than this, any client may claim the host role. */
 export const HOST_TIMEOUT = 3_500;
 
@@ -121,33 +123,101 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
   }
 }
 
-/** Host: planning → combat. Pairs alive players, freezes boards, resolves. */
+/** Atomically claim a phase transition so exactly ONE client resolves a round,
+ *  even if two clients briefly believe they are the host. Returns true if we won. */
+async function claimTransition(code: string, fromPhase: string, expectedDeadline: number): Promise<boolean> {
+  const res = await runTransaction(ref(db(), `games/${code}/meta`), (m) => {
+    if (m && m.phase === fromPhase && (m.deadline ?? 0) === expectedDeadline && serverNow() >= expectedDeadline) {
+      m.deadline = serverNow() + 60_000; // lock: park the deadline so no one else claims
+      return m;
+    }
+    return; // abort — already claimed/changed
+  });
+  return res.committed && (res.snapshot.child("deadline").val() as number) > expectedDeadline + 30_000;
+}
+
+/** Host: decide what a planning round opens into (PvP / PvE / carousel). */
+export async function resolveRoundStart(code: string, room: Room): Promise<void> {
+  if (roundKind(room.meta.stage, room.meta.round) === "carousel") return startCarousel(code, room);
+  return startCombat(code, room);
+}
+
+/** Host: planning → combat (PvP pairing or PvE creeps). Freezes boards. */
 export async function startCombat(code: string, room: Room): Promise<void> {
-  const alive = alivePlayers(room);
+  if (!(await claimTransition(code, "planning", room.meta.deadline))) return;
   const stage = room.meta.stage;
+  const kind = roundKind(stage, room.meta.round);
+  const alive = alivePlayers(room);
 
   // Bots get a fresh host-generated board each round (humans synced their own).
   for (const p of alive) {
     if (p.isBot) room.players[p.uid] = { ...p, board: botBoard(stage, room.meta.round, p.botDifficulty, p.uid) };
   }
 
-  const order = shuffled(alive.map((p) => p.uid).sort(), stage * 131 + room.meta.round);
   const combat: Record<string, CombatAssign> = {};
-  for (let i = 0; i < order.length; i += 2) {
-    const a = order[i];
-    if (i + 1 < order.length) assign(combat, room, a, order[i + 1], stage, false);
-    else if (order.length > 1) assign(combat, room, a, order[i - 1], stage, true); // odd → ghost
-    else combat[a] = { oppUid: a, oppName: "—", ghost: true, won: true, survivors: 0, dmg: 0, selfBoard: board(room.players[a]), oppBoard: [] };
+
+  if (kind === "pve") {
+    // Everyone fights wild creeps — no HP loss, a breather to build.
+    for (const p of alive) {
+      const self = board(room.players[p.uid]);
+      const creeps = generateCreepBoard(stage, stage * 97 + room.meta.round * 13 + p.uid.length);
+      const r = simulate(self, creeps);
+      combat[p.uid] = { oppUid: p.uid, oppName: "Wild Pokémon", ghost: true, pve: true, won: r.winner === "ally", survivors: 0, dmg: 0, selfBoard: self, oppBoard: creeps };
+    }
+  } else {
+    const order = shuffled(alive.map((p) => p.uid).sort(), stage * 131 + room.meta.round);
+    // Avoid an immediate rematch when there's someone else to swap with.
+    for (let i = 0; i + 1 < order.length; i += 2) {
+      if (room.players[order[i]]?.lastOpp === order[i + 1] && i + 2 < order.length) {
+        [order[i + 1], order[i + 2]] = [order[i + 2], order[i + 1]];
+      }
+    }
+    for (let i = 0; i < order.length; i += 2) {
+      const a = order[i];
+      if (i + 1 < order.length) assign(combat, room, a, order[i + 1], stage, false);
+      else if (order.length > 1) assign(combat, room, a, order[i - 1], stage, true); // odd → ghost
+      else combat[a] = { oppUid: a, oppName: "—", ghost: true, won: true, survivors: 0, dmg: 0, selfBoard: board(room.players[a]), oppBoard: [] };
+    }
   }
 
   const u: Updates = { "meta/phase": "combat", "meta/deadline": serverNow() + COMBAT_MS, "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow() };
-  for (const uid of Object.keys(combat)) u[`combat/${uid}`] = combat[uid];
+  for (const uid of Object.keys(combat)) {
+    u[`combat/${uid}`] = combat[uid];
+    if (!combat[uid].pve && !combat[uid].ghost) u[`players/${uid}/lastOpp`] = combat[uid].oppUid;
+  }
   for (const p of alive) if (p.isBot) u[`players/${p.uid}/board`] = room.players[p.uid].board; // persist for replay
   await update(gamePath(code), u);
 }
 
+/** Host: planning → carousel. Offers each human a free pick (+ a Mega Stone). */
+export async function startCarousel(code: string, room: Room): Promise<void> {
+  if (!(await claimTransition(code, "planning", room.meta.deadline))) return;
+  const carousel: Record<string, string[]> = {};
+  for (const p of alivePlayers(room)) {
+    if (p.isBot) continue;
+    carousel[p.uid] = [MEGA_STONE, ...pickCarouselOptions(room.meta.stage, room.meta.stage * 31 + room.meta.round * 7 + p.uid.length, 4)];
+  }
+  await update(gamePath(code), {
+    "meta/phase": "carousel", "meta/deadline": serverNow() + CAROUSEL_MS,
+    "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow(),
+    combat: null, carousel,
+  });
+}
+
+/** Host: carousel → next planning round. */
+export async function endCarousel(code: string, room: Room): Promise<void> {
+  if (!(await claimTransition(code, "carousel", room.meta.deadline))) return;
+  const next = advanceRound(room.meta.stage, room.meta.round);
+  await update(gamePath(code), {
+    "meta/phase": "planning", "meta/stage": next.stage, "meta/round": next.round,
+    "meta/deadline": serverNow() + PLAN_MS, "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow(),
+    carousel: null,
+  });
+}
+
 /** Host: combat → next planning (or game over). Applies HP, eliminations, placement. */
 export async function endCombat(code: string, room: Room): Promise<void> {
+  if (!(await claimTransition(code, "combat", room.meta.deadline))) return;
   const combat = room.combat ?? {};
   const u: Updates = {};
   const aliveUids = alivePlayers(room).map((p) => p.uid);
