@@ -102,6 +102,8 @@ export type Dict = {
   net_leave: string;
   net_eliminated: string;
   net_placed: (n: number) => string;
+  net_viewing: (name: string) => string;
+  net_back_to_mine: string;
   net_back_menu: string;
   net_victory: string;
   net_gameover: string;
@@ -241,6 +243,8 @@ export const FR: Dict = {
   net_leave: "Quitter",
   net_eliminated: "Éliminé",
   net_placed: (n) => `Classé #${n}`,
+  net_viewing: (name) => `Plateau de ${name}`,
+  net_back_to_mine: "Retour au mien",
   net_back_menu: "Retour au menu",
   net_victory: "Victoire Royale",
   net_gameover: "Game Over",
@@ -377,6 +381,8 @@ export const EN: Dict = {
   net_leave: "Leave",
   net_eliminated: "Eliminated",
   net_placed: (n) => `You placed #${n}`,
+  net_viewing: (name) => `${name}'s board`,
+  net_back_to_mine: "Back to mine",
   net_back_menu: "Back to menu",
   net_victory: "Victory Royale",
   net_gameover: "Game Over",

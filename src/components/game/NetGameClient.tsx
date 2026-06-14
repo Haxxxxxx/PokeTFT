@@ -30,6 +30,7 @@ function asUnits(u: unknown): UnitInstance[] {
 }
 import { Board } from "./Board";
 import { Bench } from "./Bench";
+import { UnitChip } from "./UnitChip";
 import { ShopBar } from "./ShopBar";
 import { TraitPanel } from "./TraitPanel";
 import { UnitDetail } from "./UnitDetail";
@@ -165,6 +166,22 @@ export function NetGameClient() {
     return simulate(asBoard(myCombat.selfBoard), asBoard(myCombat.oppBoard));
   }, [phase, meta?.stage, meta?.round, myCombat?.oppUid]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Live replay of the rival I'm spectating (from the host's frozen boards).
+  const spectateCombat = spectate && spectate !== myUid ? room?.combat?.[spectate] : undefined;
+  const spectateCombatResult = useMemo(() => {
+    if (phase !== "combat" || !spectateCombat) return null;
+    return simulate(asBoard(spectateCombat.selfBoard), asBoard(spectateCombat.oppBoard));
+  }, [phase, meta?.stage, meta?.round, spectate, spectateCombat?.oppUid]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When you're eliminated, default to watching the current leader.
+  useEffect(() => {
+    if (me && !me.alive && !spectate) {
+      const leader = Object.values(players).filter((p) => p.alive && p.uid !== myUid).sort((a, b) => b.hp - a.hp)[0];
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (leader) setSpectate(leader.uid);
+    }
+  }, [me?.alive, spectate]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const t = useT();
 
   // Record every combat round into the timeline (one entry per round, dedup by key).
@@ -232,9 +249,13 @@ export function NetGameClient() {
   }
 
   const streak = me?.streak ?? 0;
-  // Spectating a rival from the scoreboard → their last-synced board (read-only).
-  // My own combat replay takes priority, so spectate only applies out of combat.
-  const spectateUnits = spectate && spectate !== myUid && phase !== "combat" ? asBoard(players[spectate]?.board) : null;
+  // Spectating a rival from the scoreboard → watch their board, bench and fights
+  // (read-only). Works while alive (scouting) and after death (keep watching).
+  const spectating = !!spectate && spectate !== myUid && !!players[spectate];
+  const spectateP = spectating ? players[spectate!] : undefined;
+  const spectateUnits = spectating ? asBoard(spectateP?.board) : null;
+  // Their full roster (incl. bench) rides along in the synced economy save.
+  const spectateBench = spectating ? asUnits(spectateP?.save?.units).filter((u) => u.pos === null) : [];
 
   // Forward-looking timeline: the current stage + the next two, each round
   // tagged with its kind (PvE / carousel / PvP) and overlaid with past results.
@@ -362,16 +383,26 @@ export function NetGameClient() {
 
           <TraitPanel units={spectateUnits ?? undefined} />
           <div className="flex-1 min-w-[440px] flex flex-col gap-3 items-center">
-            {/* During combat the board is "fighting" — show the replay in its place,
-                but keep the bench + shop below fully interactive. Spectating a
-                rival overrides the planning board (read-only). */}
-            {spectateUnits ? (
+            {/* Spectating a rival overrides the view: their live fight during
+                combat, else their board + bench (read-only). Otherwise my own
+                combat replay during combat, else my board. */}
+            {spectating ? (
               <div className="w-full flex flex-col gap-2">
                 <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                  <span className="text-xs font-bold text-amber-300">Viewing {players[spectate!]?.name ?? "rival"}&apos;s board</span>
-                  <button onClick={() => setSpectate(null)} className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-300">Back to mine</button>
+                  <span className="text-xs font-bold text-amber-300">{t.net_viewing(spectateP?.name ?? "rival")}</span>
+                  <button onClick={() => setSpectate(null)} className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-300">{t.net_back_to_mine}</button>
                 </div>
-                <Board units={spectateUnits} interactive={false} />
+                {phase === "combat" && spectateCombatResult ? (
+                  <CombatStage result={spectateCombatResult} opponentName={spectateCombat?.oppName ?? "Rival"} autoResolve inline syncStart={meta.deadline - COMBAT_MS} syncWindowMs={COMBAT_MS} onResolve={() => {}} />
+                ) : (
+                  <Board units={spectateUnits ?? []} interactive={false} />
+                )}
+                {/* Rival's bench */}
+                <div className="flex gap-1.5 p-2 rounded-xl border border-slate-700/60 bg-slate-900/50 min-h-[64px] flex-wrap justify-center">
+                  {spectateBench.length === 0
+                    ? <span className="text-[11px] text-slate-600 self-center">Empty bench</span>
+                    : spectateBench.map((u) => <UnitChip key={u.iid} unit={u} size={52} interactive={false} />)}
+                </div>
               </div>
             ) : phase === "combat" && combatResult && me?.alive ? (
               <CombatStage
@@ -444,10 +475,12 @@ export function NetGameClient() {
         );
       })()}
 
+      {/* Eliminated but the game isn't over — keep watching. Non-blocking banner;
+          the scoreboard stays clickable so you can spectate any survivor. */}
       {!gameOver && me && !me.alive && (
-        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm gap-3">
-          <div className="text-3xl font-extrabold text-rose-400">{t.net_eliminated}</div>
-          <div className="text-slate-300">{t.net_placed(me.place ?? aliveCount + 1)} · {t.net_spectating}</div>
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-2 rounded-full bg-rose-950/80 border border-rose-700/60 backdrop-blur-sm">
+          <span className="text-sm font-extrabold text-rose-300">{t.net_eliminated}</span>
+          <span className="text-xs text-slate-300">{t.net_placed(me.place ?? aliveCount + 1)} · {t.net_spectating}</span>
         </div>
       )}
 
