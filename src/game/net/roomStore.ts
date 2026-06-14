@@ -54,10 +54,20 @@ type RoomState = {
   updateMe: (patch: Partial<RoomPlayer>) => void;
   setMeta: (patch: Partial<RoomMeta>) => void;
   setRules: (patch: Partial<{ startingHp: number; maxPlayers: number }>) => void;
+  /** Re-attach to the room saved in this tab (after a page refresh). */
+  reconnect: () => Promise<void>;
   leave: () => void;
 };
 
 let unsub: (() => void) | null = null;
+
+const ROOM_KEY = "poketft_room";
+function rememberRoom(code: string) {
+  if (typeof window !== "undefined") window.sessionStorage.setItem(ROOM_KEY, code);
+}
+function forgetRoom() {
+  if (typeof window !== "undefined") window.sessionStorage.removeItem(ROOM_KEY);
+}
 
 function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -97,6 +107,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       // Drop our player entry if we disconnect.
       onDisconnect(ref(db(), `games/${code}/players/${uid}/connected`)).set(false);
       setState({ code, myUid: uid, status: "connected" });
+      rememberRoom(code);
       return code;
     } catch (e) {
       setState({ status: "error", error: (e as Error).message });
@@ -128,6 +139,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       subscribe(code, uid, setState);
       onDisconnect(ref(db(), `games/${code}/players/${uid}/connected`)).set(false);
       setState({ code, myUid: uid, status: "connected" });
+      rememberRoom(code);
       return true;
     } catch (e) {
       setState({ status: "error", error: (e as Error).message });
@@ -155,10 +167,35 @@ export const useRoom = create<RoomState>((setState, getState) => ({
     update(ref(db(), `games/${code}/rules`), patch);
   },
 
+  reconnect: async () => {
+    if (typeof window === "undefined") return;
+    if (getState().code) return; // already connected
+    const code = window.sessionStorage.getItem(ROOM_KEY);
+    if (!code) return;
+    try {
+      const uid = await ensureAuth();
+      const snap = await get(roomRef(code));
+      if (!snap.exists()) { forgetRoom(); return; }
+      const data = snap.val() as Room;
+      if (!data.players?.[uid]) {
+        // We're no longer in this room (removed, or it moved on) — drop it.
+        forgetRoom();
+        return;
+      }
+      await update(ref(db(), `games/${code}/players/${uid}`), { connected: true });
+      subscribe(code, uid, setState);
+      onDisconnect(ref(db(), `games/${code}/players/${uid}/connected`)).set(false);
+      setState({ code, myUid: uid, status: "connected" });
+    } catch {
+      forgetRoom();
+    }
+  },
+
   leave: () => {
     const { code, myUid } = getState();
     if (unsub) { unsub(); unsub = null; }
     if (code && myUid) remove(ref(db(), `games/${code}/players/${myUid}`));
+    forgetRoom();
     setState({ code: null, myUid: null, room: null, status: "idle", error: null });
   },
 }));

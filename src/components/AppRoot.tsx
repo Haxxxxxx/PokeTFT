@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRoom } from "@/game/net/roomStore";
 import { WelcomeScreen } from "@/components/welcome/WelcomeScreen";
 import { LobbyScreen } from "@/components/lobby/LobbyScreen";
@@ -14,6 +15,10 @@ import { GameClient } from "@/components/game/GameClient";
 export function AppRoot() {
   const code = useRoom((s) => s.code);
   const room = useRoom((s) => s.room);
+  const reconnect = useRoom((s) => s.reconnect);
+
+  // After a refresh, re-attach to the room this tab was in.
+  useEffect(() => { reconnect(); }, [reconnect]);
 
   if (!code || !room) return <WelcomeScreen />;
   if (room.meta?.phase === "playing") {
