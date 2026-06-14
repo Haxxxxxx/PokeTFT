@@ -142,7 +142,7 @@ export function LobbyScreen() {
               <>
                 <button
                   disabled={!canStart}
-                  onClick={() => beginMatch(room.code, room)}
+                  onClick={() => { beginMatch(room.code, room).catch((e) => console.error("[beginMatch]", e)); }}
                   className="w-full max-w-sm py-3 rounded-xl font-extrabold text-sm tracking-wide transition-all
                     bg-amber-500 hover:bg-amber-400 text-black
                     disabled:opacity-30 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"

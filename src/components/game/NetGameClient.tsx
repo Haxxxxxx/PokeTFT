@@ -133,17 +133,25 @@ export function NetGameClient() {
   useEffect(() => {
     if (!myUid) return;
     const id = setInterval(() => {
-      const r = roomRef.current;
-      if (!r) return;
-      maybeClaimHost(r.code, r, myUid);
-      if (r.meta?.hostUid !== myUid) return;
-      heartbeat(r.code);
-      if (serverNow() >= r.meta.deadline && actedDeadline.current !== r.meta.deadline) {
-        actedDeadline.current = r.meta.deadline;
-        if (r.meta.phase === "planning") resolveRoundStart(r.code, r);
-        else if (r.meta.phase === "combat") endCombat(r.code, r);
-        else if (r.meta.phase === "carousel") endCarousel(r.code, r);
-      }
+      // Async + guarded: a rejected RTDB write (network blip / permission) must
+      // not become an unhandled rejection that silently freezes the round loop.
+      void (async () => {
+        try {
+          const r = roomRef.current;
+          if (!r) return;
+          await maybeClaimHost(r.code, r, myUid);
+          if (r.meta?.hostUid !== myUid) return;
+          await heartbeat(r.code);
+          if (serverNow() >= r.meta.deadline && actedDeadline.current !== r.meta.deadline) {
+            actedDeadline.current = r.meta.deadline;
+            if (r.meta.phase === "planning") await resolveRoundStart(r.code, r);
+            else if (r.meta.phase === "combat") await endCombat(r.code, r);
+            else if (r.meta.phase === "carousel") await endCarousel(r.code, r);
+          }
+        } catch (err) {
+          console.error("[host-loop]", err);
+        }
+      })();
     }, 700);
     return () => clearInterval(id);
   }, [myUid]);
@@ -302,6 +310,14 @@ export function NetGameClient() {
       const [, c, r] = target.split("-");
       moveToBoard(iid, Number(c), Number(r));
     }
+  }
+
+  // Push the current economy + board to RTDB immediately (bypassing the debounce).
+  // Carousel/augment picks must persist before the round can flip, or they're lost.
+  function flushSync() {
+    if (!room || !myUid) return;
+    const g = useGame.getState();
+    syncBoard(room.code, myUid, g.units, g.exportSave());
   }
 
   const streak = me?.streak ?? 0;
@@ -521,12 +537,12 @@ export function NetGameClient() {
             {!picked && (
               <div className="flex gap-3 flex-wrap justify-center max-w-[760px]">
                 {opts.map((pick, i) => pick === MEGA_STONE ? (
-                  <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); }} style={{ borderColor: "#f0abfc", boxShadow: "0 0 18px -2px #f0abfc88" }} className="w-[130px] rounded-xl border-2 bg-gradient-to-b from-fuchsia-900/40 to-slate-900/80 hover:-translate-y-1 transition-all p-3 flex flex-col items-center justify-center">
+                  <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); flushSync(); }} style={{ borderColor: "#f0abfc", boxShadow: "0 0 18px -2px #f0abfc88" }} className="w-[130px] rounded-xl border-2 bg-gradient-to-b from-fuchsia-900/40 to-slate-900/80 hover:-translate-y-1 transition-all p-3 flex flex-col items-center justify-center">
                     <span className="text-fuchsia-300"><MegaIcon size={48} /></span>
                     <span className="text-sm font-semibold mt-1 text-fuchsia-200">Mega Stone</span>
                   </button>
                 ) : ITEM_DEF_BY_ID[pick] ? (
-                  <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); }} style={{ borderColor: "#fbbf24", boxShadow: "0 0 16px -2px #fbbf2466" }} className="w-[130px] rounded-xl border-2 bg-gradient-to-b from-amber-900/30 to-slate-900/80 hover:-translate-y-1 transition-all p-3 flex flex-col items-center justify-center text-center">
+                  <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); flushSync(); }} style={{ borderColor: "#fbbf24", boxShadow: "0 0 16px -2px #fbbf2466" }} className="w-[130px] rounded-xl border-2 bg-gradient-to-b from-amber-900/30 to-slate-900/80 hover:-translate-y-1 transition-all p-3 flex flex-col items-center justify-center text-center">
                     <span className="text-3xl">{ITEM_DEF_BY_ID[pick].icon}</span>
                     <span className="text-sm font-semibold mt-1 text-amber-200">{ITEM_DEF_BY_ID[pick].name}</span>
                     <span className="text-[9px] text-slate-400 leading-tight mt-1">{ITEM_DEF_BY_ID[pick].effect}</span>
@@ -535,7 +551,7 @@ export function NetGameClient() {
                   const def = getDef(pick);
                   const color = COST_COLOR[def.cost];
                   return (
-                    <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); }} style={{ borderColor: color, boxShadow: `0 0 16px -2px ${color}66` }} className="w-[130px] rounded-xl border-2 bg-slate-900/80 hover:bg-slate-800 hover:-translate-y-1 transition-all p-3 flex flex-col items-center">
+                    <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); flushSync(); }} style={{ borderColor: color, boxShadow: `0 0 16px -2px ${color}66` }} className="w-[130px] rounded-xl border-2 bg-slate-900/80 hover:bg-slate-800 hover:-translate-y-1 transition-all p-3 flex flex-col items-center">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={spriteUrl(def.dex[0])} alt={def.name} width={56} height={56} style={{ imageRendering: "pixelated" }} draggable={false} />
                       <span className="text-sm font-semibold mt-1">{def.name}</span>
@@ -566,7 +582,7 @@ export function NetGameClient() {
             {augOptions.map((a) => (
               <button
                 key={a.id}
-                onClick={() => pickAugment(a.id)}
+                onClick={() => { pickAugment(a.id); flushSync(); }}
                 style={{ borderColor: "#a78bfa", boxShadow: "0 0 18px -3px #a78bfa88" }}
                 className="w-[180px] rounded-xl border-2 bg-gradient-to-b from-violet-900/40 to-slate-900/80 hover:-translate-y-1 transition-all p-4 flex flex-col items-center text-center gap-1"
               >

@@ -37,6 +37,8 @@ export function computeTraits(boardUnits: UnitInstance[]): ActiveTrait[] {
       breakpoints: def.breakpoints,
     });
   }
-  // Active traits first, then by count desc.
-  return result.sort((a, b) => (b.tier - a.tier) || (b.count - a.count));
+  // Active traits first, then by count desc, then by key. The key tiebreak makes
+  // the order TOTAL and board-order-independent — so the combat buff layer
+  // (applyTraitBuffs) composes stacked multipliers identically on every client.
+  return result.sort((a, b) => (b.tier - a.tier) || (b.count - a.count) || (a.key < b.key ? -1 : 1));
 }

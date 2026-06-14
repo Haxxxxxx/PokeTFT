@@ -1,4 +1,4 @@
-import { ref, update, runTransaction } from "firebase/database";
+import { ref, get, update, runTransaction } from "firebase/database";
 import { db } from "./firebase";
 import { serverNow } from "./serverTime";
 import { simulate } from "../engine/combat";
@@ -128,6 +128,18 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
   }
 }
 
+/** Re-read the authoritative room from RTDB. After a host migration the caller's
+ *  React snapshot can be stale (wrong HP, missing combat), so resolution should
+ *  compute from a fresh read, not the passed-in `room`. */
+async function freshRoom(code: string): Promise<Room | null> {
+  try {
+    const snap = await get(gamePath(code));
+    return snap.exists() ? (snap.val() as Room) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Atomically claim a phase transition so exactly ONE client resolves a round,
  *  even if two clients briefly believe they are the host. Returns true if we won. */
 async function claimTransition(code: string, fromPhase: string, expectedDeadline: number): Promise<boolean> {
@@ -150,6 +162,7 @@ export async function resolveRoundStart(code: string, room: Room): Promise<void>
 /** Host: planning → combat (PvP pairing or PvE creeps). Freezes boards. */
 export async function startCombat(code: string, room: Room): Promise<void> {
   if (!(await claimTransition(code, "planning", room.meta.deadline))) return;
+  room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
   const stage = room.meta.stage;
   const kind = roundKind(stage, room.meta.round);
   const alive = alivePlayers(room);
@@ -197,6 +210,7 @@ export async function startCombat(code: string, room: Room): Promise<void> {
 /** Host: planning → carousel. Offers each human a free pick (a held item + units). */
 export async function startCarousel(code: string, room: Room): Promise<void> {
   if (!(await claimTransition(code, "planning", room.meta.deadline))) return;
+  room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
   // Item rewards: a Mega Stone plus any held items the lobby enabled.
   const itemPool = [MEGA_STONE, ...(room.rules?.itemsEnabled ?? [])];
   const carousel: Record<string, string[]> = {};
@@ -217,6 +231,7 @@ export async function startCarousel(code: string, room: Room): Promise<void> {
 /** Host: carousel → next planning round. */
 export async function endCarousel(code: string, room: Room): Promise<void> {
   if (!(await claimTransition(code, "carousel", room.meta.deadline))) return;
+  room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
   const next = advanceRound(room.meta.stage, room.meta.round);
   await update(gamePath(code), {
     "meta/phase": "planning", "meta/stage": next.stage, "meta/round": next.round,
@@ -228,6 +243,7 @@ export async function endCarousel(code: string, room: Room): Promise<void> {
 /** Host: combat → next planning (or game over). Applies HP, eliminations, placement. */
 export async function endCombat(code: string, room: Room): Promise<void> {
   if (!(await claimTransition(code, "combat", room.meta.deadline))) return;
+  room = (await freshRoom(code)) ?? room; // authoritative HP/combat (migration-safe)
   const combat = room.combat ?? {};
   const u: Updates = {};
   const aliveUids = alivePlayers(room).map((p) => p.uid);
@@ -287,10 +303,18 @@ export async function maybeClaimHost(code: string, room: Room, myUid: string): P
   const hostHealthy = host?.connected && serverNow() - beat < HOST_TIMEOUT;
   if (hostHealthy) return;
 
-  // Only the lowest-uid connected player attempts (reduces contention; the
-  // transaction is the real guarantee).
-  const connected = Object.values(room.players ?? {}).filter((p) => p.connected).map((p) => p.uid).sort();
-  if (connected[0] !== myUid) return;
+  // Only a connected HUMAN can be host — a bot can't drive the round loop, so a
+  // bot holding the role would wedge the game forever. Lowest-uid attempts.
+  const humans = Object.values(room.players ?? {}).filter((p) => p.connected && !p.isBot).map((p) => p.uid).sort();
+
+  // No human left at all → abandon the game so it doesn't hang in RTDB forever.
+  if (humans.length === 0) {
+    if (meta?.phase !== "over") {
+      await update(gamePath(code), { "meta/phase": "over", "meta/updatedAt": serverNow() }).catch(() => {});
+    }
+    return;
+  }
+  if (humans[0] !== myUid) return;
 
   await runTransaction(ref(db(), `games/${code}/meta`), (m) => {
     if (!m) return m;
