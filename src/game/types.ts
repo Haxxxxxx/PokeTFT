@@ -79,6 +79,14 @@ export type TraitBuff = {
   regenPerSec?: number;
   shieldPct?: number;
   manaAdd?: number;
+  // Signature combat effects (Phase 1 depth).
+  critAdd?: number;        // +crit chance
+  lifeSteal?: number;      // heal a fraction of damage dealt
+  armorPen?: number;       // ignore a fraction of target armor
+  burnDps?: number;        // abilities burn for this fraction of victim maxHp/sec
+  stunChance?: number;     // chance to stun a victim on ability hit
+  freezeChance?: number;   // chance to freeze a victim on ability hit
+  statusImmune?: boolean;  // immune to burn/stun/freeze
 };
 
 /** One activation tier of a trait: how many units, what it grants (text + buff). */

@@ -12,7 +12,23 @@ import { effectiveness } from "../data/typeChart";
 import { isMegaActive, megaFormFor } from "../data/mega";
 import { computeTraits } from "./synergies";
 import { TRAITS_BY_KEY } from "../data/traits";
+import { makeRng, type Rng } from "./rng";
 import { allyToField, enemyToField, neighbors, hexDistance, hexKey, type Hex } from "./hex";
+
+const STATUS_TICKS = 24; // ~1.5s of stun/freeze (16 ticks/sec)
+const BURN_TICKS = 48;   // ~3s of burn
+
+/** Deterministic seed from the FROZEN board contents — host + every client pass
+ *  identical boards into simulate(), so they all roll the same crits/status. */
+function boardSeed(allies: UnitInstance[], enemies: UnitInstance[]): number {
+  let h = 2166136261 >>> 0;
+  const mix = (s: string) => { for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } };
+  for (const u of [...allies, ...enemies]) {
+    if (!u.pos) continue;
+    mix(`${u.iid}|${u.defId}|${u.star}|${u.pos[0]},${u.pos[1]}|${(u.items ?? []).join(",")}`);
+  }
+  return h >>> 0;
+}
 
 export type Team = "ally" | "enemy";
 
@@ -48,6 +64,19 @@ type Combatant = {
   regenPerSec: number;    // leftovers: fraction of maxHp healed per second
   thornsPct: number;      // rocky-helmet: fraction of attacker maxHp on melee contact
   sashReady: boolean;     // focus-sash: survive a lethal blow once at full HP
+  // Offensive effects (from base + traits/items) — what this unit inflicts.
+  critChance: number;     // chance a basic attack crits
+  critMult: number;       // crit damage multiplier
+  lifeStealPct: number;   // heal a fraction of damage dealt
+  armorPenPct: number;    // ignore a fraction of the target's armor
+  inflictBurnDps: number; // dark/fire: burn dmg/sec applied on ability hit (frac of victim maxHp)
+  inflictStun: number;    // fighting: chance to stun a victim on ability hit
+  inflictFreeze: number;  // ice: chance to freeze a victim on ability hit
+  // Defensive / status state (on the affected unit).
+  statusImmune: boolean;  // steel/assault-vest: immune to burn/stun/freeze
+  burnTicks: number;      // remaining burn ticks
+  burnPerSec: number;     // incoming burn dmg/sec (frac of maxHp)
+  disabledTicks: number;  // stunned/frozen ticks remaining (can't act)
   // Cumulative contribution (for the live damage/tank/heal recap).
   dmgDealt: number;
   dmgTaken: number;
@@ -69,12 +98,15 @@ export type FrameUnit = {
   dmgTaken: number;
   healed: number;
   name: string;
+  /** Active status this frame, for the replay overlay. */
+  burning: boolean;
+  disabled: boolean;
 };
 
 export type CombatEvent =
   | { kind: "attack"; from: string; to: string }
   | { kind: "cast"; from: string; to: string; moveType: PokeType; eff: number }
-  | { kind: "hit"; to: string; dmg: number; crit?: boolean }
+  | { kind: "hit"; to: string; dmg: number; crit?: boolean; sup?: boolean }
   | { kind: "death"; id: string };
 
 export type Frame = { t: number; overtime: boolean; units: FrameUnit[]; events: CombatEvent[] };
@@ -154,6 +186,18 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
     regenPerSec: has("leftovers") ? 0.05 : 0,
     thornsPct: has("rocky-helmet") ? 0.16 : 0,
     sashReady: has("focus-sash"),
+    // Base 20% crit for 1.5x — items/traits add on top. Choice items steady DPS.
+    critChance: 0.2 + (has("life-orb") ? 0.1 : 0),
+    critMult: 1.5,
+    lifeStealPct: 0,
+    armorPenPct: 0,
+    inflictBurnDps: 0,
+    inflictStun: 0,
+    inflictFreeze: 0,
+    statusImmune: has("assault-vest"),
+    burnTicks: 0,
+    burnPerSec: 0,
+    disabledTicks: 0,
     dmgDealt: 0,
     dmgTaken: 0,
     healed: 0,
@@ -182,6 +226,14 @@ function applyTraitBuffs(units: Combatant[], board: UnitInstance[], team: Team) 
       if (buff.mrAdd) c.mr += buff.mrAdd;
       if (buff.regenPerSec) c.regenPerSec += buff.regenPerSec;
       if (buff.manaAdd) c.mana = Math.min(c.maxMana, c.mana + buff.manaAdd);
+      // Signature effects.
+      if (buff.critAdd) c.critChance += buff.critAdd;
+      if (buff.lifeSteal) c.lifeStealPct = Math.max(c.lifeStealPct, buff.lifeSteal);
+      if (buff.armorPen) c.armorPenPct = Math.max(c.armorPenPct, buff.armorPen);
+      if (buff.burnDps) c.inflictBurnDps = Math.max(c.inflictBurnDps, buff.burnDps);
+      if (buff.stunChance) c.inflictStun = Math.max(c.inflictStun, buff.stunChance);
+      if (buff.freezeChance) c.inflictFreeze = Math.max(c.inflictFreeze, buff.freezeChance);
+      if (buff.statusImmune) c.statusImmune = true;
     }
   }
 }
@@ -205,6 +257,8 @@ function snapshot(units: Combatant[], t: number, events: CombatEvent[]): Frame {
       dmgTaken: Math.round(u.dmgTaken),
       healed: Math.round(u.healed),
       name: u.name,
+      burning: u.burnTicks > 0,
+      disabled: u.disabledTicks > 0,
     })),
   };
 }
@@ -217,6 +271,8 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
   // Trait synergies — applied as deterministic stat buffs at combat start.
   applyTraitBuffs(units, allies, "ally");
   applyTraitBuffs(units, enemies, "enemy");
+  // Seeded RNG (crits / status), derived from the boards so every client matches.
+  const rng = makeRng(boardSeed(allies, enemies));
   const byId = new Map(units.map((u) => [u.id, u]));
   const frames: Frame[] = [snapshot(units, 0, [])];
 
@@ -232,6 +288,9 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
 
     for (const u of units) {
       if (!u.alive) continue;
+      // Burn damage-over-time, then disable (stun/freeze) — disabled units skip.
+      if (u.burnTicks > 0) { u.hp -= u.maxHp * u.burnPerSec * DT; u.dmgTaken += u.maxHp * u.burnPerSec * DT; u.burnTicks--; }
+      if (u.disabledTicks > 0) { u.disabledTicks--; continue; }
       u.atkCd = Math.max(0, u.atkCd - DT);
       u.moveCd = Math.max(0, u.moveCd - DT);
 
@@ -269,14 +328,15 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
         // In range — attack if ready.
         if (u.atkCd <= 0) {
           u.atkCd = 1 / u.attackSpeed;
-          dealDamage(u, target, u.ad * armorMult(target.armor), "physical", events);
+          // Armor penetration ignores a fraction of the target's armor.
+          dealDamage(u, target, u.ad * armorMult(target.armor * (1 - u.armorPenPct)), "physical", events, rng);
           u.mana = Math.min(u.maxMana, u.mana + MANA_PER_ATTACK);
 
           // Cast on full mana — but only if the auto-attack didn't already kill
           // the target (otherwise the ability hits a corpse).
           if (u.mana >= u.maxMana && u.maxMana > 0 && target.hp > 0) {
             u.mana = 0;
-            castAbility(u, target, units, events);
+            castAbility(u, target, units, events, rng);
           }
           cleanupDeaths(units, occupied, events);
         }
@@ -291,6 +351,8 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
         }
       }
     }
+
+    cleanupDeaths(units, occupied, events); // catch burn/DoT deaths
 
     // Leftovers: steady regen each tick (capped at max HP).
     for (const u of units) {
@@ -336,18 +398,29 @@ function applyHit(from: Combatant | null, to: Combatant, dmg: number) {
   if (from) from.dmgDealt += lost;
 }
 
-function dealDamage(from: Combatant, to: Combatant, rawDmg: number, _kind: string, events: CombatEvent[]) {
-  const dmg = Math.round(rawDmg * from.dmgMult); // life-orb boosts damage dealt
+/** Heal the attacker for a fraction of damage actually dealt (lifesteal). */
+function lifesteal(from: Combatant, dmg: number) {
+  if (from.lifeStealPct <= 0 || !from.alive) return;
+  const heal = Math.min(dmg * from.lifeStealPct, from.maxHp - from.hp);
+  if (heal > 0) { from.hp += heal; from.healed += heal; }
+}
+
+function dealDamage(from: Combatant, to: Combatant, rawDmg: number, _kind: string, events: CombatEvent[], rng: Rng) {
+  // Crit roll (seeded → deterministic across clients).
+  const crit = rng() < from.critChance;
+  const dmg = Math.round(rawDmg * from.dmgMult * (crit ? from.critMult : 1));
+  const hpBefore = to.hp;
   applyHit(from, to, dmg);
+  lifesteal(from, hpBefore - to.hp);
   to.mana = Math.min(to.maxMana, to.mana + MANA_ON_HIT);
   events.push({ kind: "attack", from: from.id, to: to.id });
-  events.push({ kind: "hit", to: to.id, dmg });
+  events.push({ kind: "hit", to: to.id, dmg, crit });
   // Rocky Helmet thorns on melee contact; Life Orb recoil on the attacker.
   if (to.thornsPct > 0 && from.range <= 1) applyHit(to, from, from.maxHp * to.thornsPct);
   if (from.lifeOrbSelfPct > 0) from.hp -= from.maxHp * from.lifeOrbSelfPct;
 }
 
-function castAbility(caster: Combatant, target: Combatant, units: Combatant[], events: CombatEvent[]) {
+function castAbility(caster: Combatant, target: Combatant, units: Combatant[], events: CombatEvent[], rng: Rng) {
   const i = caster.star - 1;
   const base = caster.move.power[i] * caster.apMult;
   const eff = effectiveness(caster.move.type, target.types);
@@ -356,8 +429,16 @@ function castAbility(caster: Combatant, target: Combatant, units: Combatant[], e
   const hitOne = (victim: Combatant) => {
     const e = effectiveness(caster.move.type, victim.types);
     const dmg = Math.round(base * e * (100 / (100 + victim.mr)) * caster.dmgMult);
+    const hpBefore = victim.hp;
     applyHit(caster, victim, dmg);
-    events.push({ kind: "hit", to: victim.id, dmg, crit: e > 1 });
+    lifesteal(caster, hpBefore - victim.hp);
+    events.push({ kind: "hit", to: victim.id, dmg, sup: e > 1 });
+    // Signature on-ability statuses, blocked by status immunity.
+    if (victim.alive && !victim.statusImmune) {
+      if (caster.inflictBurnDps > 0) { victim.burnTicks = BURN_TICKS; victim.burnPerSec = caster.inflictBurnDps; }
+      if (caster.inflictStun > 0 && rng() < caster.inflictStun) victim.disabledTicks = Math.max(victim.disabledTicks, STATUS_TICKS);
+      if (caster.inflictFreeze > 0 && rng() < caster.inflictFreeze) victim.disabledTicks = Math.max(victim.disabledTicks, STATUS_TICKS);
+    }
   };
 
   hitOne(target);

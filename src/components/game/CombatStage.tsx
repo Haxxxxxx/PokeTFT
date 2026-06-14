@@ -244,7 +244,7 @@ export function CombatStage({
               const t = aMap.get(e.to);
               if (!t) return null;
               const p = hexToPixel({ c: t.c, r: t.r }, TILE_W, TILE_H);
-              return <DamageNumber key={`dn-${fi}-${k}`} x={p.x} y={p.y} dmg={e.dmg} crit={e.crit} />;
+              return <DamageNumber key={`dn-${fi}-${k}`} x={p.x} y={p.y} dmg={e.dmg} crit={e.crit} sup={e.sup} />;
             }
             return null;
           })}
@@ -382,10 +382,19 @@ function CombatUnit({
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={spriteUrl(unit.dex)} alt="" width={46} height={46} style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none" }} draggable={false} />
+        <img src={spriteUrl(unit.dex)} alt="" width={46} height={46} style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none", filter: unit.disabled ? "brightness(1.3) saturate(0.4)" : unit.burning ? "saturate(1.4)" : "none" }} draggable={false} />
         {flash && <span key={flash} className="absolute inset-0 rounded-full combat-hitflash" style={{ background: "#fff" }} />}
+        {unit.burning && (
+          <span className="absolute inset-0 rounded-full pointer-events-none" style={{ boxShadow: "inset 0 0 10px 2px #f9731699, 0 0 8px 1px #ea580c88" }} />
+        )}
+        {unit.disabled && (
+          <span className="absolute inset-0 rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, #bae6fd55, transparent 70%)", boxShadow: "inset 0 0 8px 2px #7dd3fcaa" }} />
+        )}
         {unit.mega && (
           <span className="absolute -top-1.5 -right-1.5 text-[8px] font-extrabold bg-fuchsia-500 text-black rounded px-0.5 leading-tight">M</span>
+        )}
+        {(unit.burning || unit.disabled) && (
+          <span className="absolute -top-1.5 -left-1.5 text-[10px] leading-none drop-shadow">{unit.disabled ? "❄️" : "🔥"}</span>
         )}
       </div>
     </div>
@@ -402,10 +411,11 @@ function Corpse({ unit }: { unit: FrameUnit }) {
   );
 }
 
-function DamageNumber({ x, y, dmg, crit }: { x: number; y: number; dmg: number; crit?: boolean }) {
+function DamageNumber({ x, y, dmg, crit, sup }: { x: number; y: number; dmg: number; crit?: boolean; sup?: boolean }) {
+  const color = crit ? "#fde047" : sup ? "#fb923c" : "#fff";
   return (
-    <div className="absolute pointer-events-none font-extrabold combat-float" style={{ left: x, top: y - 18, color: crit ? "#fbbf24" : "#fff", fontSize: crit ? 17 : 12, textShadow: "0 1px 3px #000" }}>
-      {dmg}{crit ? "!" : ""}
+    <div className="absolute pointer-events-none font-extrabold combat-float" style={{ left: x, top: y - 18, color, fontSize: crit ? 18 : sup ? 15 : 12, textShadow: "0 1px 3px #000" }}>
+      {dmg}{crit ? "!" : sup ? "▲" : ""}
     </div>
   );
 }
