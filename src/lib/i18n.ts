@@ -40,6 +40,7 @@ export type Dict = {
   l_code: string;
   l_copy: string;
   l_lobby: string;
+  l_items_short: string;
   // Lobby (networked)
   l_net_players: (n: number, max: number) => string;
   l_net_open_slot: string;
@@ -191,6 +192,7 @@ export const FR: Dict = {
   l_code: "Code lobby",
   l_copy: "Copier",
   l_lobby: "Salon",
+  l_items_short: "objets",
   l_net_players: (n, max) => `${n} / ${max} joueur${n > 1 ? "s" : ""} · slots vides jouent comme fantômes`,
   l_net_open_slot: "Slot libre",
   l_net_add_ai: "Ajouter IA",
@@ -334,6 +336,7 @@ export const EN: Dict = {
   l_code: "Lobby code",
   l_copy: "Copy",
   l_lobby: "Lobby",
+  l_items_short: "items",
   l_net_players: (n, max) => `${n} / ${max} player${n > 1 ? "s" : ""} · empty slots play as ghosts`,
   l_net_open_slot: "Open slot",
   l_net_add_ai: "Add AI",

@@ -6,6 +6,7 @@ import {
 } from "firebase/database";
 import { db, ensureAuth } from "./firebase";
 import { setCurrentGame } from "./users";
+import { useAuth } from "./authStore";
 import type { UnitInstance } from "../types";
 
 export type RoomPhase = "lobby" | "planning" | "combat" | "carousel" | "over";
@@ -18,6 +19,8 @@ export type RoomPlayer = {
   isHost: boolean;
   connected: boolean;
   ready: boolean;
+  /** Profile avatar (synced from the account so it shows in lobby + scoreboard). */
+  photoURL?: string | null;
   /** AI bot players are filled by the host and driven by the match controller. */
   isBot?: boolean;
   botDifficulty?: BotDifficulty;
@@ -147,7 +150,8 @@ function roomRef(code: string): DatabaseReference {
 }
 
 function newPlayer(uid: string, name: string, isHost: boolean, startingHp: number): RoomPlayer {
-  return { uid, name, isHost, connected: true, ready: isHost, hp: startingHp, level: 1, alive: true, place: null, streak: 0 };
+  const photoURL = useAuth.getState().profile?.photoURL ?? null;
+  return { uid, name, isHost, connected: true, ready: isHost, photoURL, hp: startingHp, level: 1, alive: true, place: null, streak: 0 };
 }
 
 export const useRoom = create<RoomState>((setState, getState) => ({

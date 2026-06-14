@@ -60,3 +60,11 @@ body {
   animation: celebrate-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 .celebrate-pop.fixed { transform-origin: center; }
+
+@keyframes hero-float {
+  0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+  50% { transform: translateY(-14px) rotate(var(--r, 0deg)); }
+}
+.hero-float {
+  animation: hero-float 6s ease-in-out infinite;
+}
