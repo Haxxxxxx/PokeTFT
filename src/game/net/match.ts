@@ -3,9 +3,22 @@ import { db } from "./firebase";
 import { serverNow } from "./serverTime";
 import { simulate } from "../engine/combat";
 import { makeRng } from "../engine/rng";
-import { advanceRound, stageBaseDamage } from "../config";
+import { generateBoard } from "../engine/enemy";
+import { advanceRound, stageBaseDamage, cumulativeRound } from "../config";
 import type { UnitInstance } from "../types";
-import type { Room, RoomPlayer, CombatAssign } from "./roomStore";
+import type { Room, RoomPlayer, CombatAssign, BotDifficulty } from "./roomStore";
+
+/** A bot's board for a round, scaled by stage progress and difficulty. */
+function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string): UnitInstance[] {
+  const cr = cumulativeRound(stage, round);
+  let level = Math.min(2 + Math.floor(cr / 3), 9);
+  if (difficulty === "easy") level = Math.max(1, level - 2);
+  else if (difficulty === "hard") level = Math.min(9, level + 1);
+  const count = Math.min(level, 8);
+  let seed = 0;
+  for (let i = 0; i < salt.length; i++) seed = (seed * 31 + salt.charCodeAt(i)) >>> 0;
+  return generateBoard(level, count, seed + cr);
+}
 
 export const PLAN_MS = 30_000;
 export const COMBAT_MS = 16_000;
@@ -94,6 +107,17 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
 async function startCombat(code: string, room: Room): Promise<void> {
   const alive = Object.values(room.players ?? {}).filter((p) => p.connected && p.alive);
   const stage = room.meta.stage;
+
+  // Bots get a fresh host-generated board each round (humans synced their own).
+  const botBoards: Record<string, UnitInstance[]> = {};
+  for (const p of alive) {
+    if (p.isBot) {
+      const b = botBoard(stage, room.meta.round, p.botDifficulty, p.uid);
+      botBoards[p.uid] = b;
+      room.players[p.uid] = { ...p, board: b };
+    }
+  }
+
   const order = shuffled(alive.map((p) => p.uid).sort(), stage * 131 + room.meta.round);
   const combat: Record<string, CombatAssign> = {};
 
@@ -110,6 +134,7 @@ async function startCombat(code: string, room: Room): Promise<void> {
 
   const u: Updates = { "meta/phase": "combat", "meta/deadline": serverNow() + COMBAT_MS, "meta/updatedAt": serverNow() };
   for (const uid of Object.keys(combat)) u[`combat/${uid}`] = combat[uid];
+  for (const uid of Object.keys(botBoards)) u[`players/${uid}/board`] = botBoards[uid]; // persist for the replay
   await update(gamePath(code), u);
 }
 

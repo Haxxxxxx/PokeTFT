@@ -7,7 +7,7 @@ import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { hostTick, maybeClaimHost, syncBoard, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate } from "@/game/engine/combat";
-import { getDef, spriteUrl } from "@/game/data/mons";
+import { getDef, spriteUrl, unitsForGenerations } from "@/game/data/mons";
 import type { UnitInstance } from "@/game/types";
 import { Board } from "./Board";
 import { Bench } from "./Bench";
@@ -86,7 +86,7 @@ export function NetGameClient() {
     if (lastRoundKey.current === key) return;
     const first = lastRoundKey.current === null;
     lastRoundKey.current = key;
-    if (first) newGame(room.rules?.startingHp ?? 100);
+    if (first) newGame(room.rules?.startingHp ?? 100, unitsForGenerations(room.rules?.generations ?? [1]));
     else netRound(meta.stage, meta.round, me?.streak ?? 0);
   }, [phase, meta?.stage, meta?.round]); // eslint-disable-line react-hooks/exhaustive-deps
 

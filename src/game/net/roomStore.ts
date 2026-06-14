@@ -9,12 +9,17 @@ import type { UnitInstance } from "../types";
 
 export type RoomPhase = "lobby" | "planning" | "combat" | "over";
 
+export type BotDifficulty = "easy" | "medium" | "hard";
+
 export type RoomPlayer = {
   uid: string;
   name: string;
   isHost: boolean;
   connected: boolean;
   ready: boolean;
+  /** AI bot players are filled by the host and driven by the match controller. */
+  isBot?: boolean;
+  botDifficulty?: BotDifficulty;
   /** Live game state (synced during the match). */
   hp: number;
   level: number;
@@ -45,10 +50,17 @@ export type CombatAssign = {
   dmg: number;
 };
 
+export type RoomRules = {
+  startingHp: number;
+  maxPlayers: number;
+  generations?: number[];
+  itemsEnabled?: string[];
+};
+
 export type Room = {
   code: string;
   meta: RoomMeta;
-  rules: { startingHp: number; maxPlayers: number };
+  rules: RoomRules;
   players: Record<string, RoomPlayer>;
   combat?: Record<string, CombatAssign>;
 };
@@ -62,12 +74,16 @@ type RoomState = {
   status: Status;
   error: string | null;
 
-  host: (name: string, rules?: { startingHp?: number; maxPlayers?: number }) => Promise<string | null>;
+  host: (name: string, rules?: Partial<RoomRules>) => Promise<string | null>;
   join: (code: string, name: string) => Promise<boolean>;
   setReady: (ready: boolean) => void;
   updateMe: (patch: Partial<RoomPlayer>) => void;
   setMeta: (patch: Partial<RoomMeta>) => void;
-  setRules: (patch: Partial<{ startingHp: number; maxPlayers: number }>) => void;
+  setRules: (patch: Partial<RoomRules>) => void;
+  /** Host: add an AI bot to a free slot. */
+  addBot: (difficulty: BotDifficulty) => void;
+  /** Host: remove a player or bot from the lobby. */
+  removePlayer: (uid: string) => void;
   /** Re-attach to the room saved in this tab (after a page refresh). */
   reconnect: () => Promise<void>;
   leave: () => void;
@@ -114,7 +130,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       const code = genCode();
       await set(roomRef(code), {
         meta: { hostUid: uid, phase: "lobby", stage: 1, round: 1, deadline: 0, updatedAt: serverTimestamp() },
-        rules: { startingHp, maxPlayers },
+        rules: { startingHp, maxPlayers, generations: rules?.generations ?? [1], itemsEnabled: rules?.itemsEnabled ?? [] },
         players: { [uid]: newPlayer(uid, name || "Host", true, startingHp) },
       });
       subscribe(code, uid, setState);
@@ -162,6 +178,25 @@ export const useRoom = create<RoomState>((setState, getState) => ({
   },
 
   setReady: (ready) => getState().updateMe({ ready }),
+
+  addBot: (difficulty) => {
+    const { code, room } = getState();
+    if (!code || !room) return;
+    const count = Object.values(room.players ?? {}).filter((p) => p.connected).length;
+    if (count >= (room.rules?.maxPlayers ?? 8)) return;
+    const id = "bot-" + Math.random().toString(36).slice(2, 8);
+    update(ref(db(), `games/${code}/players/${id}`), {
+      uid: id, name: `AI ${difficulty}`, isHost: false, connected: true, ready: true,
+      isBot: true, botDifficulty: difficulty,
+      hp: room.rules?.startingHp ?? 100, level: 1, alive: true, place: null, streak: 0,
+    });
+  },
+
+  removePlayer: (uid) => {
+    const { code } = getState();
+    if (!code) return;
+    remove(ref(db(), `games/${code}/players/${uid}`));
+  },
 
   updateMe: (patch) => {
     const { code, myUid } = getState();
