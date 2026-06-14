@@ -1,7 +1,9 @@
 import type { UnitInstance } from "../types";
 import { MAX_STAR } from "../config";
 
-let counter = 1;
+// Seeded from load time so dev hot-reloads don't collide iids with units that
+// are still alive in the store from the previous module instance.
+let counter = Math.floor(performance.now() * 1000) % 1_000_000;
 export function newIid(): string {
   return `u${counter++}`;
 }

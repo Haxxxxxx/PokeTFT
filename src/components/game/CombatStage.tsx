@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { spriteUrl } from "@/game/data/mons";
 import { hexToPixel, fieldPixelSize, hexDistance, FIELD } from "@/game/engine/hex";
 import { TYPE_COLOR } from "@/game/ui";
@@ -36,7 +36,7 @@ export function CombatStage({
   const [finished, setFinished] = useState(false);
   const [speed, setSpeed] = useState(1.5);
   const speedRef = useRef(speed);
-  speedRef.current = speed;
+  useEffect(() => { speedRef.current = speed; }, [speed]);
   const lastTs = useRef<number | null>(null);
 
   useEffect(() => {
@@ -157,7 +157,7 @@ export function CombatStage({
             const pa = hexToPixel({ c: from.c, r: from.r }, TILE_W, TILE_H);
             const pb = hexToPixel({ c: to.c, r: to.r }, TILE_W, TILE_H);
             const t = easeOut(frac);
-            const color = cast ? TYPE_COLOR[e.kind === "cast" ? e.moveType : "normal"] : "#e2e8f0";
+            const color = e.kind === "cast" ? TYPE_COLOR[e.moveType] : "#e2e8f0";
             const size = cast ? 14 : 8;
             return (
               <div
@@ -229,7 +229,7 @@ export function CombatStage({
   );
 }
 
-function HexGrid() {
+const HexGrid = memo(function HexGrid() {
   const cells = [];
   for (let r = 0; r < FIELD.rows; r++) {
     for (let c = 0; c < FIELD.cols; c++) {
@@ -250,7 +250,7 @@ function HexGrid() {
     }
   }
   return <>{cells}</>;
-}
+});
 
 function CombatUnit({
   unit, x, y, hpFrac, manaFrac, lunge, flash, faceLeft,

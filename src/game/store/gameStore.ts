@@ -106,6 +106,8 @@ export const useGame = create<State>((set, get) => ({
     const cost = getDef(defId).cost as Cost;
     if (state.gold < cost) return;
     if (state.benchUnits().length >= BENCH_SIZE) return;
+    // Never buy more copies than the shared pool actually has left.
+    if ((state.pool[defId] ?? 0) <= 0) return;
 
     takeFromPool(state.pool, defId);
     const units = applyCombines([...state.units, makeInstance(defId)]);
@@ -149,9 +151,10 @@ export const useGame = create<State>((set, get) => ({
 
   moveToBench: (iid) => {
     const state = get();
-    if (state.benchUnits().length >= BENCH_SIZE && state.units.find((u) => u.iid === iid)?.pos !== null) {
-      // bench full — only allow if it's already on bench (no-op)
-    }
+    const unit = state.units.find((u) => u.iid === iid);
+    if (!unit) return;
+    // Block board -> bench if the bench is already full (a board unit is no-op-ed).
+    if (unit.pos !== null && state.benchUnits().length >= BENCH_SIZE) return;
     set({ units: state.units.map((u) => (u.iid === iid ? { ...u, pos: null } : u)) });
   },
 

@@ -15,9 +15,8 @@ export const useCombat = create<CombatState>((set) => ({
   result: null,
   opponentId: null,
   opponentName: "Rival",
-  start: (allies, enemies, stage, round, opponentId, opponentName) => {
-    const seed = stage * 1000 + round * 17 + allies.length * 3 + 1;
-    const result = simulate(allies, enemies, seed);
+  start: (allies, enemies, _stage, _round, opponentId, opponentName) => {
+    const result = simulate(allies, enemies);
     set({ result, opponentId, opponentName });
   },
   clear: () => set({ result: null, opponentId: null }),

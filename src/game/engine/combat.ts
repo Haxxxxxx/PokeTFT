@@ -125,7 +125,7 @@ function snapshot(units: Combatant[], t: number, events: CombatEvent[]): Frame {
   };
 }
 
-export function simulate(allies: UnitInstance[], enemies: UnitInstance[], _seed = 1): CombatResult {
+export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): CombatResult {
   const units: Combatant[] = [
     ...allies.filter((u) => u.pos).map((u) => toCombatant(u, "ally")),
     ...enemies.filter((u) => u.pos).map((u) => toCombatant(u, "enemy")),
@@ -185,8 +185,9 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[], _seed 
           dealDamage(u, target, u.ad * armorMult(target.armor), "physical", events);
           u.mana = Math.min(u.maxMana, u.mana + MANA_PER_ATTACK);
 
-          // Cast on full mana.
-          if (u.mana >= u.maxMana && u.maxMana > 0) {
+          // Cast on full mana — but only if the auto-attack didn't already kill
+          // the target (otherwise the ability hits a corpse).
+          if (u.mana >= u.maxMana && u.maxMana > 0 && target.hp > 0) {
             u.mana = 0;
             castAbility(u, target, units, events);
           }

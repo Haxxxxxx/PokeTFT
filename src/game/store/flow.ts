@@ -23,11 +23,14 @@ export function resolveCombatFlow(won: boolean, survivors: number): void {
   const { opponentId, result } = combat;
   const combatStage = useGame.getState().stage;
 
-  useGame.getState().endRound(won, survivors);
-  const after = useGame.getState();
-
-  if (opponentId && result) {
-    useLobby.getState().resolveRound(opponentId, result, combatStage, after.stage, after.round);
+  try {
+    useGame.getState().endRound(won, survivors);
+    const after = useGame.getState();
+    if (opponentId && result) {
+      useLobby.getState().resolveRound(opponentId, result, combatStage, after.stage, after.round);
+    }
+  } finally {
+    // Always clear so a failure in round resolution can't wedge the combat store.
+    combat.clear();
   }
-  combat.clear();
 }

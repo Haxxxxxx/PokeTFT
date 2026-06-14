@@ -100,7 +100,7 @@ export const useLobby = create<LobbyState>((set, get) => ({
     for (let i = 0; i + 1 < rest.length; i += 2) {
       const a = rest[i];
       const b = rest[i + 1];
-      const r = simulate(a.board, b.board, combatStage * 50 + i + 1);
+      const r = simulate(a.board, b.board);
       const loser = r.winner === "ally" ? b : r.winner === "enemy" ? a : null;
       const winner = r.winner === "ally" ? a : r.winner === "enemy" ? b : null;
       if (loser) {
@@ -113,7 +113,7 @@ export const useLobby = create<LobbyState>((set, get) => ({
     if (rest.length % 2 === 1) {
       const solo = rest[rest.length - 1];
       const ghost = generateBoard(aiLevel(totalRound(combatStage, nextRound)), boardCount(solo.level), combatStage * 777 + 13);
-      const r = simulate(solo.board, ghost, combatStage * 999);
+      const r = simulate(solo.board, ghost);
       if (r.winner === "enemy") solo.health -= stageBaseDamage(combatStage) + r.survivors;
     }
 
