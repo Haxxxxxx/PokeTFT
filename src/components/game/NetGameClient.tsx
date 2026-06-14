@@ -15,9 +15,15 @@ import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import { MegaIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
 
+// RTDB drops empty arrays, so a synced unit can come back missing `items`.
+// Restore the invariant (every unit has an `items` array) at the boundary.
+function normUnit(u: UnitInstance): UnitInstance {
+  return u.items ? u : { ...u, items: [] };
+}
+
 function asUnits(u: unknown): UnitInstance[] {
   if (!u) return [];
-  return (Array.isArray(u) ? u : Object.values(u as Record<string, UnitInstance>)) as UnitInstance[];
+  return (Array.isArray(u) ? u : Object.values(u as Record<string, UnitInstance>)).map(normUnit);
 }
 import { Board } from "./Board";
 import { Bench } from "./Bench";
@@ -31,7 +37,7 @@ import { CoinIcon, TrophyIcon } from "./icons";
 function asBoard(b: unknown): UnitInstance[] {
   if (!b) return [];
   const arr = Array.isArray(b) ? b : Object.values(b as Record<string, UnitInstance>);
-  return (arr as UnitInstance[]).filter((u) => u && u.pos);
+  return (arr as UnitInstance[]).filter((u) => u && u.pos).map(normUnit);
 }
 
 function SellZone() {
@@ -192,7 +198,7 @@ export function NetGameClient() {
 
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-      <div className="flex flex-col gap-3 max-w-[1440px] mx-auto p-4">
+      <div className="flex flex-col gap-3 w-full max-w-[1440px] mx-auto p-3 overflow-x-hidden">
         {/* Round timeline (win/loss history) */}
         {roundLog.length > 0 && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-700/40 overflow-x-auto">
@@ -253,7 +259,7 @@ export function NetGameClient() {
           <button onClick={leave} className="ml-auto px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">Leave</button>
         </div>
 
-        <div className="flex gap-3 items-start">
+        <div className="flex flex-wrap gap-3 items-start justify-center">
           {/* Scoreboard */}
           <div className="w-[190px] shrink-0 p-2 rounded-xl bg-slate-900/70 border border-slate-700/50">
             <h2 className="text-[10px] uppercase tracking-wider text-slate-500 px-1 mb-1.5">Trainers · {aliveCount} left</h2>
@@ -287,7 +293,7 @@ export function NetGameClient() {
           </div>
 
           <TraitPanel />
-          <div className="flex-1 flex flex-col gap-3 items-center">
+          <div className="flex-1 min-w-[440px] flex flex-col gap-3 items-center">
             {/* During combat the board is "fighting" — show the replay in its place,
                 but keep the bench + shop below fully interactive. */}
             {phase === "combat" && combatResult && me?.alive ? (

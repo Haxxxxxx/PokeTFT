@@ -26,11 +26,14 @@ export function UnitChip({ unit, size = 56, interactive = true }: { unit: UnitIn
   const armedItem = useUi((s) => s.armedItem);
   const armItem = useUi((s) => s.armItem);
   const equipItem = useGame((s) => s.equipItem);
+  const deployUnit = useGame((s) => s.deployUnit);
   const dex = def.dex[unit.star - 1];
   const color = COST_COLOR[def.cost];
 
-  const megaReady = isMegaActive(unit.defId, unit.items);
-  const canEquipArmed = interactive && armedItem === MEGA_STONE && canMega(unit.defId) && unit.items.length < 3;
+  // RTDB strips empty arrays, so a rehydrated unit can arrive without `items`.
+  const heldItems = unit.items ?? [];
+  const megaReady = isMegaActive(unit.defId, heldItems);
+  const canEquipArmed = interactive && armedItem === MEGA_STONE && canMega(unit.defId) && heldItems.length < 3;
 
   function onClick() {
     if (interactive && armedItem) {
@@ -43,12 +46,18 @@ export function UnitChip({ unit, size = 56, interactive = true }: { unit: UnitIn
     setInspect(unit.defId, unit.star);
   }
 
+  // Double-click a bench unit to quick-deploy it onto the first free board cell.
+  function onDoubleClick() {
+    if (interactive && unit.pos === null) deployUnit(unit.iid);
+  }
+
   return (
     <div
       ref={interactive ? setNodeRef : undefined}
       {...(interactive ? listeners : {})}
       {...(interactive ? attributes : {})}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
       style={{
         width: size, height: size,
         borderColor: megaReady ? "#f0abfc" : color,
@@ -73,7 +82,7 @@ export function UnitChip({ unit, size = 56, interactive = true }: { unit: UnitIn
       <div className="absolute top-0 left-0 right-0">
         <Stars star={unit.star} />
       </div>
-      {unit.items.includes(MEGA_STONE) && (
+      {heldItems.includes(MEGA_STONE) && (
         <span className={`absolute bottom-0.5 right-0.5 ${megaReady ? "text-fuchsia-300" : "text-slate-500"}`} title="Mega Stone">
           <MegaIcon size={12} />
         </span>

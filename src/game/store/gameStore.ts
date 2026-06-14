@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { ECONOMY, XP_TO_REACH, MAX_LEVEL, boardSizeForLevel, roundKind, advanceRound, stageBaseDamage, streakGold, type Cost, type RoundKind } from "../config";
+import { ECONOMY, XP_TO_REACH, MAX_LEVEL, BOARD, boardSizeForLevel, roundKind, advanceRound, stageBaseDamage, streakGold, type Cost, type RoundKind } from "../config";
 import type { UnitInstance } from "../types";
 import { getDef } from "../data/mons";
 import { makeRng, type Rng } from "../engine/rng";
@@ -10,6 +10,25 @@ import { MEGA_STONE } from "../data/mega";
 
 export const BENCH_SIZE = 9;
 const INITIAL_SEED = 1337;
+
+/** RTDB returns arrays that have null/empty leading slots as objects keyed by
+ *  index (and strips empty arrays to undefined). Coerce back to a dense array
+ *  of the given length so `.map`/`.filter` never blow up after a reconnect. */
+function toArray<T>(v: unknown, len?: number): (T | null)[] {
+  let out: (T | null)[];
+  if (Array.isArray(v)) out = v as (T | null)[];
+  else if (v && typeof v === "object") {
+    const obj = v as Record<string, T>;
+    const keys = Object.keys(obj).map(Number).filter((k) => !Number.isNaN(k));
+    const max = keys.length ? Math.max(...keys) : -1;
+    out = Array.from({ length: max + 1 }, (_, i) => (i in obj ? obj[i] : null));
+  } else out = [];
+  if (len != null) {
+    out = out.slice(0, len);
+    while (out.length < len) out.push(null);
+  }
+  return out;
+}
 
 function levelFromXp(xp: number): number {
   let lvl = 1;
@@ -60,6 +79,7 @@ type State = {
   buyUnit: (slot: number) => void;
   sell: (iid: string) => void;
   moveToBoard: (iid: string, col: number, row: number) => void;
+  deployUnit: (iid: string) => void;
   moveToBench: (iid: string) => void;
   toggleFreeze: () => void;
   endRound: (won: boolean, survivors?: number) => void;
@@ -188,6 +208,27 @@ export const useGame = create<State>((set, get) => ({
     set({ units });
   },
 
+  // Quick-deploy a bench unit onto the first free board cell (front rows first),
+  // respecting the level cap. Used by double-click / the auto-deploy button.
+  deployUnit: (iid) => {
+    const state = get();
+    const unit = state.units.find((u) => u.iid === iid);
+    if (!unit || unit.pos !== null) return;
+    const cap = boardSizeForLevel(state.level);
+    const onBoard = state.boardUnits();
+    if (onBoard.length >= cap) return;
+    const taken = new Set(onBoard.map((u) => `${u.pos![0]}-${u.pos![1]}`));
+    // Front row (closest to the enemy) is the highest row index in player space.
+    for (let row = BOARD.rows - 1; row >= 0; row--) {
+      for (let col = 0; col < BOARD.cols; col++) {
+        if (!taken.has(`${col}-${row}`)) {
+          set({ units: state.units.map((u) => (u.iid === iid ? { ...u, pos: [col, row] as [number, number] } : u)) });
+          return;
+        }
+      }
+    }
+  },
+
   moveToBench: (iid) => {
     const state = get();
     const unit = state.units.find((u) => u.iid === iid);
@@ -276,7 +317,11 @@ export const useGame = create<State>((set, get) => ({
 
   importSave: (save) => set({
     gold: save.gold, xp: save.xp, level: save.level,
-    units: save.units ?? [], shop: save.shop ?? [], items: save.items ?? [],
+    // RTDB mangles arrays (objects for sparse, undefined for empty) — coerce
+    // everything back to dense arrays and guarantee each unit keeps `items`.
+    units: toArray<UnitInstance>(save.units).filter(Boolean).map((u) => (u!.items ? u! : { ...u!, items: [] })),
+    shop: toArray<string>(save.shop, ECONOMY.shopSlots),
+    items: toArray<string>(save.items).filter(Boolean) as string[],
   }),
 
   // Add an item to the inventory (carousel pick / loot).

@@ -80,11 +80,19 @@ export async function beginMatch(code: string, room: Room): Promise<void> {
   await update(gamePath(code), u);
 }
 
+/** RTDB rejects any `undefined` in a write (it accepts `null`). A holey shop
+ *  array (`shop[0] === undefined` after a buy) or a missing field would throw,
+ *  killing the sync. Round-trip through JSON to coerce every `undefined` to
+ *  `null` and drop undefined object props. */
+function rtdbSafe<T>(v: T): T {
+  return JSON.parse(JSON.stringify(v ?? null));
+}
+
 /** Client: push my on-board units + economy snapshot so the host can resolve
  *  combat and a refresh can rehydrate. */
 export async function syncBoard(code: string, uid: string, units: UnitInstance[], save?: unknown): Promise<void> {
-  const onBoard = units.filter((un) => un.pos !== null);
-  await update(ref(db(), `games/${code}/players/${uid}`), { board: onBoard, ...(save ? { save } : {}) });
+  const onBoard = rtdbSafe(units.filter((un) => un.pos !== null));
+  await update(ref(db(), `games/${code}/players/${uid}`), { board: onBoard, ...(save ? { save: rtdbSafe(save) } : {}) });
 }
 
 /** Host: write a liveness heartbeat so migration only triggers on a real stall. */
