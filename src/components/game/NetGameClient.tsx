@@ -29,8 +29,10 @@ function normUnit(u: UnitInstance): UnitInstance {
 const ITEM_DEF_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 
 // Fixed design canvas the game is laid out on; scaled uniformly to fit any screen.
-const DESIGN_W = 1440;
-const DESIGN_H = 880;
+// Wide/tall enough for all 4 columns + the 8-row combat battlefield so nothing
+// wraps or clips between phases.
+const DESIGN_W = 1500;
+const DESIGN_H = 1040;
 
 function asUnits(u: unknown): UnitInstance[] {
   if (!u) return [];
@@ -450,7 +452,7 @@ export function NetGameClient() {
           </div>
 
           <TraitPanel units={spectateUnits ?? undefined} />
-          <div className="flex-1 min-w-[440px] flex flex-col gap-3 items-center">
+          <div className="w-[700px] shrink-0 flex flex-col gap-3 items-center">
             {/* Spectating a rival overrides the view: their live fight during
                 combat, else their board + bench (read-only). Otherwise my own
                 combat replay during combat, else my board. */}

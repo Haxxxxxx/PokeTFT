@@ -9,8 +9,8 @@ import { TYPE_COLOR } from "@/game/ui";
 import { serverNow } from "@/game/net/serverTime";
 import type { CombatResult, FrameUnit } from "@/game/engine/combat";
 
-const TILE_W = 54;
-const TILE_H = 62;
+const TILE_W = 80;
+const TILE_H = 76;
 const SIM_DT = 1 / 16;
 const HEX_CLIP = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
 
@@ -131,7 +131,7 @@ export function CombatStage({
       ? "w-full flex flex-col items-center rounded-2xl border border-slate-700/50 bg-slate-950/60 p-3"
       : "fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4"}>
       {/* Scoreboard header: both teams + survivor counts */}
-      <div className="flex items-stretch gap-3 mb-2 w-full max-w-[440px]">
+      <div className="flex items-stretch gap-3 mb-2 w-full max-w-[600px]">
         <div className="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50">
           <span className="text-2xl font-extrabold tabular-nums text-emerald-300">{aliveAlly}</span>
           <span className="text-[11px] font-bold uppercase tracking-wide text-emerald-400/80 leading-tight">{t.cs_your_team}</span>
@@ -149,7 +149,7 @@ export function CombatStage({
       </div>
 
       {/* Combat timer */}
-      <div className="w-full max-w-[440px] h-1.5 rounded-full bg-slate-800 overflow-hidden mb-3">
+      <div className="w-full max-w-[600px] h-1.5 rounded-full bg-slate-800 overflow-hidden mb-3">
         <div className={`h-full ${a.overtime ? "bg-rose-500" : "bg-slate-400/70"}`} style={{ width: `${(a.t / totalTime) * 100}%` }} />
       </div>
 
@@ -306,7 +306,7 @@ function CombatRecap({ units, label }: { units: FrameUnit[]; label: string }) {
   const max = Math.max(1, ...mine.map((u) => Math.max(u.dmgDealt, u.dmgTaken)));
   const sorted = [...mine].sort((a, b) => b.dmgDealt - a.dmgDealt);
   return (
-    <div className="mt-2 w-full max-w-[440px] rounded-lg bg-slate-900/60 border border-slate-700/40 p-2">
+    <div className="mt-2 w-full max-w-[600px] rounded-lg bg-slate-900/60 border border-slate-700/40 p-2">
       <div className="flex items-center justify-between text-[9px] uppercase tracking-wider text-slate-500 mb-1 px-0.5">
         <span>{label}</span>
         <span className="flex gap-2"><span className="text-rose-400">DMG</span><span className="text-sky-400">TANK</span><span className="text-emerald-400">HEAL</span></span>
@@ -365,24 +365,24 @@ function CombatUnit({
   return (
     <div
       className="absolute"
-      style={{ left: x - 23, top: y - 30, width: 46, transform: `translate(${lunge.dx}px, ${lunge.dy}px)`, transition: "transform 90ms ease-out" }}
+      style={{ left: x - 28, top: y - 38, width: 56, transform: `translate(${lunge.dx}px, ${lunge.dy}px)`, transition: "transform 90ms ease-out" }}
     >
-      <div className="h-1.5 w-11 rounded-full bg-black/70 overflow-hidden mx-auto mb-[3px]" style={{ outline: `1px solid ${ring}66` }}>
+      <div className="h-2 w-14 rounded-full bg-black/70 overflow-hidden mx-auto mb-[3px]" style={{ outline: `1px solid ${ring}66` }}>
         <div className="h-full rounded-full" style={{ width: `${hpFrac * 100}%`, background: hpColor(hpFrac) }} />
       </div>
-      <div className="h-[3px] w-11 rounded-full bg-black/70 overflow-hidden mx-auto mb-[3px]">
+      <div className="h-[4px] w-14 rounded-full bg-black/70 overflow-hidden mx-auto mb-[3px]">
         <div className="h-full bg-sky-400" style={{ width: `${manaFrac * 100}%` }} />
       </div>
       <div
         className="relative mx-auto rounded-full flex items-center justify-center"
         style={{
-          width: 40, height: 40,
+          width: 52, height: 52,
           background: `radial-gradient(circle, ${ring}${unit.mega ? "55" : "33"}, transparent 70%)`,
           boxShadow: unit.mega ? `0 0 0 2px ${ring}, 0 0 12px 2px ${ring}aa` : `0 0 0 2px ${ring}cc, 0 3px 8px rgba(0,0,0,0.5)`,
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={spriteUrl(unit.dex)} alt="" width={36} height={36} style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none" }} draggable={false} />
+        <img src={spriteUrl(unit.dex)} alt="" width={46} height={46} style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none" }} draggable={false} />
         {flash && <span key={flash} className="absolute inset-0 rounded-full combat-hitflash" style={{ background: "#fff" }} />}
         {unit.mega && (
           <span className="absolute -top-1.5 -right-1.5 text-[8px] font-extrabold bg-fuchsia-500 text-black rounded px-0.5 leading-tight">M</span>
