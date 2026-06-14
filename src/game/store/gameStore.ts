@@ -317,9 +317,10 @@ export const useGame = create<State>((set, get) => ({
 
   importSave: (save) => set({
     gold: save.gold, xp: save.xp, level: save.level,
-    // RTDB mangles arrays (objects for sparse, undefined for empty) — coerce
-    // everything back to dense arrays and guarantee each unit keeps `items`.
-    units: toArray<UnitInstance>(save.units).filter(Boolean).map((u) => (u!.items ? u! : { ...u!, items: [] })),
+    // RTDB mangles arrays (objects for sparse, undefined for empty) and strips
+    // null values — so bench units lose `pos: null` and any unit can lose its
+    // empty `items`. Coerce back to dense arrays and restore both fields.
+    units: toArray<UnitInstance>(save.units).filter(Boolean).map((u) => ({ ...u!, pos: u!.pos ?? null, items: u!.items ?? [] })),
     shop: toArray<string>(save.shop, ECONOMY.shopSlots),
     items: toArray<string>(save.items).filter(Boolean) as string[],
   }),

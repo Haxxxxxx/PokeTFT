@@ -8,17 +8,17 @@ import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate } from "@/game/engine/combat";
 import { getDef, spriteUrl, unitsForGenerations } from "@/game/data/mons";
-import { ECONOMY, MAX_LEVEL, XP_TO_REACH, streakGold } from "@/game/config";
+import { ECONOMY, MAX_LEVEL, XP_TO_REACH, streakGold, roundKind, advanceRound } from "@/game/config";
 import { interest } from "@/game/engine/economy";
 import { MEGA_STONE } from "@/game/data/mega";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import { MegaIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
 
-// RTDB drops empty arrays, so a synced unit can come back missing `items`.
-// Restore the invariant (every unit has an `items` array) at the boundary.
+// RTDB drops null values + empty arrays, so a synced unit can come back missing
+// `pos` (bench units) or `items`. Restore both invariants at the boundary.
 function normUnit(u: UnitInstance): UnitInstance {
-  return u.items ? u : { ...u, items: [] };
+  return u.items && u.pos !== undefined ? u : { ...u, pos: u.pos ?? null, items: u.items ?? [] };
 }
 
 function asUnits(u: unknown): UnitInstance[] {
@@ -196,29 +196,52 @@ export function NetGameClient() {
 
   const streak = me?.streak ?? 0;
 
+  // Forward-looking timeline: the current stage + the next two, each round
+  // tagged with its kind (PvE / carousel / PvP) and overlaid with past results.
+  const resultByKey = new Map(roundLog.map((h) => [`${h.stage}-${h.round}`, h.won]));
+  const schedule: { stage: number; round: number; kind: ReturnType<typeof roundKind> }[] = [];
+  {
+    let s = meta.stage, r = 1; // start at round 1 of the current stage
+    for (let i = 0; i < 40; i++) {
+      schedule.push({ stage: s, round: r, kind: roundKind(s, r) });
+      const nx = advanceRound(s, r);
+      if (nx.stage > meta.stage + 2) break;
+      s = nx.stage; r = nx.round;
+    }
+  }
+
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
       <div className="flex flex-col gap-3 w-full max-w-[1440px] mx-auto p-3 overflow-x-hidden">
-        {/* Round timeline (win/loss history) */}
-        {roundLog.length > 0 && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-700/40 overflow-x-auto">
-            <span className="text-[10px] uppercase tracking-wider text-slate-500 shrink-0">Rounds</span>
-            <div className="flex items-center gap-1">
-              {roundLog.map((h, i) => (
+        {/* Round timeline: current stage + the next two, tagged by kind, with
+            past results colored win/loss and the current round highlighted. */}
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-700/40 overflow-x-auto">
+          <span className="text-[10px] uppercase tracking-wider text-slate-500 shrink-0">Timeline</span>
+          <div className="flex items-center gap-1">
+            {schedule.map(({ stage, round, kind }) => {
+              const key = `${stage}-${round}`;
+              const result = resultByKey.get(key);
+              const isCurrent = stage === meta.stage && round === meta.round;
+              const isPast = result !== undefined;
+              // Color: past → win/loss; else by kind.
+              const bg = isPast
+                ? (result ? "bg-emerald-500/90 text-black" : "bg-rose-500/90 text-black")
+                : kind === "carousel" ? "bg-fuchsia-600/40 text-fuchsia-100"
+                : kind === "pve" ? "bg-amber-600/30 text-amber-100"
+                : "bg-slate-700/60 text-slate-300";
+              const label = kind === "carousel" ? "◆" : `${stage}-${round}`;
+              return (
                 <span
-                  key={i}
-                  title={`${h.stage}-${h.round} · ${h.pve ? "PvE" : "PvP"} · ${h.won ? "Win" : "Loss"}`}
-                  className={`w-6 h-6 rounded-md flex items-center justify-center text-[8px] font-bold ${h.won ? "bg-emerald-500/90 text-black" : "bg-rose-500/90 text-black"} ${h.pve ? "ring-1 ring-amber-300/70 ring-inset" : ""}`}
+                  key={key}
+                  title={`${key} · ${kind}${isPast ? (result ? " · Win" : " · Loss") : ""}`}
+                  className={`relative w-7 h-6 shrink-0 rounded-md flex items-center justify-center text-[8px] font-bold ${bg} ${isCurrent ? "ring-2 ring-sky-400 scale-110" : ""} ${round === 1 ? "ml-1.5" : ""}`}
                 >
-                  {h.stage}-{h.round}
+                  {label}
                 </span>
-              ))}
-              {phase !== "over" && (
-                <span className="w-6 h-6 rounded-md border-2 border-sky-400 flex items-center justify-center text-[8px] font-bold text-sky-300">{meta.stage}-{meta.round}</span>
-              )}
-            </div>
+              );
+            })}
           </div>
-        )}
+        </div>
 
         {/* Top bar */}
         <div className="flex items-center gap-5 flex-wrap p-3 rounded-xl bg-slate-900/70 border border-slate-700/50">
