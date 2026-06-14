@@ -1,0 +1,170 @@
+"use client";
+
+import { useState } from "react";
+import type { PlayerSlot as PlayerSlotType, BotDifficulty } from "@/game/store/preLobbyStore";
+import { usePreLobby } from "@/game/store/preLobbyStore";
+
+const DIFFICULTY_LABELS: Record<BotDifficulty, string> = {
+  easy: "Facile",
+  medium: "Moyen",
+  hard: "Difficile",
+};
+
+const DIFFICULTY_COLORS: Record<BotDifficulty, string> = {
+  easy: "text-emerald-400 border-emerald-700 bg-emerald-950/40",
+  medium: "text-amber-400 border-amber-700 bg-amber-950/40",
+  hard: "text-rose-400 border-rose-700 bg-rose-950/40",
+};
+
+type Props = {
+  slot: PlayerSlotType;
+  index: number;
+  isHost: boolean;
+};
+
+export function PlayerSlot({ slot, index, isHost }: Props) {
+  const setSlot = usePreLobby((s) => s.setSlot);
+  const addBot = usePreLobby((s) => s.addBot);
+  const clearSlot = usePreLobby((s) => s.clearSlot);
+  const [showBotPicker, setShowBotPicker] = useState(false);
+
+  const isFirst = index === 0;
+
+  if (slot.type === "empty") {
+    return (
+      <div className="relative rounded-xl border border-dashed border-slate-700 bg-slate-900/30 p-4 flex flex-col items-center justify-center gap-3 min-h-[110px] transition-colors hover:border-slate-600">
+        <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Slot {index + 1}</span>
+        {isHost && (
+          <div className="flex gap-2">
+            <button
+              onClick={() =>
+                setSlot(slot.id, { type: "human", name: `Joueur ${index + 1}`, status: "waiting" })
+              }
+              className="px-3 py-1.5 rounded-lg bg-sky-800/60 hover:bg-sky-700/80 border border-sky-700 text-sky-300 text-xs font-bold transition-colors"
+            >
+              + Humain
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowBotPicker((v) => !v)}
+                className="px-3 py-1.5 rounded-lg bg-violet-900/60 hover:bg-violet-800/80 border border-violet-700 text-violet-300 text-xs font-bold transition-colors"
+              >
+                + Bot IA
+              </button>
+              {showBotPicker && (
+                <div className="absolute top-full left-0 mt-1 z-10 flex flex-col gap-1 rounded-lg border border-slate-700 bg-slate-900 shadow-xl p-1.5 min-w-[120px]">
+                  {(["easy", "medium", "hard"] as BotDifficulty[]).map((diff) => (
+                    <button
+                      key={diff}
+                      onClick={() => { addBot(slot.id, diff); setShowBotPicker(false); }}
+                      className={`px-3 py-1.5 rounded-md text-xs font-bold border transition-colors ${DIFFICULTY_COLORS[diff]}`}
+                    >
+                      {DIFFICULTY_LABELS[diff]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (slot.type === "human") {
+    return (
+      <div className="rounded-xl border border-sky-800/60 bg-slate-900/60 p-4 flex flex-col gap-3 min-h-[110px]">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Slot {index + 1}</span>
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-[10px] uppercase font-bold tracking-wide px-2 py-0.5 rounded-full border ${
+                slot.status === "ready"
+                  ? "text-emerald-400 border-emerald-700 bg-emerald-950/40"
+                  : "text-amber-400 border-amber-700 bg-amber-950/40"
+              }`}
+            >
+              {slot.status === "ready" ? "Prêt" : "En attente"}
+            </span>
+            {isHost && !isFirst && (
+              <button
+                onClick={() => clearSlot(slot.id)}
+                className="text-slate-600 hover:text-rose-400 text-xs transition-colors"
+                title="Retirer"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-lg">👤</span>
+          {isFirst ? (
+            <input
+              value={slot.name}
+              onChange={(e) => setSlot(slot.id, { name: e.target.value })}
+              placeholder="Ton nom"
+              className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-600"
+            />
+          ) : (
+            <span className="text-sm font-semibold text-slate-200">{slot.name || `Joueur ${index + 1}`}</span>
+          )}
+        </div>
+        {isFirst && (
+          <button
+            onClick={() => setSlot(slot.id, { status: slot.status === "ready" ? "waiting" : "ready" })}
+            className={`w-full py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+              slot.status === "ready"
+                ? "bg-slate-800 border-slate-700 text-slate-400 hover:border-rose-700 hover:text-rose-400"
+                : "bg-emerald-900/40 border-emerald-700 text-emerald-400 hover:bg-emerald-800/60"
+            }`}
+          >
+            {slot.status === "ready" ? "Annuler" : "✓ Prêt"}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Bot slot
+  return (
+    <div className="rounded-xl border border-violet-800/60 bg-slate-900/60 p-4 flex flex-col gap-3 min-h-[110px]">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Slot {index + 1}</span>
+        {isHost && (
+          <button
+            onClick={() => clearSlot(slot.id)}
+            className="text-slate-600 hover:text-rose-400 text-xs transition-colors"
+            title="Retirer le bot"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-lg">🤖</span>
+        <span className="text-sm font-semibold text-slate-200">Bot IA</span>
+        <span className={`text-[10px] uppercase font-bold tracking-wide px-2 py-0.5 rounded-full border ml-auto ${DIFFICULTY_COLORS[slot.botDifficulty]}`}>
+          {DIFFICULTY_LABELS[slot.botDifficulty]}
+        </span>
+      </div>
+      {isHost && (
+        <div className="flex gap-1.5">
+          {(["easy", "medium", "hard"] as BotDifficulty[]).map((diff) => (
+            <button
+              key={diff}
+              onClick={() => addBot(slot.id, diff)}
+              className={`flex-1 py-1 rounded-md text-[10px] font-bold border transition-all ${
+                slot.botDifficulty === diff
+                  ? DIFFICULTY_COLORS[diff]
+                  : "text-slate-600 border-slate-700 bg-slate-800/40 hover:border-slate-600"
+              }`}
+            >
+              {DIFFICULTY_LABELS[diff]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
