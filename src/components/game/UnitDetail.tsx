@@ -2,9 +2,11 @@
 
 import { useEffect } from "react";
 import { useUi } from "@/game/store/uiStore";
+import { useGame } from "@/game/store/gameStore";
 import { getDef, spriteUrl } from "@/game/data/mons";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
-import { megaFormFor } from "@/game/data/mega";
+import { ITEM_POOL } from "@/game/data/itemPool";
+import { megaFormFor, MEGA_STONE } from "@/game/data/mega";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import type { PokeType } from "@/game/types";
 import {
@@ -138,6 +140,9 @@ function Card() {
         </div>
       </div>
 
+      {/* Held items — effects + unequip (back to inventory). */}
+      <HeldItems iid={inspect.iid} />
+
       {/* Mega Evolution callout */}
       {megaFormFor(def.id) && (
         <div className="mx-3 mb-3 p-2.5 rounded-lg border border-fuchsia-500/40 bg-fuchsia-500/10 flex items-center gap-3">
@@ -156,6 +161,43 @@ function Card() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+const ITEM_DEF = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
+
+/** The inspected unit's held items, with effect text and an unequip button. */
+function HeldItems({ iid }: { iid?: string }) {
+  const unit = useGame((s) => (iid ? s.units.find((u) => u.iid === iid) : undefined));
+  const unequipItem = useGame((s) => s.unequipItem);
+  const items = unit?.items ?? [];
+  if (!iid || !unit || items.length === 0) return null;
+  return (
+    <div className="mx-3 mb-3">
+      <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">Held items · {items.length}/3</div>
+      <div className="flex flex-col gap-1.5">
+        {items.map((id, i) => {
+          const isMega = id === MEGA_STONE;
+          const def = ITEM_DEF[id];
+          return (
+            <div key={i} className="flex items-center gap-2 p-2 rounded-lg border border-slate-700/60 bg-slate-800/40">
+              <span className="text-lg shrink-0">{isMega ? <MegaIcon size={18} /> : (def?.icon ?? "◆")}</span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] font-bold text-slate-200">{isMega ? "Mega Stone" : def?.name ?? id}</div>
+                <div className="text-[10px] text-slate-400 leading-snug">{isMega ? "Mega Evolves at combat start." : def?.effect ?? ""}</div>
+              </div>
+              <button
+                onClick={() => unequipItem(unit.iid, id)}
+                title="Unequip (back to inventory)"
+                className="shrink-0 w-6 h-6 rounded-md bg-slate-900 hover:bg-rose-900/60 border border-slate-600 text-slate-400 hover:text-rose-300 flex items-center justify-center"
+              >
+                <CloseIcon size={12} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
