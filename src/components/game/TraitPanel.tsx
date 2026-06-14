@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { useGame } from "@/game/store/gameStore";
 import { computeTraits } from "@/game/engine/synergies";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
-import { TYPE_COLOR, COST_COLOR } from "@/game/ui";
+import { TYPE_COLOR, COST_COLOR, TRAIT_ICON } from "@/game/ui";
 import { getDef, spriteUrl } from "@/game/data/mons";
 
 import type { UnitInstance } from "@/game/types";
@@ -44,12 +44,13 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
                 className={`flex items-center gap-2 px-2 py-1 rounded-md cursor-help ${active ? "bg-slate-800" : "bg-slate-900/40 opacity-60"}`}
               >
                 <span
-                  style={{ background: active ? color : "transparent", borderColor: color }}
-                  className="w-5 h-5 rounded border text-[10px] font-bold flex items-center justify-center text-black"
+                  style={{ background: active ? color : "transparent", borderColor: color, boxShadow: active ? `0 0 6px -1px ${color}` : "none" }}
+                  className="w-6 h-6 rounded border flex items-center justify-center text-[11px] leading-none"
                 >
-                  {active ? t.tier : ""}
+                  {TRAIT_ICON[t.key] ?? "◆"}
                 </span>
                 <span className="text-xs font-semibold flex-1">{t.label}</span>
+                {active && <span style={{ background: color }} className="text-[9px] font-bold px-1 rounded text-black/80">{t.tier}</span>}
                 <span className="text-[11px] text-slate-400">
                   {t.count}
                   {nextBp ? `/${nextBp}` : " ✓"}
@@ -62,7 +63,7 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
                 className="hidden group-hover:block absolute left-full top-0 ml-2 z-40 w-[240px] p-3 rounded-lg border bg-[#0d1426] shadow-xl"
               >
                 <div className="flex items-center gap-2 mb-1.5">
-                  <span style={{ background: color }} className="w-3 h-3 rounded-sm" />
+                  <span style={{ borderColor: color }} className="w-5 h-5 rounded border flex items-center justify-center text-[12px] leading-none">{TRAIT_ICON[t.key] ?? "◆"}</span>
                   <span className="font-bold text-sm">{t.label}</span>
                   <span className="ml-auto text-[11px] text-slate-400">{t.count} active</span>
                 </div>

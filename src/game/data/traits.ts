@@ -5,162 +5,184 @@ type RawTrait = Omit<TraitDef, "breakpoints">;
 const RAW: RawTrait[] = [
   // ───────────── Type / origin traits ─────────────
   {
-    key: "fire", label: "Fire", description: "Fire mons set enemies ablaze, dealing damage over time.",
+    key: "fire", label: "Fire", description: "Fire mons burn with raw offense.",
     tiers: [
-      { count: 2, effect: "Burn the target for 1% max HP per second." },
-      { count: 4, effect: "Burn for 2% max HP/sec and reduce enemy healing by 33%." },
-      { count: 6, effect: "Burn for 4% max HP/sec, applied to all enemies in combat." },
+      { count: 2, effect: "Fire mons: +15% Attack Damage.", buff: { adMult: 1.15 } },
+      { count: 4, effect: "Fire mons: +32% Attack Damage.", buff: { adMult: 1.32 } },
+      { count: 6, effect: "Fire mons: +55% Attack Damage.", buff: { adMult: 1.55 } },
+      { count: 8, effect: "Fire mons: +85% Attack Damage.", buff: { adMult: 1.85 } },
     ],
   },
   {
-    key: "water", label: "Water", description: "Rain channels mana into your whole team.",
+    key: "water", label: "Water", description: "Rain floods the team with mana for faster casts.",
     tiers: [
-      { count: 2, effect: "Restore +3 mana per second to all allies." },
-      { count: 4, effect: "Restore +6 mana per second to all allies." },
-      { count: 6, effect: "Restore +10 mana/sec; first cast each combat is free." },
+      { count: 2, effect: "All allies start with +15 mana.", buff: { scope: "team", manaAdd: 15 } },
+      { count: 4, effect: "All allies start with +30 mana.", buff: { scope: "team", manaAdd: 30 } },
+      { count: 6, effect: "All allies start with +50 mana.", buff: { scope: "team", manaAdd: 50 } },
     ],
   },
   {
-    key: "electric", label: "Electric", description: "Attacks arc lightning to nearby foes.",
+    key: "electric", label: "Electric", description: "Electric mons strike at blinding speed.",
     tiers: [
-      { count: 2, effect: "Attacks chain to 1 extra enemy for 40% damage." },
-      { count: 4, effect: "Attacks chain to 3 enemies for 60% damage." },
+      { count: 2, effect: "Electric mons: +18% Attack Speed.", buff: { asMult: 1.18 } },
+      { count: 4, effect: "Electric mons: +40% Attack Speed.", buff: { asMult: 1.4 } },
+      { count: 6, effect: "Electric mons: +70% Attack Speed.", buff: { asMult: 1.7 } },
     ],
   },
   {
     key: "grass", label: "Grass", description: "Grass mons steadily regenerate health.",
     tiers: [
-      { count: 3, effect: "Regenerate 2% max HP per second." },
-      { count: 6, effect: "Regenerate 5% max HP/sec and heal 15% of damage dealt." },
+      { count: 3, effect: "Grass mons regen 2% max HP per second.", buff: { regenPerSec: 0.02 } },
+      { count: 6, effect: "Grass mons regen 4.5% max HP per second.", buff: { regenPerSec: 0.045 } },
+      { count: 9, effect: "Grass mons regen 8% max HP per second.", buff: { regenPerSec: 0.08 } },
     ],
   },
   {
-    key: "psychic", label: "Psychic", description: "Psychic power shields the team at combat start.",
+    key: "psychic", label: "Psychic", description: "Psychic power shields the whole team at combat start.",
     tiers: [
-      { count: 2, effect: "Grant the team a shield for 15% of their max HP." },
-      { count: 4, effect: "Shield for 30% max HP." },
-      { count: 6, effect: "Shield for 50% max HP and reflect 25% of damage absorbed." },
+      { count: 2, effect: "Team shield: +15% max HP.", buff: { scope: "team", shieldPct: 0.15 } },
+      { count: 4, effect: "Team shield: +30% max HP.", buff: { scope: "team", shieldPct: 0.3 } },
+      { count: 6, effect: "Team shield: +50% max HP.", buff: { scope: "team", shieldPct: 0.5 } },
     ],
   },
   {
-    key: "poison", label: "Poison", description: "Poison makes enemies fragile.",
+    key: "poison", label: "Poison", description: "Poison mons channel potent ability power.",
     tiers: [
-      { count: 3, effect: "Poisoned enemies take +12% damage and heal 30% less." },
-      { count: 5, effect: "Poisoned enemies take +20% damage and cannot heal." },
+      { count: 3, effect: "Poison mons: +30% Ability Power.", buff: { apMult: 1.3 } },
+      { count: 5, effect: "Poison mons: +55% Ability Power.", buff: { apMult: 1.55 } },
     ],
   },
   {
     key: "rock", label: "Rock", description: "Rock mons are walls of stone.",
     tiers: [
-      { count: 2, effect: "Rock mons gain +20 Armor and +20 Magic Resist." },
-      { count: 4, effect: "Gain +45 Armor & MR and reduce incoming damage by 15%." },
+      { count: 2, effect: "Rock mons: +25 Armor & Magic Resist.", buff: { armorAdd: 25, mrAdd: 25 } },
+      { count: 4, effect: "Rock mons: +55 Armor & Magic Resist.", buff: { armorAdd: 55, mrAdd: 55 } },
+      { count: 6, effect: "Rock mons: +90 Armor & MR, +15% HP.", buff: { armorAdd: 90, mrAdd: 90, hpMult: 1.15 } },
     ],
   },
   {
-    key: "flying", label: "Flying", description: "Flying mons weave through attacks.",
+    key: "flying", label: "Flying", description: "Flying mons weave fast through the fray.",
     tiers: [
-      { count: 3, effect: "Flying mons have a 15% chance to dodge attacks." },
-      { count: 6, effect: "30% dodge chance and +20% movement speed." },
+      { count: 3, effect: "Flying mons: +18% Attack Speed.", buff: { asMult: 1.18 } },
+      { count: 6, effect: "Flying mons: +38% Attack Speed.", buff: { asMult: 1.38 } },
     ],
   },
   {
     key: "dragon", label: "Dragon", description: "Dragons are raw, overwhelming power.",
-    tiers: [{ count: 2, effect: "Dragons gain +40% Attack Damage and +40 Ability Power." }],
+    tiers: [
+      { count: 2, effect: "Dragons: +35% Attack Damage & Ability Power.", buff: { adMult: 1.35, apMult: 1.35 } },
+      { count: 3, effect: "Dragons: +60% Attack Damage & Ability Power.", buff: { adMult: 1.6, apMult: 1.6 } },
+    ],
   },
   {
     key: "ghost", label: "Ghost", description: "Ghosts phase out of reach.",
-    tiers: [{ count: 2, effect: "Ghosts are untargetable for the first 3 seconds of combat." }],
+    tiers: [{ count: 2, effect: "Ghosts: +30 Armor & MR, +15% Attack Speed.", buff: { armorAdd: 30, mrAdd: 30, asMult: 1.15 } }],
   },
   {
     key: "ground", label: "Ground", description: "Ground mons are heavy and durable.",
-    tiers: [{ count: 2, effect: "Ground mons gain +200 max Health." }],
-  },
-  {
-    key: "bug", label: "Bug", description: "Bugs swarm even in death.",
-    tiers: [{ count: 3, effect: "On death, Bug mons spawn a swarmling with 40% of their stats." }],
-  },
-  {
-    key: "normal", label: "Normal", description: "Normal mons pad your wallet.",
     tiers: [
-      { count: 2, effect: "Earn +1 gold at the end of each round." },
-      { count: 4, effect: "Earn +3 gold at the end of each round." },
+      { count: 2, effect: "Ground mons: +20% max Health.", buff: { hpMult: 1.2 } },
+      { count: 4, effect: "Ground mons: +40% max Health.", buff: { hpMult: 1.4 } },
     ],
   },
   {
-    key: "ice", label: "Ice", description: "Ice locks enemies in place.",
-    tiers: [{ count: 2, effect: "Abilities have a 25% chance to freeze the target for 1.5s." }],
-  },
-  {
-    key: "fairy", label: "Fairy", description: "Fairy magic blunts the biggest threats.",
-    tiers: [{ count: 2, effect: "Take 25% less damage from the highest-cost enemy." }],
-  },
-  {
-    key: "fighting", label: "Fighting", description: "Fighting mons beat down all defenses.",
+    key: "bug", label: "Bug", description: "Bugs swarm with relentless speed.",
     tiers: [
-      { count: 2, effect: "Attacks ignore 20% of the target's Armor." },
-      { count: 4, effect: "Attacks ignore 40% of Armor and deal +15% damage." },
+      { count: 3, effect: "Bug mons: +22% Attack Speed.", buff: { asMult: 1.22 } },
+      { count: 6, effect: "Bug mons: +45% Attack Speed.", buff: { asMult: 1.45 } },
     ],
   },
   {
-    key: "dark", label: "Dark", description: "Dark mons strike when least expected.",
+    key: "normal", label: "Normal", description: "Normal mons steady the whole team.",
     tiers: [
-      { count: 2, effect: "Deal +20% bonus damage to the lowest-HP enemy." },
-      { count: 4, effect: "+20% bonus damage and execute targets below 15% HP." },
+      { count: 2, effect: "All allies: +6% Attack Damage & Health.", buff: { scope: "team", adMult: 1.06, hpMult: 1.06 } },
+      { count: 4, effect: "All allies: +14% Attack Damage & Health.", buff: { scope: "team", adMult: 1.14, hpMult: 1.14 } },
+      { count: 6, effect: "All allies: +24% Attack Damage & Health.", buff: { scope: "team", adMult: 1.24, hpMult: 1.24 } },
+    ],
+  },
+  {
+    key: "ice", label: "Ice", description: "Ice mons wield chilling magic.",
+    tiers: [{ count: 2, effect: "Ice mons: +30% Ability Power, +20 MR.", buff: { apMult: 1.3, mrAdd: 20 } }],
+  },
+  {
+    key: "fairy", label: "Fairy", description: "Fairy magic blunts incoming damage for the team.",
+    tiers: [
+      { count: 2, effect: "All allies: +20 Armor & Magic Resist.", buff: { scope: "team", armorAdd: 20, mrAdd: 20 } },
+      { count: 4, effect: "All allies: +45 Armor & Magic Resist.", buff: { scope: "team", armorAdd: 45, mrAdd: 45 } },
+    ],
+  },
+  {
+    key: "fighting", label: "Fighting", description: "Fighting mons beat down with brute force.",
+    tiers: [
+      { count: 2, effect: "Fighting mons: +22% Attack Damage.", buff: { adMult: 1.22 } },
+      { count: 4, effect: "Fighting mons: +45% Attack Damage.", buff: { adMult: 1.45 } },
+    ],
+  },
+  {
+    key: "dark", label: "Dark", description: "Dark mons hit hard from the shadows.",
+    tiers: [
+      { count: 2, effect: "Dark mons: +22% Attack Damage.", buff: { adMult: 1.22 } },
+      { count: 4, effect: "Dark mons: +45% Attack Damage.", buff: { adMult: 1.45 } },
     ],
   },
   {
     key: "steel", label: "Steel", description: "Steel mons are fortresses of iron.",
     tiers: [
-      { count: 2, effect: "Gain +30 Armor and +30 Magic Resist." },
-      { count: 4, effect: "+60 Armor & MR; incoming crits deal no bonus damage." },
+      { count: 2, effect: "Steel mons: +30 Armor & MR.", buff: { armorAdd: 30, mrAdd: 30 } },
+      { count: 4, effect: "Steel mons: +65 Armor & MR, +12% HP.", buff: { armorAdd: 65, mrAdd: 65, hpMult: 1.12 } },
+      { count: 6, effect: "Steel mons: +110 Armor & MR, +25% HP.", buff: { armorAdd: 110, mrAdd: 110, hpMult: 1.25 } },
     ],
   },
 
   // ───────────── Role / class traits ─────────────
   {
-    key: "starter", label: "Starter", description: "Your starter trio grows stronger every round.",
-    tiers: [{ count: 3, effect: "Starters gain +8 Attack Damage and +60 Health each round (stacks)." }],
+    key: "starter", label: "Starter", description: "Your starter trio grows into well-rounded threats.",
+    tiers: [
+      { count: 3, effect: "Starters: +20% Attack Damage & Health.", buff: { adMult: 1.2, hpMult: 1.2 } },
+      { count: 6, effect: "Starters: +45% Attack Damage & Health.", buff: { adMult: 1.45, hpMult: 1.45 } },
+    ],
   },
   {
-    key: "evolver", label: "Evolver", description: "Evolvers reward upgrading.",
+    key: "evolver", label: "Evolver", description: "Evolvers reward a wide, upgraded board.",
     tiers: [
-      { count: 4, effect: "Evolvers gain +10% stats when they star up." },
-      { count: 6, effect: "Evolvers gain +25% stats on star-up and cost 1 less to buy." },
+      { count: 4, effect: "Evolvers: +12% Attack Damage.", buff: { adMult: 1.12 } },
+      { count: 6, effect: "Evolvers: +25% Attack Damage, +10% HP.", buff: { adMult: 1.25, hpMult: 1.1 } },
+      { count: 9, effect: "Evolvers: +45% Attack Damage, +20% HP.", buff: { adMult: 1.45, hpMult: 1.2 } },
     ],
   },
   {
     key: "swarm", label: "Swarm", description: "Swarm mons feed off each other's speed.",
     tiers: [
-      { count: 2, effect: "Swarm mons gain +10% Attack Speed per Swarm ally." },
-      { count: 4, effect: "Swarm mons gain +18% Attack Speed per Swarm ally." },
+      { count: 2, effect: "Swarm mons: +22% Attack Speed.", buff: { asMult: 1.22 } },
+      { count: 4, effect: "Swarm mons: +45% Attack Speed.", buff: { asMult: 1.45 } },
     ],
   },
   {
-    key: "eeveelution", label: "Eeveelution", description: "Eevee adapts to your team.",
-    tiers: [{ count: 1, effect: "Eevee copies the strongest active trait on your board." }],
+    key: "eeveelution", label: "Eeveelution", description: "Eevee adapts and lifts the whole team.",
+    tiers: [{ count: 1, effect: "All allies: +10% Attack Damage & Ability Power.", buff: { scope: "team", adMult: 1.1, apMult: 1.1 } }],
   },
   {
-    key: "fossil", label: "Fossil", description: "Fossils refuse to stay down.",
-    tiers: [{ count: 2, effect: "Fossils revive once at 33% Health the first time they fall." }],
+    key: "fossil", label: "Fossil", description: "Fossils are ancient and unyielding.",
+    tiers: [{ count: 2, effect: "Fossils: +35% max Health.", buff: { hpMult: 1.35 } }],
   },
   {
     key: "pseudo-legendary", label: "Pseudo-Legend", description: "Few in number, immense in power.",
-    tiers: [{ count: 2, effect: "Pseudo-legends gain +30% Attack Damage, Ability Power and Health." }],
+    tiers: [{ count: 2, effect: "Pseudo-legends: +30% Attack Damage, Ability Power & Health.", buff: { adMult: 1.3, apMult: 1.3, hpMult: 1.3 } }],
   },
   {
-    key: "legendary", label: "Legendary", description: "The legendary birds empower the team's element.",
+    key: "legendary", label: "Legendary", description: "Legendaries empower the entire team.",
     tiers: [
-      { count: 2, effect: "The team deals +15% elemental damage." },
-      { count: 3, effect: "+30% elemental damage and allies gain the birds' typing." },
+      { count: 2, effect: "All allies: +15% Attack Damage & Ability Power.", buff: { scope: "team", adMult: 1.15, apMult: 1.15 } },
+      { count: 3, effect: "All allies: +30% Attack Damage & Ability Power.", buff: { scope: "team", adMult: 1.3, apMult: 1.3 } },
     ],
   },
   {
     key: "kanto-mythic", label: "Mythic", description: "Mew and Mewtwo bend the rules.",
-    tiers: [{ count: 1, effect: "Unlock a unique, game-warping power for the Mythic mon." }],
+    tiers: [{ count: 1, effect: "Mythic mons: +25% to all stats.", buff: { adMult: 1.25, apMult: 1.25, hpMult: 1.25 } }],
   },
   {
     key: "mythic", label: "Mythic", description: "Mythical mons defy the laws of nature.",
-    tiers: [{ count: 1, effect: "This mon gains +20% to all stats and ignores type immunities." }],
+    tiers: [{ count: 1, effect: "Mythic mons: +20% to all stats.", buff: { adMult: 1.2, apMult: 1.2, hpMult: 1.2 } }],
   },
 ];
 

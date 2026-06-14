@@ -10,6 +10,8 @@ import type { UnitInstance, PokeType, Move } from "../types";
 import { getDef } from "../data/mons";
 import { effectiveness } from "../data/typeChart";
 import { isMegaActive, megaFormFor } from "../data/mega";
+import { computeTraits } from "./synergies";
+import { TRAITS_BY_KEY } from "../data/traits";
 import { allyToField, enemyToField, neighbors, hexDistance, hexKey, type Hex } from "./hex";
 
 export type Team = "ally" | "enemy";
@@ -158,6 +160,32 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
   };
 }
 
+/** Apply each active trait tier's buff to one team's combatants, deterministically.
+ *  "self" buffs hit units carrying the trait; "team" buffs hit the whole side. */
+function applyTraitBuffs(units: Combatant[], board: UnitInstance[], team: Team) {
+  const traits = computeTraits(board.filter((u) => u.pos !== null));
+  for (const tr of traits) {
+    if (tr.tier <= 0) continue;
+    const buff = TRAITS_BY_KEY[tr.key]?.tiers[tr.tier - 1]?.buff;
+    if (!buff) continue;
+    for (const c of units) {
+      if (c.team !== team) continue;
+      const def = getDef(c.defId);
+      const carries = (def.types as string[]).includes(tr.key) || (def.roles as string[]).includes(tr.key);
+      if (buff.scope !== "team" && !carries) continue;
+      if (buff.hpMult) { c.maxHp = Math.round(c.maxHp * buff.hpMult); c.hp = c.maxHp; }
+      if (buff.shieldPct) { const extra = Math.round(c.maxHp * buff.shieldPct); c.maxHp += extra; c.hp += extra; }
+      if (buff.adMult) c.ad = Math.round(c.ad * buff.adMult);
+      if (buff.apMult) c.apMult *= buff.apMult;
+      if (buff.asMult) c.attackSpeed *= buff.asMult;
+      if (buff.armorAdd) c.armor += buff.armorAdd;
+      if (buff.mrAdd) c.mr += buff.mrAdd;
+      if (buff.regenPerSec) c.regenPerSec += buff.regenPerSec;
+      if (buff.manaAdd) c.mana = Math.min(c.maxMana, c.mana + buff.manaAdd);
+    }
+  }
+}
+
 function snapshot(units: Combatant[], t: number, events: CombatEvent[]): Frame {
   return {
     t,
@@ -186,6 +214,9 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
     ...allies.filter((u) => u.pos).map((u) => toCombatant(u, "ally")),
     ...enemies.filter((u) => u.pos).map((u) => toCombatant(u, "enemy")),
   ];
+  // Trait synergies — applied as deterministic stat buffs at combat start.
+  applyTraitBuffs(units, allies, "ally");
+  applyTraitBuffs(units, enemies, "enemy");
   const byId = new Map(units.map((u) => [u.id, u]));
   const frames: Frame[] = [snapshot(units, 0, [])];
 
