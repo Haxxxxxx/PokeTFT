@@ -5,10 +5,15 @@ import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, useDrop
 import { useGame } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
-import { hostTick, maybeClaimHost, syncBoard, PLAN_MS, COMBAT_MS } from "@/game/net/match";
+import { startCombat, endCombat, heartbeat, maybeClaimHost, syncBoard, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate } from "@/game/engine/combat";
 import { getDef, spriteUrl, unitsForGenerations } from "@/game/data/mons";
 import type { UnitInstance } from "@/game/types";
+
+function asUnits(u: unknown): UnitInstance[] {
+  if (!u) return [];
+  return (Array.isArray(u) ? u : Object.values(u as Record<string, UnitInstance>)) as UnitInstance[];
+}
 import { Board } from "./Board";
 import { Bench } from "./Bench";
 import { ShopBar } from "./ShopBar";
@@ -40,6 +45,7 @@ export function NetGameClient() {
 
   const newGame = useGame((s) => s.newGame);
   const netRound = useGame((s) => s.netRound);
+  const importSave = useGame((s) => s.importSave);
   const moveToBoard = useGame((s) => s.moveToBoard);
   const moveToBench = useGame((s) => s.moveToBench);
   const sell = useGame((s) => s.sell);
@@ -53,6 +59,7 @@ export function NetGameClient() {
   useEffect(() => { roomRef.current = room; }, [room]);
   const lastRoundKey = useRef<string | null>(null);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const actedDeadline = useRef(-1);
 
   // server time + a 250ms repaint so the shared timer counts down smoothly
   useEffect(() => {
@@ -61,14 +68,22 @@ export function NetGameClient() {
     return () => clearInterval(id);
   }, []);
 
-  // Host loop (and host migration if the host drops).
+  // Host loop: claim the host if it stalls; heartbeat; and advance the phase
+  // exactly once per deadline (idempotent — guards against the 700ms loop
+  // double-firing before the async write propagates).
   useEffect(() => {
     if (!myUid) return;
     const id = setInterval(() => {
       const r = roomRef.current;
       if (!r) return;
       maybeClaimHost(r.code, r, myUid);
-      if (r.meta?.hostUid === myUid) hostTick(r.code, r);
+      if (r.meta?.hostUid !== myUid) return;
+      heartbeat(r.code);
+      if (serverNow() >= r.meta.deadline && actedDeadline.current !== r.meta.deadline) {
+        actedDeadline.current = r.meta.deadline;
+        if (r.meta.phase === "planning") startCombat(r.code, r);
+        else if (r.meta.phase === "combat") endCombat(r.code, r);
+      }
     }, 700);
     return () => clearInterval(id);
   }, [myUid]);
@@ -79,32 +94,42 @@ export function NetGameClient() {
   const phase = meta?.phase;
   const myCombat = myUid ? room?.combat?.[myUid] : undefined;
 
-  // Grant economy on each new planning round (init the local board on round 1).
+  // Each new planning round: grant economy. On the FIRST planning we see, either
+  // restore a synced save (reconnect) or start fresh — never wipe an in-progress
+  // game by re-running newGame.
   useEffect(() => {
     if (!room || phase !== "planning" || !meta) return;
     const key = `${meta.stage}-${meta.round}`;
     if (lastRoundKey.current === key) return;
     const first = lastRoundKey.current === null;
     lastRoundKey.current = key;
-    if (first) newGame(room.rules?.startingHp ?? 100, unitsForGenerations(room.rules?.generations ?? [1]));
-    else netRound(meta.stage, meta.round, me?.streak ?? 0);
+    if (first) {
+      const save = me?.save;
+      if (save) importSave({ ...save, units: asUnits(save.units) });
+      else newGame(room.rules?.startingHp ?? 100, unitsForGenerations(room.rules?.generations ?? [1]));
+    } else {
+      netRound(meta.stage, meta.round, me?.streak ?? 0);
+    }
   }, [phase, meta?.stage, meta?.round]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Push my on-board units to the room (debounced) so the host can resolve combat.
+  // Push my board + economy snapshot to the room (debounced) — board for combat,
+  // save for reconnect.
   useEffect(() => {
     if (!room || !myUid || phase !== "planning") return;
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
-      syncBoard(room.code, myUid, useGame.getState().units);
+      const g = useGame.getState();
+      syncBoard(room.code, myUid, g.units, g.exportSave());
     }, 400);
     return () => { if (syncTimer.current) clearTimeout(syncTimer.current); };
-  }, [units, phase, myUid]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [units, gold, phase, myUid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Build the combat replay from the same boards the host used (deterministic).
+  // Replay from the boards the host FROZE into the combat assignment, so the
+  // result shown always matches the host's authoritative outcome.
   const combatResult = useMemo(() => {
-    if (phase !== "combat" || !myCombat || !me) return null;
-    return simulate(asBoard(me.board), asBoard(players[myCombat.oppUid]?.board));
-  }, [phase, meta?.stage, meta?.round, myUid]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (phase !== "combat" || !myCombat) return null;
+    return simulate(asBoard(myCombat.selfBoard), asBoard(myCombat.oppBoard));
+  }, [phase, meta?.stage, meta?.round, myCombat?.oppUid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!room || !meta || !myUid) return null;
 

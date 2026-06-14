@@ -28,6 +28,8 @@ export type RoomPlayer = {
   streak: number;
   /** The player's current on-board units (synced during planning). */
   board?: UnitInstance[];
+  /** Full economy snapshot for reconnect (synced during planning). */
+  save?: PlayerSave;
 };
 
 export type RoomMeta = {
@@ -37,10 +39,13 @@ export type RoomMeta = {
   round: number;
   /** Server-time ms at which the current phase ends. */
   deadline: number;
+  /** Host liveness heartbeat (server-time ms) — drives migration if it goes stale. */
+  hostBeat?: number;
   updatedAt: number | object;
 };
 
-/** Per-player combat assignment + result for the current round (host-written). */
+/** Per-player combat assignment + result for the current round (host-written).
+ *  Boards are frozen here so every client's replay matches the host's result. */
 export type CombatAssign = {
   oppUid: string;
   oppName: string;
@@ -48,6 +53,18 @@ export type CombatAssign = {
   won: boolean;
   survivors: number;
   dmg: number;
+  selfBoard?: UnitInstance[];
+  oppBoard?: UnitInstance[];
+};
+
+/** Snapshot of a player's local economy — synced so a refresh can rehydrate. */
+export type PlayerSave = {
+  gold: number;
+  xp: number;
+  level: number;
+  units: UnitInstance[];
+  shop: (string | null)[];
+  items: string[];
 };
 
 export type RoomRules = {
