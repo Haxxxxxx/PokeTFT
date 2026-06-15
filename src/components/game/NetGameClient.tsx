@@ -505,7 +505,7 @@ export function NetGameClient() {
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
       <Toasts />
-      <div className="fixed inset-0 flex justify-center items-center overflow-hidden">
+      <div className="tft-shell fixed inset-0 flex justify-center items-center overflow-hidden">
       <div
         style={{ width: DESIGN_W, height: DESIGN_H, transform: `scale(${scale})`, transformOrigin: "center" }}
         className="flex flex-col gap-2 px-3 py-2 shrink-0"
@@ -513,11 +513,11 @@ export function NetGameClient() {
         {/* Round tracker (TFT-style): an icon per round — ⚔ PvP, 🌿 PvE, 🎡
             carousel — grouped by stage. The current round glows; past PvP rounds
             colour win/loss and stay clickable for a recap. */}
-        <div className="relative flex items-center gap-3 px-3 py-1.5 rounded-lg bg-slate-900/60 border border-slate-700/45">
+        <div className="gilded relative flex items-center gap-3 px-3 py-1.5 rounded-lg">
           {/* Current stage/round recap, pinned beside the round tracker. */}
-          <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800/80 border border-slate-700/60">
-            <span className="text-[8px] uppercase tracking-[0.15em] text-slate-500 leading-none">{t.net_stage}</span>
-            <span className="text-base font-extrabold tabular-nums text-amber-200 leading-none">{meta.stage}-{meta.round}</span>
+          <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/30 border border-[var(--panel-edge)]">
+            <span className="text-[8px] uppercase tracking-[0.15em] text-amber-300/70 leading-none">{t.net_stage}</span>
+            <span className="text-base font-extrabold tabular-nums gild-text leading-none">{meta.stage}-{meta.round}</span>
           </div>
           <div className="flex-1 flex items-center justify-center gap-1 overflow-x-auto">
             {schedule.map(({ stage, round, kind }) => {
@@ -562,7 +562,7 @@ export function NetGameClient() {
             const r = recapByKey.get(recapKey)!;
             const opp = players[r.oppUid];
             return (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-3 px-3 py-1 rounded-lg bg-slate-800/95 border border-slate-700/60 shrink-0 shadow-lg">
+              <div className="gilded gilded-strong absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-3 px-3 py-1 rounded-lg shrink-0">
                 <span className="text-[10px] font-bold text-slate-400">{recapKey}</span>
                 <span className="flex items-center gap-1.5">
                   {opp?.photoURL
@@ -581,7 +581,7 @@ export function NetGameClient() {
 
         {/* Top HUD bar: stat chips, then the phase/timer segment + controls.
             (The stage badge lives next to the timeline above.) */}
-        <div className="flex items-center gap-2.5 flex-wrap px-3.5 py-2.5 rounded-xl bg-gradient-to-b from-slate-800/80 to-slate-900/70 border border-slate-700/60 shadow-[inset_0_1px_0_rgba(148,163,184,0.06)]">
+        <div className="gilded flex items-center gap-2.5 flex-wrap px-3.5 py-2.5 rounded-xl">
           <StatChip label={t.net_hp} accent="#ff6b6b" value={Math.max(0, me?.hp ?? 0)} />
           <StatChip label={t.net_gold} accent="#fbbf24" value={<span className="inline-flex items-center gap-1"><CoinIcon size={13} />{gold}</span>} />
           <StatChip label={t.net_interest} accent="#fcd34d" value={`+${interest(gold)}`} />
@@ -629,8 +629,8 @@ export function NetGameClient() {
         <div className="grid items-stretch gap-4" style={{ gridTemplateColumns: "260px 824px 340px", justifyContent: "space-between" }}>
           {/* Left sidebar: scoreboard + synergies, a full-height rail beside the board. */}
           <div className="flex flex-col gap-3 min-h-0">
-          <div className="w-full p-2 rounded-xl bg-slate-900/70 border border-slate-700/50 shrink-0">
-            <h2 className="text-[10px] uppercase tracking-wider text-slate-500 px-1 mb-1.5">{t.net_trainers(aliveCount)}</h2>
+          <div className="gilded w-full p-2 rounded-xl shrink-0">
+            <h2 className="text-[10px] uppercase tracking-wider text-amber-200/55 px-1 mb-1.5">{t.net_trainers(aliveCount)}</h2>
             <div className="flex flex-col gap-1">
               {ladder.map((p, i) => {
                 const dex = asBoard(p.board)[0] ? getDef(asBoard(p.board)[0].defId).dex[asBoard(p.board)[0].star - 1] : null;
@@ -753,8 +753,8 @@ export function NetGameClient() {
               const cap = boardSizeForLevel(level);
               const full = boardCount >= cap;
               return (
-                <div className="flex flex-col justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900/60 border border-slate-700/50 shrink-0">
-                  <div className="text-[9px] uppercase tracking-wider text-slate-500 text-center leading-none">{lang === "fr" ? "Plateau" : "Board"}</div>
+                <div className="gilded flex flex-col justify-center gap-1 px-2.5 py-1.5 rounded-xl shrink-0">
+                  <div className="text-[9px] uppercase tracking-wider text-amber-200/55 text-center leading-none">{lang === "fr" ? "Plateau" : "Board"}</div>
                   <div className="text-center text-base font-extrabold tabular-nums leading-none">
                     <span className={full ? "text-emerald-300" : "text-amber-300"}>{boardCount}</span>
                     <span className="text-slate-600">/{cap}</span>
@@ -1186,8 +1186,8 @@ function PhaseTimer({ phase, phaseLabel, deadline, totalMs }: { phase?: string; 
 
 function StatChip({ label, value, accent, sub, title }: { label: string; value: ReactNode; accent?: string; sub?: string; title?: string }) {
   return (
-    <div title={title} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/70 border border-slate-600/50 shrink-0">
-      <span className="text-[9px] uppercase tracking-wider text-slate-400 leading-none">{label}</span>
+    <div title={title} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/25 border border-[var(--panel-edge)] shadow-[inset_0_1px_0_rgba(231,198,107,0.06)] shrink-0">
+      <span className="text-[9px] uppercase tracking-wider text-amber-200/55 leading-none">{label}</span>
       <span className="text-base font-extrabold leading-none inline-flex items-baseline gap-1" style={{ color: accent }}>
         {value}{sub && <span className="text-[10px] font-bold text-slate-400">{sub}</span>}
       </span>

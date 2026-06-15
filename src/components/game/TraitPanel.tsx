@@ -36,8 +36,8 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
   const hovered = hover ? traits.find((t) => t.key === hover.key) : null;
 
   return (
-    <div className="w-full h-full min-h-0 flex flex-col p-3 rounded-xl bg-slate-900/70 border border-slate-700/50">
-      <h2 className="text-xs uppercase tracking-wide text-slate-400 mb-2 shrink-0">Synergies</h2>
+    <div className="gilded w-full h-full min-h-0 flex flex-col p-3 rounded-xl">
+      <h2 className="text-xs uppercase tracking-wide text-amber-200/60 mb-2 shrink-0">Synergies</h2>
       {traits.length === 0 && <p className="text-xs text-slate-500">Place mons to activate traits.</p>}
       {/* Scrolls when the list gets long. */}
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-1.5 pr-0.5">

@@ -57,9 +57,9 @@ export function ItemsPanel() {
   const distinct = [...counts.keys()];
 
   return (
-    <div data-inspectable className="rounded-2xl border border-slate-700/50 bg-slate-900/60 p-3">
+    <div data-inspectable className="gilded rounded-2xl p-3">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">{t.sh_items_title}</h2>
+        <h2 className="text-[10px] uppercase tracking-widest text-amber-200/60 font-bold">{t.sh_items_title}</h2>
         <span className="text-[10px] text-slate-500">{items.length}</span>
       </div>
       {distinct.length === 0 ? (
