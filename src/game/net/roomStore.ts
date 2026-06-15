@@ -163,6 +163,7 @@ type RoomState = {
 
 let unsub: (() => void) | null = null;
 let privUnsub: (() => void) | null = null;
+let privWatchdog: ReturnType<typeof setTimeout> | null = null;
 
 let lobbiesUnsub: (() => void) | null = null;
 
@@ -391,6 +392,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
     const { code, myUid, room } = getState();
     if (unsub) { unsub(); unsub = null; }
     if (privUnsub) { privUnsub(); privUnsub = null; }
+    if (privWatchdog) { clearTimeout(privWatchdog); privWatchdog = null; }
     if (myUid) setCurrentGame(myUid, null);
     if (code && myUid) {
       // Only delete the WHOLE room when it's safe: no other human player nodes at
@@ -432,6 +434,7 @@ function subscribe(code: string, uid: string, setState: (p: Partial<RoomState>) 
   // Listen to my OWN private econ snapshot (priv/{code}/{uid}) — readable only by
   // me — so a refresh can rehydrate gold/shop/items without ever exposing them to
   // opponents. undefined → null/value once it loads (gates reconnect fresh-start).
+  if (privWatchdog) clearTimeout(privWatchdog);
   setState({ mySave: undefined });
   privUnsub = onValue(ref(db(), `priv/${code}/${uid}`), (snap) => {
     setState({ mySave: (snap.val()?.save ?? null) as PlayerSave | null });
@@ -439,8 +442,13 @@ function subscribe(code: string, uid: string, setState: (p: Partial<RoomState>) 
   // Watchdog: onValue's error callback only fires on permission-denied, NOT on a
   // network stall — so a stalled priv read would leave mySave `undefined` forever,
   // gating first-planning and never running newGame (shop falls back to all-547,
-  // no economy). If neither callback resolved within 4s, treat it as empty (fresh).
-  setTimeout(() => { if (useRoom.getState().mySave === undefined) setState({ mySave: null }); }, 4000);
+  // no economy). If neither callback resolved within 6s, treat it as empty (fresh).
+  // Gated on `code` so a stale watchdog from a previous room can't clobber a new
+  // game's in-flight restore (the timer is also cleared on re-subscribe + leave).
+  privWatchdog = setTimeout(() => {
+    const s = useRoom.getState();
+    if (s.code === code && s.mySave === undefined) setState({ mySave: null });
+  }, 6000);
   const r = roomRef(code);
   unsub = onValue(r, (snap) => {
     if (!snap.exists()) {

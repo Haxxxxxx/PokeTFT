@@ -213,7 +213,7 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
     attackSpeed,
     armor,
     mr,
-    range: s.range,
+    range: Math.max(1, s.range), // floor at melee — range 0 could never reach a target and would idle until overtime
     mana: Math.min(s.maxMana, s.startMana + manaAdd),
     maxMana: s.maxMana,
     apMult,
@@ -291,7 +291,7 @@ function snapshot(units: Combatant[], t: number, events: CombatEvent[]): Frame {
       dex: u.dex,
       c: u.pos.c,
       r: u.pos.r,
-      hpFrac: Math.max(0, u.hp / u.maxHp),
+      hpFrac: u.maxHp > 0 ? Math.max(0, u.hp / u.maxHp) : 0, // guard maxHp=0 → no NaN in the rendered bar
       manaFrac: u.maxMana > 0 ? u.mana / u.maxMana : 0,
       alive: u.alive,
       mega: u.mega,
@@ -376,9 +376,11 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
       if (dist <= u.range) {
         // In range — attack if ready.
         if (u.atkCd <= 0) {
-          // Cap attack speed (post all item/trait multipliers) so stacked AS
-          // can't reach degenerate machine-gun DPS — matches TFT's 5.0 ceiling.
-          u.atkCd = 1 / Math.min(MAX_ATTACK_SPEED, u.attackSpeed);
+          // Clamp attack speed to (0.1 .. 5.0): the ceiling stops stacked-AS
+          // machine-gun DPS, the floor guards against a 0/negative/NaN attackSpeed
+          // (a bad item mult or misauthored stat) producing an infinite/negative
+          // cooldown — i.e. a unit that never attacks or fires every tick.
+          u.atkCd = 1 / Math.max(0.1, Math.min(MAX_ATTACK_SPEED, u.attackSpeed || 0));
           // Armor penetration ignores a fraction of the target's armor.
           dealDamage(u, target, u.ad * armorMult(target.armor * (1 - u.armorPenPct)), "physical", events, rng);
           u.mana = Math.min(u.maxMana, u.mana + MANA_PER_ATTACK);

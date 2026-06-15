@@ -15,10 +15,13 @@ export function makeInstance(defId: string, star: 1 | 2 | 3 = 1): UnitInstance {
 /**
  * Repeatedly merges any 3 units sharing defId + star into one of the next star.
  * A merged unit inherits a board position if any of its components was on-board,
- * and pools the components' items. Returns a new units array.
+ * and pools the components' items (max 3 on the upgraded unit). Any items beyond
+ * that cap are returned as `dropped` so the caller can refund them to the
+ * inventory instead of destroying them. Returns the new units array + dropped ids.
  */
-export function applyCombines(units: UnitInstance[]): UnitInstance[] {
+export function applyCombines(units: UnitInstance[]): { units: UnitInstance[]; dropped: string[] } {
   let working = [...units];
+  const dropped: string[] = [];
   let merged = true;
 
   while (merged) {
@@ -39,13 +42,15 @@ export function applyCombines(units: UnitInstance[]): UnitInstance[] {
       const components = [a, b, c];
       // Prefer to keep a board slot if one of the three was placed.
       const placed = components.find((u) => u.pos !== null);
+      const pooled = components.flatMap((u) => u.items ?? []).filter(Boolean);
       const upgraded: UnitInstance = {
         iid: a.iid,
         defId: a.defId,
         star: (a.star + 1) as 1 | 2 | 3,
         pos: placed ? placed.pos : null,
-        items: components.flatMap((u) => u.items ?? []).slice(0, 3),
+        items: pooled.slice(0, 3),
       };
+      dropped.push(...pooled.slice(3)); // overflow → refunded to inventory by the caller
       const removeIids = new Set(components.map((u) => u.iid));
       working = working.filter((u) => !removeIids.has(u.iid));
       working.push(upgraded);
@@ -53,5 +58,5 @@ export function applyCombines(units: UnitInstance[]): UnitInstance[] {
       break; // restart scan after each merge (cascade ⭐⭐ -> ⭐⭐⭐)
     }
   }
-  return working;
+  return { units: working, dropped };
 }

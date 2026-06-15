@@ -199,14 +199,14 @@ export const useGame = create<State>((set, get) => ({
 
     // Combine first, THEN gate on bench size: a 3rd copy that merges into a
     // star-up frees its bench slots, so a full bench can still accept it.
-    const units = applyCombines([...state.units, makeInstance(defId)]);
+    const { units, dropped } = applyCombines([...state.units, makeInstance(defId)]);
     const benchAfter = units.filter((u) => u.pos === null).length;
     if (benchAfter > BENCH_SIZE) { toast("Bench full", "Banc plein"); return; }
 
     takeFromPool(state.pool, defId);
     const shop = [...state.shop];
     shop[slot] = null;
-    set({ gold: state.gold - cost, units, shop, pool: { ...state.pool } });
+    set({ gold: state.gold - cost, units, shop, pool: { ...state.pool }, items: [...state.items, ...dropped] });
   },
 
   sell: (iid) => {
@@ -364,7 +364,8 @@ export const useGame = create<State>((set, get) => ({
     if (pick === MEGA_STONE) {
       items = [...state.items, MEGA_STONE];
     } else if (state.units.filter((u) => u.pos === null).length < BENCH_SIZE) {
-      units = applyCombines([...state.units, makeInstance(pick)]);
+      const r = applyCombines([...state.units, makeInstance(pick)]);
+      units = r.units; items = [...items, ...r.dropped];
     }
     const income = roundIncome(state.gold, state.streak);
     const record: RoundRecord = { stage: state.stage, round: state.round, kind: "carousel", outcome: "carousel" };
@@ -400,7 +401,8 @@ export const useGame = create<State>((set, get) => ({
       if (prev.stage === 1 || rng() < 0.45) items = [...items, COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)]];
       const cheap = [...(state.unitsByCost[1] ?? []), ...(state.unitsByCost[2] ?? [])];
       if (rng() < 0.25 && cheap.length && units.filter((u) => u.pos === null).length < BENCH_SIZE) {
-        units = applyCombines([...units, makeInstance(cheap[randInt(rng, cheap.length)])]);
+        const r = applyCombines([...units, makeInstance(cheap[randInt(rng, cheap.length)])]);
+        units = r.units; items = [...items, ...r.dropped];
       }
     }
 
@@ -412,7 +414,8 @@ export const useGame = create<State>((set, get) => ({
     // Item picks (Mega Stone or any held item) go to the inventory; otherwise a unit.
     if (pick === MEGA_STONE || ITEM_IDS.has(pick)) { set({ items: [...state.items, pick] }); return; }
     if (state.units.filter((u) => u.pos === null).length < BENCH_SIZE) {
-      set({ units: applyCombines([...state.units, makeInstance(pick)]) });
+      const r = applyCombines([...state.units, makeInstance(pick)]);
+      set({ units: r.units, items: [...state.items, ...r.dropped] });
     }
   },
 
@@ -439,7 +442,8 @@ export const useGame = create<State>((set, get) => ({
         const n = id === "draft-day" ? 3 : 2;
         const cheap = [...(state.unitsByCost[1] ?? []), ...(state.unitsByCost[2] ?? [])];
         for (let i = 0; i < n && benchFree() > 0 && cheap.length; i++) {
-          units = applyCombines([...units, makeInstance(cheap[randInt(rng, cheap.length)])]);
+          const r = applyCombines([...units, makeInstance(cheap[randInt(rng, cheap.length)])]);
+          units = r.units; items = [...items, ...r.dropped];
         }
         break;
       }
@@ -452,24 +456,32 @@ export const useGame = create<State>((set, get) => ({
     return { gold: s.gold, xp: s.xp, level: s.level, units: s.units, shop: s.shop, items: s.items, augments: s.augments };
   },
 
-  importSave: (save, allowedIds, enabledItems) => set({
+  importSave: (save, allowedIds, enabledItems) => {
     // Rebuild the shop pool from the room's roster — otherwise a restore leaves
     // pool/unitsByCost at the store's default makePool() (ALL generations), so the
     // shop would offer out-of-region mons even though the rules restrict the pool.
-    pool: makePool(allowedIds),
-    unitsByCost: makeUnitsByCost(allowedIds),
-    enabledItems: enabledItems && enabledItems.length ? enabledItems : null,
-    // Derive level from XP so it always matches (a stale/dropped synced `level`
-    // can't stick after a reconnect and show the wrong level all game).
-    gold: save.gold, xp: save.xp, level: levelFromXp(save.xp ?? 0),
+    const pool = makePool(allowedIds);
+    const unitsByCost = makeUnitsByCost(allowedIds);
     // RTDB mangles arrays (objects for sparse, undefined for empty) and strips
     // null values — so bench units lose `pos: null` and any unit can lose its
     // empty `items`. Coerce back to dense arrays and restore both fields.
-    units: toArray<UnitInstance>(save.units).filter(Boolean).map((u) => ({ ...u!, pos: u!.pos ?? null, items: toArray<string>(u!.items).filter(Boolean) as string[] })),
-    shop: toArray<string>(save.shop, ECONOMY.shopSlots),
-    items: toArray<string>(save.items).filter(Boolean) as string[],
-    augments: toArray<string>(save.augments).filter(Boolean) as string[],
-  }),
+    const units = toArray<UnitInstance>(save.units).filter(Boolean).map((u) => ({ ...u!, pos: u!.pos ?? null, items: toArray<string>(u!.items).filter(Boolean) as string[] }));
+    // Decrement the rebuilt pool by the copies the player ALREADY owns (a ⭐⭐ = 3
+    // copies, ⭐⭐⭐ = 9) so scarcity/3-star odds stay honest — a full pool plus
+    // owned units would double-count every copy.
+    for (const u of units) takeFromPool(pool, u.defId, u.star === 1 ? 1 : u.star === 2 ? 3 : 9);
+    set({
+      pool, unitsByCost,
+      enabledItems: enabledItems && enabledItems.length ? enabledItems : null,
+      // Derive level from XP so it always matches (a stale/dropped synced `level`
+      // can't stick after a reconnect and show the wrong level all game).
+      gold: save.gold, xp: save.xp, level: levelFromXp(save.xp ?? 0),
+      units,
+      shop: toArray<string>(save.shop, ECONOMY.shopSlots),
+      items: toArray<string>(save.items).filter(Boolean) as string[],
+      augments: toArray<string>(save.augments).filter(Boolean) as string[],
+    });
+  },
 
   // Add an item to the inventory (carousel pick / loot).
   grantItem: (itemId) => set({ items: [...get().items, itemId] }),

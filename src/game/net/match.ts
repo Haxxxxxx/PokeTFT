@@ -99,7 +99,10 @@ function board(p: RoomPlayer | undefined): UnitInstance[] {
   // wrongly truncate a legit board to 1 unit. The synced board is the source.
   return (arr as UnitInstance[])
     .filter((u) => u && u.pos && hasDef(u.defId))
-    .map((u) => (Array.isArray(u.items) ? u : { ...u, items: u.items ? Object.values(u.items as Record<string, string>) : [] }));
+    // Coerce items to a dense, falsy-free array EXACTLY like the client's normUnit
+    // (itemsArray → .filter(Boolean)). If the host kept a null item the client dropped,
+    // boardSeed would differ → host/client roll different crits → replay desync.
+    .map((u) => ({ ...u, items: (Array.isArray(u.items) ? u.items : Object.values((u.items ?? {}) as Record<string, string>)).filter(Boolean) }));
 }
 
 /** Players still in the game (alive). Disconnected-but-alive players still fight
@@ -168,13 +171,18 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
   const draw = r.winner === "draw";
   const aWon = r.winner === "ally";
   const bWon = r.winner === "enemy";
+  // Draws normally cost no HP — but at the stage cap (50) a perpetual mirror-draw
+  // between the last two players would loop forever (advanceRound is clamped, so
+  // stage can't climb to force a finish). Chip both sides on a draw there so the
+  // stalemate resolves into an elimination.
+  const drawChip = draw && stage >= 50 ? 10 : 0;
   combat[aUid] = {
     oppUid: bUid,
     oppName: (room.players[bUid]?.name ?? "Rival") + (ghost ? " (ghost)" : ""),
     ghost,
     won: aWon,
     survivors: aWon || draw ? 0 : r.survivors,
-    dmg: aWon || draw ? 0 : stageBaseDamage(stage) + r.survivors,
+    dmg: aWon ? 0 : draw ? drawChip : stageBaseDamage(stage) + r.survivors,
     selfBoard: sa,
     oppBoard: sb,
   };
@@ -185,7 +193,7 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
       ghost: false,
       won: bWon,
       survivors: bWon || draw ? 0 : r.survivors,
-      dmg: bWon || draw ? 0 : stageBaseDamage(stage) + r.survivors,
+      dmg: bWon ? 0 : draw ? drawChip : stageBaseDamage(stage) + r.survivors,
       selfBoard: sb,
       oppBoard: sa,
       // B is the "enemy" side of the canonical simulate(ba, bb): B replays the
@@ -229,11 +237,19 @@ async function claimTransition(code: string, fromPhase: string, expectedDeadline
  *  match stuck re-firing the parked deadline every minute (the planning-loop class).
  *  The error is re-thrown so the host loop logs it; the deadline reset lets the next
  *  host tick re-attempt the transition cleanly (or migrate). */
+const claimFailures = new Map<string, number>();
 async function withClaimGuard(code: string, body: () => Promise<void>): Promise<void> {
   try {
     await body();
+    claimFailures.delete(code); // success → reset backoff (the failure was transient)
   } catch (err) {
-    await update(ref(db(), `games/${code}/meta`), { deadline: serverNow() + 2500, hostBeat: serverNow() }).catch(() => {});
+    // Escalating backoff: a TRANSIENT error recovers fast (2.5s), but a
+    // DETERMINISTIC one (a write the rules always reject) backs off to 30s instead
+    // of hammering RTDB every 2.5s on a wedged game.
+    const n = (claimFailures.get(code) ?? 0) + 1;
+    claimFailures.set(code, n);
+    const backoff = Math.min(2500 * 2 ** (n - 1), 30_000);
+    await update(ref(db(), `games/${code}/meta`), { deadline: serverNow() + backoff, hostBeat: serverNow() }).catch(() => {});
     throw err;
   }
 }
