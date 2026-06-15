@@ -1,5 +1,5 @@
 import { SHOP_ODDS, POOL_SIZE, ECONOMY, type Cost } from "../config";
-import { UNITS } from "../data/mons";
+import { UNITS, getDef } from "../data/mons";
 import { weightedPick, type Rng } from "./rng";
 
 /** Shared pool: defId -> remaining copies in the global bag. */
@@ -53,7 +53,11 @@ export function takeFromPool(pool: Pool, defId: string, copies = 1): void {
   pool[defId] = Math.max(0, (pool[defId] ?? 0) - copies);
 }
 
-/** Return copies to the pool when a unit is sold/dies-out. */
+/** Return copies to the pool when a unit is sold/dies-out. Clamped to the original
+ *  bag size for that cost so no path can ever inflate a mon's pool weight beyond
+ *  POOL_SIZE (defense-in-depth: even if a free grant hit an empty slot, selling it
+ *  back can't mint phantom copies that would skew everyone's shop odds). */
 export function returnToPool(pool: Pool, defId: string, copies = 1): void {
-  pool[defId] = (pool[defId] ?? 0) + copies;
+  const cap = POOL_SIZE[getDef(defId).cost] ?? Infinity;
+  pool[defId] = Math.min(cap, (pool[defId] ?? 0) + copies);
 }

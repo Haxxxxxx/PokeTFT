@@ -370,7 +370,11 @@ export async function finishCarouselEarlyIfReady(code: string, room: Room): Prom
   if (room.meta?.phase !== "carousel") return;
   if (serverNow() >= room.meta.deadline) return; // already ending
   const key = `${room.meta.stage}-${room.meta.round}`;
-  const humans = alivePlayers(room).filter((p) => !p.isBot && p.connected);
+  // NOTE: don't filter on `connected` — an alive-but-momentarily-disconnected
+  // player (backgrounded tab) must still block the early finish, otherwise the
+  // carousel ends before they can reconnect and pick, silently robbing them of a
+  // reward. The deadline still bounds the wait if they never come back.
+  const humans = alivePlayers(room).filter((p) => !p.isBot);
   if (humans.length === 0 || !humans.every((p) => p.carouselPicked === key)) return;
   await update(ref(db(), `games/${code}/meta`), { deadline: serverNow(), updatedAt: serverNow() });
 }

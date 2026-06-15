@@ -151,8 +151,13 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
   const local = u.pos!;
   const pos = team === "ally" ? allyToField(local[0], local[1]) : enemyToField(local[0], local[1]);
 
+  // Held items, coerced to a real array first: a RTDB round-trip can turn a sparse
+  // array into an index-keyed object ({0:"x"}), which would throw on .includes/for-of
+  // and desync whichever side fed the mangled shape. Coerce once, use everywhere.
+  const items = Array.isArray(u.items) ? u.items : u.items ? Object.values(u.items as Record<string, string>) : [];
+
   // Mega Evolution applies at combat start when the mon holds a Mega Stone.
-  const mega = isMegaActive(u.defId, u.items) ? megaFormFor(u.defId) : undefined;
+  const mega = isMegaActive(u.defId, items) ? megaFormFor(u.defId) : undefined;
   const types = mega?.addType && !def.types.includes(mega.addType) ? [...def.types, mega.addType] : def.types;
   let hp = mega ? Math.round(s.hp[i] * mega.hpMult) : s.hp[i];
   let ad = mega ? Math.round(s.ad[i] * mega.adMult) : s.ad[i];
@@ -160,7 +165,6 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
   // Held-item stat modifiers (deterministic; items synced on the unit). Effects
   // are data-driven (ITEM_EFFECT) so combining produces items the sim applies
   // generically — no per-id branching here.
-  const items = u.items ?? [];
   let apMult = mega ? mega.apMult : 1;
   let armor = mega ? s.armor + mega.armorBonus : s.armor;
   let mr = mega ? s.magicResist + mega.mrBonus : s.magicResist;

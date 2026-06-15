@@ -840,7 +840,7 @@ export function NetGameClient() {
                 </div>
               );
             })()}
-            <Bench />
+            <Bench interactive={phase === "planning" && (!spectate || spectate === myUid)} />
           </div>
           <div className="flex gap-3 w-full max-w-[1480px]">
             <ShopSellDrop><ShopBar /></ShopSellDrop>

@@ -380,6 +380,7 @@ export const useGame = create<State>((set, get) => ({
     if (pick === MEGA_STONE) {
       items = [...state.items, MEGA_STONE];
     } else if (state.units.filter((u) => u.pos === null).length < BENCH_SIZE) {
+      takeFromPool(state.pool, pick); // carousel mons come from the shared bag — debit it
       const r = applyCombines([...state.units, makeInstance(pick)]);
       units = r.units; items = [...items, ...r.dropped];
     }
@@ -389,6 +390,7 @@ export const useGame = create<State>((set, get) => ({
       ...advancePartial(state, state.gold + income),
       units,
       items,
+      pool: { ...state.pool },
       history: [...state.history, record],
     });
   },
@@ -417,7 +419,9 @@ export const useGame = create<State>((set, get) => ({
       if (prev.stage === 1 || rng() < 0.45) items = [...items, COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)]];
       const cheap = [...(state.unitsByCost[1] ?? []), ...(state.unitsByCost[2] ?? [])];
       if (rng() < 0.25 && cheap.length && units.filter((u) => u.pos === null).length < BENCH_SIZE) {
-        const r = applyCombines([...units, makeInstance(cheap[randInt(rng, cheap.length)])]);
+        const pickId = cheap[randInt(rng, cheap.length)];
+        takeFromPool(state.pool, pickId); // free PvE drop is a real pool copy — debit it
+        const r = applyCombines([...units, makeInstance(pickId)]);
         units = r.units; items = [...items, ...r.dropped];
       }
     }
@@ -425,7 +429,7 @@ export const useGame = create<State>((set, get) => ({
     // Pension trains one planning round closer to maturity (down to 0 = ready).
     const pension = state.pension ? { ...state.pension, roundsLeft: Math.max(0, state.pension.roundsLeft - 1) } : null;
 
-    set({ gold: state.gold + income + bonusGold, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false, items, units, pension });
+    set({ gold: state.gold + income + bonusGold, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false, items, units, pension, pool: { ...state.pool } });
   },
 
   netCarouselPick: (pick) => {
@@ -433,8 +437,9 @@ export const useGame = create<State>((set, get) => ({
     // Item picks (Mega Stone or any held item) go to the inventory; otherwise a unit.
     if (pick === MEGA_STONE || ITEM_IDS.has(pick)) { set({ items: [...state.items, pick] }); return; }
     if (state.units.filter((u) => u.pos === null).length < BENCH_SIZE) {
+      takeFromPool(state.pool, pick); // carousel mons come from the shared bag — debit it
       const r = applyCombines([...state.units, makeInstance(pick)]);
-      set({ units: r.units, items: [...state.items, ...r.dropped] });
+      set({ units: r.units, items: [...state.items, ...r.dropped], pool: { ...state.pool } });
     }
   },
 
@@ -461,13 +466,15 @@ export const useGame = create<State>((set, get) => ({
         const n = id === "draft-day" ? 3 : 2;
         const cheap = [...(state.unitsByCost[1] ?? []), ...(state.unitsByCost[2] ?? [])];
         for (let i = 0; i < n && benchFree() > 0 && cheap.length; i++) {
-          const r = applyCombines([...units, makeInstance(cheap[randInt(rng, cheap.length)])]);
+          const pickId = cheap[randInt(rng, cheap.length)];
+          takeFromPool(state.pool, pickId); // granted mons come from the shared bag — debit it
+          const r = applyCombines([...units, makeInstance(pickId)]);
           units = r.units; items = [...items, ...r.dropped];
         }
         break;
       }
     }
-    set({ augments: [...state.augments, id], gold, xp, level: levelFromXp(xp), items, units });
+    set({ augments: [...state.augments, id], gold, xp, level: levelFromXp(xp), items, units, pool: { ...state.pool } });
   },
 
   exportSave: () => {
