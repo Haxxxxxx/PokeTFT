@@ -20,12 +20,20 @@ export function LobbyScreen() {
   const addBot = useRoom((s) => s.addBot);
   const removePlayer = useRoom((s) => s.removePlayer);
   const leave = useRoom((s) => s.leave);
+  const publishLobby = useRoom((s) => s.publishLobby);
+  const removeLobby = useRoom((s) => s.removeLobby);
   const preRules = usePreLobby((s) => s.rules);
   const setPreRules = usePreLobby((s) => s.setRules);
   const [copied, setCopied] = useState(false);
   const [showRules, setShowRules] = useState(false);
 
   const isHost = room?.meta?.hostUid === myUid;
+
+  // Host: keep the game-browser listing's player count fresh, and delist when the
+  // lobby closes (game starts → unmount, or host leaves).
+  const lobbyCount = room ? Object.values(room.players ?? {}).filter((p) => p.connected).length : 0;
+  useEffect(() => { if (isHost) publishLobby(lobbyCount); }, [isHost, lobbyCount, publishLobby]);
+  useEffect(() => () => { if (isHost) removeLobby(); }, [isHost, removeLobby]);
 
   useEffect(() => {
     if (!room || !isHost) return;
