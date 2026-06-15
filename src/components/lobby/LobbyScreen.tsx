@@ -6,7 +6,7 @@ import { usePreLobby } from "@/game/store/preLobbyStore";
 import { beginMatch } from "@/game/net/match";
 import { enterFullscreen } from "@/lib/fullscreen";
 import { GameRulesPanel } from "./GameRulesPanel";
-import { unitsForGenerations } from "@/game/data/mons";
+import { rosterForGenerations } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 
 const GEN_NAMES = ["", "Kanto", "Johto", "Hoenn", "Sinnoh", "Unova", "Kalos", "Alola", "Galar", "Paldea"];
@@ -64,7 +64,7 @@ export function LobbyScreen() {
   const canStart = isHost && players.length >= 1 && allReady;
 
   const gens = room.rules?.generations ?? [1];
-  const poolCount = unitsForGenerations(gens).length;
+  const poolCount = rosterForGenerations(gens).length;
   const items = room.rules?.itemsEnabled ?? [];
 
   const copyCode = () => navigator.clipboard?.writeText(room.code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {});
@@ -175,11 +175,11 @@ export function LobbyScreen() {
 
       {/* Rules modal (host) */}
       {showRules && isHost && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setShowRules(false)}>
-          <div className="w-full max-w-[460px] max-h-[85vh] overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
-              <h2 className="text-xs font-extrabold uppercase tracking-widest text-slate-400">{t.l_rules}</h2>
-              <button onClick={() => setShowRules(false)} className="text-slate-500 hover:text-slate-300 text-xl leading-none">×</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4" onClick={() => setShowRules(false)}>
+          <div className="gilded gilded-strong w-full max-w-[460px] max-h-[85vh] overflow-y-auto rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--panel-edge)]">
+              <h2 className="text-sm font-extrabold uppercase tracking-[0.18em] gild-text">{t.l_rules}</h2>
+              <button onClick={() => setShowRules(false)} className="text-slate-500 hover:text-amber-300 text-xl leading-none">×</button>
             </div>
             <GameRulesPanel isHost={isHost} />
           </div>

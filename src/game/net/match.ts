@@ -4,7 +4,7 @@ import { serverNow } from "./serverTime";
 import { simulate } from "../engine/combat";
 import { makeRng } from "../engine/rng";
 import { generatePlayerLikeBoard, generateCreepBoard, pickCarouselOptions } from "../engine/enemy";
-import { unitsForGenerations, hasDef } from "../data/mons";
+import { rosterForGenerations, hasDef } from "../data/mons";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
 import { COMPONENT_IDS } from "../data/items";
@@ -34,7 +34,7 @@ function hashStr(s: string): number {
 /** The roster (unit ids) the room's selected generations allow — so AI/creeps/
  *  carousel only ever use the same mons the players can roll. */
 function rosterFor(room: Room): string[] {
-  return unitsForGenerations(room.rules?.generations ?? [1]);
+  return rosterForGenerations(room.rules?.generations ?? [1]);
 }
 
 /** A bot's board for a round, scaled by stage progress and difficulty. */

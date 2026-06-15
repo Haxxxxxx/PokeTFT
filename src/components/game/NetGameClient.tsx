@@ -7,7 +7,7 @@ import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, markCarouselPicked, finishCarouselEarlyIfReady, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate } from "@/game/engine/combat";
-import { getDef, spriteUrl, unitsForGenerations, hasDef } from "@/game/data/mons";
+import { getDef, spriteUrl, rosterForGenerations, hasDef } from "@/game/data/mons";
 import { streakGold, roundKind, advanceRound, boardSizeForLevel } from "@/game/config";
 import { interest } from "@/game/engine/economy";
 import { MEGA_STONE, canMega } from "@/game/data/mega";
@@ -250,7 +250,7 @@ export function NetGameClient() {
     if (first) {
       const save = me?.save;
       if (save) importSave({ ...save, units: asUnits(save.units) });
-      else newGame(room.rules?.startingHp ?? 100, unitsForGenerations(room.rules?.generations ?? [1]));
+      else newGame(room.rules?.startingHp ?? 100, rosterForGenerations(room.rules?.generations ?? [1]));
     } else {
       netRound(meta.stage, meta.round, me?.streak ?? 0);
     }

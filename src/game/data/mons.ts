@@ -785,3 +785,31 @@ export function unitsForGenerations(gens: number[]): string[] {
     .filter((u) => ranges.some(([s, e]) => u.dex[0] >= s && u.dex[0] <= e))
     .map((u) => u.id);
 }
+
+/** Roster plateau: a single region only has its own mons, but stacking many
+ *  regions used to balloon the pool to 200+ (diluting the shop so you never hit
+ *  3-stars). We cap the playable roster so it stays stable from ~4 regions up to
+ *  all regions. Region counts below the cap are unaffected (their natural size).
+ *
+ *  Cumulative roster by region count is ~42 / 66 / 88 / 111 / … / 206, so a cap
+ *  of 100 makes the roster plateau right at 4 regions and stay flat to the max. */
+export const ROSTER_CAP = 100;
+
+/** The actual playable roster for the selected generations — the source of truth
+ *  for the shop pool, bots, creeps and carousel alike. Deterministic (same gens
+ *  → same list on every client) and cost-balanced, so capping doesn't skew the
+ *  shop's cost distribution. */
+export function rosterForGenerations(gens: number[]): string[] {
+  const ids = unitsForGenerations(gens);
+  if (ids.length <= ROSTER_CAP) return ids;
+  // Sort by (cost, id) then take an even stride — preserves the per-cost-tier
+  // proportions while trimming to the cap, fully deterministically.
+  const sorted = [...ids].sort((a, b) => {
+    const ca = getDef(a).cost, cb = getDef(b).cost;
+    return ca !== cb ? ca - cb : a < b ? -1 : a > b ? 1 : 0;
+  });
+  const stride = sorted.length / ROSTER_CAP;
+  const out: string[] = [];
+  for (let i = 0; i < ROSTER_CAP; i++) out.push(sorted[Math.floor(i * stride)]);
+  return out;
+}
