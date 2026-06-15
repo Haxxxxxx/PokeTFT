@@ -12,6 +12,7 @@ import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 
 type Mode = "idle" | "join";
+const GEN_NAMES = ["", "Kanto", "Johto", "Hoenn", "Sinnoh", "Unova", "Kalos", "Alola", "Galar", "Paldea"];
 
 // Decorative hero composition — random showcase mons scattered behind the play CTA.
 const HERO_SLOTS: { x: string; y: string; size: number; rot: number }[] = [
@@ -33,6 +34,9 @@ export function WelcomeScreen() {
   const rules = usePreLobby((s) => s.rules);
   const host = useRoom((s) => s.host);
   const join = useRoom((s) => s.join);
+  const lobbies = useRoom((s) => s.lobbies);
+  const watchLobbies = useRoom((s) => s.watchLobbies);
+  const unwatchLobbies = useRoom((s) => s.unwatchLobbies);
   const status = useRoom((s) => s.status);
   const netError = useRoom((s) => s.error);
   const profile = useAuth((s) => s.profile);
@@ -52,6 +56,9 @@ export function WelcomeScreen() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setHeroMons(HERO_SLOTS.map((s, i) => ({ ...s, dex: pool[i] })));
   }, []);
+
+  // Live game browser — subscribe to open lobbies while on this screen.
+  useEffect(() => { watchLobbies(); return () => unwatchLobbies(); }, [watchLobbies, unwatchLobbies]);
 
   // Show the tutorial automatically the first time someone lands here.
   useEffect(() => {
@@ -138,9 +145,37 @@ export function WelcomeScreen() {
                   className="w-full py-4 rounded-2xl font-extrabold text-base tracking-wide bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black shadow-lg shadow-amber-500/20 disabled:opacity-30 disabled:shadow-none transition-all">
                   {busy ? "…" : t.w_create_btn}
                 </button>
-                <button onClick={() => setMode("join")} disabled={!canProceed}
-                  className="w-full py-3 rounded-xl font-bold text-sm bg-slate-800/80 hover:bg-slate-700 text-sky-300 border border-slate-700 disabled:opacity-30 transition-all">
-                  {t.w_join}
+
+                {/* Live game browser — find + join an open game without a code. */}
+                <div className="w-full">
+                  <div className="flex items-center justify-between mb-1.5 px-0.5">
+                    <span className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400">{t.w_open_games}</span>
+                    <span className="text-[10px] text-slate-600 tabular-nums">{lobbies.length}</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5 max-h-[176px] overflow-y-auto pr-0.5">
+                    {lobbies.length === 0 ? (
+                      <p className="text-[11px] text-slate-600 text-center py-3 rounded-lg border border-dashed border-slate-800">{t.w_no_games}</p>
+                    ) : lobbies.map((l) => {
+                      const full = l.players >= l.max;
+                      return (
+                        <button key={l.code} onClick={() => join(l.code, name)} disabled={!canProceed || busy || full}
+                          className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-slate-800/70 hover:bg-slate-700 border border-slate-700 disabled:opacity-40 transition-colors text-left">
+                          <span className="flex flex-col items-start min-w-0">
+                            <span className="text-xs font-bold text-slate-200 truncate max-w-[160px]">{l.host}</span>
+                            <span className="text-[10px] text-slate-500 truncate max-w-[160px]">{(l.gens ?? []).map((g) => GEN_NAMES[g] ?? `G${g}`).join(" · ") || "—"}</span>
+                          </span>
+                          <span className="flex items-center gap-2 shrink-0">
+                            <span className={`text-[11px] tabular-nums ${full ? "text-rose-400" : "text-slate-400"}`}>{l.players}/{l.max}</span>
+                            <span className="text-[10px] font-extrabold uppercase text-sky-300">{t.w_join_btn}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <button onClick={() => setMode("join")} disabled={!canProceed} className="text-[11px] text-slate-500 hover:text-sky-300 underline disabled:opacity-40">
+                  {t.w_join_by_code}
                 </button>
                 {!canProceed && <p className="text-[11px] text-slate-600">{t.w_username_placeholder}</p>}
                 {netError && <p className="text-xs text-rose-400">{netError}</p>}

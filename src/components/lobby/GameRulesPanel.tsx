@@ -20,6 +20,8 @@ export function GameRulesPanel({ isHost }: { isHost: boolean }) {
   // Use the REAL playable roster (units actually implemented), not the National
   // Dex range — so this matches the "42 Pokémon" chip shown in the lobby.
   const poolCount = unitsForGenerations(rules.generations).length;
+  // How many implemented mons each generation contributes (shown per button).
+  const genCounts: Record<number, number> = Object.fromEntries(ALL_GENS.map((g) => [g, unitsForGenerations([g]).length]));
   // Draft-size choices scale to the real pool so they're always achievable.
   const draftOptions = Array.from(
     new Set([Math.round(poolCount / 2), Math.round((poolCount * 3) / 4), poolCount]),
@@ -44,16 +46,19 @@ export function GameRulesPanel({ isHost }: { isHost: boolean }) {
             return (
               <button
                 key={gen}
-                disabled={!isHost}
+                disabled={!isHost || genCounts[gen] === 0}
                 onClick={() => toggleGeneration(gen)}
-                className={`flex items-center justify-between gap-1 px-2.5 py-2 rounded-lg border text-xs font-semibold transition-all ${
+                className={`flex items-center justify-between gap-1.5 px-3 py-2.5 rounded-lg border text-xs font-semibold transition-all ${
                   active
-                    ? "bg-amber-950/40 border-amber-700 text-amber-300"
-                    : "bg-slate-900/40 border-slate-700 text-slate-500 hover:border-slate-600 hover:text-slate-400"
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    ? "bg-amber-950/40 border-amber-600 text-amber-300 shadow-[0_0_14px_-6px_rgba(217,119,6,0.8)]"
+                    : "bg-slate-900/40 border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-300"
+                } disabled:opacity-40 disabled:cursor-not-allowed`}
               >
                 <span className="truncate">{GEN_LABELS[gen]}</span>
-                {active && <span className="text-amber-500 text-[10px] shrink-0">✓</span>}
+                <span className="flex items-center gap-1.5 shrink-0">
+                  <span className={`text-[10px] tabular-nums px-1 rounded ${active ? "bg-amber-500/20 text-amber-200" : "bg-slate-800 text-slate-500"}`}>{genCounts[gen]}</span>
+                  {active && <span className="text-amber-400 text-[11px]">✓</span>}
+                </span>
               </button>
             );
           })}

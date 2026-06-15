@@ -11,6 +11,9 @@ export type Dict = {
   w_username_placeholder: string;
   w_create: string;
   w_join: string;
+  w_open_games: string;
+  w_no_games: string;
+  w_join_by_code: string;
   w_create_desc: string;
   w_create_btn: string;
   w_back: string;
@@ -178,6 +181,9 @@ export const FR: Dict = {
   w_username_placeholder: "Choisis un pseudo…",
   w_create: "⚔ Créer une partie",
   w_join: "🔗 Rejoindre",
+  w_open_games: "Parties ouvertes",
+  w_no_games: "Aucune partie ouverte — crées-en une !",
+  w_join_by_code: "Rejoindre avec un code",
   w_create_desc: "Tu seras l'hôte de la partie. Les autres joueurs pourront rejoindre avec le code du lobby.",
   w_create_btn: "⚔ Créer",
   w_back: "Retour",
@@ -335,6 +341,9 @@ export const EN: Dict = {
   w_username_placeholder: "Choose a username…",
   w_create: "⚔ Create a game",
   w_join: "🔗 Join",
+  w_open_games: "Open games",
+  w_no_games: "No open games — host one!",
+  w_join_by_code: "Join with a code",
   w_create_desc: "You'll be the host. Other players can join using the lobby code.",
   w_create_btn: "⚔ Create",
   w_back: "Back",

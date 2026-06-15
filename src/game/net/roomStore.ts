@@ -100,6 +100,16 @@ export type Room = {
   carousel?: Record<string, string[]>;
 };
 
+/** Lightweight discovery entry for the game browser (lobbies/{code}). */
+export type LobbySummary = {
+  code: string;
+  host: string;
+  players: number;
+  max: number;
+  gens: number[];
+  createdAt: number;
+};
+
 type Status = "idle" | "connecting" | "connected" | "error";
 
 type RoomState = {
@@ -116,6 +126,14 @@ type RoomState = {
   error: string | null;
   /** True while reconnect() is re-attaching to a saved room after a refresh. */
   reconnecting: boolean;
+  /** Open games available to browse/join (from the lobbies index). */
+  lobbies: LobbySummary[];
+  /** Subscribe / unsubscribe to the open-games list (game browser). */
+  watchLobbies: () => void;
+  unwatchLobbies: () => void;
+  /** Host: keep the lobbies-index entry fresh (player count) or remove it. */
+  publishLobby: (players: number) => void;
+  removeLobby: () => void;
 
   host: (name: string, rules?: Partial<RoomRules>) => Promise<string | null>;
   join: (code: string, name: string) => Promise<boolean>;
@@ -133,6 +151,8 @@ type RoomState = {
 };
 
 let unsub: (() => void) | null = null;
+
+let lobbiesUnsub: (() => void) | null = null;
 
 /** Surface (don't swallow) RTDB write rejections — a silent failure during a
  *  game looks like a freeze with no signal. */
@@ -176,6 +196,26 @@ export const useRoom = create<RoomState>((setState, getState) => ({
   status: "idle",
   error: null,
   reconnecting: false,
+  lobbies: [],
+
+  watchLobbies: () => {
+    if (lobbiesUnsub) return;
+    lobbiesUnsub = onValue(ref(db(), "lobbies"), (snap) => {
+      const val = (snap.val() ?? {}) as Record<string, LobbySummary>;
+      const list = Object.values(val).filter((l) => l && l.code).sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+      setState({ lobbies: list });
+    });
+  },
+  unwatchLobbies: () => { if (lobbiesUnsub) { lobbiesUnsub(); lobbiesUnsub = null; } setState({ lobbies: [] }); },
+  publishLobby: (players) => {
+    const { code, room, myUid } = getState();
+    if (!code || !room || !myUid || room.meta.hostUid !== myUid) return;
+    update(ref(db(), `lobbies/${code}`), { players, host: room.players[myUid]?.name ?? "Host" }).catch(onWriteErr);
+  },
+  removeLobby: () => {
+    const { code } = getState();
+    if (code) remove(ref(db(), `lobbies/${code}`)).catch(() => {});
+  },
 
   host: async (name, rules) => {
     setState({ status: "connecting", error: null });
@@ -192,6 +232,10 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       subscribe(code, uid, setState);
       // Drop our player entry if we disconnect.
       onDisconnect(ref(db(), `games/${code}/players/${uid}/connected`)).set(false);
+      // Publish to the game browser so others can find + join without a code.
+      const lobbyRef = ref(db(), `lobbies/${code}`);
+      await set(lobbyRef, { code, host: name || "Host", players: 1, max: maxPlayers, gens: rules?.generations ?? [1], createdAt: serverTimestamp() }).catch(onWriteErr);
+      onDisconnect(lobbyRef).remove();
       setState({ code, myUid: uid, status: "connected" });
       setCurrentGame(uid, code);
       rememberRoom(code);
@@ -316,6 +360,8 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       const otherHumans = Object.values(room?.players ?? {}).filter((p) => p.connected && !p.isBot && p.uid !== myUid);
       if (otherHumans.length === 0) remove(roomRef(code)).catch(onWriteErr);
       else remove(ref(db(), `games/${code}/players/${myUid}`)).catch(onWriteErr);
+      // I'm the host (or the room is gone) → drop the browser listing.
+      if (room?.meta?.hostUid === myUid || otherHumans.length === 0) remove(ref(db(), `lobbies/${code}`)).catch(() => {});
     }
     forgetRoom();
     setState({ code: null, myUid: null, room: null, status: "idle", error: null });
