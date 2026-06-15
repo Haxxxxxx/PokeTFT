@@ -5,7 +5,7 @@ import { DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSen
 import { useGame } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
-import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, PLAN_MS, COMBAT_MS } from "@/game/net/match";
+import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, markCarouselPicked, finishCarouselEarlyIfReady, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate } from "@/game/engine/combat";
 import { getDef, spriteUrl, unitsForGenerations } from "@/game/data/mons";
 import { streakGold, roundKind, advanceRound, boardSizeForLevel } from "@/game/config";
@@ -187,6 +187,8 @@ export function NetGameClient() {
           await maybeClaimHost(r.code, r, myUid);
           if (r.meta?.hostUid !== myUid) return;
           await heartbeat(r.code);
+          // End the carousel the moment everyone has picked (don't wait the timer).
+          if (r.meta.phase === "carousel") await finishCarouselEarlyIfReady(r.code, r);
           if (serverNow() >= r.meta.deadline && actedDeadline.current !== r.meta.deadline) {
             actedDeadline.current = r.meta.deadline;
             if (r.meta.phase === "planning") await resolveRoundStart(r.code, r);
@@ -684,12 +686,12 @@ export function NetGameClient() {
             {!picked && (
               <div className="flex gap-3 flex-wrap justify-center max-w-[760px]">
                 {opts.map((pick, i) => pick === MEGA_STONE ? (
-                  <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); flushSync(); }} style={{ borderColor: "#f0abfc", boxShadow: "0 0 18px -2px #f0abfc88" }} className="w-[130px] rounded-xl border-2 bg-gradient-to-b from-fuchsia-900/40 to-slate-900/80 hover:-translate-y-1 transition-all p-3 flex flex-col items-center justify-center">
+                  <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); }} style={{ borderColor: "#f0abfc", boxShadow: "0 0 18px -2px #f0abfc88" }} className="w-[130px] rounded-xl border-2 bg-gradient-to-b from-fuchsia-900/40 to-slate-900/80 hover:-translate-y-1 transition-all p-3 flex flex-col items-center justify-center">
                     <span className="text-fuchsia-300"><MegaIcon size={48} /></span>
                     <span className="text-sm font-semibold mt-1 text-fuchsia-200">Mega Stone</span>
                   </button>
                 ) : ITEM_DEF_BY_ID[pick] ? (
-                  <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); flushSync(); }} style={{ borderColor: "#fbbf24", boxShadow: "0 0 16px -2px #fbbf2466" }} className="w-[130px] rounded-xl border-2 bg-gradient-to-b from-amber-900/30 to-slate-900/80 hover:-translate-y-1 transition-all p-3 flex flex-col items-center justify-center text-center">
+                  <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); }} style={{ borderColor: "#fbbf24", boxShadow: "0 0 16px -2px #fbbf2466" }} className="w-[130px] rounded-xl border-2 bg-gradient-to-b from-amber-900/30 to-slate-900/80 hover:-translate-y-1 transition-all p-3 flex flex-col items-center justify-center text-center">
                     <span className="text-3xl">{ITEM_DEF_BY_ID[pick].icon}</span>
                     <span className="text-sm font-semibold mt-1 text-amber-200">{ITEM_DEF_BY_ID[pick].name}</span>
                     <span className="text-[9px] text-slate-400 leading-tight mt-1">{ITEM_DEF_BY_ID[pick].effect}</span>
@@ -698,7 +700,7 @@ export function NetGameClient() {
                   const def = getDef(pick);
                   const color = COST_COLOR[def.cost];
                   return (
-                    <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); flushSync(); }} style={{ borderColor: color, boxShadow: `0 0 16px -2px ${color}66` }} className="w-[130px] rounded-xl border-2 bg-slate-900/80 hover:bg-slate-800 hover:-translate-y-1 transition-all p-3 flex flex-col items-center">
+                    <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); }} style={{ borderColor: color, boxShadow: `0 0 16px -2px ${color}66` }} className="w-[130px] rounded-xl border-2 bg-slate-900/80 hover:bg-slate-800 hover:-translate-y-1 transition-all p-3 flex flex-col items-center">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={spriteUrl(def.dex[0])} alt={def.name} width={56} height={56} style={{ imageRendering: "pixelated" }} draggable={false} />
                       <span className="text-sm font-semibold mt-1">{def.name}</span>

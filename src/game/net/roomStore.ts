@@ -32,6 +32,9 @@ export type RoomPlayer = {
   streak: number;
   /** Previous round's opponent uid (for rematch avoidance). */
   lastOpp?: string;
+  /** "stage-round" key of the carousel this player already picked from — lets the
+   *  host end the carousel early once everyone has chosen. */
+  carouselPicked?: string;
   /** The player's current on-board units (synced during planning). */
   board?: UnitInstance[];
   /** Full economy snapshot for reconnect (synced during planning). */

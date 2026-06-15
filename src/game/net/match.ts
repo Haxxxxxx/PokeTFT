@@ -81,6 +81,7 @@ export async function beginMatch(code: string, room: Room): Promise<void> {
     u[`players/${p.uid}/streak`] = 0;
     u[`players/${p.uid}/board`] = null;
     u[`players/${p.uid}/save`] = null;
+    u[`players/${p.uid}/carouselPicked`] = null;
   }
   await update(gamePath(code), u);
 }
@@ -244,6 +245,24 @@ export async function startCarousel(code: string, room: Room): Promise<void> {
   });
 }
 
+/** Client: mark that I've taken my carousel pick this round (so the host can end
+ *  the carousel as soon as everyone has chosen). */
+export async function markCarouselPicked(code: string, uid: string, key: string): Promise<void> {
+  await update(ref(db(), `games/${code}/players/${uid}`), { carouselPicked: key });
+}
+
+/** Host: if every alive human has already picked this carousel, end it early
+ *  instead of waiting out the timer. Implemented by parking the deadline to now
+ *  so the normal endCarousel path fires on the next host tick. */
+export async function finishCarouselEarlyIfReady(code: string, room: Room): Promise<void> {
+  if (room.meta?.phase !== "carousel") return;
+  if (serverNow() >= room.meta.deadline) return; // already ending
+  const key = `${room.meta.stage}-${room.meta.round}`;
+  const humans = alivePlayers(room).filter((p) => !p.isBot && p.connected);
+  if (humans.length === 0 || !humans.every((p) => p.carouselPicked === key)) return;
+  await update(ref(db(), `games/${code}/meta`), { deadline: serverNow(), updatedAt: serverNow() });
+}
+
 /** Host: carousel → next planning round. */
 export async function endCarousel(code: string, room: Room): Promise<void> {
   if (!(await claimTransition(code, "carousel", room.meta.deadline))) return;
@@ -332,6 +351,7 @@ export async function returnToLobby(code: string, room: Room): Promise<void> {
     u[`players/${p.uid}/board`] = null;
     u[`players/${p.uid}/save`] = null;
     u[`players/${p.uid}/lastOpp`] = null;
+    u[`players/${p.uid}/carouselPicked`] = null;
   }
   await update(gamePath(code), u);
 }
