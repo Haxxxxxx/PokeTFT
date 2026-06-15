@@ -155,26 +155,26 @@ export function CombatStage({
     <div className={inline
       ? "w-full flex flex-col items-center rounded-2xl border border-slate-700/50 bg-slate-950/60 p-3"
       : "fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4"}>
-      {/* Scoreboard header: both teams + survivor counts */}
-      <div className="flex items-stretch gap-3 mb-2 w-full max-w-[600px]">
-        <div className="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50">
-          <span className="text-2xl font-extrabold tabular-nums text-emerald-300">{aliveAlly}</span>
-          <span className="text-[11px] font-bold uppercase tracking-wide text-emerald-400/80 leading-tight">{t.cs_your_team}</span>
+      {/* Scoreboard header: both teams + survivor counts (compact) */}
+      <div className="flex items-stretch gap-2 mb-1.5 w-full max-w-[460px]">
+        <div className="flex-1 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-950/40 border border-emerald-800/50">
+          <span className="text-lg font-extrabold tabular-nums text-emerald-300">{aliveAlly}</span>
+          <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-400/80 leading-tight truncate">{t.cs_your_team}</span>
         </div>
-        <div className="flex flex-col items-center justify-center px-1">
-          <span className={`text-xs font-extrabold ${a.overtime ? "text-rose-400 animate-pulse" : "text-slate-500"}`}>
+        <div className="flex items-center justify-center px-0.5">
+          <span className={`text-[11px] font-extrabold ${a.overtime ? "text-rose-400 animate-pulse" : "text-slate-500"}`}>
             {a.overtime ? t.cs_overtime : t.cs_vs}
           </span>
         </div>
-        <div className={`flex-1 flex items-center justify-end gap-2 px-3 py-1.5 rounded-lg border ${pve ? "bg-emerald-950/40 border-emerald-800/50" : "bg-rose-950/40 border-rose-800/50"}`}>
-          {pve && <span className="text-sm">🌿</span>}
-          <span className={`text-[11px] font-bold uppercase tracking-wide leading-tight text-right truncate ${pve ? "text-emerald-400/80" : "text-rose-400/80"}`}>{opponentName}</span>
-          <span className={`text-2xl font-extrabold tabular-nums ${pve ? "text-emerald-300" : "text-rose-300"}`}>{aliveEnemy}</span>
+        <div className={`flex-1 flex items-center justify-end gap-1.5 px-2.5 py-1 rounded-md border ${pve ? "bg-emerald-950/40 border-emerald-800/50" : "bg-rose-950/40 border-rose-800/50"}`}>
+          {pve && <span className="text-xs">🌿</span>}
+          <span className={`text-[10px] font-bold uppercase tracking-wide leading-tight text-right truncate ${pve ? "text-emerald-400/80" : "text-rose-400/80"}`}>{opponentName}</span>
+          <span className={`text-lg font-extrabold tabular-nums ${pve ? "text-emerald-300" : "text-rose-300"}`}>{aliveEnemy}</span>
         </div>
       </div>
 
       {/* Combat timer */}
-      <div className="w-full max-w-[600px] h-1.5 rounded-full bg-slate-800 overflow-hidden mb-3">
+      <div className="w-full max-w-[460px] h-1 rounded-full bg-slate-800 overflow-hidden mb-2">
         <div className={`h-full ${a.overtime ? "bg-rose-500" : "bg-slate-400/70"}`} style={{ width: `${(a.t / totalTime) * 100}%` }} />
       </div>
 

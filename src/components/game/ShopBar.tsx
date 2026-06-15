@@ -96,7 +96,7 @@ export function ShopBar() {
       <div className="flex gap-2 flex-1">
         {shop.map((defId, i) => {
           if (!defId) {
-            return <div key={i} className="flex-1 h-[104px] rounded-lg border border-slate-800 bg-slate-900/40" />;
+            return <div key={i} className="flex-1 h-[120px] rounded-lg border border-slate-800 bg-slate-900/40" />;
           }
           const def = getDef(defId);
           const color = COST_COLOR[def.cost];
@@ -124,8 +124,8 @@ export function ShopBar() {
                 borderColor: color,
                 boxShadow: own ? `0 0 0 1px ${color}, 0 0 14px ${color}66` : undefined,
               }}
-              className={`group relative flex-1 h-[104px] rounded-lg border bg-slate-900/80 hover:bg-slate-800 disabled:opacity-50
-                flex flex-col items-center pt-5 pb-1.5 px-1 transition-colors ${oneFromStar ? "ring-2 ring-amber-300/80" : ""}`}
+              className={`group relative flex-1 h-[120px] rounded-lg border bg-slate-900/80 hover:bg-slate-800 disabled:opacity-50
+                flex items-center gap-1.5 pt-4 pb-1.5 pl-1.5 pr-1 transition-colors ${oneFromStar ? "ring-2 ring-amber-300/80" : ""}`}
             >
               {/* top-left info */}
               <span
@@ -135,36 +135,36 @@ export function ShopBar() {
                 onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setInspect(def.id, 1); } }}
                 aria-label={t.sh_view_details}
                 title={t.sh_view_details}
-                className="absolute top-1 left-1 text-slate-500 hover:text-sky-300 opacity-60 group-hover:opacity-100 transition-opacity cursor-help"
+                className="absolute top-1 left-1 z-10 text-slate-500 hover:text-sky-300 opacity-60 group-hover:opacity-100 transition-opacity cursor-help"
               >
-                <InfoIcon size={13} />
+                <InfoIcon size={12} />
               </span>
 
-              {/* top-right cost */}
-              <span style={{ color }} className="absolute top-1 right-1.5 inline-flex items-center gap-0.5 text-[11px] font-bold">
-                <CoinIcon size={11} />{def.cost}
-              </span>
-
-              {/* owned mark */}
-              {own && (
-                <span className="absolute top-1 left-1/2 -translate-x-1/2 inline-flex items-center gap-0.5 rounded-full bg-emerald-500/90 px-1.5 text-[9px] font-bold text-black leading-tight">
-                  {own.topStar > 1 && <StarIcon size={8} />}
-                  {nextThreshold !== null ? `${copies}/${nextThreshold}` : t.sh_max}
-                </span>
-              )}
-
+              {/* Sprite on the LEFT, big and clear. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={spriteUrl(def.dex[Math.max(0, (own?.topStar ?? 1) - 1)])} alt={def.name} width={38} height={38} style={{ imageRendering: "pixelated" }} draggable={false} />
-              <span className="text-[11px] font-medium truncate w-full text-center leading-tight">{def.name}</span>
+              <img src={spriteUrl(def.dex[Math.max(0, (own?.topStar ?? 1) - 1)])} alt={def.name} width={58} height={58} className="shrink-0" style={{ imageRendering: "pixelated" }} draggable={false} />
 
-              {/* traits — active ones glow */}
-              <div className="flex flex-wrap gap-0.5 justify-center mt-1">
-                {def.types.map((t) => (
-                  <TraitChip key={t} label={TRAITS_BY_KEY[t]?.label ?? t} color={TYPE_COLOR[t as PokeType]} active={activeTraits.has(t)} />
-                ))}
-                {def.roles.map((r) => (
-                  <TraitChip key={r} label={TRAITS_BY_KEY[r]?.label ?? r} color="#64748b" active={activeTraits.has(r)} />
-                ))}
+              {/* Name + cost grouped at the TOP-RIGHT, then the traits stacked one
+                  above the other beneath them (also right-aligned). */}
+              <div className="flex-1 min-w-0 self-stretch flex flex-col items-end justify-center gap-1.5 pr-0.5">
+                <div className="flex items-center justify-end gap-1 w-full">
+                  <span className="text-[11px] font-bold truncate text-right leading-tight">{def.name}</span>
+                  <span style={{ color }} className="inline-flex items-center gap-0.5 text-[10px] font-bold shrink-0"><CoinIcon size={10} />{def.cost}</span>
+                </div>
+                {own && (
+                  <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/90 px-1.5 text-[8px] font-bold text-black leading-tight">
+                    {own.topStar > 1 && <StarIcon size={7} />}
+                    {nextThreshold !== null ? `${copies}/${nextThreshold}` : t.sh_max}
+                  </span>
+                )}
+                <div className="flex flex-col items-end gap-1 w-full">
+                  {def.types.map((tt) => (
+                    <TraitChip key={tt} label={TRAITS_BY_KEY[tt]?.label ?? tt} color={TYPE_COLOR[tt as PokeType]} active={activeTraits.has(tt)} />
+                  ))}
+                  {def.roles.map((r) => (
+                    <TraitChip key={r} label={TRAITS_BY_KEY[r]?.label ?? r} color="#64748b" active={activeTraits.has(r)} />
+                  ))}
+                </div>
               </div>
             </button>
           );
@@ -178,8 +178,8 @@ function TraitChip({ label, color, active }: { label: string; color: string; act
   return (
     <span
       title={active ? `${label} (active)` : label}
-      style={active ? { background: color, color: "#0b1020" } : { borderColor: `${color}99`, color: "#cbd5e1" }}
-      className={`text-[8px] leading-tight px-1 rounded font-bold ${active ? "ring-1 ring-white/70" : "border bg-slate-900/40"}`}
+      style={active ? { background: color, color: "#0b1020" } : { borderColor: `${color}99`, color: "#e2e8f0" }}
+      className={`text-[9px] leading-none px-1.5 py-[2px] rounded font-bold whitespace-nowrap ${active ? "ring-1 ring-white/70" : "border bg-slate-900/40"}`}
     >
       {label}
     </span>

@@ -21,6 +21,14 @@ function gamePath(code: string) {
   return ref(db(), `games/${code}`);
 }
 
+/** FNV-1a string hash → 32-bit uint. Used to fold stable identifiers (game code,
+ *  uid) into deterministic-but-varied seeds. */
+function hashStr(s: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
 /** A bot's board for a round, scaled by stage progress and difficulty. */
 function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string): UnitInstance[] {
   const cr = cumulativeRound(stage, round);
@@ -217,11 +225,16 @@ export async function startCarousel(code: string, room: Room): Promise<void> {
   // Item rewards: a Mega Stone plus any held items the lobby enabled.
   const itemPool = [MEGA_STONE, ...(room.rules?.itemsEnabled ?? [])];
   const carousel: Record<string, string[]> = {};
+  // Per-GAME entropy: the room code is unique to each match, so folding it in
+  // makes carousels differ from game to game (they used to seed only on
+  // stage/round/uid.length, which is identical across every game). The host
+  // writes this once, so it just needs to vary — not be client-reproducible.
+  const gameSeed = hashStr(code);
   for (const p of alivePlayers(room)) {
     if (p.isBot) continue;
-    const salt = room.meta.stage * 31 + room.meta.round * 7 + p.uid.length;
+    const salt = (gameSeed ^ hashStr(p.uid) ^ Math.imul(room.meta.stage * 31 + room.meta.round * 7 + 1, 2654435761)) >>> 0;
     // Rotate which item is offered per player/round so it varies but stays sync-free (host-written).
-    const item = itemPool[(salt + room.meta.round) % itemPool.length];
+    const item = itemPool[(salt >>> 3) % itemPool.length];
     carousel[p.uid] = [item, ...pickCarouselOptions(room.meta.stage, salt, 4)];
   }
   await update(gamePath(code), {

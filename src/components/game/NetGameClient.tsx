@@ -34,7 +34,7 @@ const ITEM_DEF_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 // constant-scale fit. Both phases share these dimensions; the shorter one just
 // leaves unused space at the bottom (invisible), so nothing jumps.
 const DESIGN_W = 1500;
-const DESIGN_H = 1140;
+const DESIGN_H = 1160;
 
 function asUnits(u: unknown): UnitInstance[] {
   if (!u) return [];
@@ -622,7 +622,9 @@ export function NetGameClient() {
           <div
             className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4"
             style={revealBoard
-              ? { background: "transparent", pointerEvents: "none" }
+              // Transparent but still CAPTURING clicks — you can see your board
+              // through the veil but can't edit it (picks aren't placement turns).
+              ? { background: "transparent" }
               : { background: "radial-gradient(58% 58% at 50% 38%, rgba(146,64,14,0.32), rgba(2,6,23,0.93))", backdropFilter: "blur(7px)" }}
           >
             {/* Always-clickable toggle: hide the choices to peek at your live
@@ -683,7 +685,8 @@ export function NetGameClient() {
         <div
           className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4"
           style={revealBoard
-            ? { background: "transparent", pointerEvents: "none" }
+            // Transparent but still capturing clicks — view-only board peek.
+            ? { background: "transparent" }
             : { background: "radial-gradient(58% 58% at 50% 38%, rgba(76,29,149,0.4), rgba(2,6,23,0.93))", backdropFilter: "blur(7px)" }}
         >
           <button
