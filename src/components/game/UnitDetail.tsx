@@ -5,7 +5,7 @@ import { useUi } from "@/game/store/uiStore";
 import { useGame } from "@/game/store/gameStore";
 import { getDef, spriteUrl } from "@/game/data/mons";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
-import { ITEM_POOL } from "@/game/data/itemPool";
+import { ITEM_POOL, RARITY_COLOR } from "@/game/data/itemPool";
 import { megaFormFor, MEGA_STONE } from "@/game/data/mega";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import type { PokeType } from "@/game/types";
@@ -46,7 +46,7 @@ function ItemCard({ id }: { id: string }) {
   const def = ITEM_DEF[id];
   const name = isMega ? "Mega Stone" : def?.name ?? id;
   const effect = isMega ? "Holds on a Mega-capable mon → it Mega Evolves at combat start." : def?.effect ?? "";
-  const color = isMega ? "#f0abfc" : "#a78bfa";
+  const color = isMega ? "#c084fc" : def ? RARITY_COLOR[def.rarity] : "#a78bfa";
   return (
     <div style={{ borderColor: `${color}aa`, boxShadow: `0 10px 40px -12px ${color}44` }} className="rounded-2xl border bg-[#0d1426] text-slate-100 overflow-hidden">
       <div className="flex items-start gap-3 p-3 border-b border-white/5" style={{ background: `linear-gradient(105deg, ${color}1f, transparent 70%)` }}>

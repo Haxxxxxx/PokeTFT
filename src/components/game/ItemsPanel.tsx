@@ -5,7 +5,7 @@ import { useDraggable } from "@dnd-kit/core";
 import { useGame } from "@/game/store/gameStore";
 import { useUi } from "@/game/store/uiStore";
 import { MEGA_STONE } from "@/game/data/mega";
-import { ITEM_POOL } from "@/game/data/itemPool";
+import { ITEM_POOL, RARITY_COLOR } from "@/game/data/itemPool";
 import { MegaIcon } from "./icons";
 import { useT } from "@/lib/i18n";
 
@@ -17,13 +17,14 @@ function ItemButton({ id, n, selected, onClick }: { id: string; n: number; selec
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `equip-${id}`, data: { itemId: id } });
   const isMega = id === MEGA_STONE;
   const def = ITEM_BY_ID[id];
+  const rarityColor = isMega ? "#c084fc" : def ? RARITY_COLOR[def.rarity] : "#475569";
   return (
     <button
       ref={setNodeRef}
       {...listeners}
       {...attributes}
       onClick={onClick}
-      style={{ borderColor: selected ? "#f0abfc" : isMega ? "#5b21b6" : "#475569", opacity: isDragging ? 0.4 : 1 }}
+      style={{ borderColor: selected ? "#f0abfc" : rarityColor, opacity: isDragging ? 0.4 : 1 }}
       className={`relative flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-left transition-all min-w-0 cursor-grab active:cursor-grabbing touch-none
         ${selected ? "bg-fuchsia-500/15 ring-1 ring-fuchsia-400/70" : "bg-slate-900 hover:bg-slate-800"}`}
       title={isMega ? "Mega Stone" : def?.name ?? id}

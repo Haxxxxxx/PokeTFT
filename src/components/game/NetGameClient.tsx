@@ -11,8 +11,8 @@ import { getDef, spriteUrl, unitsForGenerations } from "@/game/data/mons";
 import { streakGold, roundKind, advanceRound, boardSizeForLevel } from "@/game/config";
 import { interest } from "@/game/engine/economy";
 import { MEGA_STONE, canMega } from "@/game/data/mega";
-import { ITEM_POOL } from "@/game/data/itemPool";
-import { AUGMENTS, augmentSlot } from "@/game/data/augments";
+import { ITEM_POOL, RARITY_COLOR } from "@/game/data/itemPool";
+import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
 import { useUi } from "@/game/store/uiStore";
 import { makeRng } from "@/game/engine/rng";
@@ -754,7 +754,7 @@ export function NetGameClient() {
                   const onPick = () => { netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); };
                   if (pick === MEGA_STONE) return <CarouselCard key={i} onClick={onPick} color="#f0abfc" name="Mega Stone" sub={lang === "fr" ? "Méga-Évolution" : "Mega Evolve"} art={<span className="text-fuchsia-300"><MegaIcon size={56} /></span>} />;
                   const item = ITEM_DEF_BY_ID[pick];
-                  if (item) return <CarouselCard key={i} onClick={onPick} color="#fbbf24" name={item.name} sub={item.effect} art={<span className="text-5xl">{item.icon}</span>} />;
+                  if (item) return <CarouselCard key={i} onClick={onPick} color={RARITY_COLOR[item.rarity] ?? "#fbbf24"} name={item.name} sub={item.effect} art={<span className="text-5xl">{item.icon}</span>} />;
                   const def = getDef(pick);
                   return (
                     <CarouselCard
@@ -808,6 +808,8 @@ export function NetGameClient() {
                 icon={a.icon}
                 name={lang === "fr" ? a.nameFr : a.name}
                 desc={lang === "fr" ? a.descFr : a.desc}
+                tier={a.tier}
+                frame={AUGMENT_TIER_COLOR[a.tier]}
               />
             ))}
             </div>
@@ -989,14 +991,15 @@ function CarouselCard({ onClick, color, name, sub, cost, types, art }: { onClick
 
 /** Augment choice in the ornate frame: icon in a gilded tile, name, then the
  *  effect on the dark panel — matching the TFT "Select an Augment" look. */
-function OrnateAugmentCard({ onClick, icon, name, desc }: { onClick: () => void; icon: string; name: string; desc: string }) {
+function OrnateAugmentCard({ onClick, icon, name, desc, tier, frame }: { onClick: () => void; icon: string; name: string; desc: string; tier: string; frame: string }) {
   return (
-    <OrnateFrame onClick={onClick} frame="#a78bfa" height={264}>
+    <OrnateFrame onClick={onClick} frame={frame} height={272}>
       <div className="flex flex-col items-center pt-5 px-3">
-        <div className="w-16 h-16 rounded-lg bg-sky-300/15 border border-sky-200/40 flex items-center justify-center text-4xl shadow-[inset_0_0_14px_rgba(125,211,252,0.3)]">{icon}</div>
-        <span className="mt-3 text-[15px] font-extrabold text-amber-100 text-center leading-tight drop-shadow">{name}</span>
+        <div className="w-16 h-16 rounded-lg flex items-center justify-center text-4xl" style={{ background: `${frame}1f`, border: `1px solid ${frame}66`, boxShadow: `inset 0 0 14px ${frame}40` }}>{icon}</div>
+        <span className="mt-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em]" style={{ color: frame }}>{tier}</span>
+        <span className="mt-1 text-[15px] font-extrabold text-amber-50 text-center leading-tight drop-shadow">{name}</span>
       </div>
-      <div className="mt-auto bg-slate-950/80 border-t border-amber-600/40 px-3 py-3 text-center">
+      <div className="mt-auto bg-slate-950/80 border-t border-amber-600/30 px-3 py-3 text-center">
         <span className="text-[11px] text-slate-300 leading-snug">{desc}</span>
       </div>
     </OrnateFrame>

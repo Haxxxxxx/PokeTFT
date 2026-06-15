@@ -368,8 +368,8 @@ export const useGame = create<State>((set, get) => ({
   netRound: (stage, round, streak) => {
     const state = get();
     // Passive augments: extra gold / XP each round.
-    const augGold = state.augments.includes("rich") ? 1 : 0;
-    const augXp = state.augments.includes("scholar") ? 2 : 0;
+    const augGold = (state.augments.includes("rich") ? 1 : 0) + (state.augments.includes("compound-interest") ? 2 : 0);
+    const augXp = (state.augments.includes("scholar") ? 2 : 0) + (state.augments.includes("fast-learner") ? 3 : 0);
     const income = ECONOMY.baseIncome + interest(state.gold) + streakGold(streak) + augGold;
     const newXp = state.xp + ECONOMY.passiveXpPerRound + augXp;
     const shop = state.frozen ? state.shop : rollShop(levelFromXp(newXp), state.pool, rng, state.unitsByCost);
@@ -409,14 +409,21 @@ export const useGame = create<State>((set, get) => ({
     // Instant effects fire on pick; passive ones are applied each round in netRound.
     switch (id) {
       case "pumped-up": gold += 8; break;
+      case "windfall": gold += 12; break;
       case "training": xp += 4; break;
+      case "big-brain": xp += 8; break;
       case "mega-gift": items = [...items, MEGA_STONE]; break;
       case "treasure":
         for (let i = 0; i < 2; i++) items = [...items, ITEM_POOL[randInt(rng, ITEM_POOL.length)].id];
         break;
-      case "recruiter": {
+      case "component-cache":
+        for (let i = 0; i < 3; i++) items = [...items, ITEM_POOL[randInt(rng, ITEM_POOL.length)].id];
+        break;
+      case "recruiter":
+      case "draft-day": {
+        const n = id === "draft-day" ? 3 : 2;
         const cheap = [...(state.unitsByCost[1] ?? []), ...(state.unitsByCost[2] ?? [])];
-        for (let i = 0; i < 2 && benchFree() > 0 && cheap.length; i++) {
+        for (let i = 0; i < n && benchFree() > 0 && cheap.length; i++) {
           units = applyCombines([...units, makeInstance(cheap[randInt(rng, cheap.length)])]);
         }
         break;

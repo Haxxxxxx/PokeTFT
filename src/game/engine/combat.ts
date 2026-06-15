@@ -153,8 +153,13 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
   let mr = mega ? s.magicResist + mega.mrBonus : s.magicResist;
   if (has("choice-band")) ad = Math.round(ad * 1.5);
   if (has("choice-specs")) apMult *= 1.5;
+  if (has("muscle-band")) ad = Math.round(ad * 1.25);
+  if (has("wise-glasses")) apMult *= 1.2;
+  if (has("light-ball")) { ad = Math.round(ad * 1.3); apMult *= 1.3; }
   if (has("assault-vest")) mr = Math.round(mr * 1.5);
   if (has("eviolite") && notFinalEvo) { armor = Math.round(armor * 1.5); mr = Math.round(mr * 1.5); }
+  let attackSpeed = s.attackSpeed;
+  if (has("choice-scarf")) attackSpeed *= 1.35;
 
   return {
     id: `${team}-${u.iid}`,
@@ -168,7 +173,7 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
     hp,
     maxHp: hp,
     ad,
-    attackSpeed: s.attackSpeed,
+    attackSpeed,
     armor,
     mr,
     range: s.range,
@@ -187,12 +192,12 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
     thornsPct: has("rocky-helmet") ? 0.16 : 0,
     sashReady: has("focus-sash"),
     // Base 20% crit for 1.5x — items/traits add on top. Choice items steady DPS.
-    critChance: 0.2 + (has("life-orb") ? 0.1 : 0),
+    critChance: 0.2 + (has("life-orb") ? 0.1 : 0) + (has("light-ball") ? 0.15 : 0),
     critMult: 1.5,
-    lifeStealPct: 0,
-    armorPenPct: 0,
+    lifeStealPct: has("shell-bell") ? 0.2 : 0,
+    armorPenPct: has("expert-belt") ? 0.4 : 0,
     inflictBurnDps: 0,
-    inflictStun: 0,
+    inflictStun: has("kings-rock") ? 0.3 : 0,
     inflictFreeze: 0,
     statusImmune: has("assault-vest"),
     burnTicks: 0,
