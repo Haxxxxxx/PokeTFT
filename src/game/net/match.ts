@@ -4,6 +4,7 @@ import { serverNow } from "./serverTime";
 import { simulate } from "../engine/combat";
 import { makeRng } from "../engine/rng";
 import { generatePlayerLikeBoard, generateCreepBoard, pickCarouselOptions } from "../engine/enemy";
+import { unitsForGenerations } from "../data/mons";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
 import type { UnitInstance } from "../types";
@@ -29,13 +30,19 @@ function hashStr(s: string): number {
   return h >>> 0;
 }
 
+/** The roster (unit ids) the room's selected generations allow — so AI/creeps/
+ *  carousel only ever use the same mons the players can roll. */
+function rosterFor(room: Room): string[] {
+  return unitsForGenerations(room.rules?.generations ?? [1]);
+}
+
 /** A bot's board for a round, scaled by stage progress and difficulty. */
-function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string): UnitInstance[] {
+function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string, allowed: string[]): UnitInstance[] {
   const cr = cumulativeRound(stage, round);
   let seed = 0;
   for (let i = 0; i < salt.length; i++) seed = (seed * 31 + salt.charCodeAt(i)) >>> 0;
   // Economy-realistic: a board a real player could actually build at this round.
-  return generatePlayerLikeBoard(stage, round, difficulty, seed + cr);
+  return generatePlayerLikeBoard(stage, round, difficulty, seed + cr, allowed);
 }
 
 /** Deterministic shuffle for pairings. */
@@ -178,10 +185,11 @@ export async function startCombat(code: string, room: Room): Promise<void> {
   const stage = room.meta.stage;
   const kind = roundKind(stage, room.meta.round);
   const alive = alivePlayers(room);
+  const allowed = rosterFor(room);
 
   // Bots get a fresh host-generated board each round (humans synced their own).
   for (const p of alive) {
-    if (p.isBot) room.players[p.uid] = { ...p, board: botBoard(stage, room.meta.round, p.botDifficulty, p.uid) };
+    if (p.isBot) room.players[p.uid] = { ...p, board: botBoard(stage, room.meta.round, p.botDifficulty, p.uid, allowed) };
   }
 
   const combat: Record<string, CombatAssign> = {};
@@ -190,7 +198,7 @@ export async function startCombat(code: string, room: Room): Promise<void> {
     // Everyone fights wild creeps — no HP loss, a breather to build.
     for (const p of alive) {
       const self = board(room.players[p.uid]);
-      const creeps = generateCreepBoard(stage, room.meta.round, stage * 97 + room.meta.round * 13 + p.uid.length);
+      const creeps = generateCreepBoard(stage, room.meta.round, stage * 97 + room.meta.round * 13 + p.uid.length, allowed);
       const r = simulate(self, creeps);
       combat[p.uid] = { oppUid: p.uid, oppName: "Wild Pokémon", ghost: true, pve: true, won: r.winner === "ally", survivors: 0, dmg: 0, selfBoard: self, oppBoard: creeps };
     }
@@ -236,7 +244,7 @@ export async function startCarousel(code: string, room: Room): Promise<void> {
     const salt = (gameSeed ^ hashStr(p.uid) ^ Math.imul(room.meta.stage * 31 + room.meta.round * 7 + 1, 2654435761)) >>> 0;
     // Rotate which item is offered per player/round so it varies but stays sync-free (host-written).
     const item = itemPool[(salt >>> 3) % itemPool.length];
-    carousel[p.uid] = [item, ...pickCarouselOptions(room.meta.stage, salt, 4)];
+    carousel[p.uid] = [item, ...pickCarouselOptions(room.meta.stage, salt, 4, rosterFor(room))];
   }
   await update(gamePath(code), {
     "meta/phase": "carousel", "meta/deadline": serverNow() + CAROUSEL_MS,
