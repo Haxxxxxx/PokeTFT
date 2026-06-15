@@ -150,7 +150,7 @@ export function ShopBar() {
               }}
               disabled={!affordable}
               style={{ boxShadow: own ? `inset 0 0 0 1.5px ${color}` : undefined }}
-              className={`group relative flex-1 self-stretch min-h-[120px] overflow-hidden rounded-lg border border-slate-700/60 bg-slate-900 hover:brightness-125 disabled:opacity-50
+              className={`group relative flex-1 self-stretch min-h-[148px] overflow-hidden rounded-lg border border-slate-700/60 bg-slate-900 hover:brightness-125 disabled:opacity-50
                 transition ${oneFromStar ? "ring-2 ring-amber-300/80 ring-inset" : ""}`}
             >
               {/* Sprite as the card "art" on the right (TFT-style). */}
@@ -158,9 +158,9 @@ export function ShopBar() {
               <img
                 src={spriteUrl(def.dex[Math.max(0, (own?.topStar ?? 1) - 1)])}
                 alt={def.name}
-                width={86}
-                height={86}
-                className="absolute right-0 bottom-1 pointer-events-none"
+                width={140}
+                height={140}
+                className="absolute right-0 bottom-0 pointer-events-none"
                 style={{ imageRendering: "pixelated" }}
                 draggable={false}
               />
@@ -214,9 +214,9 @@ function TraitChip({ label, color, active, icon }: { label: string; color: strin
     <span
       title={active ? `${label} (active)` : label}
       style={active ? { background: `${color}cc`, color: "#0b1020" } : { color: "#e2e8f0" }}
-      className={`inline-flex items-center gap-1 text-[9px] leading-none px-1.5 py-[2px] rounded font-bold whitespace-nowrap backdrop-blur-sm ${active ? "ring-1 ring-white/70" : "bg-slate-950/60"}`}
+      className={`inline-flex items-center gap-1 text-[13px] leading-none px-2 py-[3px] rounded font-bold whitespace-nowrap backdrop-blur-sm ${active ? "ring-1 ring-white/70" : "bg-slate-950/60"}`}
     >
-      {icon && <span className="text-[10px] leading-none">{icon}</span>}
+      {icon && <span className="text-[14px] leading-none">{icon}</span>}
       {label}
     </span>
   );
