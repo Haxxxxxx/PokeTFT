@@ -128,6 +128,20 @@ export function CombatStage({
   // the host applied, even if a board edge-case made the local replay diverge.
   const won = authWon ?? (result.winner === "ally");
 
+  // Tamper/desync detection: the client independently re-ran the SAME
+  // deterministic sim from the host's frozen boards, so a disagreement between
+  // the host's authoritative outcome and our local result means either a genuine
+  // desync or a host writing a result that isn't the canonical sim. We can't
+  // override host-applied HP without a trusted server, but we surface it.
+  const flaggedRef = useRef(false);
+  useEffect(() => {
+    if (!finished || flaggedRef.current || authWon === undefined) return;
+    flaggedRef.current = true;
+    if (authWon !== (result.winner === "ally")) {
+      console.warn("[combat-integrity] host outcome disagrees with local canonical sim", { authWon, localWinner: result.winner });
+    }
+  }, [finished, authWon, result.winner]);
+
   // Play sound when combat ends — exactly once, using the LATEST `won` at the
   // moment the fight finishes (a ref so a late-arriving authWon isn't read stale
   // and we never play both the local and the authoritative result).

@@ -34,7 +34,7 @@
         ".write": "auth != null && (!data.exists() || (!newData.exists() && data.child('meta/hostUid').val() === auth.uid))",
 
         "meta": {
-          ".write": "auth != null && (!data.parent().child('meta/hostUid').exists() || data.parent().child('meta/hostUid').val() === auth.uid || newData.child('hostUid').val() === auth.uid)",
+          ".write": "auth != null && (!data.parent().child('meta/hostUid').exists() || data.parent().child('meta/hostUid').val() === auth.uid || (newData.child('hostUid').val() === auth.uid && (!data.child('hostBeat').exists() || data.child('hostBeat').val() < now - 3000)))",
           "phase": { ".validate": "newData.val().matches(/^(lobby|planning|combat|carousel|over)$/)" },
           "stage": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 50" },
           "round": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 12" }
