@@ -264,6 +264,14 @@ export function NetGameClient() {
     return () => clearInterval(id);
   }, [phase, myUid]);
 
+  // Auto-fill the board: during planning, the leftmost bench unit is deployed into
+  // any empty board slot (centre-out) so the board stays topped up to the level
+  // cap without manual placement. Runs whenever the roster or level changes;
+  // fillBoard only mutates state when it actually places a unit, so it settles.
+  useEffect(() => {
+    if (phase === "planning") fillBoard();
+  }, [units, level, phase, fillBoard]);
+
   // Replay from the boards the host FROZE into the combat assignment, so the
   // result shown always matches the host's authoritative outcome.
   const combatResult = useMemo(() => {
@@ -999,21 +1007,39 @@ function Countdown({ deadline }: { deadline: number }) {
   return <>{Math.max(0, Math.ceil((deadline - serverNow()) / 1000))}</>;
 }
 
-/** Phase label + countdown + progress bar; ticks internally so the heavy game
- *  tree isn't re-rendered every frame for the timer. */
+/** A progress bar that DRAINS smoothly via a single CSS transition over the
+ *  remaining time, instead of stepping every tick — so it never jumps. Re-renders
+ *  only when the deadline changes (new round), the animation is pure CSS. */
+function SmoothBar({ deadline, totalMs, combat }: { deadline: number; totalMs: number; combat: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const remaining = Math.max(0, deadline - serverNow());
+    const startPct = Math.max(0, Math.min(100, (remaining / totalMs) * 100));
+    el.style.transition = "none";
+    el.style.width = `${startPct}%`;
+    void el.offsetWidth; // force reflow so the next change animates
+    el.style.transition = `width ${remaining}ms linear`;
+    el.style.width = "0%";
+  }, [deadline, totalMs]);
+  return (
+    <div className="h-2.5 rounded-full bg-slate-800 overflow-hidden">
+      <div ref={ref} className={`h-full ${combat ? "bg-rose-400" : "bg-sky-400"}`} />
+    </div>
+  );
+}
+
+/** Phase label + countdown + smooth progress bar; ticks the seconds text
+ *  internally (the bar is CSS-driven) so the heavy game tree isn't re-rendered. */
 function PhaseTimer({ phase, phaseLabel, deadline, totalMs }: { phase?: string; phaseLabel: string; deadline: number; totalMs: number }) {
-  useClockTick(true);
-  const secondsLeft = Math.max(0, Math.ceil((deadline - serverNow()) / 1000));
-  const pct = Math.max(0, Math.min(100, ((deadline - serverNow()) / totalMs) * 100));
   return (
     <div className="flex-1 min-w-[220px] flex flex-col gap-1 px-2">
       <div className="flex justify-between items-baseline">
         <span className={`text-xs font-extrabold uppercase tracking-wide ${phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{phaseLabel}</span>
-        <span className="text-sm font-bold tabular-nums text-slate-200">{secondsLeft}s</span>
+        <span className="text-sm font-bold tabular-nums text-slate-200"><Countdown deadline={deadline} />s</span>
       </div>
-      <div className="h-2.5 rounded-full bg-slate-800 overflow-hidden">
-        <div className={`h-full transition-all ${phase === "combat" ? "bg-rose-400" : "bg-sky-400"}`} style={{ width: `${pct}%` }} />
-      </div>
+      <SmoothBar deadline={deadline} totalMs={totalMs} combat={phase === "combat"} />
     </div>
   );
 }

@@ -294,33 +294,35 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
       u.atkCd = Math.max(0, u.atkCd - DT);
       u.moveCd = Math.max(0, u.moveCd - DT);
 
-      // Keep the current target until it dies (stickiness avoids jitter), then
-      // re-acquire: prefer the nearest foe, but break ties toward the foe with
-      // the fewest current attackers so a team spreads its aggro instead of
-      // dogpiling a single unit.
-      let target = u.targetId ? byId.get(u.targetId) : undefined;
-      if (!target || !target.alive) {
-        const foes = enemiesOf(u);
-        if (foes.length === 0) continue;
+      // Smarter target selection (deterministic — no RNG):
+      //  1. If any enemy is already in attack range, FOCUS the lowest-HP one to
+      //     secure kills (and stop walking past attackable foes).
+      //  2. Otherwise hold the current target if it's still alive (stickiness),
+      //     else acquire the nearest, tie-broken toward the lowest-HP foe.
+      // Focus-firing the weakest reachable enemy wins fights faster than spreading
+      // damage around, which is what real players do.
+      const foes = enemiesOf(u);
+      if (foes.length === 0) continue;
 
-        const load = new Map<string, number>();
-        for (const ally of units) {
-          if (ally.alive && ally.team === u.team && ally.targetId) {
-            load.set(ally.targetId, (load.get(ally.targetId) ?? 0) + 1);
-          }
+      const inRange = foes.filter((f) => hexDistance(u.pos, f.pos) <= u.range);
+      let target: Combatant;
+      if (inRange.length > 0) {
+        target = inRange.reduce((best, f) => (f.hp !== best.hp ? (f.hp < best.hp ? f : best) : (f.id < best.id ? f : best)));
+      } else {
+        const cur = u.targetId ? byId.get(u.targetId) : undefined;
+        if (cur && cur.alive) {
+          target = cur;
+        } else {
+          target = foes.reduce((best, f) => {
+            const d = hexDistance(u.pos, f.pos);
+            const bd = hexDistance(u.pos, best.pos);
+            if (d !== bd) return d < bd ? f : best;
+            if (f.hp !== best.hp) return f.hp < best.hp ? f : best;
+            return f.id < best.id ? f : best;
+          });
         }
-
-        target = foes.reduce((best, f) => {
-          const d = hexDistance(u.pos, f.pos);
-          const bd = hexDistance(u.pos, best.pos);
-          if (d !== bd) return d < bd ? f : best;
-          const lf = load.get(f.id) ?? 0;
-          const lb = load.get(best.id) ?? 0;
-          if (lf !== lb) return lf < lb ? f : best;
-          return f.id < best.id ? f : best;
-        });
-        u.targetId = target.id;
       }
+      u.targetId = target.id;
 
       const dist = hexDistance(u.pos, target.pos);
 
