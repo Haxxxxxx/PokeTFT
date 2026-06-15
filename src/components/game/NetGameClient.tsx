@@ -10,7 +10,7 @@ import { simulate } from "@/game/engine/combat";
 import { getDef, spriteUrl, unitsForGenerations } from "@/game/data/mons";
 import { streakGold, roundKind, advanceRound, boardSizeForLevel } from "@/game/config";
 import { interest } from "@/game/engine/economy";
-import { MEGA_STONE } from "@/game/data/mega";
+import { MEGA_STONE, canMega } from "@/game/data/mega";
 import { ITEM_POOL } from "@/game/data/itemPool";
 import { AUGMENTS, augmentSlot } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
@@ -108,6 +108,7 @@ export function NetGameClient() {
   const moveToBench = useGame((s) => s.moveToBench);
   const reorderBench = useGame((s) => s.reorderBench);
   const sell = useGame((s) => s.sell);
+  const equipItem = useGame((s) => s.equipItem);
   const units = useGame((s) => s.units);
   const gold = useGame((s) => s.gold);
   const level = useGame((s) => s.level);
@@ -377,10 +378,27 @@ export function NetGameClient() {
     // Bench management + selling stay available during combat (no effect on the
     // frozen, already-resolved fight). Board placement is locked while fighting.
     if (phase !== "planning" && phase !== "combat") return;
-    const iid = String(e.active.id);
     const over = e.over?.id;
     if (!over) return;
     const target = String(over);
+
+    // Item drag → equip onto the mon at the drop target (planning only).
+    const itemId = e.active.data.current?.itemId as string | undefined;
+    if (itemId) {
+      if (phase !== "planning") return;
+      const g = useGame.getState();
+      let unit: UnitInstance | undefined;
+      if (target.startsWith("cell-")) {
+        const [, c, r] = target.split("-");
+        unit = g.units.find((u) => u.pos?.[0] === Number(c) && u.pos?.[1] === Number(r));
+      } else if (target.startsWith("bench-")) {
+        unit = g.units.filter((u) => u.pos === null)[Number(target.slice("bench-".length))];
+      }
+      if (unit && !(itemId === MEGA_STONE && !canMega(unit.defId))) equipItem(unit.iid, itemId);
+      return;
+    }
+
+    const iid = String(e.active.id);
     if (target === "sell" || target === "sell-shop") sell(iid);
     else if (target.startsWith("bench-")) {
       // A specific bench slot: bench a board unit, or rearrange/swap within the bench.
