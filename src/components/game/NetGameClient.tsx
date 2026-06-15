@@ -684,7 +684,7 @@ export function NetGameClient() {
               <p className="text-xs text-slate-300/80">{picked ? (lang === "fr" ? "Choisi — en attente du tour…" : "Picked — waiting for the round…") : (lang === "fr" ? "Choisis une récompense gratuite." : "Pick one free reward.")}</p>
               <div className="text-[11px] tabular-nums font-bold text-amber-200/70 mt-0.5 mb-5">{secondsLeft}s</div>
             {!picked && (
-              <div className="flex gap-3 flex-wrap justify-center max-w-[760px]">
+              <div className="flex gap-3 justify-center items-start">
                 {opts.map((pick, i) => {
                   const onPick = () => { netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); };
                   if (pick === MEGA_STONE) return <CarouselCard key={i} onClick={onPick} color="#f0abfc" name="Mega Stone" sub={lang === "fr" ? "Méga-Évolution" : "Mega Evolve"} art={<span className="text-fuchsia-300"><MegaIcon size={56} /></span>} />;
@@ -737,22 +737,13 @@ export function NetGameClient() {
             <p className="text-xs text-slate-300/80 mb-5">{lang === "fr" ? "Choisis un bonus permanent." : "Pick one permanent boost."}</p>
             <div className="flex gap-3 flex-wrap justify-center max-w-[640px]">
             {augOptions.map((a) => (
-              <button
+              <OrnateAugmentCard
                 key={a.id}
                 onClick={() => { pickAugment(a.id); flushSync(); }}
-                style={{ borderColor: "#a78bfa", boxShadow: "0 0 22px -6px #a78bfa" }}
-                className="group relative w-[190px] h-[170px] rounded-xl overflow-hidden border-2 bg-slate-950/80 hover:-translate-y-1 transition-all flex flex-col items-center text-center"
-              >
-                {/* Rarity bar on top (TFT-style), big icon, then name + effect on a scrim. */}
-                <span className="absolute top-0 inset-x-0 h-1 bg-violet-400" />
-                <div className="flex-1 flex items-center justify-center pt-3">
-                  <span className="text-5xl drop-shadow-[0_0_12px_rgba(167,139,250,0.6)]">{a.icon}</span>
-                </div>
-                <div className="w-full px-3 pt-6 pb-3 flex flex-col items-center gap-1" style={{ background: "linear-gradient(to top, rgba(2,6,23,0.97), rgba(2,6,23,0.5) 70%, transparent)" }}>
-                  <span className="text-sm font-extrabold text-violet-200 leading-tight drop-shadow">{lang === "fr" ? a.nameFr : a.name}</span>
-                  <span className="text-[10px] text-slate-300/90 leading-snug">{lang === "fr" ? a.descFr : a.desc}</span>
-                </div>
-              </button>
+                icon={a.icon}
+                name={lang === "fr" ? a.nameFr : a.name}
+                desc={lang === "fr" ? a.descFr : a.desc}
+              />
             ))}
             </div>
           </div>
@@ -890,28 +881,60 @@ function Kbd({ k, label }: { k: string; label: string }) {
   );
 }
 
-/** TFT-style reward card for the carousel: rarity bar on top, big art, then name
- *  + cost/traits (units) or effect (items) over a scrim at the bottom. */
+/** Ornate gold-framed TFT card (used for carousel rewards + augments): a gilded
+ *  border with corner brackets, a blue gilded body, and a dark info panel. */
+function OrnateFrame({ onClick, frame = "#d4af37", height, children }: { onClick: () => void; frame?: string; height: number; children: ReactNode }) {
+  // The gilded border, corner brackets and glow are tinted to `frame` so the card
+  // reads its rarity (cost colour for units, amber for items, violet for augments).
+  const cornerCls = "absolute w-3.5 h-3.5 pointer-events-none";
+  return (
+    <button onClick={onClick} style={{ height, boxShadow: `0 0 30px -10px ${frame}` }} className="group relative w-[160px] shrink-0 rounded-md hover:-translate-y-1.5 transition-all">
+      <div className="absolute inset-0 rounded-md p-[2px]" style={{ background: `linear-gradient(155deg, ${frame}, ${frame} 42%, rgba(2,6,23,0.6))` }}>
+        <div className="w-full h-full rounded-[4px] overflow-hidden flex flex-col bg-gradient-to-b from-sky-700/55 via-sky-950/90 to-slate-950 group-hover:from-sky-600/70 transition-colors">
+          {children}
+        </div>
+      </div>
+      <span className={`${cornerCls} top-0 left-0 border-t-2 border-l-2 rounded-tl-md`} style={{ borderColor: frame }} />
+      <span className={`${cornerCls} top-0 right-0 border-t-2 border-r-2 rounded-tr-md`} style={{ borderColor: frame }} />
+      <span className={`${cornerCls} bottom-0 left-0 border-b-2 border-l-2 rounded-bl-md`} style={{ borderColor: frame }} />
+      <span className={`${cornerCls} bottom-0 right-0 border-b-2 border-r-2 rounded-br-md`} style={{ borderColor: frame }} />
+    </button>
+  );
+}
+
+/** Carousel reward card in the ornate frame: big art on top, then name +
+ *  cost/traits (units) or effect (items) on the dark panel. */
 function CarouselCard({ onClick, color, name, sub, cost, types, art }: { onClick: () => void; color: string; name: string; sub?: string; cost?: number; types?: PokeType[]; art: ReactNode }) {
   return (
-    <button
-      onClick={onClick}
-      style={{ borderColor: color, boxShadow: `0 0 22px -6px ${color}` }}
-      className="group relative w-[150px] h-[186px] rounded-xl overflow-hidden border-2 bg-slate-950/80 hover:-translate-y-1 transition-all"
-    >
-      <span className="absolute top-0 inset-x-0 h-1" style={{ background: color }} />
-      <div className="absolute inset-0 flex items-center justify-center pb-14">{art}</div>
-      <div className="absolute inset-x-0 bottom-0 px-2 pt-7 pb-2 flex flex-col items-center gap-1" style={{ background: "linear-gradient(to top, rgba(2,6,23,0.97), rgba(2,6,23,0.55) 62%, transparent)" }}>
-        <span className="text-sm font-extrabold text-white text-center leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">{name}</span>
+    <OrnateFrame onClick={onClick} frame={color} height={200}>
+      <div className="flex-1 flex items-center justify-center pt-3 pb-1">{art}</div>
+      <div className="px-2 py-2 bg-slate-950/80 border-t border-amber-600/40 flex flex-col items-center gap-1">
+        <span className="text-sm font-extrabold text-amber-50 text-center leading-tight drop-shadow">{name}</span>
         {cost != null && <span style={{ color }} className="inline-flex items-center gap-0.5 text-[11px] font-extrabold"><CoinIcon size={11} />{cost}</span>}
         {types && (
           <div className="flex flex-wrap gap-0.5 justify-center">
             {types.map((ty) => <span key={ty} style={{ background: TYPE_COLOR[ty] }} className="text-[8px] px-1 rounded text-black/80 font-bold uppercase">{ty.slice(0, 3)}</span>)}
           </div>
         )}
-        {sub && <span className="text-[9px] text-slate-300/80 text-center leading-tight">{sub}</span>}
+        {sub && <span className="text-[9px] text-slate-300/85 text-center leading-tight">{sub}</span>}
       </div>
-    </button>
+    </OrnateFrame>
+  );
+}
+
+/** Augment choice in the ornate frame: icon in a gilded tile, name, then the
+ *  effect on the dark panel — matching the TFT "Select an Augment" look. */
+function OrnateAugmentCard({ onClick, icon, name, desc }: { onClick: () => void; icon: string; name: string; desc: string }) {
+  return (
+    <OrnateFrame onClick={onClick} frame="#a78bfa" height={264}>
+      <div className="flex flex-col items-center pt-5 px-3">
+        <div className="w-16 h-16 rounded-lg bg-sky-300/15 border border-sky-200/40 flex items-center justify-center text-4xl shadow-[inset_0_0_14px_rgba(125,211,252,0.3)]">{icon}</div>
+        <span className="mt-3 text-[15px] font-extrabold text-amber-100 text-center leading-tight drop-shadow">{name}</span>
+      </div>
+      <div className="mt-auto bg-slate-950/80 border-t border-amber-600/40 px-3 py-3 text-center">
+        <span className="text-[11px] text-slate-300 leading-snug">{desc}</span>
+      </div>
+    </OrnateFrame>
   );
 }
 
