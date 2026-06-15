@@ -279,8 +279,9 @@ export function NetGameClient() {
       // by the room code) — passed to BOTH paths so the shop pool always respects
       // the lobby's region/draft rules, even on a reconnect/restore.
       const roster = rosterForGenerations(room.rules?.generations ?? [1], room.rules?.draftPoolSize, codeSeed(room.code));
-      if (save) importSave({ ...save, units: asUnits(save.units) }, roster);
-      else newGame(room.rules?.startingHp ?? 100, roster);
+      const enabledItems = room.rules?.itemsEnabled;
+      if (save) importSave({ ...save, units: asUnits(save.units) }, roster, enabledItems);
+      else newGame(room.rules?.startingHp ?? 100, roster, enabledItems);
     } else {
       lastRoundKey.current = key;
       netRound(meta.stage, meta.round, me?.streak ?? 0);

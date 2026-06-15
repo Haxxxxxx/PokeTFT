@@ -73,6 +73,9 @@ type State = {
   round: number;
   pool: Pool;
   unitsByCost: UnitsByCost;
+  /** Completed item ids the lobby enabled. null/empty = all allowed. A component
+   *  pair only fuses if its resulting completed item is in here. */
+  enabledItems: string[] | null;
   units: UnitInstance[];
   shop: (string | null)[];
   frozen: boolean;
@@ -88,7 +91,7 @@ type State = {
   xpProgress: () => { current: number; needed: number | null };
 
   // actions
-  newGame: (startingHp?: number, allowedIds?: string[]) => void;
+  newGame: (startingHp?: number, allowedIds?: string[], enabledItems?: string[]) => void;
   reroll: () => void;
   buyXp: () => void;
   buyUnit: (slot: number) => void;
@@ -110,7 +113,7 @@ type State = {
   pickAugment: (id: string) => void;
   /** Multiplayer: snapshot / restore the local economy for reconnect. */
   exportSave: () => { gold: number; xp: number; level: number; units: UnitInstance[]; shop: (string | null)[]; items: string[]; augments: string[] };
-  importSave: (save: { gold: number; xp: number; level: number; units?: UnitInstance[]; shop?: (string | null)[]; items?: string[]; augments?: string[] }, allowedIds?: string[]) => void;
+  importSave: (save: { gold: number; xp: number; level: number; units?: UnitInstance[]; shop?: (string | null)[]; items?: string[]; augments?: string[] }, allowedIds?: string[], enabledItems?: string[]) => void;
   grantItem: (itemId: string) => void;
   equipItem: (iid: string, itemId: string) => void;
   unequipItem: (iid: string, itemId: string) => void;
@@ -130,6 +133,7 @@ export const useGame = create<State>((set, get) => ({
   round: 1,
   pool: makePool(),
   unitsByCost: makeUnitsByCost(),
+  enabledItems: null,
   units: [],
   shop: [],
   frozen: false,
@@ -147,7 +151,7 @@ export const useGame = create<State>((set, get) => ({
     return { current: xp - base, needed: next - base };
   },
 
-  newGame: (startingHp = ECONOMY.startingHealth, allowedIds?: string[]) => {
+  newGame: (startingHp = ECONOMY.startingHealth, allowedIds?: string[], enabledItems?: string[]) => {
     // Fresh, independent randomness each game (and per player) — not a fixed seed,
     // so every player's shop rolls differently.
     rng = makeRng((Math.floor(Math.random() * 0x7fffffff) ^ Date.now()) >>> 0);
@@ -164,7 +168,8 @@ export const useGame = create<State>((set, get) => ({
       units.push({ ...makeInstance(id), pos: [3, BOARD.rows - 1] });
     }
     set({
-      pool, unitsByCost, gold: 4, xp: 0, level: 1, health: startingHp,
+      pool, unitsByCost, enabledItems: enabledItems && enabledItems.length ? enabledItems : null,
+      gold: 4, xp: 0, level: 1, health: startingHp,
       streak: 0, stage: 1, round: 1, units, frozen: false, history: [], items: [], augments: [],
       shop: rollShop(1, pool, rng, unitsByCost),
     });
@@ -449,12 +454,13 @@ export const useGame = create<State>((set, get) => ({
     return { gold: s.gold, xp: s.xp, level: s.level, units: s.units, shop: s.shop, items: s.items, augments: s.augments };
   },
 
-  importSave: (save, allowedIds) => set({
+  importSave: (save, allowedIds, enabledItems) => set({
     // Rebuild the shop pool from the room's roster — otherwise a restore leaves
     // pool/unitsByCost at the store's default makePool() (ALL generations), so the
     // shop would offer out-of-region mons even though the rules restrict the pool.
     pool: makePool(allowedIds),
     unitsByCost: makeUnitsByCost(allowedIds),
+    enabledItems: enabledItems && enabledItems.length ? enabledItems : null,
     // Derive level from XP so it always matches (a stale/dropped synced `level`
     // can't stick after a reconnect and show the wrong level all game).
     gold: save.gold, xp: save.xp, level: levelFromXp(save.xp ?? 0),
@@ -479,13 +485,16 @@ export const useGame = create<State>((set, get) => ({
     if (!unit) return;
 
     // Combining: dragging a COMPONENT onto a unit that already holds a component
-    // they form a recipe with fuses them into the completed item (2 → 1).
+    // they form a recipe with fuses them into the completed item (2 → 1) — but
+    // only if that completed item is enabled by the lobby rules (else the pieces
+    // just stay as separate held components).
+    const itemAllowed = (id: string) => !state.enabledItems || state.enabledItems.includes(id);
     if (isComponent(itemId)) {
       for (let i = 0; i < unit.items.length; i++) {
         const held = unit.items[i];
         if (!isComponent(held)) continue;
         const completed = RECIPES[combineKey(itemId, held)];
-        if (completed) {
+        if (completed && itemAllowed(completed)) {
           const items = [...state.items];
           items.splice(idx, 1); // consume the dragged component
           const newItems = [...unit.items];
