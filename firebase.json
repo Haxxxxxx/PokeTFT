@@ -19,14 +19,14 @@
     ],
     "headers": [
       {
-        "comment": "Never cache HTML — it points at the content-hashed JS chunks, so a stale index.html keeps loading old code after a deploy (the rules-not-applying bug).",
-        "source": "**/*.html",
+        "comment": "Default: never cache (covers the SPA routes that serve index.html via the rewrite, e.g. '/'). A stale index.html points at old JS chunks → the rules-not-applying bug.",
+        "source": "**",
         "headers": [
           { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
         ]
       },
       {
-        "comment": "Hashed build assets are immutable — safe to cache forever (a new build = new hashes).",
+        "comment": "Hashed build assets are immutable — safe to cache forever. Listed LAST so it overrides the catch-all for these paths (Firebase: last match wins).",
         "source": "/_next/static/**",
         "headers": [
           { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
