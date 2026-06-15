@@ -37,7 +37,9 @@ export type RoomPlayer = {
   carouselPicked?: string;
   /** The player's current on-board units (synced during planning). */
   board?: UnitInstance[];
-  /** Full economy snapshot for reconnect (synced during planning). */
+  /** Legacy public economy snapshot. Econ now lives in the private priv/{code}/{uid}
+   *  node (see roomStore.mySave); kept optional only so reconnect can fall back to
+   *  it for sessions that synced before the privacy migration. */
   save?: PlayerSave;
 };
 
@@ -122,6 +124,8 @@ type RoomState = {
   /** Always-fresh snapshot (incl. meta.hostBeat) for the host loop / failover.
    *  Read via getState() — nothing subscribes to it for render. */
   liveRoom: Room | null;
+  /** My private econ snapshot (priv/{code}/{uid}). undefined while loading. */
+  mySave: PlayerSave | null | undefined;
   status: Status;
   error: string | null;
   /** True while reconnect() is re-attaching to a saved room after a refresh. */
@@ -134,6 +138,9 @@ type RoomState = {
   /** Host: keep the lobbies-index entry fresh (player count) or remove it. */
   publishLobby: (players: number) => void;
   removeLobby: () => void;
+  /** Clear my own private econ snapshot — called on entering the lobby so a
+   *  "Play again" rematch in the same room can't restore the previous game. */
+  clearMySave: () => void;
 
   host: (name: string, rules?: Partial<RoomRules>) => Promise<string | null>;
   join: (code: string, name: string) => Promise<boolean>;
@@ -151,6 +158,7 @@ type RoomState = {
 };
 
 let unsub: (() => void) | null = null;
+let privUnsub: (() => void) | null = null;
 
 let lobbiesUnsub: (() => void) | null = null;
 
@@ -193,6 +201,10 @@ export const useRoom = create<RoomState>((setState, getState) => ({
   myUid: null,
   room: null,
   liveRoom: null,
+  /** My own private econ snapshot (from priv/{code}/{uid}). `undefined` = still
+   *  loading; `null` = loaded but empty (fresh game). Used to rehydrate on
+   *  reconnect without exposing my gold/shop to opponents. */
+  mySave: undefined,
   status: "idle",
   error: null,
   reconnecting: false,
@@ -230,6 +242,11 @@ export const useRoom = create<RoomState>((setState, getState) => ({
   removeLobby: () => {
     const { code } = getState();
     if (code) remove(ref(db(), `lobbies/${code}`)).catch(() => {});
+  },
+  clearMySave: () => {
+    const { code, myUid } = getState();
+    if (code && myUid) remove(ref(db(), `priv/${code}/${myUid}`)).catch(() => {});
+    setState({ mySave: null });
   },
 
   host: async (name, rules) => {
@@ -369,6 +386,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
   leave: () => {
     const { code, myUid, room } = getState();
     if (unsub) { unsub(); unsub = null; }
+    if (privUnsub) { privUnsub(); privUnsub = null; }
     if (myUid) setCurrentGame(myUid, null);
     if (code && myUid) {
       // If I'm the last connected human, delete the whole room so abandoned games
@@ -376,11 +394,13 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       const otherHumans = Object.values(room?.players ?? {}).filter((p) => p.connected && !p.isBot && p.uid !== myUid);
       if (otherHumans.length === 0) remove(roomRef(code)).catch(onWriteErr);
       else remove(ref(db(), `games/${code}/players/${myUid}`)).catch(onWriteErr);
+      // Always clear my own private econ node (rules only let me write my own).
+      remove(ref(db(), `priv/${code}/${myUid}`)).catch(() => {});
       // I'm the host (or the room is gone) → drop the browser listing.
       if (room?.meta?.hostUid === myUid || otherHumans.length === 0) remove(ref(db(), `lobbies/${code}`)).catch(() => {});
     }
     forgetRoom();
-    setState({ code: null, myUid: null, room: null, status: "idle", error: null });
+    setState({ code: null, myUid: null, room: null, mySave: undefined, status: "idle", error: null });
   },
 }));
 
@@ -398,7 +418,15 @@ let lastSig: string | null = null;
 
 function subscribe(code: string, uid: string, setState: (p: Partial<RoomState>) => void) {
   if (unsub) unsub();
+  if (privUnsub) privUnsub();
   lastSig = null;
+  // Listen to my OWN private econ snapshot (priv/{code}/{uid}) — readable only by
+  // me — so a refresh can rehydrate gold/shop/items without ever exposing them to
+  // opponents. undefined → null/value once it loads (gates reconnect fresh-start).
+  setState({ mySave: undefined });
+  privUnsub = onValue(ref(db(), `priv/${code}/${uid}`), (snap) => {
+    setState({ mySave: (snap.val()?.save ?? null) as PlayerSave | null });
+  }, () => setState({ mySave: null }));
   const r = roomRef(code);
   unsub = onValue(r, (snap) => {
     if (!snap.exists()) {

@@ -108,11 +108,15 @@ function rtdbSafe<T>(v: T): T {
   return JSON.parse(JSON.stringify(v ?? null));
 }
 
-/** Client: push my on-board units + economy snapshot so the host can resolve
- *  combat and a refresh can rehydrate. */
+/** Client: push my on-board units + economy snapshot. The board is PUBLIC (the
+ *  host resolves combat from it and rivals legitimately spectate it), but the
+ *  full economy snapshot (gold, shop roll, items, bench) is PRIVATE — written to
+ *  priv/{code}/{uid}, readable only by me — so opponents can't scout my gold or
+ *  shop. A refresh rehydrates my own state from there. */
 export async function syncBoard(code: string, uid: string, units: UnitInstance[], save?: unknown): Promise<void> {
   const onBoard = rtdbSafe(units.filter((un) => un.pos !== null));
-  await update(ref(db(), `games/${code}/players/${uid}`), { board: onBoard, ...(save ? { save: rtdbSafe(save) } : {}) });
+  await update(ref(db(), `games/${code}/players/${uid}`), { board: onBoard });
+  if (save) await update(ref(db(), `priv/${code}/${uid}`), { save: rtdbSafe(save) });
 }
 
 /** Host: write a liveness heartbeat so migration only triggers on a real stall. */

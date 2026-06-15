@@ -17,6 +17,14 @@
         ".write": "auth != null && ((newData.exists() && newData.val() === auth.uid && (!data.exists() || data.val() === auth.uid)) || (!newData.exists() && data.val() === auth.uid))"
       }
     },
+    "priv": {
+      "$code": {
+        "$uid": {
+          ".read": "auth != null && $uid === auth.uid",
+          ".write": "auth != null && $uid === auth.uid"
+        }
+      }
+    },
     "lobbies": {
       ".read": "auth != null",
       ".indexOn": ["createdAt"],

@@ -111,6 +111,7 @@ function ShopSellDrop({ children }: { children: ReactNode }) {
 export function NetGameClient() {
   const room = useRoom((s) => s.room);
   const myUid = useRoom((s) => s.myUid);
+  const mySave = useRoom((s) => s.mySave);
   const leave = useRoom((s) => s.leave);
 
   const newGame = useGame((s) => s.newGame);
@@ -246,15 +247,19 @@ export function NetGameClient() {
     const key = `${meta.stage}-${meta.round}`;
     if (lastRoundKey.current === key) return;
     const first = lastRoundKey.current === null;
-    lastRoundKey.current = key;
     if (first) {
-      const save = me?.save;
+      // Wait until my PRIVATE econ snapshot has loaded before deciding restore vs
+      // fresh — a slow priv read must never fresh-start an in-progress game.
+      if (mySave === undefined) return; // still loading; re-runs when it resolves
+      lastRoundKey.current = key;
+      const save = mySave ?? me?.save; // private path first, legacy public save as fallback
       if (save) importSave({ ...save, units: asUnits(save.units) });
       else newGame(room.rules?.startingHp ?? 100, rosterForGenerations(room.rules?.generations ?? [1]));
     } else {
+      lastRoundKey.current = key;
       netRound(meta.stage, meta.round, me?.streak ?? 0);
     }
-  }, [phase, meta?.stage, meta?.round]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, meta?.stage, meta?.round, mySave]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Push my board + economy snapshot to the room (debounced) — board for combat,
   // save for reconnect.
@@ -452,8 +457,9 @@ export function NetGameClient() {
   const spectating = !!spectate && spectate !== myUid && !!players[spectate];
   const spectateP = spectating ? players[spectate!] : undefined;
   const spectateUnits = spectating ? asBoard(spectateP?.board) : null;
-  // Their full roster (incl. bench) rides along in the synced economy save.
-  const spectateBench = spectating ? asUnits(spectateP?.save?.units).filter((u) => u.pos === null) : [];
+  // Only the on-board units are public — a rival's BENCH is hidden information
+  // (it lives in their private econ snapshot now), so spectating never reveals it.
+  const spectateBench: UnitInstance[] = [];
 
   // Forward-looking timeline: the current stage + the next two, each round
   // tagged with its kind (PvE / carousel / PvP) and overlaid with past results.

@@ -22,6 +22,7 @@ export function LobbyScreen() {
   const leave = useRoom((s) => s.leave);
   const publishLobby = useRoom((s) => s.publishLobby);
   const removeLobby = useRoom((s) => s.removeLobby);
+  const clearMySave = useRoom((s) => s.clearMySave);
   const preRules = usePreLobby((s) => s.rules);
   const setPreRules = usePreLobby((s) => s.setRules);
   const [copied, setCopied] = useState(false);
@@ -34,6 +35,9 @@ export function LobbyScreen() {
   const lobbyCount = room ? Object.values(room.players ?? {}).filter((p) => p.connected).length : 0;
   useEffect(() => { if (isHost) publishLobby(lobbyCount); }, [isHost, lobbyCount, publishLobby]);
   useEffect(() => () => { if (isHost) removeLobby(); }, [isHost, removeLobby]);
+  // Clear my private econ on entering the lobby so a "Play again" rematch in the
+  // same room starts fresh instead of restoring the finished game from priv.
+  useEffect(() => { clearMySave(); }, [clearMySave]);
 
   useEffect(() => {
     if (!room || !isHost) return;
