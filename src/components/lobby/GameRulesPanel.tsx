@@ -117,6 +117,43 @@ export function GameRulesPanel({ isHost }: { isHost: boolean }) {
             })}
           </div>
         </SectionCard>
+
+        <SectionCard title={lang === "fr" ? "Joueurs max" : "Max Players"}>
+          <div className="flex flex-wrap gap-1.5">
+            {[2, 3, 4, 5, 6, 7, 8].map((n) => {
+              const active = rules.maxPlayers === n;
+              return (
+                <button
+                  key={n}
+                  disabled={!isHost}
+                  onClick={() => setRules({ maxPlayers: n })}
+                  className={`px-3.5 py-1.5 ${chipBase} ${active ? chipActive : chipIdle} disabled:opacity-50`}
+                >
+                  {n}
+                </button>
+              );
+            })}
+          </div>
+        </SectionCard>
+
+        <SectionCard title={lang === "fr" ? "Augments" : "Augments"}>
+          <div className="flex gap-1.5">
+            {[true, false].map((on) => {
+              const active = (rules.augmentsEnabled !== false) === on;
+              return (
+                <button
+                  key={String(on)}
+                  disabled={!isHost}
+                  onClick={() => setRules({ augmentsEnabled: on })}
+                  className={`px-4 py-1.5 ${chipBase} ${active ? chipActive : chipIdle} disabled:opacity-50`}
+                >
+                  {on ? (lang === "fr" ? "Activés" : "On") : (lang === "fr" ? "Désactivés" : "Off")}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-slate-500 mt-2">{lang === "fr" ? "Boosts choisis aux étapes 2/3/4." : "Power-ups picked at stages 2/3/4."}</p>
+        </SectionCard>
       </div>
 
       {/* Right column: the tall items list, on its own. */}

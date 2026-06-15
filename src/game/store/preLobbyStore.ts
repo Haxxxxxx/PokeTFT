@@ -24,6 +24,8 @@ export type GameRules = {
   itemsEnabled: string[];
   /** Max players (2–8). */
   maxPlayers: number;
+  /** Whether augment rounds (stage 2/3/4) are offered. Default on. */
+  augmentsEnabled: boolean;
 };
 
 export type PreLobbyState = {
@@ -66,6 +68,7 @@ const DEFAULT_RULES: GameRules = {
   startingHp: 100,
   itemsEnabled: DEFAULT_ITEMS_ENABLED,
   maxPlayers: 8,
+  augmentsEnabled: true,
 };
 
 export const usePreLobby = create<PreLobbyState>((set, get) => ({

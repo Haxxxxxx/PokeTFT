@@ -41,8 +41,8 @@ export function LobbyScreen() {
 
   useEffect(() => {
     if (!room || !isHost) return;
-    setRules({ startingHp: preRules.startingHp, generations: preRules.generations, itemsEnabled: preRules.itemsEnabled, draftPoolSize: preRules.draftPoolSize });
-  }, [isHost, room, setRules, preRules.startingHp, preRules.generations, preRules.itemsEnabled, preRules.draftPoolSize]);
+    setRules({ startingHp: preRules.startingHp, generations: preRules.generations, itemsEnabled: preRules.itemsEnabled, draftPoolSize: preRules.draftPoolSize, maxPlayers: preRules.maxPlayers, augmentsEnabled: preRules.augmentsEnabled });
+  }, [isHost, room, setRules, preRules.startingHp, preRules.generations, preRules.itemsEnabled, preRules.draftPoolSize, preRules.maxPlayers, preRules.augmentsEnabled]);
 
   const roomGenKey = (room?.rules?.generations ?? [1]).join(",");
   const roomItemKey = (room?.rules?.itemsEnabled ?? []).join(",");
@@ -54,8 +54,10 @@ export function LobbyScreen() {
       generations: room.rules?.generations ?? [1],
       itemsEnabled: room.rules?.itemsEnabled ?? [],
       draftPoolSize: room.rules?.draftPoolSize ?? 90,
+      maxPlayers: room.rules?.maxPlayers ?? 8,
+      augmentsEnabled: room.rules?.augmentsEnabled !== false,
     });
-  }, [isHost, room, setPreRules, roomHp, roomGenKey, roomItemKey, room?.rules?.draftPoolSize]);
+  }, [isHost, room, setPreRules, roomHp, roomGenKey, roomItemKey, room?.rules?.draftPoolSize, room?.rules?.maxPlayers, room?.rules?.augmentsEnabled]);
 
   if (!room) return null;
 

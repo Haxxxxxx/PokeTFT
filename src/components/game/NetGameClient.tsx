@@ -329,7 +329,7 @@ export function NetGameClient() {
   }, [phase, meta?.stage, meta?.round, spectate, spectateCombat?.oppUid, spectateCombat?.flip, boardSig(spectateCombat?.selfBoard), boardSig(spectateCombat?.oppBoard)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Augment round? (stage 2/3/4 round 1). Show the pick until this slot is taken.
-  const augSlotNow = meta && phase === "planning" && me?.alive ? augmentSlot(meta.stage, meta.round) : null;
+  const augSlotNow = meta && phase === "planning" && me?.alive && room?.rules?.augmentsEnabled !== false ? augmentSlot(meta.stage, meta.round) : null;
   const augOptions = useMemo(() => {
     if (augSlotNow == null) return [];
     const owned = new Set(useGame.getState().augments);
