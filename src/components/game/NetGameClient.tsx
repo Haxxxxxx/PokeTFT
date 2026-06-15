@@ -492,6 +492,9 @@ export function NetGameClient() {
     // Bench management + selling stay available during combat (no effect on the
     // frozen, already-resolved fight). Board placement is locked while fighting.
     if (phase !== "planning" && phase !== "combat") return;
+    // While spectating a rival, drags must not mutate YOUR own board/econ (same
+    // class as the disabled R/L/S hotkeys) — your bench is still rendered below.
+    if (!!spectate && spectate !== myUid) return;
     const over = e.over?.id;
     if (!over) return;
     const target = String(over);

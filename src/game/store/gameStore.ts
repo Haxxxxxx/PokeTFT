@@ -28,6 +28,9 @@ const INITIAL_SEED = 1337;
 export const PENSION_COST = 4;
 export const PENSION_ROUNDS = 3;
 
+/** Shared-pool copies a unit of the given star represents (★=1, ★★=3, ★★★=9). */
+const copiesForStar = (star: number) => (star === 1 ? 1 : star === 2 ? 3 : 9);
+
 /** RTDB returns arrays that have null/empty leading slots as objects keyed by
  *  index (and strips empty arrays to undefined). Coerce back to a dense array
  *  of the given length so `.map`/`.filter` never blow up after a reconnect. */
@@ -485,7 +488,12 @@ export const useGame = create<State>((set, get) => ({
     // Decrement the rebuilt pool by the copies the player ALREADY owns (a ⭐⭐ = 3
     // copies, ⭐⭐⭐ = 9) so scarcity/3-star odds stay honest — a full pool plus
     // owned units would double-count every copy.
-    for (const u of units) takeFromPool(pool, u.defId, u.star === 1 ? 1 : u.star === 2 ? 3 : 9);
+    for (const u of units) takeFromPool(pool, u.defId, copiesForStar(u.star));
+    // A pension mon still "exists" (it took its copies at buy time) — keep it only
+    // if it belongs to this game's roster (drops a stale cross-roster rematch carry-
+    // over) and debit its copies from the rebuilt pool too.
+    const restoredPension = save.pension && getDef(save.pension.defId) && (!allowedIds || allowedIds.includes(save.pension.defId)) ? save.pension : null;
+    if (restoredPension) takeFromPool(pool, restoredPension.defId, copiesForStar(restoredPension.star));
     set({
       pool, unitsByCost,
       enabledItems: enabledItems && enabledItems.length ? enabledItems : null,
@@ -496,7 +504,7 @@ export const useGame = create<State>((set, get) => ({
       shop: toArray<string>(save.shop, ECONOMY.shopSlots),
       items: toArray<string>(save.items).filter(Boolean) as string[],
       augments: toArray<string>(save.augments).filter(Boolean) as string[],
-      pension: save.pension ?? null,
+      pension: restoredPension,
     });
   },
 
@@ -580,9 +588,15 @@ export const useGame = create<State>((set, get) => ({
     const p = state.pension;
     if (!p || p.roundsLeft > 0) return;
     if (state.units.filter((u) => u.pos === null).length >= BENCH_SIZE) { toast("Bench full", "Banc plein"); return; }
-    const grown = { ...makeInstance(p.defId), star: Math.min(3, p.star + 1) as 1 | 2 | 3 };
+    const grownStar = Math.min(3, p.star + 1) as 1 | 2 | 3;
+    // Keep pool scarcity honest: the deposited 1★ only debited 1 copy, but the
+    // returned 2★ represents 3 copies — debit the difference, or a deposit→collect
+    // →sell loop would inject phantom copies into the shared pool.
+    const pool = { ...state.pool };
+    takeFromPool(pool, p.defId, copiesForStar(grownStar) - copiesForStar(p.star));
+    const grown = { ...makeInstance(p.defId), star: grownStar };
     const { units, dropped } = applyCombines([...state.units, grown]); // may chain-combine into a 3★
-    set({ units, items: [...state.items, ...dropped], pension: null });
+    set({ units, items: [...state.items, ...dropped], pension: null, pool });
   },
 }));
 
