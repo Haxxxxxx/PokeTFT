@@ -5,7 +5,7 @@ import { simulate } from "../engine/combat";
 import { makeRng } from "../engine/rng";
 import { generatePlayerLikeBoard, generateCreepBoard, pickCarouselOptions } from "../engine/enemy";
 import { rosterForGenerations, hasDef } from "../data/mons";
-import { advanceRound, stageBaseDamage, cumulativeRound, roundKind, boardSizeForLevel } from "../config";
+import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
 import { COMPONENT_IDS } from "../data/items";
 import type { UnitInstance } from "../types";
@@ -93,17 +93,13 @@ function board(p: RoomPlayer | undefined): UnitInstance[] {
   // never reach simulate() — both host and client filter identically — and
   // coerce each unit's `items` to a dense array (RTDB can return it as an
   // index-keyed object, which would break the sim's `for (const id of items)`).
-  const placed = (arr as UnitInstance[])
+  // NOTE: we do NOT re-cap by board-size here. The planning client already
+  // enforces the cap with the player's true level; the public players/level is
+  // no longer synced (it lives in the private save), so capping by it would
+  // wrongly truncate a legit board to 1 unit. The synced board is the source.
+  return (arr as UnitInstance[])
     .filter((u) => u && u.pos && hasDef(u.defId))
     .map((u) => (Array.isArray(u.items) ? u : { ...u, items: u.items ? Object.values(u.items as Record<string, string>) : [] }));
-  // Host-side fairness: never field more units than the player's level allows,
-  // even if a stale/tampered client board claims extras. Keep a deterministic
-  // front-to-back subset so host and replaying clients agree on which survive.
-  const cap = boardSizeForLevel(p?.level ?? 1);
-  if (placed.length <= cap) return placed;
-  return [...placed]
-    .sort((a, b2) => (a.pos![1] - b2.pos![1]) || (a.pos![0] - b2.pos![0]) || (a.iid < b2.iid ? -1 : a.iid > b2.iid ? 1 : 0))
-    .slice(0, cap);
 }
 
 /** Players still in the game (alive). Disconnected-but-alive players still fight
