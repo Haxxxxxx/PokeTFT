@@ -422,7 +422,11 @@ export function NetGameClient() {
       } else if (target.startsWith("bench-")) {
         unit = g.units.filter((u) => u.pos === null)[Number(target.slice("bench-".length))];
       }
-      if (unit && !(itemId === MEGA_STONE && !canMega(unit.defId))) equipItem(unit.iid, itemId);
+      if (unit && itemId === MEGA_STONE && !canMega(unit.defId)) {
+        useUi.getState().pushToast(lang === "fr" ? "Ce Pokémon ne peut pas Méga-Évoluer" : "This Pokémon can't Mega Evolve");
+      } else if (unit) {
+        equipItem(unit.iid, itemId);
+      }
       return;
     }
 
@@ -480,6 +484,7 @@ export function NetGameClient() {
 
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+      <Toasts />
       <div className="fixed inset-0 flex justify-center items-center overflow-hidden">
       <div
         style={{ width: DESIGN_W, height: DESIGN_H, transform: `scale(${scale})`, transformOrigin: "center" }}
@@ -1017,6 +1022,35 @@ function OrnateFrame({ onClick, frame = "#d4af37", height, children }: { onClick
 
 /** Carousel reward card in the ornate frame: big art on top, then name +
  *  cost/traits (units) or effect (items) on the dark panel. */
+/** Transient feedback toast for rejected actions — fixed at the bottom-centre,
+ *  auto-dismisses, re-triggers on a new `seq` (so repeated messages re-animate). */
+function Toasts() {
+  const toast = useUi((s) => s.toast);
+  const clear = useUi((s) => s.clearToast);
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(clear, 2200);
+    return () => clearTimeout(id);
+  }, [toast?.seq, clear]);
+  if (!toast) return null;
+  return (
+    <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-[140] pointer-events-none">
+      <div
+        key={toast.seq}
+        className="toast-pop px-4 py-2.5 rounded-xl border text-sm font-bold shadow-2xl flex items-center gap-2"
+        style={{
+          background: "linear-gradient(180deg, rgba(40,13,13,0.96), rgba(20,6,6,0.96))",
+          borderColor: "rgba(244,63,94,0.5)",
+          color: "#fecdd3",
+          boxShadow: "0 18px 50px -20px rgba(0,0,0,0.9), 0 0 24px -10px rgba(244,63,94,0.6)",
+        }}
+      >
+        <span className="text-rose-300">⚠</span>{toast.text}
+      </div>
+    </div>
+  );
+}
+
 function CarouselCard({ onClick, color, name, sub, cost, types, art, disabled, note }: { onClick: () => void; color: string; name: string; sub?: string; cost?: number; types?: PokeType[]; art: ReactNode; disabled?: boolean; note?: string }) {
   return (
     <div className={disabled ? "opacity-45 grayscale pointer-events-none relative" : "relative"}>

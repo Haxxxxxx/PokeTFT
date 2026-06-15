@@ -20,7 +20,16 @@ type UiState = {
   /** An inventory item the player has "picked up" to equip on the next unit click. */
   armedItem: string | null;
   armItem: (itemId: string | null) => void;
+
+  /** Transient feedback toast for rejected/blocked actions (board full, not
+   *  enough gold, item slots full…). The `seq` makes repeated identical messages
+   *  re-trigger the auto-dismiss animation. */
+  toast: { seq: number; text: string; kind: "error" | "info" } | null;
+  pushToast: (text: string, kind?: "error" | "info") => void;
+  clearToast: () => void;
 };
+
+let toastSeq = 0;
 
 export const useUi = create<UiState>((set) => ({
   inspect: null,
@@ -36,4 +45,8 @@ export const useUi = create<UiState>((set) => ({
 
   armedItem: null,
   armItem: (itemId) => set((s) => ({ armedItem: s.armedItem === itemId ? null : itemId })),
+
+  toast: null,
+  pushToast: (text, kind = "error") => set({ toast: { seq: ++toastSeq, text, kind } }),
+  clearToast: () => set({ toast: null }),
 }));

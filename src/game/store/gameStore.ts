@@ -9,8 +9,17 @@ import { applyCombines, makeInstance } from "../engine/combine";
 import { MEGA_STONE } from "../data/mega";
 import { ITEM_POOL, COMPONENT_IDS, RECIPES, combineKey, isComponent } from "../data/itemPool";
 import { AUGMENT_BY_ID } from "../data/augments";
+import { useUi } from "./uiStore";
+import { useAppStore } from "./appStore";
 
 const ITEM_IDS = new Set(ITEM_POOL.map((i) => i.id));
+
+/** Fire a localized feedback toast for a rejected action (no import cycle —
+ *  uiStore/appStore don't import gameStore). */
+function toast(en: string, fr: string) {
+  const lang = useAppStore.getState().settings.language;
+  useUi.getState().pushToast(lang === "fr" ? fr : en);
+}
 
 export const BENCH_SIZE = 9;
 const INITIAL_SEED = 1337;
@@ -164,13 +173,14 @@ export const useGame = create<State>((set, get) => ({
   reroll: () => {
     const { gold, level, pool, unitsByCost, augments } = get();
     const cost = augments.includes("lucky") ? 1 : ECONOMY.rerollCost; // Lucky Rolls augment
-    if (gold < cost) return;
+    if (gold < cost) { toast("Not enough gold", "Pas assez d'or"); return; }
     set({ gold: gold - cost, frozen: false, shop: rollShop(level, pool, rng, unitsByCost) });
   },
 
   buyXp: () => {
     const { gold, xp, level } = get();
-    if (gold < ECONOMY.buyXpCost || level >= MAX_LEVEL) return;
+    if (level >= MAX_LEVEL) { toast("Already max level", "Niveau max atteint"); return; }
+    if (gold < ECONOMY.buyXpCost) { toast("Not enough gold", "Pas assez d'or"); return; }
     const newXp = xp + ECONOMY.buyXpAmount;
     set({ gold: gold - ECONOMY.buyXpCost, xp: newXp, level: levelFromXp(newXp) });
   },
@@ -180,7 +190,7 @@ export const useGame = create<State>((set, get) => ({
     const defId = state.shop[slot];
     if (!defId) return;
     const cost = getDef(defId).cost as Cost;
-    if (state.gold < cost) return;
+    if (state.gold < cost) { toast("Not enough gold", "Pas assez d'or"); return; }
     // Never buy more copies than the shared pool actually has left.
     if ((state.pool[defId] ?? 0) <= 0) return;
 
@@ -188,7 +198,7 @@ export const useGame = create<State>((set, get) => ({
     // star-up frees its bench slots, so a full bench can still accept it.
     const units = applyCombines([...state.units, makeInstance(defId)]);
     const benchAfter = units.filter((u) => u.pos === null).length;
-    if (benchAfter > BENCH_SIZE) return;
+    if (benchAfter > BENCH_SIZE) { toast("Bench full", "Banc plein"); return; }
 
     takeFromPool(state.pool, defId);
     const shop = [...state.shop];
@@ -220,7 +230,7 @@ export const useGame = create<State>((set, get) => ({
     const occupant = onBoard.find((u) => u.pos?.[0] === col && u.pos?.[1] === row);
 
     // Reject if board full and this unit isn't already on the board (and not a swap).
-    if (unit.pos === null && !occupant && onBoard.length >= cap) return;
+    if (unit.pos === null && !occupant && onBoard.length >= cap) { toast("Board full — level up for more slots", "Plateau plein — montez de niveau"); return; }
 
     const units = state.units.map((u) => {
       if (u.iid === iid) return { ...u, pos: [col, row] as [number, number] };
@@ -482,7 +492,7 @@ export const useGame = create<State>((set, get) => ({
     }
 
     // No combine → slot the item whole (respect the 3-item cap).
-    if (unit.items.length >= 3) return;
+    if (unit.items.length >= 3) { toast("Item slots full (3 max)", "Emplacements pleins (3 max)"); return; }
     const items = [...state.items];
     items.splice(idx, 1);
     set({
