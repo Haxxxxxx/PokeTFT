@@ -21,7 +21,7 @@
       ".read": "auth != null",
       ".indexOn": ["createdAt"],
       "$code": {
-        ".write": "auth != null && (!root.child('games').child($code).exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)",
+        ".write": "auth != null && (root.child('games').child($code).child('meta/hostUid').val() === auth.uid || (!newData.exists() && !root.child('games').child($code).exists()))",
         "host":    { ".validate": "newData.isString() && newData.val().length <= 24" },
         "players": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 8" },
         "max":     { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 8" }

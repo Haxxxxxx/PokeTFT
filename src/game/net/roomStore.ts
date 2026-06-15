@@ -210,7 +210,22 @@ export const useRoom = create<RoomState>((setState, getState) => ({
   publishLobby: (players) => {
     const { code, room, myUid } = getState();
     if (!code || !room || !myUid || room.meta.hostUid !== myUid) return;
-    update(ref(db(), `lobbies/${code}`), { players, host: room.players[myUid]?.name ?? "Host" }).catch(onWriteErr);
+    // Write the COMPLETE summary every time — the browser filters on `code`, so a
+    // partial write (host/players only) would make the lobby invisible. createdAt
+    // is set once (only if missing) so the browse-order doesn't churn each update.
+    const r = room.rules ?? ({} as Room["rules"]);
+    const max = Math.max(1, Math.min(8, r.maxPlayers ?? 8)); // keep inside the rules' .validate range
+    update(ref(db(), `lobbies/${code}`), {
+      code,
+      players: Math.max(0, Math.min(8, players)),
+      host: (room.players[myUid]?.name ?? "Host").slice(0, 24),
+      max,
+      gens: r.generations ?? [1],
+    }).catch(onWriteErr);
+    // Stamp createdAt only if the entry doesn't have one yet (keeps sort stable).
+    get(ref(db(), `lobbies/${code}/createdAt`)).then((s) => {
+      if (!s.exists()) update(ref(db(), `lobbies/${code}`), { createdAt: serverTimestamp() }).catch(onWriteErr);
+    }).catch(() => {});
   },
   removeLobby: () => {
     const { code } = getState();
@@ -234,7 +249,8 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       onDisconnect(ref(db(), `games/${code}/players/${uid}/connected`)).set(false);
       // Publish to the game browser so others can find + join without a code.
       const lobbyRef = ref(db(), `lobbies/${code}`);
-      await set(lobbyRef, { code, host: name || "Host", players: 1, max: maxPlayers, gens: rules?.generations ?? [1], createdAt: serverTimestamp() }).catch(onWriteErr);
+      const lobbyMax = Math.max(1, Math.min(8, maxPlayers)); // stay inside the .validate range so the write isn't rejected
+      await set(lobbyRef, { code, host: (name || "Host").slice(0, 24), players: 1, max: lobbyMax, gens: rules?.generations ?? [1], createdAt: serverTimestamp() }).catch(onWriteErr);
       onDisconnect(lobbyRef).remove();
       setState({ code, myUid: uid, status: "connected" });
       setCurrentGame(uid, code);
