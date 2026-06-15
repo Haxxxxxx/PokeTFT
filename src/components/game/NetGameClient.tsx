@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
 import { useGame } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
@@ -69,8 +69,13 @@ function SellZone() {
   const t = useT();
   const { setNodeRef, isOver } = useDroppable({ id: "sell" });
   return (
-    <div ref={setNodeRef} className={`flex items-center justify-center px-5 rounded-xl border-2 border-dashed text-xs font-bold uppercase tracking-wide transition-colors ${isOver ? "border-rose-400 bg-rose-500/20 text-rose-200" : "border-slate-700 text-slate-500"}`}>
-      {t.sh_drag_sell}
+    <div
+      ref={setNodeRef}
+      className={`w-[150px] shrink-0 flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed transition-all
+        ${isOver ? "border-rose-400 bg-rose-500/25 text-rose-100 scale-[1.03] shadow-[0_0_22px_-6px_rgba(244,63,94,0.7)]" : "border-slate-700/70 bg-slate-900/30 text-slate-500 hover:border-rose-700/60 hover:text-rose-300/80"}`}
+    >
+      <span className={`text-2xl leading-none transition-transform ${isOver ? "scale-125" : ""}`}>🗑️</span>
+      <span className="text-[10px] font-extrabold uppercase tracking-wider text-center leading-tight px-2">{t.sh_drag_sell}</span>
     </div>
   );
 }
@@ -257,20 +262,15 @@ export function NetGameClient() {
       const r = useRoom.getState().liveRoom;
       if (!r?.meta || r.meta.phase !== "planning") return;
       if (r.meta.deadline - serverNow() <= 2500) {
+        // Last-second safety net: if the player left bench units while the board
+        // has room, auto-deploy them just before the fight (NOT on every level-up).
+        useGame.getState().fillBoard();
         const g = useGame.getState();
         syncBoard(r.code, myUid, g.units, g.exportSave());
       }
     }, 200);
     return () => clearInterval(id);
   }, [phase, myUid]);
-
-  // Auto-fill the board: during planning, the leftmost bench unit is deployed into
-  // any empty board slot (centre-out) so the board stays topped up to the level
-  // cap without manual placement. Runs whenever the roster or level changes;
-  // fillBoard only mutates state when it actually places a unit, so it settles.
-  useEffect(() => {
-    if (phase === "planning") fillBoard();
-  }, [units, level, phase, fillBoard]);
 
   // Replay from the boards the host FROZE into the combat assignment, so the
   // result shown always matches the host's authoritative outcome.
@@ -441,15 +441,19 @@ export function NetGameClient() {
         {/* Round tracker (TFT-style): an icon per round — ⚔ PvP, 🌿 PvE, 🎡
             carousel — grouped by stage. The current round glows; past PvP rounds
             colour win/loss and stay clickable for a recap. */}
-        <div className="relative flex items-center justify-center gap-2 px-3 py-1 rounded-lg bg-slate-900/50 border border-slate-700/30 overflow-x-auto">
-          <div className="flex items-center gap-1">
-            {schedule.map(({ stage, round, kind }, idx) => {
+        <div className="relative flex items-center gap-3 px-3 py-1.5 rounded-lg bg-slate-900/60 border border-slate-700/45">
+          {/* Current stage/round recap, pinned beside the round tracker. */}
+          <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800/80 border border-slate-700/60">
+            <span className="text-[8px] uppercase tracking-[0.15em] text-slate-500 leading-none">{t.net_stage}</span>
+            <span className="text-base font-extrabold tabular-nums text-amber-200 leading-none">{meta.stage}-{meta.round}</span>
+          </div>
+          <div className="flex-1 flex items-center justify-center gap-1 overflow-x-auto">
+            {schedule.map(({ stage, round, kind }) => {
               const key = `${stage}-${round}`;
               const result = resultByKey.get(key);
               const isCurrent = stage === meta.stage && round === meta.round;
               const isPast = result !== undefined;
               const icon = kind === "carousel" ? "🎡" : kind === "pve" ? "🌿" : "⚔️";
-              const newStage = idx === 0 || schedule[idx - 1].stage !== stage;
               const recap = recapByKey.get(key);
               const clickable = isPast && !!recap && !recap.pve && recap.oppUid !== myUid && !!players[recap.oppUid];
               const open = recapKey === key;
@@ -462,27 +466,23 @@ export function NetGameClient() {
                   : kind === "pve" ? "bg-amber-900/20 ring-1 ring-amber-600/30"
                   : "bg-slate-800/60 ring-1 ring-slate-600/40";
               return (
-                <Fragment key={key}>
-                  {newStage && (
-                    <span className="shrink-0 text-[9px] font-extrabold text-slate-600 tabular-nums pl-1 pr-0.5" title={`Stage ${stage}`}>{stage}</span>
+                <button
+                  key={key}
+                  type="button"
+                  disabled={!clickable}
+                  onClick={() => {
+                    if (!clickable || !recap) return;
+                    if (open) setRecapKey(null);
+                    else { setRecapKey(key); setSpectate(recap.oppUid); }
+                  }}
+                  title={`${key} · ${kind}${isPast ? (result ? " · Win" : " · Loss") : ""}${clickable ? " · click for recap" : ""}`}
+                  className={`relative w-6 h-6 shrink-0 rounded flex items-center justify-center text-[12px] leading-none grayscale-[0.15] transition-all ${cls} ${open ? "ring-2 ring-amber-300" : ""} ${clickable ? "cursor-pointer hover:brightness-125" : "cursor-default"}`}
+                >
+                  <span className={isPast && !isCurrent ? "opacity-80" : ""}>{icon}</span>
+                  {isPast && !isCurrent && (
+                    <span className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-slate-900 ${result ? "bg-emerald-400" : "bg-rose-400"}`} />
                   )}
-                  <button
-                    type="button"
-                    disabled={!clickable}
-                    onClick={() => {
-                      if (!clickable || !recap) return;
-                      if (open) setRecapKey(null);
-                      else { setRecapKey(key); setSpectate(recap.oppUid); }
-                    }}
-                    title={`${key} · ${kind}${isPast ? (result ? " · Win" : " · Loss") : ""}${clickable ? " · click for recap" : ""}`}
-                    className={`relative w-5 h-5 shrink-0 rounded flex items-center justify-center text-[11px] leading-none grayscale-[0.15] transition-all ${cls} ${open ? "ring-2 ring-amber-300" : ""} ${clickable ? "cursor-pointer hover:brightness-125" : "cursor-default"}`}
-                  >
-                    <span className={isPast && !isCurrent ? "opacity-80" : ""}>{icon}</span>
-                    {isPast && !isCurrent && (
-                      <span className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-slate-900 ${result ? "bg-emerald-400" : "bg-rose-400"}`} />
-                    )}
-                  </button>
-                </Fragment>
+                </button>
               );
             })}
           </div>
@@ -507,15 +507,9 @@ export function NetGameClient() {
           })()}
         </div>
 
-        {/* Top HUD bar: a prominent stage badge, a row of stat chips, then the
-            phase/timer segment and session controls. */}
-        <div className="flex items-center gap-2 flex-wrap px-3 py-1.5 rounded-lg bg-gradient-to-b from-slate-900/85 to-slate-900/55 border border-slate-700/50">
-          {/* Stage badge */}
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-800/70 border border-slate-700/50 shrink-0">
-            <span className="text-[8px] uppercase tracking-[0.15em] text-slate-500 leading-none">{t.net_stage}</span>
-            <span className="text-base font-extrabold tabular-nums text-slate-100 leading-none">{meta.stage}-{meta.round}</span>
-          </div>
-
+        {/* Top HUD bar: stat chips, then the phase/timer segment + controls.
+            (The stage badge lives next to the timeline above.) */}
+        <div className="flex items-center gap-2.5 flex-wrap px-3.5 py-2.5 rounded-xl bg-gradient-to-b from-slate-800/80 to-slate-900/70 border border-slate-700/60 shadow-[inset_0_1px_0_rgba(148,163,184,0.06)]">
           <StatChip label={t.net_hp} accent="#ff6b6b" value={Math.max(0, me?.hp ?? 0)} />
           <StatChip label={t.net_gold} accent="#fbbf24" value={<span className="inline-flex items-center gap-1"><CoinIcon size={13} />{gold}</span>} />
           <StatChip label={t.net_interest} accent="#fcd34d" value={`+${interest(gold)}`} />
@@ -658,7 +652,7 @@ export function NetGameClient() {
           </div>
         </div>
 
-        {/* Bottom bar: board controls + bench, then shop. */}
+        {/* Bottom bar: board controls + bench (centred), then the shop. */}
         <div className="flex flex-col items-center gap-2">
           <div className="flex items-stretch gap-2">
             {/* Board capacity (placed / cap) + one-click auto-fill from the bench. */}
@@ -1046,10 +1040,10 @@ function PhaseTimer({ phase, phaseLabel, deadline, totalMs }: { phase?: string; 
 
 function StatChip({ label, value, accent, sub }: { label: string; value: ReactNode; accent?: string; sub?: string }) {
   return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800/50 border border-slate-700/40 shrink-0">
-      <span className="text-[8px] uppercase tracking-wider text-slate-500 leading-none">{label}</span>
-      <span className="text-sm font-extrabold leading-none inline-flex items-baseline gap-1" style={{ color: accent }}>
-        {value}{sub && <span className="text-[9px] font-bold text-slate-500">{sub}</span>}
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/70 border border-slate-600/50 shrink-0">
+      <span className="text-[9px] uppercase tracking-wider text-slate-400 leading-none">{label}</span>
+      <span className="text-base font-extrabold leading-none inline-flex items-baseline gap-1" style={{ color: accent }}>
+        {value}{sub && <span className="text-[10px] font-bold text-slate-400">{sub}</span>}
       </span>
     </div>
   );
