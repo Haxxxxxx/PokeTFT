@@ -25,9 +25,10 @@ function gamePath(code: string) {
 
 /** FNV-1a string hash → 32-bit uint. Used to fold stable identifiers (game code,
  *  uid) into deterministic-but-varied seeds. */
-function hashStr(s: string): number {
+function hashStr(s: string | undefined): number {
   let h = 2166136261 >>> 0;
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  const str = s ?? "";
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h >>> 0;
 }
 
@@ -205,7 +206,10 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
 async function freshRoom(code: string): Promise<Room | null> {
   try {
     const snap = await get(gamePath(code));
-    return snap.exists() ? (snap.val() as Room) : null;
+    // RTDB stores the game UNDER its code key, so the snapshot value has no `code`
+    // field — inject it, or anything reading room.code (e.g. the seeded roster
+    // draw) hits undefined and the whole transition throws.
+    return snap.exists() ? ({ ...(snap.val() as Room), code }) : null;
   } catch {
     return null;
   }
