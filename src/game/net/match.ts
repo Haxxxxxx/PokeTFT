@@ -58,6 +58,33 @@ function shuffled<T>(arr: T[], seed: number): T[] {
   return a;
 }
 
+/** Predict who I'll fight in the upcoming combat — the pairing is deterministic
+ *  (same shuffle seed + rematch-avoidance as startCombat), so the planning UI can
+ *  show it before the round resolves. Returns a display label or null (carousel
+ *  round / not pairable). */
+export function predictOpponent(room: Room, myUid: string): { name: string; ghost?: boolean; pve?: boolean } | null {
+  const stage = room.meta?.stage, round = room.meta?.round;
+  if (stage == null || round == null) return null;
+  const kind = roundKind(stage, round);
+  if (kind === "carousel") return null;
+  if (kind === "pve") return { name: "Wild Pokémon", pve: true };
+  const alive = alivePlayers(room);
+  if (alive.length <= 1) return null;
+  const order = shuffled(alive.map((p) => p.uid).sort(), stage * 131 + round);
+  for (let i = 0; i + 1 < order.length; i += 2) {
+    if (room.players[order[i]]?.lastOpp === order[i + 1] && i + 2 < order.length) {
+      [order[i + 1], order[i + 2]] = [order[i + 2], order[i + 1]];
+    }
+  }
+  const nameOf = (uid: string) => room.players[uid]?.name ?? "Rival";
+  for (let i = 0; i < order.length; i += 2) {
+    const a = order[i], b = order[i + 1];
+    if (a === myUid) return b ? { name: nameOf(b) } : { name: nameOf(order[i - 1]), ghost: true };
+    if (b === myUid) return { name: nameOf(a) };
+  }
+  return null;
+}
+
 function board(p: RoomPlayer | undefined): UnitInstance[] {
   const b = p?.board;
   const arr = Array.isArray(b) ? b : b ? Object.values(b) : [];

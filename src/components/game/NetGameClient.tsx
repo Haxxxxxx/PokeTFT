@@ -5,7 +5,7 @@ import { DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSen
 import { useGame, BENCH_SIZE } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
-import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, markCarouselPicked, finishCarouselEarlyIfReady, PLAN_MS, COMBAT_MS } from "@/game/net/match";
+import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, markCarouselPicked, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate } from "@/game/engine/combat";
 import { getDef, spriteUrl, rosterForGenerations, hasDef } from "@/game/data/mons";
 import { streakGold, roundKind, advanceRound, boardSizeForLevel } from "@/game/config";
@@ -181,10 +181,21 @@ export function NetGameClient() {
     return () => window.removeEventListener("resize", fit);
   }, []);
 
-  // Lift the boot veil after a short beat (sprites + room sync settle).
+  // Boot-veil readiness ref filled in below (after `me` is known).
+  const bootReadyRef = useRef(false);
   useEffect(() => {
-    const id = setTimeout(() => setBooting(false), 1900);
-    return () => clearTimeout(id);
+    // Lift when we're actually READY (room + my player synced) past a short min so
+    // sprites get a head start — capped so a slow sync can't hang it. Faster than
+    // the old fixed 1.9s on good connections; patient on bad ones.
+    const start = performance.now();
+    let raf = 0;
+    const check = () => {
+      const elapsed = performance.now() - start;
+      if ((bootReadyRef.current && elapsed > 800) || elapsed > 2400) { setBooting(false); return; }
+      raf = requestAnimationFrame(check);
+    };
+    raf = requestAnimationFrame(check);
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   // Sync the shared clock. The countdowns tick inside their own components
@@ -240,6 +251,7 @@ export function NetGameClient() {
   const meta = room?.meta;
   const players = room?.players ?? {};
   const me = myUid ? players[myUid] : undefined;
+  bootReadyRef.current = !!room && !!me; // feeds the boot-veil readiness check above
   const phase = meta?.phase;
   const myCombat = myUid ? room?.combat?.[myUid] : undefined;
 
@@ -573,8 +585,19 @@ export function NetGameClient() {
           <StatChip label={t.net_hp} accent="#ff6b6b" value={Math.max(0, me?.hp ?? 0)} />
           <StatChip label={t.net_gold} accent="#fbbf24" value={<span className="inline-flex items-center gap-1"><CoinIcon size={13} />{gold}</span>} />
           <StatChip label={t.net_interest} accent="#fcd34d" value={`+${interest(gold)}`} />
-          <StatChip label={t.net_streak} accent={streak >= 0 ? "#34d399" : "#f87171"} value={`${streak >= 0 ? "W" : "L"}${Math.abs(streak)}`} sub={`+${streakGold(streak)}`} />
+          <StatChip label={t.net_streak} accent={streak >= 0 ? "#34d399" : "#f87171"} value={`${streak >= 0 ? "W" : "L"}${Math.abs(streak)}`} sub={`+${streakGold(streak)}`}
+            title={lang === "fr"
+              ? "Or de série (victoires OU défaites d'affilée) : 2–3 → +1, 4 → +2, 5+ → +3 or par tour."
+              : "Streak gold (a run of wins OR losses): 2–3 → +1, 4 → +2, 5+ → +3 gold per round."} />
           <StatChip label={t.net_alive(aliveCount).replace(/[0-9]+\s*/, "")} accent="#cbd5e1" value={aliveCount} />
+          {phase === "planning" && (() => {
+            // Deterministic pairing → show who you're about to fight this round.
+            const opp = room && myUid ? predictOpponent(room, myUid) : null;
+            if (!opp) return null;
+            return <StatChip label={lang === "fr" ? "Prochain" : "Next"} accent="#f0abfc"
+              value={<span className="text-sm font-bold">{opp.pve ? (lang === "fr" ? "Sauvages" : "Wild") : `vs ${opp.name}`}{opp.ghost ? " 👻" : ""}</span>}
+              title={opp.ghost ? (lang === "fr" ? "Combat fantôme (copie d'un adversaire)" : "Ghost fight (a copy of a rival)") : undefined} />;
+          })()}
 
           {augments.length > 0 && (
             <div className="flex items-center gap-1 shrink-0" title="Augments">
@@ -796,7 +819,14 @@ export function NetGameClient() {
                 <span className="text-2xl">🎡</span>
                 <h2 className="text-2xl font-extrabold text-amber-300 tracking-tight">{lang === "fr" ? "Carrousel" : "Carousel"}</h2>
               </div>
-              <p className="text-xs text-slate-300/80">{picked ? (lang === "fr" ? "Choisi — en attente du tour…" : "Picked — waiting for the round…") : (lang === "fr" ? "Choisis une récompense gratuite." : "Pick one free reward.")}</p>
+              <p className="text-xs text-slate-300/80">{picked ? (() => {
+                // How many connected trainers still owe a pick (the round ends as
+                // soon as everyone has chosen).
+                const waiting = Object.values(room.players ?? {}).filter((p) => !p.isBot && p.connected && p.alive && p.carouselPicked !== key).length;
+                return waiting > 0
+                  ? (lang === "fr" ? `Choisi — en attente de ${waiting} dresseur${waiting > 1 ? "s" : ""}…` : `Picked — waiting for ${waiting} trainer${waiting > 1 ? "s" : ""}…`)
+                  : (lang === "fr" ? "Choisi — en attente du tour…" : "Picked — waiting for the round…");
+              })() : (lang === "fr" ? "Choisis une récompense gratuite." : "Pick one free reward.")}</p>
               <div className="text-[11px] tabular-nums font-bold text-amber-200/70 mt-0.5 mb-5"><Countdown deadline={meta.deadline} />s</div>
             {!picked && (() => {
               // A unit pick needs a free bench slot; items/Mega go to the inventory.
@@ -1154,9 +1184,9 @@ function PhaseTimer({ phase, phaseLabel, deadline, totalMs }: { phase?: string; 
   );
 }
 
-function StatChip({ label, value, accent, sub }: { label: string; value: ReactNode; accent?: string; sub?: string }) {
+function StatChip({ label, value, accent, sub, title }: { label: string; value: ReactNode; accent?: string; sub?: string; title?: string }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/70 border border-slate-600/50 shrink-0">
+    <div title={title} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/70 border border-slate-600/50 shrink-0">
       <span className="text-[9px] uppercase tracking-wider text-slate-400 leading-none">{label}</span>
       <span className="text-base font-extrabold leading-none inline-flex items-baseline gap-1" style={{ color: accent }}>
         {value}{sub && <span className="text-[10px] font-bold text-slate-400">{sub}</span>}
