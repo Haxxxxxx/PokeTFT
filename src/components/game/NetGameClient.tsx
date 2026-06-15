@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
-import { useGame, BENCH_SIZE } from "@/game/store/gameStore";
+import { useGame, BENCH_SIZE, PENSION_COST, PENSION_ROUNDS } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, markCarouselPicked, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS } from "@/game/net/match";
@@ -106,6 +106,48 @@ function SellZone() {
   );
 }
 
+/** Pokémon Pension (Day Care): drop a ★ mon in to train it into a ★★ over a few
+ *  rounds, then collect it. One slot; costs gold; the mon is away while training. */
+function PensionZone() {
+  const lang = useAppStore((s) => s.settings.language);
+  const pension = useGame((s) => s.pension);
+  const collect = useGame((s) => s.collectPension);
+  const { setNodeRef, isOver } = useDroppable({ id: "pension" });
+  const ready = !!pension && pension.roundsLeft <= 0;
+  const title = lang === "fr" ? "Pension" : "Day Care";
+  if (!pension) {
+    return (
+      <div
+        ref={setNodeRef}
+        title={lang === "fr" ? `Glissez un ★ pour l'entraîner en ★★ (${PENSION_COST} or, ${PENSION_ROUNDS} tours)` : `Drag a ★ mon to train it to ★★ (${PENSION_COST} gold, ${PENSION_ROUNDS} rounds)`}
+        className={`w-[120px] shrink-0 flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed transition-all
+          ${isOver ? "border-emerald-400 bg-emerald-500/25 text-emerald-100 scale-[1.03]" : "border-[var(--panel-edge)] bg-black/25 text-amber-200/55 hover:border-emerald-700/60 hover:text-emerald-300/80"}`}
+      >
+        <span className={`text-xl leading-none ${isOver ? "scale-125" : ""}`}>🏡</span>
+        <span className="text-[9px] font-extrabold uppercase tracking-wider text-center leading-tight px-1">{title}</span>
+      </div>
+    );
+  }
+  const def = getDef(pension.defId);
+  return (
+    <div className="gilded w-[120px] shrink-0 flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5">
+      <span className="text-[8px] uppercase tracking-wider text-amber-200/55 leading-none">{title}</span>
+      <div className="relative">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={spriteUrl(def.dex[0])} alt={def.name} width={44} height={44} style={{ imageRendering: "pixelated" }} className={ready ? "" : "opacity-80"} draggable={false} />
+        {!ready && <span className="absolute inset-0 flex items-center justify-center text-sm font-extrabold text-amber-200 drop-shadow">{pension.roundsLeft}</span>}
+      </div>
+      {ready ? (
+        <button onClick={collect} className="px-2 py-0.5 rounded-md bg-amber-500 hover:bg-amber-400 text-black text-[10px] font-extrabold leading-none">
+          {lang === "fr" ? "Récupérer ★★" : "Collect ★★"}
+        </button>
+      ) : (
+        <span className="text-[9px] font-bold text-amber-200/70 leading-none">{lang === "fr" ? `${pension.roundsLeft} tour${pension.roundsLeft > 1 ? "s" : ""}` : `${pension.roundsLeft} round${pension.roundsLeft > 1 ? "s" : ""}`}</span>
+      )}
+    </div>
+  );
+}
+
 /** Dropping a bench unit onto the shop sells it (id "sell-shop"). */
 function ShopSellDrop({ children }: { children: ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: "sell-shop" });
@@ -137,6 +179,7 @@ export function NetGameClient() {
   const moveToBench = useGame((s) => s.moveToBench);
   const reorderBench = useGame((s) => s.reorderBench);
   const sell = useGame((s) => s.sell);
+  const depositToPension = useGame((s) => s.depositToPension);
   const equipItem = useGame((s) => s.equipItem);
   const units = useGame((s) => s.units);
   const gold = useGame((s) => s.gold);
@@ -475,6 +518,7 @@ export function NetGameClient() {
 
     const iid = String(e.active.id);
     if (target === "sell" || target === "sell-shop") sell(iid);
+    else if (target === "pension") { if (phase === "planning") depositToPension(iid); }
     else if (target.startsWith("bench-")) {
       // A specific bench slot: bench a board unit, or rearrange/swap within the bench.
       const idx = Number(target.slice("bench-".length));
@@ -798,6 +842,7 @@ export function NetGameClient() {
           <div className="flex gap-3 w-full max-w-[1480px]">
             <ShopSellDrop><ShopBar /></ShopSellDrop>
             <SellZone />
+            <PensionZone />
           </div>
           {/* Shortcut hints live in-flow (scaled with the canvas) so they never
               float over the shop. */}

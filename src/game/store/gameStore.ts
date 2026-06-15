@@ -24,6 +24,10 @@ function toast(en: string, fr: string) {
 export const BENCH_SIZE = 9;
 const INITIAL_SEED = 1337;
 
+// Pension (Day Care): gold to deposit, planning rounds until it matures (1★→2★).
+export const PENSION_COST = 4;
+export const PENSION_ROUNDS = 3;
+
 /** RTDB returns arrays that have null/empty leading slots as objects keyed by
  *  index (and strips empty arrays to undefined). Coerce back to a dense array
  *  of the given length so `.map`/`.filter` never blow up after a reconnect. */
@@ -83,6 +87,9 @@ type State = {
   items: string[];
   /** Chosen augment ids (TFT-style persistent boosts). */
   augments: string[];
+  /** Pokémon Pension (Day Care): a single 1★ mon training to a 2★. `roundsLeft`
+   *  ticks down each planning round; at 0 it's ready to collect. */
+  pension: { defId: string; star: 1 | 2 | 3; roundsLeft: number } | null;
 
   // selectors
   benchUnits: () => UnitInstance[];
@@ -111,11 +118,15 @@ type State = {
   /** Pick an augment — applies its effect and persists it. */
   pickAugment: (id: string) => void;
   /** Multiplayer: snapshot / restore the local economy for reconnect. */
-  exportSave: () => { gold: number; xp: number; level: number; units: UnitInstance[]; shop: (string | null)[]; items: string[]; augments: string[] };
-  importSave: (save: { gold: number; xp: number; level: number; units?: UnitInstance[]; shop?: (string | null)[]; items?: string[]; augments?: string[] }, allowedIds?: string[], enabledItems?: string[]) => void;
+  exportSave: () => { gold: number; xp: number; level: number; units: UnitInstance[]; shop: (string | null)[]; items: string[]; augments: string[]; pension: State["pension"] };
+  importSave: (save: { gold: number; xp: number; level: number; units?: UnitInstance[]; shop?: (string | null)[]; items?: string[]; augments?: string[]; pension?: State["pension"] }, allowedIds?: string[], enabledItems?: string[]) => void;
   grantItem: (itemId: string) => void;
   equipItem: (iid: string, itemId: string) => void;
   unequipItem: (iid: string, itemId: string) => void;
+  /** Pension: drop a 1★ mon into the Day Care to train it into a 2★. */
+  depositToPension: (iid: string) => void;
+  /** Pension: retrieve a matured mon (back to the bench, one star higher). */
+  collectPension: () => void;
 };
 
 // Module-level RNG so the store stays serialisable; reseeded on newGame.
@@ -132,6 +143,7 @@ export const useGame = create<State>((set, get) => ({
   pool: makePool(),
   unitsByCost: makeUnitsByCost(),
   enabledItems: null,
+  pension: null,
   units: [],
   shop: [],
   frozen: false,
@@ -167,6 +179,7 @@ export const useGame = create<State>((set, get) => ({
     }
     set({
       pool, unitsByCost, enabledItems: enabledItems && enabledItems.length ? enabledItems : null,
+      pension: null,
       gold: 4, xp: 0, level: 1, health: startingHp,
       streak: 0, stage: 1, round: 1, units, frozen: false, history: [], items: [], augments: [],
       shop: rollShop(1, pool, rng, unitsByCost),
@@ -406,7 +419,10 @@ export const useGame = create<State>((set, get) => ({
       }
     }
 
-    set({ gold: state.gold + income + bonusGold, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false, items, units });
+    // Pension trains one planning round closer to maturity (down to 0 = ready).
+    const pension = state.pension ? { ...state.pension, roundsLeft: Math.max(0, state.pension.roundsLeft - 1) } : null;
+
+    set({ gold: state.gold + income + bonusGold, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false, items, units, pension });
   },
 
   netCarouselPick: (pick) => {
@@ -453,7 +469,7 @@ export const useGame = create<State>((set, get) => ({
 
   exportSave: () => {
     const s = get();
-    return { gold: s.gold, xp: s.xp, level: s.level, units: s.units, shop: s.shop, items: s.items, augments: s.augments };
+    return { gold: s.gold, xp: s.xp, level: s.level, units: s.units, shop: s.shop, items: s.items, augments: s.augments, pension: s.pension };
   },
 
   importSave: (save, allowedIds, enabledItems) => {
@@ -480,6 +496,7 @@ export const useGame = create<State>((set, get) => ({
       shop: toArray<string>(save.shop, ECONOMY.shopSlots),
       items: toArray<string>(save.items).filter(Boolean) as string[],
       augments: toArray<string>(save.augments).filter(Boolean) as string[],
+      pension: save.pension ?? null,
     });
   },
 
@@ -538,6 +555,34 @@ export const useGame = create<State>((set, get) => ({
       items: [...state.items, itemId],
       units: state.units.map((u) => (u.iid === iid ? { ...u, items: newItems } : u)),
     });
+  },
+
+  // Pension: deposit a 1★ mon to train into a 2★ over PENSION_ROUNDS planning
+  // rounds (costs gold, one slot). Its held items return to the inventory.
+  depositToPension: (iid) => {
+    const state = get();
+    if (state.pension) { toast("Pension is occupied", "La Pension est occupée"); return; }
+    const unit = state.units.find((u) => u.iid === iid);
+    if (!unit) return;
+    if (unit.star !== 1) { toast("Only ★ mons can be trained", "Seuls les ★ peuvent s'entraîner"); return; }
+    if (state.gold < PENSION_COST) { toast("Not enough gold", "Pas assez d'or"); return; }
+    set({
+      gold: state.gold - PENSION_COST,
+      units: state.units.filter((u) => u.iid !== iid),
+      items: [...state.items, ...unit.items], // return any held items to inventory
+      pension: { defId: unit.defId, star: unit.star, roundsLeft: PENSION_ROUNDS },
+    });
+  },
+
+  // Pension: retrieve a matured mon onto the bench, one star higher.
+  collectPension: () => {
+    const state = get();
+    const p = state.pension;
+    if (!p || p.roundsLeft > 0) return;
+    if (state.units.filter((u) => u.pos === null).length >= BENCH_SIZE) { toast("Bench full", "Banc plein"); return; }
+    const grown = { ...makeInstance(p.defId), star: Math.min(3, p.star + 1) as 1 | 2 | 3 };
+    const { units, dropped } = applyCombines([...state.units, grown]); // may chain-combine into a 3★
+    set({ units, items: [...state.items, ...dropped], pension: null });
   },
 }));
 
