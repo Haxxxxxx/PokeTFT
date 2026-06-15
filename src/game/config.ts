@@ -112,7 +112,11 @@ export function roundsInStage(stage: number): number {
 
 /** The next round position, rolling over to the next stage when a stage ends. */
 export function advanceRound(stage: number, round: number): { stage: number; round: number } {
-  if (round >= roundsInStage(stage)) return { stage: stage + 1, round: 1 };
+  // Cap stage at 50 — the RTDB rules validate meta/stage <= 50, so an uncapped
+  // increment in a pathological stalemate would get the whole transition write
+  // REJECTED and wedge the match. At stage 50 damage keeps ramping (stageBaseDamage
+  // default), so the game still resolves via elimination; it just can't overflow.
+  if (round >= roundsInStage(stage)) return { stage: Math.min(stage + 1, 50), round: 1 };
   return { stage, round: round + 1 };
 }
 

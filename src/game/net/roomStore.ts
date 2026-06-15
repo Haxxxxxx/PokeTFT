@@ -436,6 +436,11 @@ function subscribe(code: string, uid: string, setState: (p: Partial<RoomState>) 
   privUnsub = onValue(ref(db(), `priv/${code}/${uid}`), (snap) => {
     setState({ mySave: (snap.val()?.save ?? null) as PlayerSave | null });
   }, () => setState({ mySave: null }));
+  // Watchdog: onValue's error callback only fires on permission-denied, NOT on a
+  // network stall — so a stalled priv read would leave mySave `undefined` forever,
+  // gating first-planning and never running newGame (shop falls back to all-547,
+  // no economy). If neither callback resolved within 4s, treat it as empty (fresh).
+  setTimeout(() => { if (useRoom.getState().mySave === undefined) setState({ mySave: null }); }, 4000);
   const r = roomRef(code);
   unsub = onValue(r, (snap) => {
     if (!snap.exists()) {

@@ -242,6 +242,10 @@ export function NetGameClient() {
           }
         } catch (err) {
           console.error("[host-loop]", err);
+          // A transition threw (withClaimGuard already released the parked lock by
+          // resetting the deadline). Clear the idempotency guard so this host
+          // re-attempts the round on the next tick instead of staying blocked.
+          actedDeadline.current = -1;
         }
       })();
     }, 700);
@@ -280,19 +284,8 @@ export function NetGameClient() {
       // the lobby's region/draft rules, even on a reconnect/restore.
       const roster = rosterForGenerations(room.rules?.generations ?? [1], room.rules?.draftPoolSize, codeSeed(room.code));
       const enabledItems = room.rules?.itemsEnabled;
-      // TEMP diagnostic — remove once the rules-apply bug is confirmed fixed.
-      console.log("[rules-debug] gens=", room.rules?.generations, "draft=", room.rules?.draftPoolSize, "→ roster size=", roster.length, "| path=", save ? "importSave(restore)" : "newGame(fresh)", "| hp=", room.rules?.startingHp);
       if (save) importSave({ ...save, units: asUnits(save.units) }, roster, enabledItems);
       else newGame(room.rules?.startingHp ?? 100, roster, enabledItems);
-      // Dump the actual shop + pool gens so we can SEE if anything out-of-region slips in.
-      setTimeout(() => {
-        const g = useGame.getState();
-        const gset = new Set(room.rules?.generations ?? [1]);
-        const genOf = (id: string) => { const dx = getDef(id).dex[0]; const R: Record<number, [number, number]> = { 1: [1, 151], 2: [152, 251], 3: [252, 386], 4: [387, 493], 5: [494, 649], 6: [650, 721], 7: [722, 809], 8: [810, 905], 9: [906, 1025] }; for (const k in R) { const [s, e] = R[k]; if (dx >= s && dx <= e) return +k; } return 0; };
-        const shopGens = g.shop.filter(Boolean).map((id) => `${id}(g${genOf(id as string)})`);
-        const poolBad = Object.keys(g.pool).filter((id) => !gset.has(genOf(id)));
-        console.log("[rules-debug] SHOP=", shopGens, "| pool out-of-region count=", poolBad.length, poolBad.slice(0, 6));
-      }, 50);
     } else {
       lastRoundKey.current = key;
       netRound(meta.stage, meta.round, me?.streak ?? 0);

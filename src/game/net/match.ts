@@ -158,17 +158,16 @@ export async function heartbeat(code: string): Promise<void> {
 }
 
 function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, bUid: string, stage: number, ghost: boolean) {
-  const ba = board(room.players[aUid]);
-  const bb = board(room.players[bUid]);
-  const r = simulate(ba, bb);
+  // RTDB-safe the boards FIRST, then simulate THOSE for the authoritative result:
+  // the clients re-sim the round-tripped boards they read back, so computing `won`
+  // from the same round-tripped data guarantees the banner can't disagree with the
+  // replay (the "I see a different fight / phantom loss" desync).
+  const sa = rtdbSafe(board(room.players[aUid]));
+  const sb = rtdbSafe(board(room.players[bUid]));
+  const r = simulate(sa, sb);
   const draw = r.winner === "draw";
   const aWon = r.winner === "ally";
   const bWon = r.winner === "enemy";
-  // The boards are written into the combat node, so they must be RTDB-safe:
-  // a single unit with an undefined field (e.g. items) would make the whole
-  // combat update() reject → clients stuck on the planning board / desync.
-  const sa = rtdbSafe(ba);
-  const sb = rtdbSafe(bb);
   combat[aUid] = {
     oppUid: bUid,
     oppName: (room.players[bUid]?.name ?? "Rival") + (ghost ? " (ghost)" : ""),
@@ -224,6 +223,21 @@ async function claimTransition(code: string, fromPhase: string, expectedDeadline
   return res.committed && (res.snapshot.child("deadline").val() as number) > expectedDeadline + 30_000;
 }
 
+/** Run a claimed transition's body so that ANY throw / rejected write RELEASES the
+ *  60s claim lock (resets the deadline to a near-future value) instead of wedging
+ *  the phase forever. Without this, a single error after claimTransition leaves the
+ *  match stuck re-firing the parked deadline every minute (the planning-loop class).
+ *  The error is re-thrown so the host loop logs it; the deadline reset lets the next
+ *  host tick re-attempt the transition cleanly (or migrate). */
+async function withClaimGuard(code: string, body: () => Promise<void>): Promise<void> {
+  try {
+    await body();
+  } catch (err) {
+    await update(ref(db(), `games/${code}/meta`), { deadline: serverNow() + 2500, hostBeat: serverNow() }).catch(() => {});
+    throw err;
+  }
+}
+
 /** Host: decide what a planning round opens into (PvP / PvE / carousel). */
 export async function resolveRoundStart(code: string, room: Room): Promise<void> {
   if (roundKind(room.meta.stage, room.meta.round) === "carousel") return startCarousel(code, room);
@@ -253,12 +267,14 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
 
   const combat: Record<string, CombatAssign> = {};
   if (kind === "pve") {
-    // Everyone fights wild creeps — no HP loss, a breather to build.
+    // Everyone fights wild creeps — no HP loss, a breather to build. Resolve from
+    // the SAME round-tripped boards the client replays (see assign()) so the PvE
+    // outcome the player sees always matches what the host recorded.
     for (const p of alive) {
-      const self = board(room.players[p.uid]);
-      const creeps = generateCreepBoard(stage, room.meta.round, stage * 97 + room.meta.round * 13 + p.uid.length, allowed);
+      const self = rtdbSafe(board(room.players[p.uid]));
+      const creeps = rtdbSafe(generateCreepBoard(stage, room.meta.round, stage * 97 + room.meta.round * 13 + p.uid.length, allowed));
       const r = simulate(self, creeps);
-      combat[p.uid] = { oppUid: p.uid, oppName: "Wild Pokémon", ghost: true, pve: true, won: r.winner === "ally", survivors: 0, dmg: 0, selfBoard: rtdbSafe(self), oppBoard: rtdbSafe(creeps) };
+      combat[p.uid] = { oppUid: p.uid, oppName: "Wild Pokémon", ghost: true, pve: true, won: r.winner === "ally", survivors: 0, dmg: 0, selfBoard: self, oppBoard: creeps };
     }
   } else {
     const order = shuffled(alive.map((p) => p.uid).sort(), stage * 131 + room.meta.round);
@@ -281,43 +297,47 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
 /** Host: planning → combat (PvP pairing or PvE creeps). Freezes boards. */
 export async function startCombat(code: string, room: Room): Promise<void> {
   if (!(await claimTransition(code, "planning", room.meta.deadline))) return;
-  room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
-  const { combat, botBoards } = buildCombat(room);
+  return withClaimGuard(code, async () => {
+    room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
+    const { combat, botBoards } = buildCombat(room);
 
-  const u: Updates = { "meta/phase": "combat", "meta/deadline": serverNow() + COMBAT_MS, "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow() };
-  for (const uid of Object.keys(combat)) {
-    u[`combat/${uid}`] = combat[uid];
-    if (!combat[uid].pve && !combat[uid].ghost) u[`players/${uid}/lastOpp`] = combat[uid].oppUid;
-  }
-  for (const uid of Object.keys(botBoards)) u[`players/${uid}/board`] = botBoards[uid]; // persist for replay
-  await update(gamePath(code), u);
+    const u: Updates = { "meta/phase": "combat", "meta/deadline": serverNow() + COMBAT_MS, "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow() };
+    for (const uid of Object.keys(combat)) {
+      u[`combat/${uid}`] = combat[uid];
+      if (!combat[uid].pve && !combat[uid].ghost) u[`players/${uid}/lastOpp`] = combat[uid].oppUid;
+    }
+    for (const uid of Object.keys(botBoards)) u[`players/${uid}/board`] = botBoards[uid]; // persist for replay
+    await update(gamePath(code), u);
+  });
 }
 
 /** Host: planning → carousel. Offers each human a free pick (a held item + units). */
 export async function startCarousel(code: string, room: Room): Promise<void> {
   if (!(await claimTransition(code, "planning", room.meta.deadline))) return;
-  room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
-  // Item rewards: a Mega Stone plus item components players combine into the
-  // completed items the lobby enabled. Offering components (not finished items)
-  // is what makes the carousel a build-toward-a-recipe decision.
-  const itemPool = [MEGA_STONE, ...COMPONENT_IDS];
-  const carousel: Record<string, string[]> = {};
-  // Per-GAME entropy: the room code is unique to each match, so folding it in
-  // makes carousels differ from game to game (they used to seed only on
-  // stage/round/uid.length, which is identical across every game). The host
-  // writes this once, so it just needs to vary — not be client-reproducible.
-  const gameSeed = hashStr(code);
-  for (const p of alivePlayers(room)) {
-    if (p.isBot) continue;
-    const salt = (gameSeed ^ hashStr(p.uid) ^ Math.imul(room.meta.stage * 31 + room.meta.round * 7 + 1, 2654435761)) >>> 0;
-    // Rotate which item is offered per player/round so it varies but stays sync-free (host-written).
-    const item = itemPool[(salt >>> 3) % itemPool.length];
-    carousel[p.uid] = [item, ...pickCarouselOptions(room.meta.stage, salt, 4, rosterFor(room))];
-  }
-  await update(gamePath(code), {
-    "meta/phase": "carousel", "meta/deadline": serverNow() + CAROUSEL_MS,
-    "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow(),
-    combat: null, carousel,
+  return withClaimGuard(code, async () => {
+    room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
+    // Item rewards: a Mega Stone plus item components players combine into the
+    // completed items the lobby enabled. Offering components (not finished items)
+    // is what makes the carousel a build-toward-a-recipe decision.
+    const itemPool = [MEGA_STONE, ...COMPONENT_IDS];
+    const carousel: Record<string, string[]> = {};
+    // Per-GAME entropy: the room code is unique to each match, so folding it in
+    // makes carousels differ from game to game (they used to seed only on
+    // stage/round/uid.length, which is identical across every game). The host
+    // writes this once, so it just needs to vary — not be client-reproducible.
+    const gameSeed = hashStr(code);
+    for (const p of alivePlayers(room)) {
+      if (p.isBot) continue;
+      const salt = (gameSeed ^ hashStr(p.uid) ^ Math.imul(room.meta.stage * 31 + room.meta.round * 7 + 1, 2654435761)) >>> 0;
+      // Rotate which item is offered per player/round so it varies but stays sync-free (host-written).
+      const item = itemPool[(salt >>> 3) % itemPool.length];
+      carousel[p.uid] = [item, ...pickCarouselOptions(room.meta.stage, salt, 4, rosterFor(room))];
+    }
+    await update(gamePath(code), {
+      "meta/phase": "carousel", "meta/deadline": serverNow() + CAROUSEL_MS,
+      "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow(),
+      combat: null, carousel,
+    });
   });
 }
 
@@ -342,78 +362,83 @@ export async function finishCarouselEarlyIfReady(code: string, room: Room): Prom
 /** Host: carousel → next planning round. */
 export async function endCarousel(code: string, room: Room): Promise<void> {
   if (!(await claimTransition(code, "carousel", room.meta.deadline))) return;
-  room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
-  const next = advanceRound(room.meta.stage, room.meta.round);
-  await update(gamePath(code), {
-    "meta/phase": "planning", "meta/stage": next.stage, "meta/round": next.round,
-    "meta/deadline": serverNow() + PLAN_MS, "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow(),
-    carousel: null,
+  return withClaimGuard(code, async () => {
+    room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
+    const next = advanceRound(room.meta.stage, room.meta.round);
+    await update(gamePath(code), {
+      "meta/phase": "planning", "meta/stage": next.stage, "meta/round": next.round,
+      "meta/deadline": serverNow() + PLAN_MS, "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow(),
+      carousel: null,
+    });
   });
 }
 
 /** Host: combat → next planning (or game over). Applies HP, eliminations, placement. */
 export async function endCombat(code: string, room: Room): Promise<void> {
   if (!(await claimTransition(code, "combat", room.meta.deadline))) return;
-  room = (await freshRoom(code)) ?? room; // authoritative HP/combat (migration-safe)
-  let combat = room.combat ?? {};
-  const u: Updates = {};
-  const aliveUids = alivePlayers(room).map((p) => p.uid);
+  return withClaimGuard(code, async () => {
+    room = (await freshRoom(code)) ?? room; // authoritative HP/combat (migration-safe)
+    let combat = room.combat ?? {};
+    const u: Updates = {};
+    const aliveUids = alivePlayers(room).map((p) => p.uid);
 
-  // Defensive: if a migration left us with no combat results for the alive
-  // players, re-resolve the round deterministically from the frozen boards
-  // instead of applying zero damage (which would silently void the round).
-  if (aliveUids.length > 0 && !aliveUids.some((uid) => combat[uid])) {
-    combat = buildCombat(room).combat;
-  }
-  const hpAfter: Record<string, number> = {};
-
-  for (const uid of aliveUids) {
-    const p = room.players[uid];
-    if (!p) continue;
-    const c = combat[uid];
-    const hp = Math.max(0, p.hp - (c?.dmg ?? 0));
-    hpAfter[uid] = hp;
-    u[`players/${uid}/hp`] = hp;
-    if (c) {
-      const s = p.streak ?? 0;
-      u[`players/${uid}/streak`] = c.won ? (s >= 0 ? s + 1 : 1) : (s <= 0 ? s - 1 : -1);
+    // Defensive: if a migration left us with a missing OR PARTIAL combat map for
+    // the alive players, re-resolve the round deterministically from the frozen
+    // boards instead of applying zero damage to whoever's entry is missing (which
+    // would silently void the round for them).
+    if (aliveUids.length > 0 && !aliveUids.every((uid) => combat[uid])) {
+      combat = buildCombat(room).combat;
     }
-  }
+    const hpAfter: Record<string, number> = {};
 
-  let surviving = aliveUids.filter((uid) => hpAfter[uid] > 0);
-  let dead = aliveUids.filter((uid) => hpAfter[uid] <= 0);
+    for (const uid of aliveUids) {
+      const p = room.players[uid];
+      if (!p) continue;
+      const c = combat[uid];
+      const hp = Math.max(0, p.hp - (c?.dmg ?? 0));
+      hpAfter[uid] = hp;
+      u[`players/${uid}/hp`] = hp;
+      if (c) {
+        const s = p.streak ?? 0;
+        u[`players/${uid}/streak`] = c.won ? (s >= 0 ? s + 1 : 1) : (s <= 0 ? s - 1 : -1);
+      }
+    }
 
-  // Everyone died this round (mutual KO): the one with the most pre-damage HP wins.
-  if (surviving.length === 0 && dead.length > 0) {
-    const winner = [...dead].sort((a, b) => (room.players[b]?.hp ?? 0) - (room.players[a]?.hp ?? 0))[0];
-    surviving = [winner];
-    dead = dead.filter((uid) => uid !== winner);
-    u[`players/${winner}/hp`] = 1;
-  }
+    let surviving = aliveUids.filter((uid) => hpAfter[uid] > 0);
+    let dead = aliveUids.filter((uid) => hpAfter[uid] <= 0);
 
-  // Assign DISTINCT placements to everyone who died this round, ordered by their
-  // pre-damage HP (higher HP → better place) so a multi-death round doesn't hand
-  // out duplicate medals. Lowest HP gets the worst remaining place.
-  const deadByHp = [...dead].sort((a, b) => (room.players[a]?.hp ?? 0) - (room.players[b]?.hp ?? 0));
-  deadByHp.forEach((uid, i) => {
-    u[`players/${uid}/alive`] = false;
-    u[`players/${uid}/place`] = surviving.length + dead.length - i;
+    // Everyone died this round (mutual KO): the one with the most pre-damage HP wins.
+    if (surviving.length === 0 && dead.length > 0) {
+      const winner = [...dead].sort((a, b) => (room.players[b]?.hp ?? 0) - (room.players[a]?.hp ?? 0))[0];
+      surviving = [winner];
+      dead = dead.filter((uid) => uid !== winner);
+      u[`players/${winner}/hp`] = 1;
+    }
+
+    // Assign DISTINCT placements to everyone who died this round, ordered by their
+    // pre-damage HP (higher HP → better place) so a multi-death round doesn't hand
+    // out duplicate medals. Lowest HP gets the worst remaining place.
+    const deadByHp = [...dead].sort((a, b) => (room.players[a]?.hp ?? 0) - (room.players[b]?.hp ?? 0));
+    deadByHp.forEach((uid, i) => {
+      u[`players/${uid}/alive`] = false;
+      u[`players/${uid}/place`] = surviving.length + dead.length - i;
+    });
+
+    if (surviving.length <= 1) {
+      if (surviving.length === 1) u[`players/${surviving[0]}/place`] = 1;
+      u["meta/phase"] = "over";
+    } else {
+      const next = advanceRound(room.meta.stage, room.meta.round);
+      u["meta/phase"] = "planning";
+      u["meta/stage"] = next.stage;
+      u["meta/round"] = next.round;
+      u["meta/deadline"] = serverNow() + PLAN_MS;
+      u["combat"] = null;
+    }
+    u["meta/hostBeat"] = serverNow();
+    u["meta/updatedAt"] = serverNow();
+    await update(gamePath(code), u);
   });
-
-  if (surviving.length <= 1) {
-    if (surviving.length === 1) u[`players/${surviving[0]}/place`] = 1;
-    u["meta/phase"] = "over";
-  } else {
-    const next = advanceRound(room.meta.stage, room.meta.round);
-    u["meta/phase"] = "planning";
-    u["meta/stage"] = next.stage;
-    u["meta/round"] = next.round;
-    u["meta/deadline"] = serverNow() + PLAN_MS;
-    u["combat"] = null;
-  }
-  u["meta/hostBeat"] = serverNow();
-  u["meta/updatedAt"] = serverNow();
-  await update(gamePath(code), u);
 }
 
 /** End screen → rematch: send the whole room back to the pre-game lobby. Resets
