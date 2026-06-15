@@ -125,7 +125,7 @@ export function ShopBar() {
           if (!defId) {
             // Sold/empty slot — same footprint + border treatment as a filled slot
             // so every shop slot stays visually uniform.
-            return <div key={i} className="flex-1 h-[120px] rounded-lg border border-slate-700/50 bg-slate-900/30" />;
+            return <div key={i} className="flex-1 self-stretch min-h-[120px] rounded-lg border border-slate-700/50 bg-slate-900/30" />;
           }
           const def = getDef(defId);
           const color = COST_COLOR[def.cost];
@@ -150,7 +150,7 @@ export function ShopBar() {
               }}
               disabled={!affordable}
               style={{ boxShadow: own ? `inset 0 0 0 1.5px ${color}` : undefined }}
-              className={`group relative flex-1 h-[120px] overflow-hidden rounded-lg border border-slate-700/60 bg-slate-900 hover:brightness-125 disabled:opacity-50
+              className={`group relative flex-1 self-stretch min-h-[120px] overflow-hidden rounded-lg border border-slate-700/60 bg-slate-900 hover:brightness-125 disabled:opacity-50
                 transition ${oneFromStar ? "ring-2 ring-amber-300/80 ring-inset" : ""}`}
             >
               {/* Sprite as the card "art" on the right (TFT-style). */}
