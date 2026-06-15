@@ -5,7 +5,7 @@ import { DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSen
 import { useGame } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
-import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, PLAN_MS, COMBAT_MS } from "@/game/net/match";
+import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate } from "@/game/engine/combat";
 import { getDef, spriteUrl, unitsForGenerations } from "@/game/data/mons";
 import { ECONOMY, MAX_LEVEL, XP_TO_REACH, streakGold, roundKind, advanceRound } from "@/game/config";
@@ -28,11 +28,13 @@ function normUnit(u: UnitInstance): UnitInstance {
 
 const ITEM_DEF_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 
-// Fixed design canvas the game is laid out on; scaled uniformly to fit any screen.
-// Wide/tall enough for all 4 columns + the 8-row combat battlefield so nothing
-// wraps or clips between phases.
+// Fixed design canvas the game is laid out on; scaled uniformly to fit any
+// screen. Sized for the TALLEST phase (combat: battlefield + recap + bench/shop)
+// so the canvas never changes size between phases — the whole point of the
+// constant-scale fit. Both phases share these dimensions; the shorter one just
+// leaves unused space at the bottom (invisible), so nothing jumps.
 const DESIGN_W = 1500;
-const DESIGN_H = 1040;
+const DESIGN_H = 1140;
 
 function asUnits(u: unknown): UnitInstance[] {
   if (!u) return [];
@@ -44,7 +46,7 @@ import { UnitChip } from "./UnitChip";
 import { ShopBar } from "./ShopBar";
 import { TraitPanel } from "./TraitPanel";
 import { UnitDetail } from "./UnitDetail";
-import { ItemTray } from "./ItemTray";
+import { ItemsPanel } from "./ItemsPanel";
 import { CombatStage } from "./CombatStage";
 import { CoinIcon, TrophyIcon } from "./icons";
 import { useT } from "@/lib/i18n";
@@ -113,29 +115,24 @@ export function NetGameClient() {
   const [roundLog, setRoundLog] = useState<{ stage: number; round: number; won: boolean; pve: boolean }[]>([]);
   const [pickedKey, setPickedKey] = useState<string | null>(null);
   const [spectate, setSpectate] = useState<string | null>(null);
+  // Carousel/augment: hide the choice cards (revealing the live board behind the
+  // overlay) and toggle them back. Resets whenever a new pick screen opens.
+  const [revealBoard, setRevealBoard] = useState(false);
 
-  // Scale-to-fit the WHOLE page onto any screen. The combat phase (battlefield +
-  // damage recap) is taller than the planning phase, so we measure the ACTUAL
-  // content height via a ResizeObserver and refit whenever it changes (window
-  // resize OR phase swap). A constant canvas height made combat overflow the
-  // viewport — forcing a scroll and clipping the top bar. offsetWidth/Height are
-  // layout sizes (unaffected by the transform), so there's no feedback loop.
-  const contentRef = useRef<HTMLDivElement>(null);
+  // Scale-to-fit the fixed design canvas onto any screen. The canvas is a
+  // CONSTANT size (DESIGN_W × DESIGN_H, sized for the tallest phase), so the
+  // scale only ever changes on a window resize — NEVER when planning flips to
+  // combat. Both phases live on the same-sized canvas, so the board no longer
+  // resizes or jumps between phases (the old measured-height refit did).
   const [scale, setScale] = useState(1);
   useEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
     const fit = () => {
-      const cw = el.offsetWidth || DESIGN_W;
-      const ch = el.offsetHeight || DESIGN_H;
-      const s = Math.min(1, (window.innerWidth - 8) / cw, (window.innerHeight - 8) / ch);
+      const s = Math.min(1, (window.innerWidth - 8) / DESIGN_W, (window.innerHeight - 8) / DESIGN_H);
       setScale(s > 0 ? s : 1);
     };
     fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(el);
     window.addEventListener("resize", fit);
-    return () => { ro.disconnect(); window.removeEventListener("resize", fit); };
+    return () => window.removeEventListener("resize", fit);
   }, []);
 
   // server time + a 250ms repaint so the shared timer counts down smoothly
@@ -143,6 +140,18 @@ export function NetGameClient() {
     startServerTime();
     const id = setInterval(() => setTick((t) => t + 1), 250);
     return () => clearInterval(id);
+  }, []);
+
+  // Click anywhere that isn't a mon / item / the detail panel closes the details.
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && el.closest("[data-inspectable]")) return;
+      const ui = useUi.getState();
+      if (ui.inspect || ui.inspectedItem) ui.clearInspect();
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
   }, []);
 
   // Host loop: claim the host if it stalls; heartbeat; and advance the phase
@@ -179,6 +188,12 @@ export function NetGameClient() {
   const me = myUid ? players[myUid] : undefined;
   const phase = meta?.phase;
   const myCombat = myUid ? room?.combat?.[myUid] : undefined;
+
+  // A fresh carousel/augment screen always opens showing its choices.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRevealBoard(false);
+  }, [phase]);
 
   // Each new planning round: grant economy. On the FIRST planning we see, either
   // restore a synced save (reconnect) or start fresh — never wipe an in-progress
@@ -372,8 +387,7 @@ export function NetGameClient() {
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
       <div className="fixed inset-0 flex justify-center items-center overflow-hidden">
       <div
-        ref={contentRef}
-        style={{ width: DESIGN_W, transform: `scale(${scale})`, transformOrigin: "center", transition: "transform 140ms ease-out" }}
+        style={{ width: DESIGN_W, height: DESIGN_H, transform: `scale(${scale})`, transformOrigin: "center" }}
         className="flex flex-col gap-3 p-3 shrink-0"
       >
         {/* Round timeline: current stage + the next two, tagged by kind, with
@@ -453,9 +467,14 @@ export function NetGameClient() {
           <button onClick={leave} className="ml-auto px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.net_leave}</button>
         </div>
 
-        <div className="flex flex-wrap gap-3 items-start justify-center">
-          {/* Scoreboard */}
-          <div className="w-[190px] shrink-0 p-2 rounded-xl bg-slate-900/70 border border-slate-700/50">
+        {/* Pinned 3-column layout: a fixed-width sidebar, a fixed-width FIELD
+            column, and a fixed-width right rail. Because every track is a
+            constant width, the battlefield sits in the exact same place in
+            planning and combat — it never shifts when the phase flips. */}
+        <div className="grid items-start gap-3" style={{ gridTemplateColumns: "220px 748px 300px", justifyContent: "center" }}>
+          {/* Left sidebar: scoreboard + synergies */}
+          <div className="flex flex-col gap-3">
+          <div className="w-full p-2 rounded-xl bg-slate-900/70 border border-slate-700/50">
             <h2 className="text-[10px] uppercase tracking-wider text-slate-500 px-1 mb-1.5">{t.net_trainers(aliveCount)}</h2>
             <div className="flex flex-col gap-1">
               {ladder.map((p, i) => {
@@ -493,9 +512,11 @@ export function NetGameClient() {
               })}
             </div>
           </div>
+            <TraitPanel units={spectateUnits ?? undefined} />
+          </div>
 
-          <TraitPanel units={spectateUnits ?? undefined} />
-          <div className="w-[700px] shrink-0 flex flex-col gap-3 items-center">
+          {/* Center: the shared field — identical pixels every phase */}
+          <div className="flex flex-col gap-3 items-center min-w-0">
             {/* Spectating a rival overrides the view: their live fight during
                 combat, else their board + bench (read-only). Otherwise my own
                 combat replay during combat, else my board. */}
@@ -532,9 +553,19 @@ export function NetGameClient() {
             ) : (
               <Board />
             )}
-            <ItemTray />
           </div>
-          <UnitDetail />
+
+          {/* Right rail: items inventory + details (planning). During combat the
+              recap (with tabs) lives inside CombatStage; the 300px track stays
+              reserved so the field column doesn't move. */}
+          <div className="w-[300px]">
+            {phase !== "combat" && !spectating && (
+              <div className="flex flex-col gap-3">
+                <ItemsPanel />
+                <UnitDetail />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Bottom bar: bench + shop, pinned to the bottom of the screen. */}
@@ -554,7 +585,22 @@ export function NetGameClient() {
         const picked = pickedKey === key;
         if (!opts) return null;
         return (
-          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4" style={{ background: "radial-gradient(58% 58% at 50% 38%, rgba(146,64,14,0.32), rgba(2,6,23,0.93))", backdropFilter: "blur(7px)" }}>
+          <div
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4"
+            style={revealBoard
+              ? { background: "transparent", pointerEvents: "none" }
+              : { background: "radial-gradient(58% 58% at 50% 38%, rgba(146,64,14,0.32), rgba(2,6,23,0.93))", backdropFilter: "blur(7px)" }}
+          >
+            {/* Always-clickable toggle: hide the choices to peek at your live
+                board/bench/shop underneath, then bring the choices back. */}
+            <button
+              onClick={() => setRevealBoard((v) => !v)}
+              style={{ pointerEvents: "auto" }}
+              className="absolute top-4 right-4 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-200 shadow-lg"
+            >
+              👁 {revealBoard ? (lang === "fr" ? "Afficher les choix" : "Show choices") : (lang === "fr" ? "Voir mon plateau" : "Hide & view board")}
+            </button>
+            {!revealBoard && (
             <div className="celebrate-pop flex flex-col items-center">
               <div className="flex items-center gap-2.5 mb-1">
                 <span className="text-2xl">🎡</span>
@@ -593,13 +639,27 @@ export function NetGameClient() {
               </div>
             )}
             </div>
+            )}
           </div>
         );
       })()}
 
       {/* Augment pick — 3 TFT-style boosts at the start of stages 2/3/4. */}
       {showAugment && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4" style={{ background: "radial-gradient(58% 58% at 50% 38%, rgba(76,29,149,0.4), rgba(2,6,23,0.93))", backdropFilter: "blur(7px)" }}>
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4"
+          style={revealBoard
+            ? { background: "transparent", pointerEvents: "none" }
+            : { background: "radial-gradient(58% 58% at 50% 38%, rgba(76,29,149,0.4), rgba(2,6,23,0.93))", backdropFilter: "blur(7px)" }}
+        >
+          <button
+            onClick={() => setRevealBoard((v) => !v)}
+            style={{ pointerEvents: "auto" }}
+            className="absolute top-4 right-4 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-200 shadow-lg"
+          >
+            👁 {revealBoard ? (lang === "fr" ? "Afficher les choix" : "Show choices") : (lang === "fr" ? "Voir mon plateau" : "Hide & view board")}
+          </button>
+          {!revealBoard && (
           <div className="celebrate-pop flex flex-col items-center">
             <div className="flex items-center gap-2.5 mb-1">
               <span className="text-2xl">✨</span>
@@ -621,6 +681,7 @@ export function NetGameClient() {
             ))}
             </div>
           </div>
+          )}
         </div>
       )}
 
@@ -643,16 +704,69 @@ export function NetGameClient() {
         </div>
       )}
 
-      {gameOver && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm gap-4">
-          <div className={`celebrate-pop flex flex-col items-center gap-3 ${iWon ? "text-amber-300" : "text-slate-200"}`}>
-            {iWon && <TrophyIcon size={56} />}
+      {gameOver && (() => {
+        // Final standings: every player ranked by placement (winner = #1), with
+        // their final team so you can see how everyone finished before a rematch.
+        const standings = Object.values(players).sort((a, b) => (a.place ?? 99) - (b.place ?? 99));
+        const medal = (place: number) => (place === 1 ? "🥇" : place === 2 ? "🥈" : place === 3 ? "🥉" : `#${place}`);
+        return (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm gap-5 p-4">
+          <div className={`celebrate-pop flex flex-col items-center gap-2 ${iWon ? "text-amber-300" : "text-slate-200"}`}>
+            {iWon && <TrophyIcon size={52} />}
             <div className="text-4xl font-extrabold">{iWon ? t.net_victory : t.net_gameover}</div>
+            <div className="text-sm text-slate-400">{t.net_placed(me?.place ?? 1)}</div>
           </div>
-          <div className="text-slate-300">{t.net_placed(me?.place ?? 1)}</div>
-          <button onClick={leave} className="px-6 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold">{t.net_back_menu}</button>
+
+          <div className="w-full max-w-[560px] flex flex-col gap-2">
+            <h3 className="text-[11px] uppercase tracking-[0.2em] text-slate-500 text-center mb-1">{t.net_final_standings}</h3>
+            <div className="flex flex-col gap-1.5 max-h-[52vh] overflow-y-auto pr-1">
+              {standings.map((p) => {
+                const team = asBoard(p.board);
+                const isMe = p.uid === myUid;
+                const first = p.place === 1;
+                return (
+                  <div
+                    key={p.uid}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-xl border ${first ? "bg-amber-500/10 border-amber-500/50" : "bg-slate-900/70 border-slate-700/50"} ${isMe ? "ring-1 ring-sky-500/60" : ""}`}
+                  >
+                    <span className="w-8 text-center text-lg font-extrabold tabular-nums shrink-0">{medal(p.place ?? 99)}</span>
+                    <span className="w-9 h-9 rounded-md bg-black/40 border border-slate-700 flex items-center justify-center shrink-0 overflow-hidden">
+                      {p.photoURL
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={p.photoURL} alt="" width={32} height={32} style={{ imageRendering: "pixelated" }} />
+                        : <span className="text-xs text-slate-500">{p.name.slice(0, 1).toUpperCase()}</span>}
+                    </span>
+                    <div className="w-[120px] shrink-0 min-w-0">
+                      <div className={`text-sm font-bold truncate ${first ? "text-amber-300" : isMe ? "text-sky-300" : "text-slate-200"}`}>{p.name}</div>
+                      <div className="text-[10px] text-slate-500">{Math.max(0, p.hp)} HP</div>
+                    </div>
+                    <div className="flex-1 flex flex-wrap gap-0.5 justify-end items-center">
+                      {team.length === 0
+                        ? <span className="text-[10px] text-slate-600">{t.net_empty_board}</span>
+                        : team.slice(0, 10).map((u) => {
+                            const def = getDef(u.defId);
+                            return (
+                              <span key={u.iid} title={`${def.name} ★${u.star}`} className="relative w-7 h-7 rounded bg-black/40 border border-slate-700/70 flex items-center justify-center shrink-0">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={spriteUrl(def.dex[u.star - 1])} alt="" width={24} height={24} style={{ imageRendering: "pixelated" }} draggable={false} />
+                                {u.star > 1 && <span className="absolute -top-1 -right-1 text-[7px] font-extrabold text-amber-300 bg-slate-900/90 rounded px-0.5 leading-tight">{u.star}★</span>}
+                              </span>
+                            );
+                          })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button onClick={() => returnToLobby(room.code, room)} className="px-6 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold shadow-lg">{t.net_play_again}</button>
+            <button onClick={leave} className="px-6 py-2.5 rounded-lg bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-slate-200 text-sm font-bold">{t.net_quit}</button>
+          </div>
         </div>
-      )}
+        );
+      })()}
     </DndContext>
   );
 }

@@ -297,6 +297,32 @@ export async function endCombat(code: string, room: Room): Promise<void> {
   await update(gamePath(code), u);
 }
 
+/** End screen → rematch: send the whole room back to the pre-game lobby. Resets
+ *  every player's match state (the next start re-rolls fresh) and clears the
+ *  finished game. Any player may trigger it — everyone returns to the lobby
+ *  together the moment the shared phase flips. */
+export async function returnToLobby(code: string, room: Room): Promise<void> {
+  const hp = room.rules?.startingHp ?? 100;
+  const u: Updates = {
+    "meta/phase": "lobby",
+    "meta/updatedAt": serverNow(),
+    "meta/hostBeat": serverNow(),
+    combat: null,
+    carousel: null,
+  };
+  for (const p of Object.values(room.players ?? {})) {
+    u[`players/${p.uid}/hp`] = hp;
+    u[`players/${p.uid}/alive`] = true;
+    u[`players/${p.uid}/place`] = null;
+    u[`players/${p.uid}/streak`] = 0;
+    u[`players/${p.uid}/level`] = 1;
+    u[`players/${p.uid}/board`] = null;
+    u[`players/${p.uid}/save`] = null;
+    u[`players/${p.uid}/lastOpp`] = null;
+  }
+  await update(gamePath(code), u);
+}
+
 /** Any client: claim the host role if the current host's heartbeat has gone
  *  stale (dropped OR backgrounded tab). Race-free via a transaction on meta. */
 export async function maybeClaimHost(code: string, room: Room, myUid: string): Promise<void> {

@@ -114,6 +114,10 @@ export type Dict = {
   net_victory: string;
   net_gameover: string;
   net_spectating: string;
+  net_final_standings: string;
+  net_play_again: string;
+  net_quit: string;
+  net_empty_board: string;
   // Shop
   sh_reroll: string;
   sh_freeze: string;
@@ -122,6 +126,10 @@ export type Dict = {
   sh_view_details: string;
   sh_max: string;
   sh_odds: string;
+  sh_items_title: string;
+  it_empty: string;
+  it_equip_hint: string;
+  it_equip_mega: string;
   // Combat stage
   cs_your_team: string;
   cs_vs: string;
@@ -130,6 +138,9 @@ export type Dict = {
   cs_victory: string;
   cs_defeat: string;
   cs_draw: string;
+  cs_recap: string;
+  cs_show_recap: string;
+  cs_hide_recap: string;
   // Unit detail
   ud_click_hint: string;
   ud_ability: string;
@@ -262,6 +273,10 @@ export const FR: Dict = {
   net_victory: "Victoire Royale",
   net_gameover: "Game Over",
   net_spectating: "spectateur",
+  net_final_standings: "Classement final",
+  net_play_again: "Rejouer",
+  net_quit: "Quitter",
+  net_empty_board: "Aucun Pokémon",
   sh_reroll: "Reroll",
   sh_freeze: "Geler",
   sh_frozen: "Gelé",
@@ -269,9 +284,16 @@ export const FR: Dict = {
   sh_view_details: "Voir les détails",
   sh_max: "MAX",
   sh_odds: "Chances",
+  sh_items_title: "Objets",
+  it_empty: "Aucun objet — gagne-les en carrousel ou PvE.",
+  it_equip_hint: "Clique un mon pour l'équiper · Échap pour annuler",
+  it_equip_mega: "Clique un mon Méga-capable pour l'équiper",
   cs_your_team: "Votre équipe",
   cs_vs: "VS",
   cs_overtime: "PROLONGATION",
+  cs_recap: "Bilan",
+  cs_show_recap: "Afficher le bilan",
+  cs_hide_recap: "Masquer le bilan",
   cs_continue: "Continuer",
   cs_victory: "Victoire",
   cs_defeat: "Défaite",
@@ -407,6 +429,10 @@ export const EN: Dict = {
   net_victory: "Victory Royale",
   net_gameover: "Game Over",
   net_spectating: "spectating",
+  net_final_standings: "Final Standings",
+  net_play_again: "Play again",
+  net_quit: "Quit",
+  net_empty_board: "No Pokémon",
   sh_reroll: "Reroll",
   sh_freeze: "Freeze",
   sh_frozen: "Frozen",
@@ -414,9 +440,16 @@ export const EN: Dict = {
   sh_view_details: "View details",
   sh_max: "MAX",
   sh_odds: "Odds",
+  sh_items_title: "Items",
+  it_empty: "No items yet — win them in carousel or PvE.",
+  it_equip_hint: "Click a mon to equip · Esc to cancel",
+  it_equip_mega: "Click a Mega-capable mon to equip",
   cs_your_team: "Your Team",
   cs_vs: "VS",
   cs_overtime: "OVERTIME",
+  cs_recap: "Recap",
+  cs_show_recap: "Show recap",
+  cs_hide_recap: "Hide recap",
   cs_continue: "Continue",
   cs_victory: "Victory",
   cs_defeat: "Defeat",

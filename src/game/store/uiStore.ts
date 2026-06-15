@@ -8,6 +8,11 @@ type UiState = {
   setInspect: (defId: string, star: 1 | 2 | 3, iid?: string) => void;
   clearInspect: () => void;
 
+  /** An inventory item being inspected in the detail panel (mutually exclusive
+   *  with a mon inspect). */
+  inspectedItem: string | null;
+  setInspectedItem: (id: string | null) => void;
+
   /** Which player's board we're viewing. null = your own (interactive). */
   viewPlayerId: string | null;
   setView: (playerId: string | null) => void;
@@ -19,8 +24,12 @@ type UiState = {
 
 export const useUi = create<UiState>((set) => ({
   inspect: null,
-  setInspect: (defId, star, iid) => set({ inspect: { defId, star, iid } }),
-  clearInspect: () => set({ inspect: null }),
+  // Inspecting a mon clears any item inspect (one detail panel, one subject).
+  setInspect: (defId, star, iid) => set({ inspect: { defId, star, iid }, inspectedItem: null }),
+  clearInspect: () => set({ inspect: null, inspectedItem: null }),
+
+  inspectedItem: null,
+  setInspectedItem: (id) => set({ inspectedItem: id, inspect: null }),
 
   viewPlayerId: null,
   setView: (playerId) => set({ viewPlayerId: playerId }),

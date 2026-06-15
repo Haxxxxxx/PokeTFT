@@ -95,6 +95,7 @@ export function UnitChip({ unit, size = 56, interactive = true, shape = "square"
         {...(interactive ? attributes : {})}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
+        data-inspectable
         style={{ width: size, height: size, opacity: isDragging ? 0.4 : 1 }}
         className={`relative select-none touch-none ${interactive ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${canEquipArmed ? "animate-pulse" : ""}`}
         title={title}
@@ -120,6 +121,7 @@ export function UnitChip({ unit, size = 56, interactive = true, shape = "square"
       {...(interactive ? attributes : {})}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
+      data-inspectable
       style={{
         width: size, height: size,
         borderColor: ring,

@@ -142,14 +142,18 @@ export const useGame = create<State>((set, get) => ({
     rng = makeRng((Math.floor(Math.random() * 0x7fffffff) ^ Date.now()) >>> 0);
     const pool = makePool(allowedIds);
     const unitsByCost = makeUnitsByCost(allowedIds);
-    // Free starter unit, auto-placed on the front row, so the opening PvE round
-    // is never an empty board (the main reason new players lost at 1-1).
-    const starters = unitsByCost[1] ?? [];
+    // Two free starters, auto-placed on the front row. The opening PvE rounds pit
+    // you against 1-2 wild creeps, so starting with a 2-unit squad gives a
+    // reliable numbers edge — the 1-1 fight is no longer a 1v1 coin flip (the
+    // main reason players lost the opener).
+    const starters = [...(unitsByCost[1] ?? [])];
     const units: UnitInstance[] = [];
-    if (starters.length) {
-      const id = starters[randInt(rng, starters.length)];
+    const frontRow = BOARD.rows - 1;
+    const startCols = [3, 2]; // centre-front, then its left neighbour
+    for (let i = 0; i < 2 && starters.length; i++) {
+      const id = starters.splice(randInt(rng, starters.length), 1)[0]; // distinct mons
       takeFromPool(pool, id);
-      units.push({ ...makeInstance(id), pos: [3, BOARD.rows - 1] });
+      units.push({ ...makeInstance(id), pos: [startCols[i], frontRow] });
     }
     set({
       pool, unitsByCost, gold: 4, xp: 0, level: 1, health: startingHp,
