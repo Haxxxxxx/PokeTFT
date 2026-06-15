@@ -463,35 +463,43 @@ export function NetGameClient() {
           </div>
         </div>
 
-        {/* Top bar */}
-        <div className="flex items-center gap-5 flex-wrap p-3 rounded-xl bg-slate-900/70 border border-slate-700/50">
-          <Stat label={t.net_stage} value={`${meta.stage}-${meta.round}`} />
-          <Stat label={t.net_hp} value={`${Math.max(0, me?.hp ?? 0)}`} accent="#ff6b6b" />
-          <Stat label={t.net_gold} accent="#fbbf24" value={<span className="inline-flex items-center gap-1"><CoinIcon size={13} />{gold}</span>} />
-          <Stat label={t.net_interest} value={`+${interest(gold)}`} />
-          <Stat label={t.net_streak} value={`${streak >= 0 ? "W" : "L"}${Math.abs(streak)} (+${streakGold(streak)})`} />
-          <Stat label={t.net_alive(aliveCount)} value="" />
-
-          {/* Level + XP + Buy XP */}
-          <div className="flex flex-col gap-1 min-w-[200px]">
-            <div className="flex justify-between text-[11px]">
-              <span className={`font-bold uppercase ${phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{phaseLabel}</span>
-              <span className="tabular-nums text-slate-300">{secondsLeft}s</span>
-            </div>
-            <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
-              <div className={`h-full transition-all ${phase === "combat" ? "bg-rose-400" : "bg-sky-400"}`} style={{ width: `${pct}%` }} />
-            </div>
+        {/* Top HUD bar: a prominent stage badge, a row of stat chips, then the
+            phase/timer segment and session controls. */}
+        <div className="flex items-center gap-2.5 flex-wrap p-2.5 rounded-xl bg-gradient-to-b from-slate-900/85 to-slate-900/60 border border-slate-700/50">
+          {/* Stage badge */}
+          <div className="flex flex-col items-center justify-center px-3.5 py-1 rounded-lg bg-slate-800/70 border border-slate-700/50 shrink-0">
+            <span className="text-[8px] uppercase tracking-[0.2em] text-slate-500 leading-none">{t.net_stage}</span>
+            <span className="text-xl font-extrabold tabular-nums text-slate-100 leading-tight">{meta.stage}-{meta.round}</span>
           </div>
+
+          <StatChip label={t.net_hp} accent="#ff6b6b" value={Math.max(0, me?.hp ?? 0)} />
+          <StatChip label={t.net_gold} accent="#fbbf24" value={<span className="inline-flex items-center gap-1"><CoinIcon size={13} />{gold}</span>} />
+          <StatChip label={t.net_interest} accent="#fcd34d" value={`+${interest(gold)}`} />
+          <StatChip label={t.net_streak} accent={streak >= 0 ? "#34d399" : "#f87171"} value={`${streak >= 0 ? "W" : "L"}${Math.abs(streak)}`} sub={`+${streakGold(streak)}`} />
+          <StatChip label={t.net_alive(aliveCount).replace(/[0-9]+\s*/, "")} accent="#cbd5e1" value={aliveCount} />
+
           {augments.length > 0 && (
-            <div className="flex items-center gap-1" title="Augments">
+            <div className="flex items-center gap-1 shrink-0" title="Augments">
               {augments.map((id, i) => {
                 const a = AUGMENTS.find((x) => x.id === id);
                 return <span key={i} className="w-7 h-7 rounded-md bg-violet-900/40 border border-violet-500/50 flex items-center justify-center text-sm" title={a ? (lang === "fr" ? `${a.nameFr} — ${a.descFr}` : `${a.name} — ${a.desc}`) : id}>{a?.icon ?? "◆"}</span>;
               })}
             </div>
           )}
-          {isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1">{t.net_host_badge}</span>}
-          <div className="ml-auto flex items-center gap-2">
+
+          {/* Phase + timer (prominent, takes the remaining width). */}
+          <div className="flex-1 min-w-[220px] flex flex-col gap-1 px-2">
+            <div className="flex justify-between items-baseline">
+              <span className={`text-xs font-extrabold uppercase tracking-wide ${phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{phaseLabel}</span>
+              <span className="text-sm font-bold tabular-nums text-slate-200">{secondsLeft}s</span>
+            </div>
+            <div className="h-2.5 rounded-full bg-slate-800 overflow-hidden">
+              <div className={`h-full transition-all ${phase === "combat" ? "bg-rose-400" : "bg-sky-400"}`} style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+
+          {isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1 shrink-0">{t.net_host_badge}</span>}
+          <div className="flex items-center gap-2 shrink-0">
             <FullscreenButton />
             <button onClick={leave} className="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.net_leave}</button>
           </div>
@@ -941,11 +949,13 @@ function OrnateAugmentCard({ onClick, icon, name, desc }: { onClick: () => void;
   );
 }
 
-function Stat({ label, value, accent }: { label: string; value: ReactNode; accent?: string }) {
+function StatChip({ label, value, accent, sub }: { label: string; value: ReactNode; accent?: string; sub?: string }) {
   return (
-    <div className="flex flex-col">
-      <span className="text-[10px] uppercase tracking-wider text-slate-500">{label}</span>
-      <span className="text-sm font-bold" style={{ color: accent }}>{value}</span>
+    <div className="flex flex-col px-2.5 py-1 rounded-lg bg-slate-800/50 border border-slate-700/40 shrink-0">
+      <span className="text-[8px] uppercase tracking-wider text-slate-500 leading-none mb-0.5">{label}</span>
+      <span className="text-sm font-extrabold leading-none inline-flex items-baseline gap-1" style={{ color: accent }}>
+        {value}{sub && <span className="text-[9px] font-bold text-slate-500">{sub}</span>}
+      </span>
     </div>
   );
 }
