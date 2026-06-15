@@ -74,6 +74,14 @@ function asBoard(b: unknown): UnitInstance[] {
   return (arr as UnitInstance[]).filter((u) => u && u.pos && hasDef(u.defId)).map(normUnit);
 }
 
+/** FNV-1a hash of the room code → a numeric seed for the per-game roster draw,
+ *  matching match.ts's hashStr so the local pool equals the host's. */
+function codeSeed(code: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < code.length; i++) { h ^= code.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
 /** Cheap, stable signature of a frozen board for memo deps — changes whenever the
  *  board's units/positions/items change, so a re-frozen board re-runs the replay. */
 function boardSig(b: unknown): string {
@@ -256,7 +264,7 @@ export function NetGameClient() {
       lastRoundKey.current = key;
       const save = mySave ?? me?.save; // private path first, legacy public save as fallback
       if (save) importSave({ ...save, units: asUnits(save.units) });
-      else newGame(room.rules?.startingHp ?? 100, rosterForGenerations(room.rules?.generations ?? [1]));
+      else newGame(room.rules?.startingHp ?? 100, rosterForGenerations(room.rules?.generations ?? [1], room.rules?.draftPoolSize, codeSeed(room.code)));
     } else {
       lastRoundKey.current = key;
       netRound(meta.stage, meta.round, me?.streak ?? 0);

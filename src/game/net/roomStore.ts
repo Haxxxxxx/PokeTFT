@@ -90,6 +90,8 @@ export type RoomRules = {
   maxPlayers: number;
   generations?: number[];
   itemsEnabled?: string[];
+  /** How many mons are randomly drawn from the eligible pool for this game. */
+  draftPoolSize?: number;
 };
 
 export type Room = {
@@ -258,7 +260,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       const code = genCode();
       await set(roomRef(code), {
         meta: { hostUid: uid, phase: "lobby", stage: 1, round: 1, deadline: 0, updatedAt: serverTimestamp() },
-        rules: { startingHp, maxPlayers, generations: rules?.generations ?? [1], itemsEnabled: rules?.itemsEnabled ?? [] },
+        rules: { startingHp, maxPlayers, generations: rules?.generations ?? [1], itemsEnabled: rules?.itemsEnabled ?? [], draftPoolSize: rules?.draftPoolSize ?? 90 },
         players: { [uid]: newPlayer(uid, name || "Host", true, startingHp) },
       });
       subscribe(code, uid, setState);

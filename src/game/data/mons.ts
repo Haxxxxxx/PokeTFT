@@ -1,6 +1,7 @@
 import type { UnitDef, StatBlock, Move, PokeType, RoleTrait } from "../types";
 import type { Cost } from "../config";
 import { GEN_DEX_RANGES } from "./generations";
+import { GENERATED } from "./mons.generated";
 
 /** Sprite URL from national dex id (PokéAPI's public sprite repo). */
 export function spriteUrl(dex: number): string {
@@ -747,6 +748,25 @@ export const UNITS: UnitDef[] = [
     patch: { attackSpeed: 0.78 } }),
 ];
 
+// Fill out each region's full national-dex roster from the auto-generated set.
+// Curated lines above take precedence: a generated unit is skipped if its id or
+// ANY of its dex stages already belongs to a curated line (no duplicate mons).
+{
+  const ids = new Set(UNITS.map((u) => u.id));
+  const dexSeen = new Set(UNITS.flatMap((u) => u.dex));
+  for (const g of GENERATED) {
+    if (ids.has(g.id) || g.dex.some((d) => dexSeen.has(d))) continue;
+    ids.add(g.id);
+    g.dex.forEach((d) => dexSeen.add(d));
+    UNITS.push(def({
+      id: g.id, name: g.name, cost: g.cost, types: g.types, roles: [],
+      dex: g.dex, stageNames: g.stageNames,
+      move: move(g.move.name, g.move.type, g.move.power, g.move.shape),
+      patch: g.patch,
+    }));
+  }
+}
+
 export const UNITS_BY_ID: Record<string, UnitDef> = Object.fromEntries(
   UNITS.map((u) => [u.id, u]),
 );
@@ -786,30 +806,50 @@ export function unitsForGenerations(gens: number[]): string[] {
     .map((u) => u.id);
 }
 
-/** Roster plateau: a single region only has its own mons, but stacking many
- *  regions used to balloon the pool to 200+ (diluting the shop so you never hit
- *  3-stars). We cap the playable roster so it stays stable from ~4 regions up to
- *  all regions. Region counts below the cap are unaffected (their natural size).
- *
- *  Cumulative roster by region count is ~42 / 66 / 88 / 111 / … / 206, so a cap
- *  of 100 makes the roster plateau right at 4 regions and stay flat to the max. */
-export const ROSTER_CAP = 100;
+/** Default roster size when no explicit draft size is given (keeps the shop from
+ *  being diluted by a 200+ pool you can never 3-star out of). */
+export const ROSTER_CAP = 90;
+
+// Tiny seeded RNG (mulberry32) so a game's random roster draw is identical on
+// every client (seed = the room code) yet differs game-to-game.
+function seededRng(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 /** The actual playable roster for the selected generations — the source of truth
- *  for the shop pool, bots, creeps and carousel alike. Deterministic (same gens
- *  → same list on every client) and cost-balanced, so capping doesn't skew the
- *  shop's cost distribution. */
-export function rosterForGenerations(gens: number[]): string[] {
+ *  for the shop pool, bots, creeps and carousel alike.
+ *
+ *  When the eligible pool is larger than `size`, we draw a RANDOM, cost-balanced
+ *  subset: the "draft size" rule decides how many of the region's mons are in
+ *  play this game (so each match feels different), while the per-cost proportions
+ *  are preserved so the shop still has units at every tier. The draw is seeded by
+ *  `seed` (the room code) so the host and every client compute the identical
+ *  roster — essential for combat determinism. */
+export function rosterForGenerations(gens: number[], size: number = ROSTER_CAP, seed = 1): string[] {
   const ids = unitsForGenerations(gens);
-  if (ids.length <= ROSTER_CAP) return ids;
-  // Sort by (cost, id) then take an even stride — preserves the per-cost-tier
-  // proportions while trimming to the cap, fully deterministically.
-  const sorted = [...ids].sort((a, b) => {
-    const ca = getDef(a).cost, cb = getDef(b).cost;
-    return ca !== cb ? ca - cb : a < b ? -1 : a > b ? 1 : 0;
-  });
-  const stride = sorted.length / ROSTER_CAP;
+  if (ids.length <= size) return ids;
+  const rng = seededRng(seed);
+  // Group by cost, shuffle each tier, take a proportional share so the subset
+  // keeps the pool's cost spread.
+  const byCost: Record<number, string[]> = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+  for (const id of ids) (byCost[getDef(id).cost] ??= []).push(id);
   const out: string[] = [];
-  for (let i = 0; i < ROSTER_CAP; i++) out.push(sorted[Math.floor(i * stride)]);
+  for (const c of [1, 2, 3, 4, 5]) {
+    const tier = byCost[c] ?? [];
+    tier.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)); // stable base order
+    for (let i = tier.length - 1; i > 0; i--) { // seeded Fisher–Yates
+      const j = Math.floor(rng() * (i + 1));
+      [tier[i], tier[j]] = [tier[j], tier[i]];
+    }
+    const take = Math.max(1, Math.round((size * tier.length) / ids.length));
+    out.push(...tier.slice(0, Math.min(take, tier.length)));
+  }
   return out;
 }

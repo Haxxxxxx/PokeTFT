@@ -6,7 +6,7 @@ import { usePreLobby } from "@/game/store/preLobbyStore";
 import { beginMatch } from "@/game/net/match";
 import { enterFullscreen } from "@/lib/fullscreen";
 import { GameRulesPanel } from "./GameRulesPanel";
-import { rosterForGenerations } from "@/game/data/mons";
+import { unitsForGenerations } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 
 const GEN_NAMES = ["", "Kanto", "Johto", "Hoenn", "Sinnoh", "Unova", "Kalos", "Alola", "Galar", "Paldea"];
@@ -41,8 +41,8 @@ export function LobbyScreen() {
 
   useEffect(() => {
     if (!room || !isHost) return;
-    setRules({ startingHp: preRules.startingHp, generations: preRules.generations, itemsEnabled: preRules.itemsEnabled });
-  }, [isHost, room, setRules, preRules.startingHp, preRules.generations, preRules.itemsEnabled]);
+    setRules({ startingHp: preRules.startingHp, generations: preRules.generations, itemsEnabled: preRules.itemsEnabled, draftPoolSize: preRules.draftPoolSize });
+  }, [isHost, room, setRules, preRules.startingHp, preRules.generations, preRules.itemsEnabled, preRules.draftPoolSize]);
 
   const roomGenKey = (room?.rules?.generations ?? [1]).join(",");
   const roomItemKey = (room?.rules?.itemsEnabled ?? []).join(",");
@@ -53,8 +53,9 @@ export function LobbyScreen() {
       startingHp: room.rules?.startingHp ?? 100,
       generations: room.rules?.generations ?? [1],
       itemsEnabled: room.rules?.itemsEnabled ?? [],
+      draftPoolSize: room.rules?.draftPoolSize ?? 90,
     });
-  }, [isHost, room, setPreRules, roomHp, roomGenKey, roomItemKey]);
+  }, [isHost, room, setPreRules, roomHp, roomGenKey, roomItemKey, room?.rules?.draftPoolSize]);
 
   if (!room) return null;
 
@@ -70,7 +71,7 @@ export function LobbyScreen() {
   const canStart = isHost && players.length >= 2 && allReady;
 
   const gens = room.rules?.generations ?? [1];
-  const poolCount = rosterForGenerations(gens).length;
+  const poolCount = unitsForGenerations(gens).length;
   const items = room.rules?.itemsEnabled ?? [];
 
   const copyCode = () => navigator.clipboard?.writeText(room.code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {});

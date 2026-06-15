@@ -31,10 +31,11 @@ function hashStr(s: string): number {
   return h >>> 0;
 }
 
-/** The roster (unit ids) the room's selected generations allow — so AI/creeps/
- *  carousel only ever use the same mons the players can roll. */
+/** The roster (unit ids) in play this game — the selected generations, randomly
+ *  drawn down to the room's draft size, seeded by the room code so AI/creeps/
+ *  carousel and every client share the identical pool. */
 function rosterFor(room: Room): string[] {
-  return rosterForGenerations(room.rules?.generations ?? [1]);
+  return rosterForGenerations(room.rules?.generations ?? [1], room.rules?.draftPoolSize, hashStr(room.code));
 }
 
 /** A bot's board for a round, scaled by stage progress and difficulty. */

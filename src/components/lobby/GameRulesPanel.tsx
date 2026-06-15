@@ -2,7 +2,7 @@
 
 import { usePreLobby } from "@/game/store/preLobbyStore";
 import { ALL_GENS, GEN_LABELS } from "@/game/data/generations";
-import { unitsForGenerations, rosterForGenerations } from "@/game/data/mons";
+import { unitsForGenerations } from "@/game/data/mons";
 import { COMPLETED } from "@/game/data/itemPool";
 import { useT } from "@/lib/i18n";
 import { useAppStore } from "@/game/store/appStore";
@@ -42,15 +42,15 @@ export function GameRulesPanel({ isHost }: { isHost: boolean }) {
   const toggleItem = usePreLobby((s) => s.toggleItem);
   const setRules = usePreLobby((s) => s.setRules);
 
-  // Use the REAL playable roster (capped — see rosterForGenerations) so the count
-  // matches what the shop actually draws from, plateauing past ~4 regions.
-  const poolCount = rosterForGenerations(rules.generations).length;
+  // The full eligible pool for the selected regions; the Draft Size below chooses
+  // how many of these are randomly drawn into a given game.
+  const poolCount = unitsForGenerations(rules.generations).length;
   // How many implemented mons each generation contributes (shown per button).
   const genCounts: Record<number, number> = Object.fromEntries(ALL_GENS.map((g) => [g, unitsForGenerations([g]).length]));
-  // Draft-size choices scale to the real pool so they're always achievable.
-  const draftOptions = Array.from(
-    new Set([Math.round(poolCount / 2), Math.round((poolCount * 3) / 4), poolCount]),
-  ).filter((n) => n >= 1 && n <= poolCount);
+  // Draft-size choices: fixed shop-density tiers plus "all", filtered to the pool.
+  const draftOptions = Array.from(new Set([40, 60, 90, 120, poolCount]))
+    .filter((n) => n >= 1 && n <= poolCount)
+    .sort((a, b) => a - b);
   const effectiveDraft = Math.min(rules.draftPoolSize, poolCount);
   const activeItems = rules.itemsEnabled.length;
 
