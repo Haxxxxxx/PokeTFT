@@ -33,7 +33,7 @@ const ITEM_DEF_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 // column is a fixed height in both phases — see CENTER_H), so the canvas size is
 // constant and nothing jumps between phases.
 const DESIGN_W = 1760;
-const DESIGN_H = 1162;
+const DESIGN_H = 1190;
 // The middle row (field column) is locked to this height in BOTH phases so the
 // battlefield stays put and the bench/shop below it never move when the phase
 // flips. Sized to hold the 8-row field plus the floating combat chrome.
