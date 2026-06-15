@@ -61,6 +61,16 @@ body {
 }
 .celebrate-pop.fixed { transform-origin: center; }
 
+/* Soft swap when the board view changes (phase flip, or landing on your / a
+   rival's board). Keeps the transition subtle so it doesn't feel jumpy. */
+@keyframes board-swap {
+  0% { opacity: 0; transform: scale(0.985); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.board-swap {
+  animation: board-swap 0.28s ease-out both;
+}
+
 @keyframes hero-float {
   0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
   50% { transform: translateY(-14px) rotate(var(--r, 0deg)); }

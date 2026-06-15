@@ -153,8 +153,12 @@ export function CombatStage({
 
   return (
     <div className={inline
-      ? "w-full flex flex-col items-center rounded-2xl border border-slate-700/50 bg-slate-950/60 p-3"
-      : "fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4"}>
+      ? "absolute inset-0 flex items-center justify-center"
+      : "fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"}>
+      {/* Combat chrome (scoreboard + timer) FLOATS at the top so the battlefield
+          stays vertically centered in the exact same box as the planning board —
+          the layout never shifts between phases. */}
+      <div className="absolute top-0 inset-x-0 flex flex-col items-center">
       {/* Scoreboard header: both teams + survivor counts (compact) */}
       <div className="flex items-stretch gap-2 mb-1.5 w-full max-w-[460px]">
         <div className="flex-1 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-950/40 border border-emerald-800/50">
@@ -174,8 +178,9 @@ export function CombatStage({
       </div>
 
       {/* Combat timer */}
-      <div className="w-full max-w-[460px] h-1 rounded-full bg-slate-800 overflow-hidden mb-2">
+      <div className="w-full max-w-[460px] h-1 rounded-full bg-slate-800 overflow-hidden">
         <div className={`h-full ${a.overtime ? "bg-rose-500" : "bg-slate-400/70"}`} style={{ width: `${(a.t / totalTime) * 100}%` }} />
+      </div>
       </div>
 
       {/* Battlefield (the focus) + a compact side recap with DMG/TANK/HEAL tabs.
@@ -294,8 +299,8 @@ export function CombatStage({
       )}
       </div>
 
-      {/* Controls */}
-      <div className="flex items-center gap-2 mt-3 min-h-[40px]">
+      {/* Controls — floated at the bottom of the same box (keeps the field static). */}
+      <div className="absolute bottom-0 inset-x-0 flex items-center justify-center gap-2 min-h-[40px]">
         {!finished ? (
           clockDriven ? (
             // Lockstep with the shared clock — no local speed/skip (would desync visuals).

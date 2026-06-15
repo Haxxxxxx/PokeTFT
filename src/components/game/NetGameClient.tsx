@@ -29,12 +29,18 @@ function normUnit(u: UnitInstance): UnitInstance {
 const ITEM_DEF_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 
 // Fixed design canvas the game is laid out on; scaled uniformly to fit any
-// screen. Sized for the TALLEST phase (combat: battlefield + recap + bench/shop)
-// so the canvas never changes size between phases — the whole point of the
-// constant-scale fit. Both phases share these dimensions; the shorter one just
-// leaves unused space at the bottom (invisible), so nothing jumps.
+// screen. Planning and combat now share the SAME layout height (the center
+// column is a fixed height in both phases — see CENTER_H), so the canvas size is
+// constant and nothing jumps between phases.
 const DESIGN_W = 1500;
-const DESIGN_H = 1160;
+const DESIGN_H = 1090;
+// The middle row (field column) is locked to this height in BOTH phases so the
+// battlefield stays put and the bench/shop below it never move when the phase
+// flips. Sized to hold the 8-row field plus the floating combat chrome.
+const CENTER_H = 706;
+// Let the canvas scale UP (not just down) so big monitors aren't left with huge
+// empty margins — capped so it doesn't become cartoonishly large.
+const MAX_SCALE = 1.5;
 
 function asUnits(u: unknown): UnitInstance[] {
   if (!u) return [];
@@ -132,7 +138,7 @@ export function NetGameClient() {
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const fit = () => {
-      const s = Math.min(1, (window.innerWidth - 8) / DESIGN_W, (window.innerHeight - 8) / DESIGN_H);
+      const s = Math.min(MAX_SCALE, (window.innerWidth - 8) / DESIGN_W, (window.innerHeight - 8) / DESIGN_H);
       setScale(s > 0 ? s : 1);
     };
     fit();
@@ -549,43 +555,50 @@ export function NetGameClient() {
             <TraitPanel units={spectateUnits ?? undefined} />
           </div>
 
-          {/* Center: the shared field — identical pixels every phase */}
-          <div className="flex flex-col gap-3 items-center min-w-0">
-            {/* Spectating a rival overrides the view: their live fight during
-                combat, else their board + bench (read-only). Otherwise my own
-                combat replay during combat, else my board. */}
+          {/* Center: the shared field. Locked to CENTER_H in EVERY phase so the
+              battlefield stays in the exact same spot and the bench/shop below it
+              never move — only the units on the field and what's interactive
+              change. A `board-swap` fade plays when the view changes (phase flip
+              or landing on a rival's / your own board). */}
+          <div className="relative min-w-0" style={{ height: CENTER_H }}>
             {spectating ? (
-              <div className="w-full flex flex-col gap-2">
-                <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <div key={`spec-${spectate}`} className="board-swap absolute inset-0 flex flex-col gap-2">
+                <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 shrink-0">
                   <span className="text-xs font-bold text-amber-300">{t.net_viewing(spectateP?.name ?? "rival")}</span>
                   <button onClick={() => setSpectate(null)} className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-300">{t.net_back_to_mine}</button>
                 </div>
-                {phase === "combat" && spectateCombatResult ? (
-                  <CombatStage result={spectateCombatResult} flip={!!spectateCombat?.flip} opponentName={spectateCombat?.oppName ?? "Rival"} autoResolve inline syncStart={meta.deadline - COMBAT_MS} syncWindowMs={COMBAT_MS} onResolve={() => {}} />
-                ) : (
-                  <Board units={spectateUnits ?? []} interactive={false} />
-                )}
+                <div className="relative flex-1 min-h-0 flex items-center justify-center">
+                  {phase === "combat" && spectateCombatResult ? (
+                    <CombatStage result={spectateCombatResult} flip={!!spectateCombat?.flip} opponentName={spectateCombat?.oppName ?? "Rival"} autoResolve inline syncStart={meta.deadline - COMBAT_MS} syncWindowMs={COMBAT_MS} onResolve={() => {}} />
+                  ) : (
+                    <Board units={spectateUnits ?? []} interactive={false} />
+                  )}
+                </div>
                 {/* Rival's bench */}
-                <div className="flex gap-1.5 p-2 rounded-xl border border-slate-700/60 bg-slate-900/50 min-h-[64px] flex-wrap justify-center">
+                <div className="flex gap-1.5 p-2 rounded-xl border border-slate-700/60 bg-slate-900/50 min-h-[64px] flex-wrap justify-center shrink-0">
                   {spectateBench.length === 0
                     ? <span className="text-[11px] text-slate-600 self-center">Empty bench</span>
                     : spectateBench.map((u) => <UnitChip key={u.iid} unit={u} size={52} interactive={false} />)}
                 </div>
               </div>
-            ) : phase === "combat" && combatResult && me?.alive ? (
-              <CombatStage
-                result={combatResult}
-                flip={!!myCombat?.flip}
-                opponentName={myCombat?.oppName ?? "Rival"}
-                pve={!!myCombat?.pve}
-                autoResolve
-                inline
-                syncStart={meta.deadline - COMBAT_MS}
-                syncWindowMs={COMBAT_MS}
-                onResolve={() => {}}
-              />
             ) : (
-              <Board />
+              <div key={`mine-${phase === "combat" ? "fight" : "plan"}`} className="board-swap absolute inset-0 flex items-center justify-center">
+                {phase === "combat" && combatResult && me?.alive ? (
+                  <CombatStage
+                    result={combatResult}
+                    flip={!!myCombat?.flip}
+                    opponentName={myCombat?.oppName ?? "Rival"}
+                    pve={!!myCombat?.pve}
+                    autoResolve
+                    inline
+                    syncStart={meta.deadline - COMBAT_MS}
+                    syncWindowMs={COMBAT_MS}
+                    onResolve={() => {}}
+                  />
+                ) : (
+                  <Board />
+                )}
+              </div>
             )}
           </div>
 
