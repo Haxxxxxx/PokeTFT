@@ -389,10 +389,15 @@ export const useRoom = create<RoomState>((setState, getState) => ({
     if (privUnsub) { privUnsub(); privUnsub = null; }
     if (myUid) setCurrentGame(myUid, null);
     if (code && myUid) {
-      // If I'm the last connected human, delete the whole room so abandoned games
-      // don't accumulate in RTDB. Otherwise just drop my player node.
-      const otherHumans = Object.values(room?.players ?? {}).filter((p) => p.connected && !p.isBot && p.uid !== myUid);
-      if (otherHumans.length === 0) remove(roomRef(code)).catch(onWriteErr);
+      // Only delete the WHOLE room when it's safe: no other human player nodes at
+      // all (regardless of momentary connection) AND we're not mid-match. A human
+      // whose tab is briefly backgrounded shows connected:false — deleting on that
+      // would nuke a live game out from under them, so during play we just drop our
+      // own node and let host migration carry on.
+      const otherHumans = Object.values(room?.players ?? {}).filter((p) => !p.isBot && p.uid !== myUid);
+      const phase = room?.meta?.phase;
+      const safeToDelete = otherHumans.length === 0 && (phase === "lobby" || phase === "over" || !phase);
+      if (safeToDelete) remove(roomRef(code)).catch(onWriteErr);
       else remove(ref(db(), `games/${code}/players/${myUid}`)).catch(onWriteErr);
       // Always clear my own private econ node (rules only let me write my own).
       remove(ref(db(), `priv/${code}/${myUid}`)).catch(() => {});

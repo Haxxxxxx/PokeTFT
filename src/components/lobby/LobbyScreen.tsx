@@ -65,7 +65,9 @@ export function LobbyScreen() {
   const maxPlayers = room.rules?.maxPlayers ?? 8;
   const openSlots = Math.max(0, maxPlayers - players.length);
   const allReady = players.every((p) => p.ready);
-  const canStart = isHost && players.length >= 1 && allReady;
+  // Need at least 2 players (humans and/or bots) — a 1-player game has no
+  // opponent, so it can never deal damage or end. Add a bot to play solo.
+  const canStart = isHost && players.length >= 2 && allReady;
 
   const gens = room.rules?.generations ?? [1];
   const poolCount = rosterForGenerations(gens).length;

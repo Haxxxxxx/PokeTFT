@@ -113,6 +113,8 @@ export function NetGameClient() {
   const myUid = useRoom((s) => s.myUid);
   const mySave = useRoom((s) => s.mySave);
   const leave = useRoom((s) => s.leave);
+  const inspect = useUi((s) => s.inspect);
+  const inspectedItem = useUi((s) => s.inspectedItem);
 
   const newGame = useGame((s) => s.newGame);
   const netRound = useGame((s) => s.netRound);
@@ -692,6 +694,14 @@ export function NetGameClient() {
                 <div className="flex-1 min-h-0 flex flex-col">
                   <UnitDetail />
                 </div>
+              </div>
+            )}
+            {/* During combat the rail is otherwise free — show the inspected mon's
+                stats when one is clicked (e.g. a bench unit), so you can still
+                consult details mid-fight. */}
+            {phase === "combat" && !spectating && (inspect || inspectedItem) && (
+              <div className="flex flex-col h-full min-h-0">
+                <UnitDetail />
               </div>
             )}
           </div>

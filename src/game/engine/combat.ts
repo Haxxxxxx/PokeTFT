@@ -137,6 +137,7 @@ const MAX_TIME = 35;
 const OVERTIME_START = 15; // after this, a ramping storm forces a finish
 const MANA_PER_ATTACK = 10;
 const MANA_ON_HIT = 3;
+const MAX_ATTACK_SPEED = 5.0; // hard ceiling on attacks/sec after all multipliers
 const MOVE_TIME = 0.3; // seconds per hex step
 
 function armorMult(armor: number): number {
@@ -368,7 +369,9 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
       if (dist <= u.range) {
         // In range — attack if ready.
         if (u.atkCd <= 0) {
-          u.atkCd = 1 / u.attackSpeed;
+          // Cap attack speed (post all item/trait multipliers) so stacked AS
+          // can't reach degenerate machine-gun DPS — matches TFT's 5.0 ceiling.
+          u.atkCd = 1 / Math.min(MAX_ATTACK_SPEED, u.attackSpeed);
           // Armor penetration ignores a fraction of the target's armor.
           dealDamage(u, target, u.ad * armorMult(target.armor * (1 - u.armorPenPct)), "physical", events, rng);
           u.mana = Math.min(u.maxMana, u.mana + MANA_PER_ATTACK);
@@ -447,9 +450,12 @@ function lifesteal(from: Combatant, dmg: number) {
 }
 
 function dealDamage(from: Combatant, to: Combatant, rawDmg: number, _kind: string, events: CombatEvent[], rng: Rng) {
-  // Crit roll (seeded → deterministic across clients).
+  // Crit roll (seeded → deterministic across clients). Crit chance past 100% would
+  // otherwise be wasted, so the overcap converts into bonus crit DAMAGE — crit
+  // items stay meaningful once you also have a crit trait (TFT "Infinity Edge").
+  const overcap = Math.max(0, from.critChance - 1);
   const crit = rng() < from.critChance;
-  const dmg = Math.round(rawDmg * from.dmgMult * (crit ? from.critMult : 1));
+  const dmg = Math.round(rawDmg * from.dmgMult * (crit ? from.critMult + overcap : 1));
   const hpBefore = to.hp;
   applyHit(from, to, dmg);
   lifesteal(from, hpBefore - to.hp);
