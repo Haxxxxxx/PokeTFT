@@ -114,8 +114,6 @@ export function NetGameClient() {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 140, tolerance: 8 } }),
   );
-  const roomRef = useRef(room);
-  useEffect(() => { roomRef.current = room; }, [room]);
   const lastRoundKey = useRef<string | null>(null);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const actedDeadline = useRef(-1);
@@ -181,7 +179,9 @@ export function NetGameClient() {
       // not become an unhandled rejection that silently freezes the round loop.
       void (async () => {
         try {
-          const r = roomRef.current;
+          // Use the always-fresh liveRoom (incl. meta.hostBeat) so host-failover
+          // detection still works even though `room` no longer churns on heartbeats.
+          const r = useRoom.getState().liveRoom;
           if (!r) return;
           await maybeClaimHost(r.code, r, myUid);
           if (r.meta?.hostUid !== myUid) return;
@@ -254,7 +254,7 @@ export function NetGameClient() {
   useEffect(() => {
     if (!myUid || phase !== "planning") return;
     const id = setInterval(() => {
-      const r = roomRef.current;
+      const r = useRoom.getState().liveRoom;
       if (!r?.meta || r.meta.phase !== "planning") return;
       if (r.meta.deadline - serverNow() <= 2500) {
         const g = useGame.getState();
