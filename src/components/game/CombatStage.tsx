@@ -51,12 +51,17 @@ export function CombatStage({
   autoResolve = false,
   inline = false,
   pve = false,
+  authWon,
   syncStart,
   syncWindowMs,
 }: {
   result: CombatResult;
   /** Mirror the view (this player is the canonical sim's "enemy" side). */
   flip?: boolean;
+  /** Host-authoritative win flag for THIS player. When set, the result banner
+   *  uses it (instead of the local re-sim) so the outcome shown can never
+   *  disagree with the HP the host actually applied. */
+  authWon?: boolean;
   opponentName: string;
   onResolve: (won: boolean, survivors: number) => void;
   /** Multiplayer: the host clock advances the round, so hide the Continue button. */
@@ -133,7 +138,10 @@ export function CombatStage({
   const bMap = new Map(b.units.map((u) => [u.id, u]));
   const aMap = new Map(a.units.map((u) => [u.id, u]));
 
-  const won = result.winner === "ally";
+  // Trust the host's authoritative outcome for the banner (falls back to the
+  // local sim only when not provided) — so "you win/lose" always matches the HP
+  // the host applied, even if a board edge-case made the local replay diverge.
+  const won = authWon ?? (result.winner === "ally");
   const aliveAlly = a.units.filter((u) => u.team === "ally" && u.alive).length;
   const aliveEnemy = a.units.filter((u) => u.team === "enemy" && u.alive).length;
 
@@ -315,7 +323,7 @@ export function CombatStage({
           <div className="flex flex-col items-center gap-2">
             <div className={`text-xl font-extrabold ${won ? "text-emerald-400" : result.winner === "draw" ? "text-slate-300" : "text-rose-400"}`}>
               {won ? t.cs_victory : result.winner === "draw" ? t.cs_draw : t.cs_defeat}
-              {result.winner === "enemy" && <span className="text-sm text-slate-400 font-medium"> · {result.survivors} survived</span>}
+              {!won && result.winner === "enemy" && <span className="text-sm text-slate-400 font-medium"> · {result.survivors} survived</span>}
             </div>
             {autoResolve ? (
               <span className="text-xs text-slate-500">…</span>
