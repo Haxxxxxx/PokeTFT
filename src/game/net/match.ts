@@ -429,9 +429,18 @@ export async function maybeClaimHost(code: string, room: Room, myUid: string): P
   const humans = Object.values(room.players ?? {}).filter((p) => p.connected && !p.isBot).map((p) => p.uid).sort();
 
   // No human left at all → abandon the game so it doesn't hang in RTDB forever.
+  // Assign final placements by current HP first, so a reconnecting player sees a
+  // coherent scoreboard instead of all-null places (#99 medals / fake #1).
   if (humans.length === 0) {
     if (meta?.phase !== "over") {
-      await update(gamePath(code), { "meta/phase": "over", "meta/updatedAt": serverNow() }).catch(() => {});
+      const u: Updates = { "meta/phase": "over", "meta/updatedAt": serverNow() };
+      // Players already eliminated keep their real place; the survivors (place
+      // still null) outlasted them, so rank those by alive-then-HP into 1..N.
+      const survivors = Object.values(room.players ?? {})
+        .filter((p) => p.place == null)
+        .sort((a, b) => (b.alive ? 1 : 0) - (a.alive ? 1 : 0) || (b.hp ?? 0) - (a.hp ?? 0));
+      survivors.forEach((p, i) => { u[`players/${p.uid}/place`] = i + 1; u[`players/${p.uid}/alive`] = false; });
+      await update(gamePath(code), u).catch(() => {});
     }
     return;
   }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
-import { useGame } from "@/game/store/gameStore";
+import { useGame, BENCH_SIZE } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, markCarouselPicked, finishCarouselEarlyIfReady, PLAN_MS, COMBAT_MS } from "@/game/net/match";
@@ -785,7 +785,13 @@ export function NetGameClient() {
               </div>
               <p className="text-xs text-slate-300/80">{picked ? (lang === "fr" ? "Choisi — en attente du tour…" : "Picked — waiting for the round…") : (lang === "fr" ? "Choisis une récompense gratuite." : "Pick one free reward.")}</p>
               <div className="text-[11px] tabular-nums font-bold text-amber-200/70 mt-0.5 mb-5"><Countdown deadline={meta.deadline} />s</div>
-            {!picked && (
+            {!picked && (() => {
+              // A unit pick needs a free bench slot; items/Mega go to the inventory.
+              // Block (don't silently swallow) unit picks when the bench is full so
+              // the player knows to sell a unit first instead of losing the reward.
+              const benchFull = units.filter((u) => u.pos === null).length >= BENCH_SIZE;
+              const fullNote = lang === "fr" ? "Banc plein" : "Bench full";
+              return (
               <div className="flex gap-3 justify-center items-start">
                 {opts.map((pick, i) => {
                   const onPick = () => { netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); };
@@ -797,6 +803,8 @@ export function NetGameClient() {
                     <CarouselCard
                       key={i}
                       onClick={onPick}
+                      disabled={benchFull}
+                      note={fullNote}
                       color={COST_COLOR[def.cost]}
                       name={def.name}
                       cost={def.cost}
@@ -807,7 +815,8 @@ export function NetGameClient() {
                   );
                 })}
               </div>
-            )}
+              );
+            })()}
             </div>
             )}
           </div>
@@ -1008,21 +1017,28 @@ function OrnateFrame({ onClick, frame = "#d4af37", height, children }: { onClick
 
 /** Carousel reward card in the ornate frame: big art on top, then name +
  *  cost/traits (units) or effect (items) on the dark panel. */
-function CarouselCard({ onClick, color, name, sub, cost, types, art }: { onClick: () => void; color: string; name: string; sub?: string; cost?: number; types?: PokeType[]; art: ReactNode }) {
+function CarouselCard({ onClick, color, name, sub, cost, types, art, disabled, note }: { onClick: () => void; color: string; name: string; sub?: string; cost?: number; types?: PokeType[]; art: ReactNode; disabled?: boolean; note?: string }) {
   return (
-    <OrnateFrame onClick={onClick} frame={color} height={200}>
-      <div className="flex-1 flex items-center justify-center pt-3 pb-1">{art}</div>
-      <div className="px-2 py-2 bg-slate-950/80 border-t border-amber-600/40 flex flex-col items-center gap-1">
-        <span className="text-sm font-extrabold text-amber-50 text-center leading-tight drop-shadow">{name}</span>
-        {cost != null && <span style={{ color }} className="inline-flex items-center gap-0.5 text-[11px] font-extrabold"><CoinIcon size={11} />{cost}</span>}
-        {types && (
-          <div className="flex flex-wrap gap-0.5 justify-center">
-            {types.map((ty) => <span key={ty} style={{ background: TYPE_COLOR[ty] }} className="text-[8px] px-1 rounded text-black/80 font-bold uppercase">{ty.slice(0, 3)}</span>)}
-          </div>
-        )}
-        {sub && <span className="text-[9px] text-slate-300/85 text-center leading-tight">{sub}</span>}
-      </div>
-    </OrnateFrame>
+    <div className={disabled ? "opacity-45 grayscale pointer-events-none relative" : "relative"}>
+      <OrnateFrame onClick={disabled ? () => {} : onClick} frame={color} height={200}>
+        <div className="flex-1 flex items-center justify-center pt-3 pb-1">{art}</div>
+        <div className="px-2 py-2 bg-slate-950/80 border-t border-amber-600/40 flex flex-col items-center gap-1">
+          <span className="text-sm font-extrabold text-amber-50 text-center leading-tight drop-shadow">{name}</span>
+          {cost != null && <span style={{ color }} className="inline-flex items-center gap-0.5 text-[11px] font-extrabold"><CoinIcon size={11} />{cost}</span>}
+          {types && (
+            <div className="flex flex-wrap gap-0.5 justify-center">
+              {types.map((ty) => <span key={ty} style={{ background: TYPE_COLOR[ty] }} className="text-[8px] px-1 rounded text-black/80 font-bold uppercase">{ty.slice(0, 3)}</span>)}
+            </div>
+          )}
+          {sub && <span className="text-[9px] text-slate-300/85 text-center leading-tight">{sub}</span>}
+        </div>
+      </OrnateFrame>
+      {disabled && note && (
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center px-2">
+          <span className="text-[10px] font-extrabold text-rose-200 bg-rose-950/80 border border-rose-700/60 rounded px-2 py-1 inline-block">{note}</span>
+        </div>
+      )}
+    </div>
   );
 }
 

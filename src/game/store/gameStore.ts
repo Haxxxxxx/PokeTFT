@@ -382,7 +382,9 @@ export const useGame = create<State>((set, get) => ({
     const prev = round > 1 ? { stage, round: round - 1 } : { stage: stage - 1, round: roundsInStage(stage - 1) };
     if (prev.stage >= 1 && roundKind(prev.stage, prev.round) === "pve") {
       bonusGold = 2 + Math.floor(stage / 2);
-      if (rng() < 0.3) items = [...items, COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)]];
+      // Reliable item economy: the opening (stage-1) PvE rounds always drop an
+      // item component, like TFT's creep rounds; later PvE rounds drop one ~45%.
+      if (prev.stage === 1 || rng() < 0.45) items = [...items, COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)]];
       const cheap = [...(state.unitsByCost[1] ?? []), ...(state.unitsByCost[2] ?? [])];
       if (rng() < 0.25 && cheap.length && units.filter((u) => u.pos === null).length < BENCH_SIZE) {
         units = applyCombines([...units, makeInstance(cheap[randInt(rng, cheap.length)])]);
