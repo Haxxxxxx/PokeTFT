@@ -280,6 +280,8 @@ export function NetGameClient() {
       // the lobby's region/draft rules, even on a reconnect/restore.
       const roster = rosterForGenerations(room.rules?.generations ?? [1], room.rules?.draftPoolSize, codeSeed(room.code));
       const enabledItems = room.rules?.itemsEnabled;
+      // TEMP diagnostic — remove once the rules-apply bug is confirmed fixed.
+      console.log("[rules-debug] gens=", room.rules?.generations, "draft=", room.rules?.draftPoolSize, "→ roster size=", roster.length, "| path=", save ? "importSave(restore)" : "newGame(fresh)", "| hp=", room.rules?.startingHp);
       if (save) importSave({ ...save, units: asUnits(save.units) }, roster, enabledItems);
       else newGame(room.rules?.startingHp ?? 100, roster, enabledItems);
     } else {
