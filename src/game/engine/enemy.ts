@@ -11,6 +11,21 @@ const BY_COST: Record<Cost, string[]> = (() => {
   return m;
 })();
 
+/** Cost buckets restricted to the room's selected roster (its generations), so
+ *  AI opponents, creeps and carousel picks only ever use mons from the SAME pool
+ *  the player can roll — no out-of-region mons leaking into the game. Falls back
+ *  to the full roster when no allow-list is given. */
+function byCostFrom(allowedIds?: string[]): Record<Cost, string[]> {
+  if (!allowedIds || allowedIds.length === 0) return BY_COST;
+  const allow = new Set(allowedIds);
+  const m = { 1: [], 2: [], 3: [], 4: [], 5: [] } as Record<Cost, string[]>;
+  for (const u of UNITS) if (allow.has(u.id)) m[u.cost].push(u.id);
+  // If a whole cost tier is empty in this roster, keep the global one so picks
+  // never deadlock.
+  for (const c of [1, 2, 3, 4, 5] as Cost[]) if (m[c].length === 0) m[c] = BY_COST[c];
+  return m;
+}
+
 // Center-out columns, front row first so small teams meet in the middle.
 const COL_ORDER = [3, 2, 4, 1, 5, 0, 6];
 const ROW_ORDER = [1, 0, 2, 3];
@@ -18,16 +33,17 @@ const ROW_ORDER = [1, 0, 2, 3];
 const MAX_BOARD = COL_ORDER.length * ROW_ORDER.length;
 
 /** Build a board of `count` mons at shop-`level` quality. */
-export function generateBoard(level: number, count: number, seed: number): UnitInstance[] {
+export function generateBoard(level: number, count: number, seed: number, allowedIds?: string[]): UnitInstance[] {
   const rng: Rng = makeRng(seed >>> 0);
   const odds = SHOP_ODDS[Math.min(Math.max(level, 1), 10)];
   const n = Math.min(count, MAX_BOARD); // never overflow the grid (would stack units)
+  const byCost = byCostFrom(allowedIds);
 
   const board: UnitInstance[] = [];
   for (let i = 0; i < n; i++) {
     let cost = (weightedPick(rng, odds) + 1) as Cost;
-    while (BY_COST[cost].length === 0) cost = ((cost % 5) + 1) as Cost;
-    const defId = BY_COST[cost][randInt(rng, BY_COST[cost].length)];
+    while (byCost[cost].length === 0) cost = ((cost % 5) + 1) as Cost;
+    const defId = byCost[cost][randInt(rng, byCost[cost].length)];
 
     // Higher level → better odds of upgraded mons (cheap units star up first).
     let star: 1 | 2 | 3 = 1;
@@ -45,9 +61,10 @@ export function generateBoard(level: number, count: number, seed: number): UnitI
 /** An economy-realistic AI board: what a real player could actually field at this
  *  point in the game. Board size, unit cost, and star level all track a believable
  *  gold/level curve (no 4-cost 2-stars in the first PvP). Deterministic per seed. */
-export function generatePlayerLikeBoard(stage: number, round: number, difficulty: "easy" | "medium" | "hard" | undefined, seed: number): UnitInstance[] {
+export function generatePlayerLikeBoard(stage: number, round: number, difficulty: "easy" | "medium" | "hard" | undefined, seed: number, allowedIds?: string[]): UnitInstance[] {
   const rng: Rng = makeRng(seed >>> 0);
   const cr = cumulativeRound(stage, round);
+  const byCost = byCostFrom(allowedIds);
 
   // Board size ≈ a real player's level (which lags the cap a little).
   let size = Math.round(2 + cr * 0.25); // 2-1≈3, 3-1≈5, 4-1≈7, 5-1≈8
@@ -68,8 +85,8 @@ export function generatePlayerLikeBoard(stage: number, round: number, difficulty
   const board: UnitInstance[] = [];
   for (let i = 0; i < size; i++) {
     let cost = (weightedPick(rng, weights) + 1) as Cost;
-    while (BY_COST[cost].length === 0) cost = (((cost % 5)) + 1) as Cost;
-    const defId = BY_COST[cost][randInt(rng, BY_COST[cost].length)];
+    while (byCost[cost].length === 0) cost = (((cost % 5)) + 1) as Cost;
+    const defId = byCost[cost][randInt(rng, byCost[cost].length)];
     let star: 1 | 2 | 3 = 1;
     // Cheaper units star up first, exactly like a real player's roster.
     if (cost <= 2 && rng() < threeStarChance) star = 3;
@@ -83,7 +100,7 @@ export function generatePlayerLikeBoard(stage: number, round: number, difficulty
 
 /** A wild/creep board for PvE rounds — weak in the opening, ramping by stage.
  *  Stage 1 should be comfortably winnable so the player can build economy. */
-export function generateCreepBoard(stage: number, round: number, seed: number): UnitInstance[] {
+export function generateCreepBoard(stage: number, round: number, seed: number, allowedIds?: string[]): UnitInstance[] {
   // Stage 1 stays deliberately soft so newcomers win the opening PvE and build
   // economy: one weak creep at 1-1, ramping by round. Later stages scale up.
   if (stage === 1) {
@@ -91,24 +108,25 @@ export function generateCreepBoard(stage: number, round: number, seed: number): 
     // starter + a couple of shop buys) wins them comfortably: 1-1 → 1 creep,
     // 1-2 → 1, 1-3 → 2, all weakest-tier 1-cost 1-stars.
     const count = round >= 3 ? 2 : 1;
-    return generateBoard(1, count, seed * 13 + 101);
+    return generateBoard(1, count, seed * 13 + 101, allowedIds);
   }
   const level = Math.min(1 + Math.floor(stage / 2), 6);
   const count = Math.min(stage + 1, 6);
-  return generateBoard(level, count, seed * 13 + 101);
+  return generateBoard(level, count, seed * 13 + 101, allowedIds);
 }
 
 /** Free unit choices offered on a carousel round. */
-export function pickCarouselOptions(stage: number, seed: number, n = 5): string[] {
+export function pickCarouselOptions(stage: number, seed: number, n = 5, allowedIds?: string[]): string[] {
   const rng: Rng = makeRng((seed * 277 + stage * 51) >>> 0);
   const level = Math.min(3 + stage, 9);
   const odds = SHOP_ODDS[Math.min(Math.max(level, 1), 10)];
+  const byCost = byCostFrom(allowedIds);
   const out: string[] = [];
   let guard = 0;
   while (out.length < n && guard++ < 100) {
     let cost = (weightedPick(rng, odds) + 1) as Cost;
-    while (BY_COST[cost].length === 0) cost = ((cost % 5) + 1) as Cost;
-    const id = BY_COST[cost][randInt(rng, BY_COST[cost].length)];
+    while (byCost[cost].length === 0) cost = ((cost % 5) + 1) as Cost;
+    const id = byCost[cost][randInt(rng, byCost[cost].length)];
     if (!out.includes(id)) out.push(id);
   }
   return out;

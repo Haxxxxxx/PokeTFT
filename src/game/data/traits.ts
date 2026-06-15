@@ -144,10 +144,11 @@ const RAW: RawTrait[] = [
   },
   {
     key: "evolver", label: "Evolver", description: "Evolvers reward a wide, upgraded board.",
+    // Most mons can evolve, so this is intentionally a HIGH-commitment trait —
+    // an average board half-fills it; the payoff needs a board built around it.
     tiers: [
-      { count: 4, effect: "Evolvers: +12% Attack Damage.", buff: { adMult: 1.12 } },
-      { count: 6, effect: "Evolvers: +25% Attack Damage, +10% HP.", buff: { adMult: 1.25, hpMult: 1.1 } },
-      { count: 9, effect: "Evolvers: +45% Attack Damage, +20% HP.", buff: { adMult: 1.45, hpMult: 1.2 } },
+      { count: 6, effect: "Evolvers: +18% Attack Damage.", buff: { adMult: 1.18 } },
+      { count: 9, effect: "Evolvers: +42% Attack Damage, +18% HP.", buff: { adMult: 1.42, hpMult: 1.18 } },
     ],
   },
   {
