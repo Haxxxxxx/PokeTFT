@@ -10,6 +10,7 @@ import type { UnitInstance, PokeType, Move } from "../types";
 import { getDef } from "../data/mons";
 import { effectiveness } from "../data/typeChart";
 import { isMegaActive, megaFormFor } from "../data/mega";
+import { ITEM_EFFECT } from "../data/items";
 import { computeTraits } from "./synergies";
 import { TRAITS_BY_KEY } from "../data/traits";
 import { makeRng, type Rng } from "./rng";
@@ -141,25 +142,42 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
   // Mega Evolution applies at combat start when the mon holds a Mega Stone.
   const mega = isMegaActive(u.defId, u.items) ? megaFormFor(u.defId) : undefined;
   const types = mega?.addType && !def.types.includes(mega.addType) ? [...def.types, mega.addType] : def.types;
-  const hp = mega ? Math.round(s.hp[i] * mega.hpMult) : s.hp[i];
+  let hp = mega ? Math.round(s.hp[i] * mega.hpMult) : s.hp[i];
   let ad = mega ? Math.round(s.ad[i] * mega.adMult) : s.ad[i];
 
-  // Held-item stat modifiers (deterministic; items synced on the unit).
+  // Held-item stat modifiers (deterministic; items synced on the unit). Effects
+  // are data-driven (ITEM_EFFECT) so combining produces items the sim applies
+  // generically — no per-id branching here.
   const items = u.items ?? [];
-  const has = (id: string) => items.includes(id);
-  const notFinalEvo = u.star < def.dex.length; // eviolite only for non-final forms
   let apMult = mega ? mega.apMult : 1;
   let armor = mega ? s.armor + mega.armorBonus : s.armor;
   let mr = mega ? s.magicResist + mega.mrBonus : s.magicResist;
-  if (has("choice-band")) ad = Math.round(ad * 1.5);
-  if (has("choice-specs")) apMult *= 1.5;
-  if (has("muscle-band")) ad = Math.round(ad * 1.25);
-  if (has("wise-glasses")) apMult *= 1.2;
-  if (has("light-ball")) { ad = Math.round(ad * 1.3); apMult *= 1.3; }
-  if (has("assault-vest")) mr = Math.round(mr * 1.5);
-  if (has("eviolite") && notFinalEvo) { armor = Math.round(armor * 1.5); mr = Math.round(mr * 1.5); }
   let attackSpeed = s.attackSpeed;
-  if (has("choice-scarf")) attackSpeed *= 1.35;
+  let adMult = 1, hpMult = 1, critAdd = 0, lifeSteal = 0, armorPen = 0;
+  let regen = 0, thorns = 0, burnDps = 0, stunChance = 0, manaAdd = 0;
+  let sash = false, statusImmune = false;
+  for (const id of items) {
+    const e = ITEM_EFFECT[id];
+    if (!e) continue;
+    if (e.adMult) adMult *= e.adMult;
+    if (e.apMult) apMult *= e.apMult;
+    if (e.asMult) attackSpeed *= e.asMult;
+    if (e.hpMult) hpMult *= e.hpMult;
+    if (e.armorAdd) armor += e.armorAdd;
+    if (e.mrAdd) mr += e.mrAdd;
+    if (e.critAdd) critAdd += e.critAdd;
+    if (e.lifeSteal) lifeSteal = Math.max(lifeSteal, e.lifeSteal);
+    if (e.armorPen) armorPen = Math.max(armorPen, e.armorPen);
+    if (e.regenPerSec) regen += e.regenPerSec;
+    if (e.thornsPct) thorns = Math.max(thorns, e.thornsPct);
+    if (e.burnDps) burnDps = Math.max(burnDps, e.burnDps);
+    if (e.stunChance) stunChance = Math.max(stunChance, e.stunChance);
+    if (e.manaStart) manaAdd += e.manaStart;
+    if (e.sash) sash = true;
+    if (e.statusImmune) statusImmune = true;
+  }
+  ad = Math.round(ad * adMult);
+  hp = Math.round(hp * hpMult);
 
   return {
     id: `${team}-${u.iid}`,
@@ -177,7 +195,7 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
     armor,
     mr,
     range: s.range,
-    mana: s.startMana,
+    mana: Math.min(s.maxMana, s.startMana + manaAdd),
     maxMana: s.maxMana,
     apMult,
     mega: !!mega,
@@ -186,20 +204,20 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
     moveCd: 0,
     targetId: null,
     alive: true,
-    dmgMult: has("life-orb") ? 1.3 : 1,
-    lifeOrbSelfPct: has("life-orb") ? 0.10 : 0,
-    regenPerSec: has("leftovers") ? 0.05 : 0,
-    thornsPct: has("rocky-helmet") ? 0.16 : 0,
-    sashReady: has("focus-sash"),
-    // Base 20% crit for 1.5x — items/traits add on top. Choice items steady DPS.
-    critChance: 0.2 + (has("life-orb") ? 0.1 : 0) + (has("light-ball") ? 0.15 : 0),
+    dmgMult: 1,
+    lifeOrbSelfPct: 0,
+    regenPerSec: regen,
+    thornsPct: thorns,
+    sashReady: sash,
+    // Base 20% crit for 1.5x — items/traits add on top.
+    critChance: 0.2 + critAdd,
     critMult: 1.5,
-    lifeStealPct: has("shell-bell") ? 0.2 : 0,
-    armorPenPct: has("expert-belt") ? 0.4 : 0,
-    inflictBurnDps: 0,
-    inflictStun: has("kings-rock") ? 0.3 : 0,
+    lifeStealPct: lifeSteal,
+    armorPenPct: armorPen,
+    inflictBurnDps: burnDps,
+    inflictStun: stunChance,
     inflictFreeze: 0,
-    statusImmune: has("assault-vest"),
+    statusImmune,
     burnTicks: 0,
     burnPerSec: 0,
     disabledTicks: 0,

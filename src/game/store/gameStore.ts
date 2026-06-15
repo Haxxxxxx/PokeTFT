@@ -7,7 +7,7 @@ import { makePool, makeUnitsByCost, rollShop, takeFromPool, returnToPool, type P
 import { roundIncome, sellValue, interest } from "../engine/economy";
 import { applyCombines, makeInstance } from "../engine/combine";
 import { MEGA_STONE } from "../data/mega";
-import { ITEM_POOL } from "../data/itemPool";
+import { ITEM_POOL, COMPONENT_IDS, RECIPES, combineKey, isComponent } from "../data/itemPool";
 import { AUGMENT_BY_ID } from "../data/augments";
 
 const ITEM_IDS = new Set(ITEM_POOL.map((i) => i.id));
@@ -382,7 +382,7 @@ export const useGame = create<State>((set, get) => ({
     const prev = round > 1 ? { stage, round: round - 1 } : { stage: stage - 1, round: roundsInStage(stage - 1) };
     if (prev.stage >= 1 && roundKind(prev.stage, prev.round) === "pve") {
       bonusGold = 2 + Math.floor(stage / 2);
-      if (rng() < 0.3) items = [...items, ITEM_POOL[randInt(rng, ITEM_POOL.length)].id];
+      if (rng() < 0.3) items = [...items, COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)]];
       const cheap = [...(state.unitsByCost[1] ?? []), ...(state.unitsByCost[2] ?? [])];
       if (rng() < 0.25 && cheap.length && units.filter((u) => u.pos === null).length < BENCH_SIZE) {
         units = applyCombines([...units, makeInstance(cheap[randInt(rng, cheap.length)])]);
@@ -414,10 +414,10 @@ export const useGame = create<State>((set, get) => ({
       case "big-brain": xp += 8; break;
       case "mega-gift": items = [...items, MEGA_STONE]; break;
       case "treasure":
-        for (let i = 0; i < 2; i++) items = [...items, ITEM_POOL[randInt(rng, ITEM_POOL.length)].id];
+        for (let i = 0; i < 2; i++) items = [...items, COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)]];
         break;
       case "component-cache":
-        for (let i = 0; i < 3; i++) items = [...items, ITEM_POOL[randInt(rng, ITEM_POOL.length)].id];
+        for (let i = 0; i < 3; i++) items = [...items, COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)]];
         break;
       case "recruiter":
       case "draft-day": {
@@ -459,7 +459,28 @@ export const useGame = create<State>((set, get) => ({
     const idx = state.items.indexOf(itemId);
     if (idx < 0) return;
     const unit = state.units.find((u) => u.iid === iid);
-    if (!unit || unit.items.length >= 3) return;
+    if (!unit) return;
+
+    // Combining: dragging a COMPONENT onto a unit that already holds a component
+    // they form a recipe with fuses them into the completed item (2 → 1).
+    if (isComponent(itemId)) {
+      for (let i = 0; i < unit.items.length; i++) {
+        const held = unit.items[i];
+        if (!isComponent(held)) continue;
+        const completed = RECIPES[combineKey(itemId, held)];
+        if (completed) {
+          const items = [...state.items];
+          items.splice(idx, 1); // consume the dragged component
+          const newItems = [...unit.items];
+          newItems[i] = completed; // the held component becomes the completed item
+          set({ items, units: state.units.map((u) => (u.iid === iid ? { ...u, items: newItems } : u)) });
+          return;
+        }
+      }
+    }
+
+    // No combine → slot the item whole (respect the 3-item cap).
+    if (unit.items.length >= 3) return;
     const items = [...state.items];
     items.splice(idx, 1);
     set({

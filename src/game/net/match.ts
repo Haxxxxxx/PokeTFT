@@ -7,6 +7,7 @@ import { generatePlayerLikeBoard, generateCreepBoard, pickCarouselOptions } from
 import { unitsForGenerations } from "../data/mons";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
+import { COMPONENT_IDS } from "../data/items";
 import type { UnitInstance } from "../types";
 import type { Room, RoomPlayer, CombatAssign, BotDifficulty } from "./roomStore";
 
@@ -231,8 +232,10 @@ export async function startCombat(code: string, room: Room): Promise<void> {
 export async function startCarousel(code: string, room: Room): Promise<void> {
   if (!(await claimTransition(code, "planning", room.meta.deadline))) return;
   room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
-  // Item rewards: a Mega Stone plus any held items the lobby enabled.
-  const itemPool = [MEGA_STONE, ...(room.rules?.itemsEnabled ?? [])];
+  // Item rewards: a Mega Stone plus item components players combine into the
+  // completed items the lobby enabled. Offering components (not finished items)
+  // is what makes the carousel a build-toward-a-recipe decision.
+  const itemPool = [MEGA_STONE, ...COMPONENT_IDS];
   const carousel: Record<string, string[]> = {};
   // Per-GAME entropy: the room code is unique to each match, so folding it in
   // makes carousels differ from game to game (they used to seed only on

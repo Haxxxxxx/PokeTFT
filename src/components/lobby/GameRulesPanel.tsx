@@ -3,7 +3,7 @@
 import { usePreLobby } from "@/game/store/preLobbyStore";
 import { ALL_GENS, GEN_LABELS } from "@/game/data/generations";
 import { unitsForGenerations } from "@/game/data/mons";
-import { ITEM_POOL } from "@/game/data/itemPool";
+import { COMPLETED } from "@/game/data/itemPool";
 import { useT } from "@/lib/i18n";
 import { useAppStore } from "@/game/store/appStore";
 
@@ -125,13 +125,13 @@ export function GameRulesPanel({ isHost }: { isHost: boolean }) {
           {t.r_items}
         </h3>
         <div className="grid grid-cols-2 gap-1.5">
-          {ITEM_POOL.map((item) => {
+          {COMPLETED.map((item) => {
             const active = rules.itemsEnabled.includes(item.id);
             return (
               <button
                 key={item.id}
                 disabled={!isHost}
-                title={item.effect}
+                title={lang === "en" ? item.text : item.textFr}
                 onClick={() => toggleItem(item.id)}
                 className={`flex items-start gap-2 px-2.5 py-2 rounded-lg border text-left transition-all ${
                   active
@@ -144,7 +144,7 @@ export function GameRulesPanel({ isHost }: { isHost: boolean }) {
                   <span className={`text-[11px] font-bold truncate ${active ? "text-violet-300" : "text-slate-500"}`}>
                     {lang === "en" ? item.name : item.nameFr}
                   </span>
-                  <span className="text-[10px] text-slate-500 leading-tight mt-0.5 line-clamp-2">{item.effect}</span>
+                  <span className="text-[10px] text-slate-500 leading-tight mt-0.5 line-clamp-2">{lang === "en" ? item.text : item.textFr}</span>
                 </div>
                 {active && <span className="text-violet-500 text-[10px] shrink-0 mt-0.5">✓</span>}
               </button>

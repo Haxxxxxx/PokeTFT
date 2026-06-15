@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useUi } from "@/game/store/uiStore";
 import { useGame } from "@/game/store/gameStore";
+import { useAppStore } from "@/game/store/appStore";
 import { getDef, spriteUrl } from "@/game/data/mons";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { ITEM_POOL, RARITY_COLOR } from "@/game/data/itemPool";
@@ -41,11 +42,12 @@ export function UnitDetail() {
 /** Detail card for an inventory item (clicked in the ItemsPanel). */
 function ItemCard({ id }: { id: string }) {
   const t = useT();
+  const lang = useAppStore((s) => s.settings.language);
   const setInspectedItem = useUi((s) => s.setInspectedItem);
   const isMega = id === MEGA_STONE;
   const def = ITEM_DEF[id];
-  const name = isMega ? "Mega Stone" : def?.name ?? id;
-  const effect = isMega ? "Holds on a Mega-capable mon → it Mega Evolves at combat start." : def?.effect ?? "";
+  const name = isMega ? "Mega Stone" : (lang === "fr" ? def?.nameFr : def?.name) ?? id;
+  const effect = isMega ? "Holds on a Mega-capable mon → it Mega Evolves at combat start." : (lang === "fr" ? def?.textFr : def?.text) ?? "";
   const color = isMega ? "#c084fc" : def ? RARITY_COLOR[def.rarity] : "#a78bfa";
   return (
     <div style={{ borderColor: `${color}aa`, boxShadow: `0 10px 40px -12px ${color}44` }} className="rounded-2xl border bg-[#0d1426] text-slate-100 overflow-hidden">
@@ -204,6 +206,7 @@ const ITEM_DEF = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 function HeldItems({ iid }: { iid?: string }) {
   const unit = useGame((s) => (iid ? s.units.find((u) => u.iid === iid) : undefined));
   const unequipItem = useGame((s) => s.unequipItem);
+  const lang = useAppStore((s) => s.settings.language);
   const items = unit?.items ?? [];
   if (!iid || !unit || items.length === 0) return null;
   return (
@@ -217,8 +220,8 @@ function HeldItems({ iid }: { iid?: string }) {
             <div key={i} className="flex items-center gap-2 p-2 rounded-lg border border-slate-700/60 bg-slate-800/40">
               <span className="text-lg shrink-0">{isMega ? <MegaIcon size={18} /> : (def?.icon ?? "◆")}</span>
               <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-bold text-slate-200">{isMega ? "Mega Stone" : def?.name ?? id}</div>
-                <div className="text-[10px] text-slate-400 leading-snug">{isMega ? "Mega Evolves at combat start." : def?.effect ?? ""}</div>
+                <div className="text-[11px] font-bold text-slate-200">{isMega ? "Mega Stone" : (lang === "fr" ? def?.nameFr : def?.name) ?? id}</div>
+                <div className="text-[10px] text-slate-400 leading-snug">{isMega ? "Mega Evolves at combat start." : (lang === "fr" ? def?.textFr : def?.text) ?? ""}</div>
               </div>
               <button
                 onClick={() => unequipItem(unit.iid, id)}
