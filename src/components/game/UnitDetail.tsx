@@ -40,9 +40,8 @@ export function UnitDetail() {
 
 /** Detail card for an inventory item (clicked in the ItemsPanel). */
 function ItemCard({ id }: { id: string }) {
+  const t = useT();
   const setInspectedItem = useUi((s) => s.setInspectedItem);
-  const armItem = useUi((s) => s.armItem);
-  const armed = useUi((s) => s.armedItem) === id;
   const isMega = id === MEGA_STONE;
   const def = ITEM_DEF[id];
   const name = isMega ? "Mega Stone" : def?.name ?? id;
@@ -62,13 +61,9 @@ function ItemCard({ id }: { id: string }) {
       </div>
       <p className="text-[12px] text-slate-300 leading-relaxed p-3">{effect}</p>
       <div className="px-3 pb-3">
-        <button
-          onClick={() => armItem(armed ? null : id)}
-          style={armed ? { background: color, color: "#0b1020" } : undefined}
-          className={`w-full py-2 rounded-lg text-xs font-bold transition-colors ${armed ? "" : "bg-slate-800 hover:bg-slate-700 text-slate-200"}`}
-        >
-          {armed ? "Click a mon to equip · Esc" : "Equip on a mon"}
-        </button>
+        <p className="text-[11px] text-center text-slate-400 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/50">
+          {isMega ? t.it_equip_mega : t.it_drag_equip}
+        </p>
       </div>
     </div>
   );

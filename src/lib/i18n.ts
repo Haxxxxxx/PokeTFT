@@ -130,6 +130,7 @@ export type Dict = {
   it_empty: string;
   it_equip_hint: string;
   it_equip_mega: string;
+  it_drag_equip: string;
   // Combat stage
   cs_your_team: string;
   cs_vs: string;
@@ -288,6 +289,7 @@ export const FR: Dict = {
   it_empty: "Aucun objet — gagne-les en carrousel ou PvE.",
   it_equip_hint: "Clique un mon pour l'équiper · Échap pour annuler",
   it_equip_mega: "Clique un mon Méga-capable pour l'équiper",
+  it_drag_equip: "Glisse un objet sur un mon pour l'équiper.",
   cs_your_team: "Votre équipe",
   cs_vs: "VS",
   cs_overtime: "PROLONGATION",
@@ -444,6 +446,7 @@ export const EN: Dict = {
   it_empty: "No items yet — win them in carousel or PvE.",
   it_equip_hint: "Click a mon to equip · Esc to cancel",
   it_equip_mega: "Click a Mega-capable mon to equip",
+  it_drag_equip: "Drag an item onto a mon to equip it.",
   cs_your_team: "Your Team",
   cs_vs: "VS",
   cs_overtime: "OVERTIME",
