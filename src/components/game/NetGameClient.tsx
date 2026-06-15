@@ -8,7 +8,7 @@ import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate } from "@/game/engine/combat";
 import { getDef, spriteUrl, unitsForGenerations } from "@/game/data/mons";
-import { ECONOMY, MAX_LEVEL, XP_TO_REACH, streakGold, roundKind, advanceRound } from "@/game/config";
+import { streakGold, roundKind, advanceRound, boardSizeForLevel } from "@/game/config";
 import { interest } from "@/game/engine/economy";
 import { MEGA_STONE } from "@/game/data/mega";
 import { ITEM_POOL } from "@/game/data/itemPool";
@@ -101,11 +101,12 @@ export function NetGameClient() {
   const reroll = useGame((s) => s.reroll);
   const moveToBoard = useGame((s) => s.moveToBoard);
   const moveToBench = useGame((s) => s.moveToBench);
+  const reorderBench = useGame((s) => s.reorderBench);
   const sell = useGame((s) => s.sell);
   const units = useGame((s) => s.units);
   const gold = useGame((s) => s.gold);
   const level = useGame((s) => s.level);
-  const xp = useGame((s) => s.xp);
+  const fillBoard = useGame((s) => s.fillBoard);
 
   // Mouse drags on a 5px move; touch drags on a short press-and-hold so finger
   // scrolling still works on mobile.
@@ -353,10 +354,6 @@ export function NetGameClient() {
   if (!room || !meta || !myUid) return null;
 
   const secondsLeft = Math.max(0, Math.ceil((meta.deadline - serverNow()) / 1000));
-  const atMax = level >= MAX_LEVEL;
-  const xpBase = XP_TO_REACH[level];
-  const xpNeed = atMax ? 1 : XP_TO_REACH[level + 1] - xpBase;
-  const xpCur = xp - xpBase;
   const totalMs = phase === "combat" ? COMBAT_MS : PLAN_MS;
   const pct = Math.max(0, Math.min(100, ((meta.deadline - serverNow()) / totalMs) * 100));
   const isHost = meta.hostUid === myUid;
@@ -379,6 +376,13 @@ export function NetGameClient() {
     if (!over) return;
     const target = String(over);
     if (target === "sell" || target === "sell-shop") sell(iid);
+    else if (target.startsWith("bench-")) {
+      // A specific bench slot: bench a board unit, or rearrange/swap within the bench.
+      const idx = Number(target.slice("bench-".length));
+      const u = useGame.getState().units.find((x) => x.iid === iid);
+      if (u && u.pos !== null) moveToBench(iid);
+      else reorderBench(iid, idx);
+    }
     else if (target === "bench") moveToBench(iid);
     else if (target.startsWith("cell-")) {
       if (phase !== "planning") return; // can't move onto the board mid-combat
@@ -467,22 +471,6 @@ export function NetGameClient() {
           <Stat label={t.net_alive(aliveCount)} value="" />
 
           {/* Level + XP + Buy XP */}
-          <div className="flex flex-col gap-1 min-w-[150px]">
-            <div className="flex justify-between text-[11px] text-slate-400">
-              <span className="font-semibold text-slate-200">{t.net_level} {level}</span>
-              <span>{atMax ? "MAX" : `${xpCur}/${xpNeed} XP`}</span>
-            </div>
-            <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
-              <div className="h-full bg-sky-400 transition-all" style={{ width: atMax ? "100%" : `${(xpCur / xpNeed) * 100}%` }} />
-            </div>
-            <button
-              onClick={buyXp}
-              disabled={phase !== "planning" || gold < ECONOMY.buyXpCost || atMax}
-              className="inline-flex items-center justify-center gap-1.5 px-2 py-1 rounded-md bg-sky-700/90 hover:bg-sky-600 disabled:opacity-40 text-[11px] font-semibold"
-            >
-              {t.net_buy_xp} <span className="inline-flex items-center gap-0.5 text-amber-200"><CoinIcon size={11} />{ECONOMY.buyXpCost}</span> <span className="text-sky-200">+{ECONOMY.buyXpAmount}</span>
-            </button>
-          </div>
           <div className="flex flex-col gap-1 min-w-[200px]">
             <div className="flex justify-between text-[11px]">
               <span className={`font-bold uppercase ${phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{phaseLabel}</span>
@@ -615,13 +603,49 @@ export function NetGameClient() {
           </div>
         </div>
 
-        {/* Bottom bar: bench + shop, pinned to the bottom of the screen. */}
+        {/* Bottom bar: board controls + bench, then shop. */}
         <div className="flex flex-col items-center gap-2">
-          <Bench />
+          <div className="flex items-stretch gap-2">
+            {/* Board capacity (placed / cap) + one-click auto-fill from the bench. */}
+            {(() => {
+              const boardCount = units.filter((u) => u.pos !== null).length;
+              const benchCount = units.length - boardCount;
+              const cap = boardSizeForLevel(level);
+              const full = boardCount >= cap;
+              return (
+                <div className="flex flex-col justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900/60 border border-slate-700/50 shrink-0">
+                  <div className="text-[9px] uppercase tracking-wider text-slate-500 text-center leading-none">{lang === "fr" ? "Plateau" : "Board"}</div>
+                  <div className="text-center text-base font-extrabold tabular-nums leading-none">
+                    <span className={full ? "text-emerald-300" : "text-amber-300"}>{boardCount}</span>
+                    <span className="text-slate-600">/{cap}</span>
+                  </div>
+                  <button
+                    onClick={fillBoard}
+                    disabled={phase !== "planning" || benchCount === 0 || full}
+                    title={lang === "fr" ? "Remplir le plateau depuis le banc" : "Fill the board from the bench"}
+                    className="px-2 py-1 rounded-md bg-emerald-700/80 hover:bg-emerald-600 disabled:opacity-30 text-[10px] font-bold text-white leading-none"
+                  >
+                    {lang === "fr" ? "Remplir" : "Fill"}
+                  </button>
+                </div>
+              );
+            })()}
+            <Bench />
+          </div>
           <div className="flex gap-3 w-full max-w-[1180px]">
             <ShopSellDrop><ShopBar /></ShopSellDrop>
             <SellZone />
           </div>
+          {/* Shortcut hints live in-flow (scaled with the canvas) so they never
+              float over the shop. */}
+          {phase === "planning" && me?.alive && (
+            <div className="flex items-center gap-2 opacity-80">
+              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">{lang === "fr" ? "Raccourcis" : "Keys"}</span>
+              <Kbd k="R" label={lang === "fr" ? "Reroll" : "Reroll"} />
+              <Kbd k="L" label="XP" />
+              <Kbd k="S" label={lang === "fr" ? "Vendre" : "Sell"} />
+            </div>
+          )}
         </div>
       </div>
       </div>
@@ -732,16 +756,6 @@ export function NetGameClient() {
             </div>
           </div>
           )}
-        </div>
-      )}
-
-      {/* Shortcut hints (planning only). */}
-      {phase === "planning" && me?.alive && (
-        <div className="fixed bottom-2 left-2 z-30 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900/85 border border-slate-700/60 backdrop-blur-sm">
-          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mr-0.5">{lang === "fr" ? "Raccourcis" : "Keys"}</span>
-          <Kbd k="R" label={lang === "fr" ? "Reroll" : "Reroll"} />
-          <Kbd k="L" label="XP" />
-          <Kbd k="S" label={lang === "fr" ? "Vendre" : "Sell"} />
         </div>
       )}
 

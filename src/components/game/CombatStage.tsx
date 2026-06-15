@@ -159,22 +159,12 @@ export function CombatStage({
           stays vertically centered in the exact same box as the planning board —
           the layout never shifts between phases. */}
       <div className="absolute top-0 inset-x-0 flex flex-col items-center">
-      {/* Scoreboard header: both teams + survivor counts (compact) */}
-      <div className="flex items-stretch gap-2 mb-1.5 w-full max-w-[460px]">
-        <div className="flex-1 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-950/40 border border-emerald-800/50">
-          <span className="text-lg font-extrabold tabular-nums text-emerald-300">{aliveAlly}</span>
-          <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-400/80 leading-tight truncate">{t.cs_your_team}</span>
-        </div>
-        <div className="flex items-center justify-center px-0.5">
-          <span className={`text-[11px] font-extrabold ${a.overtime ? "text-rose-400 animate-pulse" : "text-slate-500"}`}>
-            {a.overtime ? t.cs_overtime : t.cs_vs}
-          </span>
-        </div>
-        <div className={`flex-1 flex items-center justify-end gap-1.5 px-2.5 py-1 rounded-md border ${pve ? "bg-emerald-950/40 border-emerald-800/50" : "bg-rose-950/40 border-rose-800/50"}`}>
-          {pve && <span className="text-xs">🌿</span>}
-          <span className={`text-[10px] font-bold uppercase tracking-wide leading-tight text-right truncate ${pve ? "text-emerald-400/80" : "text-rose-400/80"}`}>{opponentName}</span>
-          <span className={`text-lg font-extrabold tabular-nums ${pve ? "text-emerald-300" : "text-rose-300"}`}>{aliveEnemy}</span>
-        </div>
+      {/* Subtle one-line matchup (was a big scoreboard bar) — survivor counts +
+          opponent, kept minimal so it doesn't dominate the fight view. */}
+      <div className="flex items-center justify-center gap-2 mb-1 text-[11px] font-bold max-w-[460px]">
+        <span className="tabular-nums text-emerald-300">{aliveAlly}</span>
+        <span className={a.overtime ? "text-rose-400 animate-pulse" : "text-slate-500"}>{a.overtime ? t.cs_overtime : t.cs_vs}</span>
+        <span className={`truncate ${pve ? "text-emerald-300" : "text-rose-300"}`}>{pve ? "🌿 " : ""}{opponentName} <span className="tabular-nums">{aliveEnemy}</span></span>
       </div>
 
       {/* Combat timer */}

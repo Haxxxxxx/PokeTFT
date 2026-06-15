@@ -6,7 +6,7 @@ import { getDef, spriteUrl } from "@/game/data/mons";
 import { computeTraits } from "@/game/engine/synergies";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
-import { ECONOMY, COPIES_TO_STAR, SHOP_ODDS, type Cost } from "@/game/config";
+import { ECONOMY, COPIES_TO_STAR, SHOP_ODDS, MAX_LEVEL, XP_TO_REACH, type Cost } from "@/game/config";
 import { RerollIcon, SnowIcon, CoinIcon, InfoIcon, StarIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
 import { useT } from "@/lib/i18n";
@@ -34,9 +34,11 @@ export function ShopBar() {
   const shop = useGame((s) => s.shop);
   const gold = useGame((s) => s.gold);
   const level = useGame((s) => s.level);
+  const xp = useGame((s) => s.xp);
   const units = useGame((s) => s.units);
   const buyUnit = useGame((s) => s.buyUnit);
   const reroll = useGame((s) => s.reroll);
+  const buyXp = useGame((s) => s.buyXp);
   const frozen = useGame((s) => s.frozen);
   const toggleFreeze = useGame((s) => s.toggleFreeze);
   const setInspect = useUi((s) => s.setInspect);
@@ -48,6 +50,11 @@ export function ShopBar() {
   );
 
   const odds = SHOP_ODDS[Math.min(Math.max(1, level), 10)];
+  // Level recap for the Buy XP control: progress toward the next level + cost.
+  const atMax = level >= MAX_LEVEL;
+  const xpBase = XP_TO_REACH[level];
+  const xpNeed = atMax ? 1 : XP_TO_REACH[level + 1] - xpBase;
+  const xpCur = xp - xpBase;
 
   return (
     <div className="flex items-stretch gap-2">
@@ -70,12 +77,32 @@ export function ShopBar() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-1.5 justify-center pr-1 w-[110px] shrink-0">
+      <div className="flex flex-col gap-1.5 justify-center pr-1 w-[140px] shrink-0">
+        {/* Buy XP — with the level recap (current level + progress to the next) and
+            the cost to level past it, so all the level info lives on the button. */}
+        <button
+          onClick={buyXp}
+          disabled={gold < ECONOMY.buyXpCost || atMax}
+          className="flex flex-col gap-1 px-2.5 py-1.5 rounded-lg bg-sky-800/80 hover:bg-sky-700 disabled:opacity-40 border border-sky-600/40 transition-colors"
+        >
+          <div className="flex items-center justify-between w-full text-[10px] leading-none">
+            <span className="font-extrabold text-slate-100">{t.net_level} {level}</span>
+            <span className="text-sky-200 tabular-nums">{atMax ? "MAX" : `${xpCur}/${xpNeed} XP`}</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-sky-950/70 overflow-hidden">
+            <div className="h-full bg-sky-300 transition-all" style={{ width: atMax ? "100%" : `${(xpCur / xpNeed) * 100}%` }} />
+          </div>
+          <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-white">
+            {t.net_buy_xp}
+            <span className="inline-flex items-center gap-0.5 text-amber-200"><CoinIcon size={11} />{ECONOMY.buyXpCost}</span>
+            <span className="text-sky-200">+{ECONOMY.buyXpAmount}</span>
+          </div>
+        </button>
         {/* Reroll — bigger, with your current gold shown alongside the cost. */}
         <button
           onClick={() => { reroll(); sfx.reroll(); }}
           disabled={gold < ECONOMY.rerollCost}
-          className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg bg-slate-700/80 hover:bg-slate-600 disabled:opacity-40 transition-colors"
+          className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg bg-slate-700/80 hover:bg-slate-600 disabled:opacity-40 transition-colors"
         >
           <span className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-100"><RerollIcon size={16} /> {t.sh_reroll}</span>
           <span className="inline-flex items-center gap-1 text-[11px] text-slate-300">
