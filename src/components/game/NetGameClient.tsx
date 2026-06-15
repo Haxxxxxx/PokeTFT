@@ -32,7 +32,7 @@ const ITEM_DEF_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 // screen. Planning and combat now share the SAME layout height (the center
 // column is a fixed height in both phases — see CENTER_H), so the canvas size is
 // constant and nothing jumps between phases.
-const DESIGN_W = 1500;
+const DESIGN_W = 1760;
 const DESIGN_H = 1130;
 // The middle row (field column) is locked to this height in BOTH phases so the
 // battlefield stays put and the bench/shop below it never move when the phase
@@ -501,7 +501,10 @@ export function NetGameClient() {
             column, and a fixed-width right rail. Because every track is a
             constant width, the battlefield sits in the exact same place in
             planning and combat — it never shifts when the phase flips. */}
-        <div className="grid items-start gap-4" style={{ gridTemplateColumns: "230px 824px 320px", justifyContent: "center" }}>
+        {/* Columns spread to the edges (TFT-style) so wide screens use the side
+            space; the centre field column is fixed-width + centred, so it stays
+            pinned across phases. */}
+        <div className="grid items-start gap-4" style={{ gridTemplateColumns: "260px 824px 340px", justifyContent: "space-between" }}>
           {/* Left sidebar: scoreboard + synergies */}
           <div className="flex flex-col gap-3">
           <div className="w-full p-2 rounded-xl bg-slate-900/70 border border-slate-700/50">
@@ -595,7 +598,7 @@ export function NetGameClient() {
           {/* Right rail: items inventory + details (planning). During combat the
               recap (with tabs) lives inside CombatStage; the 300px track stays
               reserved so the field column doesn't move. */}
-          <div className="w-[320px]">
+          <div className="w-[340px]">
             {phase !== "combat" && !spectating && (
               <div className="flex flex-col gap-3">
                 <ItemsPanel />
@@ -634,7 +637,7 @@ export function NetGameClient() {
             })()}
             <Bench />
           </div>
-          <div className="flex gap-3 w-full max-w-[1180px]">
+          <div className="flex gap-3 w-full max-w-[1480px]">
             <ShopSellDrop><ShopBar /></ShopSellDrop>
             <SellZone />
           </div>
