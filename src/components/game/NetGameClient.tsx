@@ -685,32 +685,25 @@ export function NetGameClient() {
               <div className="text-[11px] tabular-nums font-bold text-amber-200/70 mt-0.5 mb-5">{secondsLeft}s</div>
             {!picked && (
               <div className="flex gap-3 flex-wrap justify-center max-w-[760px]">
-                {opts.map((pick, i) => pick === MEGA_STONE ? (
-                  <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); }} style={{ borderColor: "#f0abfc", boxShadow: "0 0 18px -2px #f0abfc88" }} className="w-[130px] rounded-xl border-2 bg-gradient-to-b from-fuchsia-900/40 to-slate-900/80 hover:-translate-y-1 transition-all p-3 flex flex-col items-center justify-center">
-                    <span className="text-fuchsia-300"><MegaIcon size={48} /></span>
-                    <span className="text-sm font-semibold mt-1 text-fuchsia-200">Mega Stone</span>
-                  </button>
-                ) : ITEM_DEF_BY_ID[pick] ? (
-                  <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); }} style={{ borderColor: "#fbbf24", boxShadow: "0 0 16px -2px #fbbf2466" }} className="w-[130px] rounded-xl border-2 bg-gradient-to-b from-amber-900/30 to-slate-900/80 hover:-translate-y-1 transition-all p-3 flex flex-col items-center justify-center text-center">
-                    <span className="text-3xl">{ITEM_DEF_BY_ID[pick].icon}</span>
-                    <span className="text-sm font-semibold mt-1 text-amber-200">{ITEM_DEF_BY_ID[pick].name}</span>
-                    <span className="text-[9px] text-slate-400 leading-tight mt-1">{ITEM_DEF_BY_ID[pick].effect}</span>
-                  </button>
-                ) : (() => {
+                {opts.map((pick, i) => {
+                  const onPick = () => { netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); };
+                  if (pick === MEGA_STONE) return <CarouselCard key={i} onClick={onPick} color="#f0abfc" name="Mega Stone" sub={lang === "fr" ? "Méga-Évolution" : "Mega Evolve"} art={<span className="text-fuchsia-300"><MegaIcon size={56} /></span>} />;
+                  const item = ITEM_DEF_BY_ID[pick];
+                  if (item) return <CarouselCard key={i} onClick={onPick} color="#fbbf24" name={item.name} sub={item.effect} art={<span className="text-5xl">{item.icon}</span>} />;
                   const def = getDef(pick);
-                  const color = COST_COLOR[def.cost];
                   return (
-                    <button key={i} onClick={() => { netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); }} style={{ borderColor: color, boxShadow: `0 0 16px -2px ${color}66` }} className="w-[130px] rounded-xl border-2 bg-slate-900/80 hover:bg-slate-800 hover:-translate-y-1 transition-all p-3 flex flex-col items-center">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={spriteUrl(def.dex[0])} alt={def.name} width={56} height={56} style={{ imageRendering: "pixelated" }} draggable={false} />
-                      <span className="text-sm font-semibold mt-1">{def.name}</span>
-                      <span style={{ color }} className="inline-flex items-center gap-0.5 text-[11px] font-bold"><CoinIcon size={11} />{def.cost}</span>
-                      <div className="flex flex-wrap gap-0.5 justify-center mt-1.5">
-                        {def.types.map((ty) => <span key={ty} style={{ background: TYPE_COLOR[ty as PokeType] }} className="text-[8px] px-1 rounded text-black/80 font-bold uppercase">{ty.slice(0, 3)}</span>)}
-                      </div>
-                    </button>
+                    <CarouselCard
+                      key={i}
+                      onClick={onPick}
+                      color={COST_COLOR[def.cost]}
+                      name={def.name}
+                      cost={def.cost}
+                      types={def.types as PokeType[]}
+                      // eslint-disable-next-line @next/next/no-img-element
+                      art={<img src={spriteUrl(def.dex[0])} alt={def.name} width={88} height={88} style={{ imageRendering: "pixelated" }} draggable={false} />}
+                    />
                   );
-                })())}
+                })}
               </div>
             )}
             </div>
@@ -747,12 +740,18 @@ export function NetGameClient() {
               <button
                 key={a.id}
                 onClick={() => { pickAugment(a.id); flushSync(); }}
-                style={{ borderColor: "#a78bfa", boxShadow: "0 0 18px -3px #a78bfa88" }}
-                className="w-[180px] rounded-xl border-2 bg-gradient-to-b from-violet-900/40 to-slate-900/80 hover:-translate-y-1 transition-all p-4 flex flex-col items-center text-center gap-1"
+                style={{ borderColor: "#a78bfa", boxShadow: "0 0 22px -6px #a78bfa" }}
+                className="group relative w-[190px] h-[170px] rounded-xl overflow-hidden border-2 bg-slate-950/80 hover:-translate-y-1 transition-all flex flex-col items-center text-center"
               >
-                <span className="text-3xl">{a.icon}</span>
-                <span className="text-sm font-bold text-violet-200">{lang === "fr" ? a.nameFr : a.name}</span>
-                <span className="text-[11px] text-slate-300 leading-snug">{lang === "fr" ? a.descFr : a.desc}</span>
+                {/* Rarity bar on top (TFT-style), big icon, then name + effect on a scrim. */}
+                <span className="absolute top-0 inset-x-0 h-1 bg-violet-400" />
+                <div className="flex-1 flex items-center justify-center pt-3">
+                  <span className="text-5xl drop-shadow-[0_0_12px_rgba(167,139,250,0.6)]">{a.icon}</span>
+                </div>
+                <div className="w-full px-3 pt-6 pb-3 flex flex-col items-center gap-1" style={{ background: "linear-gradient(to top, rgba(2,6,23,0.97), rgba(2,6,23,0.5) 70%, transparent)" }}>
+                  <span className="text-sm font-extrabold text-violet-200 leading-tight drop-shadow">{lang === "fr" ? a.nameFr : a.name}</span>
+                  <span className="text-[10px] text-slate-300/90 leading-snug">{lang === "fr" ? a.descFr : a.desc}</span>
+                </div>
               </button>
             ))}
             </div>
@@ -888,6 +887,31 @@ function Kbd({ k, label }: { k: string; label: string }) {
       <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-600 text-[10px] font-bold text-slate-200 leading-none">{k}</kbd>
       <span className="text-[10px] text-slate-400">{label}</span>
     </span>
+  );
+}
+
+/** TFT-style reward card for the carousel: rarity bar on top, big art, then name
+ *  + cost/traits (units) or effect (items) over a scrim at the bottom. */
+function CarouselCard({ onClick, color, name, sub, cost, types, art }: { onClick: () => void; color: string; name: string; sub?: string; cost?: number; types?: PokeType[]; art: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{ borderColor: color, boxShadow: `0 0 22px -6px ${color}` }}
+      className="group relative w-[150px] h-[186px] rounded-xl overflow-hidden border-2 bg-slate-950/80 hover:-translate-y-1 transition-all"
+    >
+      <span className="absolute top-0 inset-x-0 h-1" style={{ background: color }} />
+      <div className="absolute inset-0 flex items-center justify-center pb-14">{art}</div>
+      <div className="absolute inset-x-0 bottom-0 px-2 pt-7 pb-2 flex flex-col items-center gap-1" style={{ background: "linear-gradient(to top, rgba(2,6,23,0.97), rgba(2,6,23,0.55) 62%, transparent)" }}>
+        <span className="text-sm font-extrabold text-white text-center leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">{name}</span>
+        {cost != null && <span style={{ color }} className="inline-flex items-center gap-0.5 text-[11px] font-extrabold"><CoinIcon size={11} />{cost}</span>}
+        {types && (
+          <div className="flex flex-wrap gap-0.5 justify-center">
+            {types.map((ty) => <span key={ty} style={{ background: TYPE_COLOR[ty] }} className="text-[8px] px-1 rounded text-black/80 font-bold uppercase">{ty.slice(0, 3)}</span>)}
+          </div>
+        )}
+        {sub && <span className="text-[9px] text-slate-300/80 text-center leading-tight">{sub}</span>}
+      </div>
+    </button>
   );
 }
 
