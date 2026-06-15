@@ -222,8 +222,13 @@ export function CombatStage({
           right into the reserved rail space. Fullscreen centers the pair. */}
       <div className={`flex items-start gap-3 w-full ${inline ? "justify-start" : "justify-center"}`}>
       <div
-        className="relative shrink-0 rounded-2xl border border-slate-700/50 overflow-hidden"
-        style={{ width: w + 24, height: h + 24, padding: 12, background: "radial-gradient(120% 90% at 50% 50%, #18243f 0%, #0a1020 75%)" }}
+        className="relative shrink-0 rounded-2xl overflow-hidden"
+        style={{
+          width: w + 24, height: h + 24, padding: 12,
+          background: "radial-gradient(120% 90% at 50% 50%, #1a263f 0%, #0a1020 75%)",
+          border: "1px solid rgba(212,175,55,0.32)",
+          boxShadow: "inset 0 1px 0 rgba(231,198,107,0.1), inset 0 0 60px -30px rgba(212,175,55,0.5), 0 26px 70px -34px rgba(0,0,0,0.9)",
+        }}
       >
         <div className="absolute" style={{ left: 12, top: 12, width: w, height: h }}>
           <HexGrid />
@@ -323,7 +328,7 @@ export function CombatStage({
         <button
           onClick={() => setRecapOpen(true)}
           title={t.cs_show_recap}
-          className="self-stretch w-7 shrink-0 rounded-xl bg-slate-900/60 border border-slate-700/40 flex flex-col items-center justify-center gap-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors"
+          className="gilded self-stretch w-7 shrink-0 rounded-xl flex flex-col items-center justify-center gap-1.5 text-amber-200/70 hover:text-amber-100 transition-colors"
         >
           <span className="text-sm">📊</span>
           <span className="[writing-mode:vertical-rl] rotate-180 text-[9px] font-extrabold uppercase tracking-wider">{t.cs_recap}</span>
@@ -343,21 +348,26 @@ export function CombatStage({
               <button
                 key={sp}
                 onClick={() => setSpeed(sp)}
-                className={`px-2.5 py-1 rounded-md text-xs font-semibold ${speed === sp ? "bg-sky-600 text-white" : "bg-slate-700 hover:bg-slate-600"}`}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-colors ${speed === sp ? "bg-amber-500/90 text-black border-amber-400" : "bg-black/30 border-[var(--panel-edge)] text-amber-100/70 hover:text-amber-50"}`}
               >
                 {sp}x
               </button>
             ))}
-            <button onClick={() => { setIdx(last); setFinished(true); }} className="px-3 py-1 rounded-md bg-slate-700 hover:bg-slate-600 text-xs font-semibold ml-2">
+            <button onClick={() => { setIdx(last); setFinished(true); }} className="px-3 py-1 rounded-md bg-black/30 border border-[var(--panel-edge)] text-amber-100/70 hover:text-amber-50 text-xs font-semibold ml-2">
               Skip →
             </button>
           </>
           )
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <div className={`text-xl font-extrabold ${won ? "text-emerald-400" : result.winner === "draw" ? "text-slate-300" : "text-rose-400"}`}>
-              {won ? t.cs_victory : result.winner === "draw" ? t.cs_draw : t.cs_defeat}
-              {!won && result.winner === "enemy" && <span className="text-sm text-slate-400 font-medium"> · {result.survivors} survived</span>}
+            <div
+              className="gilded gilded-strong celebrate-pop px-6 py-2 rounded-xl flex items-baseline gap-2"
+              style={{ boxShadow: `inset 0 1px 0 rgba(231,198,107,0.14), 0 0 34px -10px ${won ? "rgba(52,211,153,0.55)" : result.winner === "draw" ? "rgba(148,163,184,0.4)" : "rgba(244,63,94,0.55)"}, 0 22px 60px -34px rgba(0,0,0,0.85)` }}
+            >
+              <span className={`text-2xl font-extrabold tracking-tight ${won ? "text-emerald-300" : result.winner === "draw" ? "text-slate-200" : "text-rose-300"}`}>
+                {won ? t.cs_victory : result.winner === "draw" ? t.cs_draw : t.cs_defeat}
+              </span>
+              {!won && result.winner === "enemy" && <span className="text-sm text-slate-400 font-medium">· {result.survivors} survived</span>}
             </div>
             {autoResolve ? (
               <span className="text-xs text-slate-500">…</span>
@@ -394,9 +404,9 @@ function CombatRecapTabs({ units, label, onClose }: { units: FrameUnit[]; label:
   const sorted = [...mine].sort((a, b) => val(b) - val(a)).slice(0, 8);
 
   return (
-    <div className="w-[210px] shrink-0 rounded-xl bg-slate-900/60 border border-slate-700/40 p-2 self-stretch">
+    <div className="gilded w-[210px] shrink-0 rounded-xl p-2 self-stretch">
       <div className="flex items-center justify-between mb-1.5 px-0.5">
-        <span className="text-[9px] uppercase tracking-wider text-slate-500">{label}</span>
+        <span className="text-[9px] uppercase tracking-wider text-amber-200/55">{label}</span>
         <button onClick={onClose} title={t.cs_hide_recap} className="text-slate-500 hover:text-slate-200 text-xs leading-none">✕</button>
       </div>
       <div className="flex gap-1 mb-2">
@@ -405,7 +415,7 @@ function CombatRecapTabs({ units, label, onClose }: { units: FrameUnit[]; label:
             key={tb.key}
             onClick={() => setTab(tb.key)}
             style={tab === tb.key ? { background: tb.color, color: "#0b1020" } : undefined}
-            className={`flex-1 text-[10px] font-extrabold py-1 rounded-md transition-colors ${tab === tb.key ? "" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}
+            className={`flex-1 text-[10px] font-extrabold py-1 rounded-md border transition-colors ${tab === tb.key ? "border-transparent" : "bg-black/30 border-[var(--panel-edge)] text-amber-100/60 hover:text-amber-50"}`}
           >
             {tb.label}
           </button>
