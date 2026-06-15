@@ -105,7 +105,7 @@ export type FrameUnit = {
 
 export type CombatEvent =
   | { kind: "attack"; from: string; to: string }
-  | { kind: "cast"; from: string; to: string; moveType: PokeType; eff: number }
+  | { kind: "cast"; from: string; to: string; moveType: PokeType; eff: number; shape: Move["shape"]; move: string }
   | { kind: "hit"; to: string; dmg: number; crit?: boolean; sup?: boolean }
   | { kind: "death"; id: string };
 
@@ -426,7 +426,7 @@ function castAbility(caster: Combatant, target: Combatant, units: Combatant[], e
   const i = caster.star - 1;
   const base = caster.move.power[i] * caster.apMult;
   const eff = effectiveness(caster.move.type, target.types);
-  events.push({ kind: "cast", from: caster.id, to: target.id, moveType: caster.move.type, eff });
+  events.push({ kind: "cast", from: caster.id, to: target.id, moveType: caster.move.type, eff, shape: caster.move.shape, move: caster.move.name });
 
   const hitOne = (victim: Combatant) => {
     const e = effectiveness(caster.move.type, victim.types);

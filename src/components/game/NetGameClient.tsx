@@ -426,7 +426,7 @@ export function NetGameClient() {
     for (let i = 0; i < 40; i++) {
       schedule.push({ stage: s, round: r, kind: roundKind(s, r) });
       const nx = advanceRound(s, r);
-      if (nx.stage > meta.stage + 2) break;
+      if (nx.stage > meta.stage) break; // only the CURRENT stage's rounds
       s = nx.stage; r = nx.round;
     }
   }
