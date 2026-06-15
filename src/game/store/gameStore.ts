@@ -63,7 +63,6 @@ function advancePartial(state: State, gold: number) {
 }
 
 type State = {
-  seed: number;
   gold: number;
   xp: number;
   level: number;
@@ -123,7 +122,6 @@ type State = {
 let rng: Rng = makeRng(INITIAL_SEED);
 
 export const useGame = create<State>((set, get) => ({
-  seed: INITIAL_SEED,
   gold: 4,
   xp: 0,
   level: 1,
