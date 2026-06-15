@@ -121,6 +121,11 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
   const draw = r.winner === "draw";
   const aWon = r.winner === "ally";
   const bWon = r.winner === "enemy";
+  // The boards are written into the combat node, so they must be RTDB-safe:
+  // a single unit with an undefined field (e.g. items) would make the whole
+  // combat update() reject → clients stuck on the planning board / desync.
+  const sa = rtdbSafe(ba);
+  const sb = rtdbSafe(bb);
   combat[aUid] = {
     oppUid: bUid,
     oppName: (room.players[bUid]?.name ?? "Rival") + (ghost ? " (ghost)" : ""),
@@ -128,8 +133,8 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
     won: aWon,
     survivors: aWon || draw ? 0 : r.survivors,
     dmg: aWon || draw ? 0 : stageBaseDamage(stage) + r.survivors,
-    selfBoard: ba,
-    oppBoard: bb,
+    selfBoard: sa,
+    oppBoard: sb,
   };
   if (!ghost) {
     combat[bUid] = {
@@ -139,8 +144,8 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
       won: bWon,
       survivors: bWon || draw ? 0 : r.survivors,
       dmg: bWon || draw ? 0 : stageBaseDamage(stage) + r.survivors,
-      selfBoard: bb,
-      oppBoard: ba,
+      selfBoard: sb,
+      oppBoard: sa,
       // B is the "enemy" side of the canonical simulate(ba, bb): B replays the
       // exact same call and mirrors the view, so both screens share one outcome.
       flip: true,
@@ -179,29 +184,35 @@ export async function resolveRoundStart(code: string, room: Room): Promise<void>
   return startCombat(code, room);
 }
 
-/** Host: planning → combat (PvP pairing or PvE creeps). Freezes boards. */
-export async function startCombat(code: string, room: Room): Promise<void> {
-  if (!(await claimTransition(code, "planning", room.meta.deadline))) return;
-  room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
+/** Build the (deterministic) combat assignments + bot-board persistence for the
+ *  current round. Factored out of startCombat so endCombat can re-resolve a round
+ *  if it ever finds an empty/missing combat map (e.g. after a host migration),
+ *  rather than silently applying zero damage. Same room + stage/round always
+ *  yields the same pairings and outcomes. */
+function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoards: Record<string, UnitInstance[]> } {
   const stage = room.meta.stage;
   const kind = roundKind(stage, room.meta.round);
   const alive = alivePlayers(room);
   const allowed = rosterFor(room);
+  const botBoards: Record<string, UnitInstance[]> = {};
 
-  // Bots get a fresh host-generated board each round (humans synced their own).
+  // Bots get a deterministic host-generated board each round (humans synced theirs).
   for (const p of alive) {
-    if (p.isBot) room.players[p.uid] = { ...p, board: botBoard(stage, room.meta.round, p.botDifficulty, p.uid, allowed) };
+    if (p.isBot) {
+      const b = botBoard(stage, room.meta.round, p.botDifficulty, p.uid, allowed);
+      room.players[p.uid] = { ...p, board: b };
+      botBoards[p.uid] = b;
+    }
   }
 
   const combat: Record<string, CombatAssign> = {};
-
   if (kind === "pve") {
     // Everyone fights wild creeps — no HP loss, a breather to build.
     for (const p of alive) {
       const self = board(room.players[p.uid]);
       const creeps = generateCreepBoard(stage, room.meta.round, stage * 97 + room.meta.round * 13 + p.uid.length, allowed);
       const r = simulate(self, creeps);
-      combat[p.uid] = { oppUid: p.uid, oppName: "Wild Pokémon", ghost: true, pve: true, won: r.winner === "ally", survivors: 0, dmg: 0, selfBoard: self, oppBoard: creeps };
+      combat[p.uid] = { oppUid: p.uid, oppName: "Wild Pokémon", ghost: true, pve: true, won: r.winner === "ally", survivors: 0, dmg: 0, selfBoard: rtdbSafe(self), oppBoard: rtdbSafe(creeps) };
     }
   } else {
     const order = shuffled(alive.map((p) => p.uid).sort(), stage * 131 + room.meta.round);
@@ -215,16 +226,24 @@ export async function startCombat(code: string, room: Room): Promise<void> {
       const a = order[i];
       if (i + 1 < order.length) assign(combat, room, a, order[i + 1], stage, false);
       else if (order.length > 1) assign(combat, room, a, order[i - 1], stage, true); // odd → ghost
-      else combat[a] = { oppUid: a, oppName: "—", ghost: true, won: true, survivors: 0, dmg: 0, selfBoard: board(room.players[a]), oppBoard: [] };
+      else combat[a] = { oppUid: a, oppName: "—", ghost: true, won: true, survivors: 0, dmg: 0, selfBoard: rtdbSafe(board(room.players[a])), oppBoard: [] };
     }
   }
+  return { combat, botBoards };
+}
+
+/** Host: planning → combat (PvP pairing or PvE creeps). Freezes boards. */
+export async function startCombat(code: string, room: Room): Promise<void> {
+  if (!(await claimTransition(code, "planning", room.meta.deadline))) return;
+  room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
+  const { combat, botBoards } = buildCombat(room);
 
   const u: Updates = { "meta/phase": "combat", "meta/deadline": serverNow() + COMBAT_MS, "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow() };
   for (const uid of Object.keys(combat)) {
     u[`combat/${uid}`] = combat[uid];
     if (!combat[uid].pve && !combat[uid].ghost) u[`players/${uid}/lastOpp`] = combat[uid].oppUid;
   }
-  for (const p of alive) if (p.isBot) u[`players/${p.uid}/board`] = room.players[p.uid].board; // persist for replay
+  for (const uid of Object.keys(botBoards)) u[`players/${uid}/board`] = botBoards[uid]; // persist for replay
   await update(gamePath(code), u);
 }
 
@@ -290,9 +309,16 @@ export async function endCarousel(code: string, room: Room): Promise<void> {
 export async function endCombat(code: string, room: Room): Promise<void> {
   if (!(await claimTransition(code, "combat", room.meta.deadline))) return;
   room = (await freshRoom(code)) ?? room; // authoritative HP/combat (migration-safe)
-  const combat = room.combat ?? {};
+  let combat = room.combat ?? {};
   const u: Updates = {};
   const aliveUids = alivePlayers(room).map((p) => p.uid);
+
+  // Defensive: if a migration left us with no combat results for the alive
+  // players, re-resolve the round deterministically from the frozen boards
+  // instead of applying zero damage (which would silently void the round).
+  if (aliveUids.length > 0 && !aliveUids.some((uid) => combat[uid])) {
+    combat = buildCombat(room).combat;
+  }
   const hpAfter: Record<string, number> = {};
 
   for (const uid of aliveUids) {

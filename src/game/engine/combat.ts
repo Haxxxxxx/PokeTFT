@@ -24,10 +24,21 @@ const BURN_TICKS = 48;   // ~3s of burn
 function boardSeed(allies: UnitInstance[], enemies: UnitInstance[]): number {
   let h = 2166136261 >>> 0;
   const mix = (s: string) => { for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } };
-  for (const u of [...allies, ...enemies]) {
-    if (!u.pos) continue;
-    mix(`${u.iid}|${u.defId}|${u.star}|${u.pos[0]},${u.pos[1]}|${(u.items ?? []).join(",")}`);
-  }
+  // Order-independent: RTDB stores arrays as index-keyed objects and may reorder
+  // them, so the host's array order can differ from a client's. We sort the
+  // per-unit tokens (side-prefixed so allies≠enemies) before folding, guaranteeing
+  // host and client derive an identical seed regardless of array order.
+  const tokens: string[] = [];
+  const collect = (side: string, list: UnitInstance[]) => {
+    for (const u of list) {
+      if (!u.pos) continue;
+      tokens.push(`${side}|${u.iid}|${u.defId}|${u.star}|${u.pos[0]},${u.pos[1]}|${(u.items ?? []).join(",")}`);
+    }
+  };
+  collect("A", allies);
+  collect("E", enemies);
+  tokens.sort();
+  for (const t of tokens) mix(t);
   return h >>> 0;
 }
 
@@ -291,6 +302,11 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
     ...allies.filter((u) => u.pos).map((u) => toCombatant(u, "ally")),
     ...enemies.filter((u) => u.pos).map((u) => toCombatant(u, "enemy")),
   ];
+  // Stable iteration order, independent of the incoming array order (which RTDB
+  // can reorder). Every per-tick loop below iterates `units`, and movement /
+  // tie-break decisions can depend on that order — so we pin it by unit id to
+  // guarantee host and client step the sim identically.
+  units.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   // Trait synergies — applied as deterministic stat buffs at combat start.
   applyTraitBuffs(units, allies, "ally");
   applyTraitBuffs(units, enemies, "enemy");

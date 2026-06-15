@@ -65,6 +65,15 @@ function asBoard(b: unknown): UnitInstance[] {
   return (arr as UnitInstance[]).filter((u) => u && u.pos).map(normUnit);
 }
 
+/** Cheap, stable signature of a frozen board for memo deps — changes whenever the
+ *  board's units/positions/items change, so a re-frozen board re-runs the replay. */
+function boardSig(b: unknown): string {
+  return asBoard(b)
+    .map((u) => `${u.iid}@${u.pos?.[0]},${u.pos?.[1]}:${u.star}:${(u.items ?? []).join("+")}`)
+    .sort()
+    .join("|");
+}
+
 function SellZone() {
   const t = useT();
   const { setNodeRef, isOver } = useDroppable({ id: "sell" });
@@ -282,7 +291,10 @@ export function NetGameClient() {
     // match the host's a,b. Guarantees the same frames + outcome on every screen.
     const [p1, p2] = myCombat.flip ? [myCombat.oppBoard, myCombat.selfBoard] : [myCombat.selfBoard, myCombat.oppBoard];
     return simulate(asBoard(p1), asBoard(p2));
-  }, [phase, meta?.stage, meta?.round, myCombat?.oppUid]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Re-run when the frozen boards themselves change (host failover re-freeze or a
+    // late buzzer-beater sync for the same stage/round/opp) — not just on round id,
+    // else the replay frames can drift from the authoritative win flag.
+  }, [phase, meta?.stage, meta?.round, myCombat?.oppUid, myCombat?.flip, boardSig(myCombat?.selfBoard), boardSig(myCombat?.oppBoard)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Live replay of the rival I'm spectating (from the host's frozen boards).
   const spectateCombat = spectate && spectate !== myUid ? room?.combat?.[spectate] : undefined;
@@ -290,7 +302,7 @@ export function NetGameClient() {
     if (phase !== "combat" || !spectateCombat) return null;
     const [p1, p2] = spectateCombat.flip ? [spectateCombat.oppBoard, spectateCombat.selfBoard] : [spectateCombat.selfBoard, spectateCombat.oppBoard];
     return simulate(asBoard(p1), asBoard(p2));
-  }, [phase, meta?.stage, meta?.round, spectate, spectateCombat?.oppUid]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, meta?.stage, meta?.round, spectate, spectateCombat?.oppUid, spectateCombat?.flip, boardSig(spectateCombat?.selfBoard), boardSig(spectateCombat?.oppBoard)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Augment round? (stage 2/3/4 round 1). Show the pick until this slot is taken.
   const augSlotNow = meta && phase === "planning" && me?.alive ? augmentSlot(meta.stage, meta.round) : null;
