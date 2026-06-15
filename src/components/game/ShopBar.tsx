@@ -5,7 +5,7 @@ import { useUi } from "@/game/store/uiStore";
 import { getDef, spriteUrl } from "@/game/data/mons";
 import { computeTraits } from "@/game/engine/synergies";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
-import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
+import { COST_COLOR, TYPE_COLOR, TRAIT_ICON } from "@/game/ui";
 import { ECONOMY, COPIES_TO_STAR, SHOP_ODDS, MAX_LEVEL, XP_TO_REACH, type Cost } from "@/game/config";
 import { RerollIcon, SnowIcon, CoinIcon, InfoIcon, StarIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
@@ -123,7 +123,9 @@ export function ShopBar() {
       <div className="flex gap-2 flex-1">
         {shop.map((defId, i) => {
           if (!defId) {
-            return <div key={i} className="flex-1 h-[120px] rounded-lg border border-slate-800 bg-slate-900/40" />;
+            // Sold/empty slot — same footprint + border treatment as a filled slot
+            // so every shop slot stays visually uniform.
+            return <div key={i} className="flex-1 h-[120px] rounded-lg border border-slate-700/50 bg-slate-900/30" />;
           }
           const def = getDef(defId);
           const color = COST_COLOR[def.cost];
@@ -147,14 +149,27 @@ export function ShopBar() {
                 else { sfx.buy(); playCry(def.dex[0]); }
               }}
               disabled={!affordable}
-              style={{
-                borderColor: color,
-                boxShadow: own ? `0 0 0 1px ${color}, 0 0 14px ${color}66` : undefined,
-              }}
-              className={`group relative flex-1 h-[120px] rounded-lg border bg-slate-900/80 hover:bg-slate-800 disabled:opacity-50
-                flex items-center gap-1.5 pt-4 pb-1.5 pl-1.5 pr-1 transition-colors ${oneFromStar ? "ring-2 ring-amber-300/80" : ""}`}
+              style={{ boxShadow: own ? `inset 0 0 0 1.5px ${color}` : undefined }}
+              className={`group relative flex-1 h-[120px] overflow-hidden rounded-lg border border-slate-700/60 bg-slate-900 hover:brightness-125 disabled:opacity-50
+                transition ${oneFromStar ? "ring-2 ring-amber-300/80 ring-inset" : ""}`}
             >
-              {/* top-left info */}
+              {/* Sprite as the card "art" on the right (TFT-style). */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={spriteUrl(def.dex[Math.max(0, (own?.topStar ?? 1) - 1)])}
+                alt={def.name}
+                width={86}
+                height={86}
+                className="absolute right-0 bottom-1 pointer-events-none"
+                style={{ imageRendering: "pixelated" }}
+                draggable={false}
+              />
+              {/* Left-to-right legibility scrim so the traits/name read over the art. */}
+              <span className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(90deg, rgba(9,13,24,0.96) 32%, rgba(9,13,24,0.55) 62%, rgba(9,13,24,0.05) 100%)" }} />
+              {/* Rarity bar across the top (cost colour). */}
+              <span className="absolute top-0 inset-x-0 h-[3px]" style={{ background: color }} />
+
+              {/* Info button, top-right. */}
               <span
                 role="button"
                 tabIndex={0}
@@ -162,37 +177,30 @@ export function ShopBar() {
                 onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setInspect(def.id, 1); } }}
                 aria-label={t.sh_view_details}
                 title={t.sh_view_details}
-                className="absolute top-1 left-1 z-10 text-slate-500 hover:text-sky-300 opacity-60 group-hover:opacity-100 transition-opacity cursor-help"
+                className="absolute top-1 right-1 z-20 text-slate-400 hover:text-sky-300 opacity-50 group-hover:opacity-100 transition-opacity cursor-help"
               >
                 <InfoIcon size={12} />
               </span>
 
-              {/* Sprite on the LEFT, big and clear. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={spriteUrl(def.dex[Math.max(0, (own?.topStar ?? 1) - 1)])} alt={def.name} width={58} height={58} className="shrink-0" style={{ imageRendering: "pixelated" }} draggable={false} />
-
-              {/* Name + cost grouped at the TOP-RIGHT, then the traits stacked one
-                  above the other beneath them (also right-aligned). */}
-              <div className="flex-1 min-w-0 self-stretch flex flex-col items-end justify-center gap-1.5 pr-0.5">
-                <div className="flex items-center justify-end gap-1 w-full">
-                  <span className="text-[11px] font-bold truncate text-right leading-tight">{def.name}</span>
-                  <span style={{ color }} className="inline-flex items-center gap-0.5 text-[10px] font-bold shrink-0"><CoinIcon size={10} />{def.cost}</span>
-                </div>
+              {/* Traits with icons, stacked top-left. */}
+              <div className="absolute top-2.5 left-2 z-10 flex flex-col items-start gap-1">
                 {own && (
-                  <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/90 px-1.5 text-[8px] font-bold text-black leading-tight">
+                  <span className="inline-flex items-center gap-0.5 rounded bg-emerald-500/90 px-1 text-[8px] font-extrabold text-black leading-none py-[2px]">
                     {own.topStar > 1 && <StarIcon size={7} />}
                     {nextThreshold !== null ? `${copies}/${nextThreshold}` : t.sh_max}
                   </span>
                 )}
-                <div className="flex flex-col items-end gap-1 w-full">
-                  {def.types.map((tt) => (
-                    <TraitChip key={tt} label={TRAITS_BY_KEY[tt]?.label ?? tt} color={TYPE_COLOR[tt as PokeType]} active={activeTraits.has(tt)} />
-                  ))}
-                  {def.roles.map((r) => (
-                    <TraitChip key={r} label={TRAITS_BY_KEY[r]?.label ?? r} color="#64748b" active={activeTraits.has(r)} />
-                  ))}
-                </div>
+                {def.types.map((tt) => (
+                  <TraitChip key={tt} icon={TRAIT_ICON[tt]} label={TRAITS_BY_KEY[tt]?.label ?? tt} color={TYPE_COLOR[tt as PokeType]} active={activeTraits.has(tt)} />
+                ))}
+                {def.roles.map((r) => (
+                  <TraitChip key={r} icon={TRAIT_ICON[r]} label={TRAITS_BY_KEY[r]?.label ?? r} color="#94a3b8" active={activeTraits.has(r)} />
+                ))}
               </div>
+
+              {/* Name bottom-left, cost bottom-right (TFT-style). */}
+              <span className="absolute bottom-1.5 left-2 z-10 max-w-[78%] truncate text-[13px] font-extrabold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">{def.name}</span>
+              <span style={{ color }} className="absolute bottom-1.5 right-2 z-10 inline-flex items-center gap-0.5 text-[11px] font-extrabold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"><CoinIcon size={11} />{def.cost}</span>
             </button>
           );
         })}
@@ -201,13 +209,14 @@ export function ShopBar() {
   );
 }
 
-function TraitChip({ label, color, active }: { label: string; color: string; active: boolean }) {
+function TraitChip({ label, color, active, icon }: { label: string; color: string; active: boolean; icon?: string }) {
   return (
     <span
       title={active ? `${label} (active)` : label}
-      style={active ? { background: color, color: "#0b1020" } : { borderColor: `${color}99`, color: "#e2e8f0" }}
-      className={`text-[9px] leading-none px-1.5 py-[2px] rounded font-bold whitespace-nowrap ${active ? "ring-1 ring-white/70" : "border bg-slate-900/40"}`}
+      style={active ? { background: `${color}cc`, color: "#0b1020" } : { color: "#e2e8f0" }}
+      className={`inline-flex items-center gap-1 text-[9px] leading-none px-1.5 py-[2px] rounded font-bold whitespace-nowrap backdrop-blur-sm ${active ? "ring-1 ring-white/70" : "bg-slate-950/60"}`}
     >
+      {icon && <span className="text-[10px] leading-none">{icon}</span>}
       {label}
     </span>
   );
