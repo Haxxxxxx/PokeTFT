@@ -444,7 +444,7 @@ export const useGame = create<State>((set, get) => ({
     // RTDB mangles arrays (objects for sparse, undefined for empty) and strips
     // null values — so bench units lose `pos: null` and any unit can lose its
     // empty `items`. Coerce back to dense arrays and restore both fields.
-    units: toArray<UnitInstance>(save.units).filter(Boolean).map((u) => ({ ...u!, pos: u!.pos ?? null, items: u!.items ?? [] })),
+    units: toArray<UnitInstance>(save.units).filter(Boolean).map((u) => ({ ...u!, pos: u!.pos ?? null, items: toArray<string>(u!.items).filter(Boolean) as string[] })),
     shop: toArray<string>(save.shop, ECONOMY.shopSlots),
     items: toArray<string>(save.items).filter(Boolean) as string[],
     augments: toArray<string>(save.augments).filter(Boolean) as string[],

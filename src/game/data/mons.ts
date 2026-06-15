@@ -751,10 +751,31 @@ export const UNITS_BY_ID: Record<string, UnitDef> = Object.fromEntries(
   UNITS.map((u) => [u.id, u]),
 );
 
+/** Synthetic stand-in for an unknown def id, cached per-id. Keeps rendering and
+ *  the sim alive if a stale/cross-roster id ever reaches a client instead of
+ *  throwing and white-screening the whole game tree. */
+const PLACEHOLDER_CACHE: Record<string, UnitDef> = {};
+function placeholderDef(id: string): UnitDef {
+  return (PLACEHOLDER_CACHE[id] ??= {
+    id,
+    name: "?",
+    cost: 1 as UnitDef["cost"],
+    types: ["normal"] as UnitDef["types"],
+    roles: [] as UnitDef["roles"],
+    dex: [0, 0, 0],
+    stageNames: ["?", "?", "?"],
+    stats: { hp: [500, 600, 700], ad: [40, 50, 60], attackSpeed: 0.6, armor: 20, magicResist: 20, range: 1, maxMana: 100, startMana: 0 },
+    move: { name: "—", type: "normal", power: [0, 0, 0], shape: "single" },
+  });
+}
+
+/** True if `id` is a real, known unit def (use to filter RTDB-sourced ids). */
+export function hasDef(id: string): boolean {
+  return !!UNITS_BY_ID[id];
+}
+
 export function getDef(id: string): UnitDef {
-  const d = UNITS_BY_ID[id];
-  if (!d) throw new Error(`Unknown unit def: ${id}`);
-  return d;
+  return UNITS_BY_ID[id] ?? placeholderDef(id);
 }
 
 /** Returns unit IDs whose base-form dex number falls within the given generations. */

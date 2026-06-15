@@ -123,11 +123,21 @@ export function CombatStage({
     return () => cancelAnimationFrame(raf);
   }, [last, clockDriven, syncStart, syncWindowMs]);
 
-  // Play sound when combat ends
+  // Trust the host's authoritative outcome for the banner (falls back to the
+  // local sim only when not provided) — so "you win/lose" always matches the HP
+  // the host applied, even if a board edge-case made the local replay diverge.
+  const won = authWon ?? (result.winner === "ally");
+
+  // Play sound when combat ends — exactly once, using the LATEST `won` at the
+  // moment the fight finishes (a ref so a late-arriving authWon isn't read stale
+  // and we never play both the local and the authoritative result).
+  const wonRef = useRef(won);
+  wonRef.current = won;
+  const playedEnd = useRef(false);
   useEffect(() => {
-    if (!finished) return;
-    if (won) sfx.victory(); else sfx.defeat();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!finished || playedEnd.current) return;
+    playedEnd.current = true;
+    if (wonRef.current) sfx.victory(); else sfx.defeat();
   }, [finished]);
 
   const { w, h } = fieldPixelSize(TILE_W, TILE_H);
@@ -135,47 +145,43 @@ export function CombatStage({
   const frac = idx - fi;
   const a = frames[fi];
   const b = frames[Math.min(fi + 1, last)];
-  const bMap = new Map(b.units.map((u) => [u.id, u]));
-  const aMap = new Map(a.units.map((u) => [u.id, u]));
 
-  // Discrete combat feedback (hits + casts) from a TRAILING WINDOW of frames, not
-  // just the current one. When playback advances several frames in one paint
-  // (low fps / compressed window) every action is still shown — fixing the
-  // "jumping / skipping / looks different on each screen" problem. Keys are the
-  // event's identity so each effect mounts once and its animation plays out.
+  // The per-frame derived structures (interpolation maps, the trailing FX window,
+  // and the O(n²) facing pass) depend ONLY on the integer frame index `fi`, not
+  // the sub-frame `frac`. Memoizing on `fi` rebuilds them when the frame advances
+  // instead of on every 60fps paint — kills the combat-phase jank.
   const FX_TRAIL = 9;
-  const recentFx: { fk: string; e: CombatEvent; pos: Map<string, FrameUnit> }[] = [];
-  const recentHit = new Set<string>(); // units hit anywhere in the window (for the flash)
-  for (let f = Math.max(0, fi - FX_TRAIL); f <= fi; f++) {
-    const fr = frames[f];
-    if (!fr) continue;
-    const pm = f === fi ? aMap : new Map(fr.units.map((u) => [u.id, u]));
-    fr.events.forEach((e, k) => {
-      if (e.kind === "hit") { recentFx.push({ fk: `${f}-${k}`, e, pos: pm }); if (f >= fi - 1) recentHit.add(e.to); }
-      else if (e.kind === "cast") recentFx.push({ fk: `${f}-${k}`, e, pos: pm });
-    });
-  }
+  const { aMap, bMap, recentFx, recentHit, facing } = useMemo(() => {
+    const aMap = new Map(a.units.map((u) => [u.id, u]));
+    const bMap = new Map(b.units.map((u) => [u.id, u]));
+    const recentFx: { fk: string; e: CombatEvent; pos: Map<string, FrameUnit> }[] = [];
+    const recentHit = new Set<string>();
+    for (let f = Math.max(0, fi - FX_TRAIL); f <= fi; f++) {
+      const fr = frames[f];
+      if (!fr) continue;
+      const pm = f === fi ? aMap : new Map(fr.units.map((u) => [u.id, u]));
+      fr.events.forEach((e, k) => {
+        if (e.kind === "hit") { recentFx.push({ fk: `${f}-${k}`, e, pos: pm }); if (f >= fi - 1) recentHit.add(e.to); }
+        else if (e.kind === "cast") recentFx.push({ fk: `${f}-${k}`, e, pos: pm });
+      });
+    }
+    const facing = new Map<string, number>();
+    for (const u of a.units) {
+      if (!u.alive) continue;
+      let nx = u.c;
+      let best = Infinity;
+      for (const o of a.units) {
+        if (!o.alive || o.team === u.team) continue;
+        const d = hexDistance({ c: u.c, r: u.r }, { c: o.c, r: o.r });
+        if (d < best) { best = d; nx = o.c; }
+      }
+      facing.set(u.id, nx);
+    }
+    return { aMap, bMap, recentFx, recentHit, facing };
+  }, [fi, frames, a, b]);
 
-  // Trust the host's authoritative outcome for the banner (falls back to the
-  // local sim only when not provided) — so "you win/lose" always matches the HP
-  // the host applied, even if a board edge-case made the local replay diverge.
-  const won = authWon ?? (result.winner === "ally");
   const aliveAlly = a.units.filter((u) => u.team === "ally" && u.alive).length;
   const aliveEnemy = a.units.filter((u) => u.team === "enemy" && u.alive).length;
-
-  // Nearest enemy per unit (for facing + lunge fallback).
-  const facing = new Map<string, number>();
-  for (const u of a.units) {
-    if (!u.alive) continue;
-    let nx = u.c;
-    let best = Infinity;
-    for (const o of a.units) {
-      if (!o.alive || o.team === u.team) continue;
-      const d = hexDistance({ c: u.c, r: u.r }, { c: o.c, r: o.r });
-      if (d < best) { best = d; nx = o.c; }
-    }
-    facing.set(u.id, nx);
-  }
 
   return (
     <div className={inline

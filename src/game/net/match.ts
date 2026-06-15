@@ -4,7 +4,7 @@ import { serverNow } from "./serverTime";
 import { simulate } from "../engine/combat";
 import { makeRng } from "../engine/rng";
 import { generatePlayerLikeBoard, generateCreepBoard, pickCarouselOptions } from "../engine/enemy";
-import { unitsForGenerations } from "../data/mons";
+import { unitsForGenerations, hasDef } from "../data/mons";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
 import { COMPONENT_IDS } from "../data/items";
@@ -60,7 +60,13 @@ function shuffled<T>(arr: T[], seed: number): T[] {
 function board(p: RoomPlayer | undefined): UnitInstance[] {
   const b = p?.board;
   const arr = Array.isArray(b) ? b : b ? Object.values(b) : [];
-  return (arr as UnitInstance[]).filter((u) => u && u.pos);
+  // Drop placed units with an unknown def id (stale/cross-roster data) so they
+  // never reach simulate() — both host and client filter identically — and
+  // coerce each unit's `items` to a dense array (RTDB can return it as an
+  // index-keyed object, which would break the sim's `for (const id of items)`).
+  return (arr as UnitInstance[])
+    .filter((u) => u && u.pos && hasDef(u.defId))
+    .map((u) => (Array.isArray(u.items) ? u : { ...u, items: u.items ? Object.values(u.items as Record<string, string>) : [] }));
 }
 
 /** Players still in the game (alive). Disconnected-but-alive players still fight

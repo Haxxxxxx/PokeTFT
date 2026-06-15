@@ -6,7 +6,13 @@ import { useRoom } from "@/game/net/roomStore";
 
 /** Friends list with quick-add by username + join-friend's-game. */
 export function FriendsPanel() {
-  const { user, profile, friends, addFriendByName, unfriend } = useAuth();
+  // Field-level selectors so auth churn (busy/error/status during sign-in) doesn't
+  // re-render the whole friends list on every store write.
+  const user = useAuth((s) => s.user);
+  const profile = useAuth((s) => s.profile);
+  const friends = useAuth((s) => s.friends);
+  const addFriendByName = useAuth((s) => s.addFriendByName);
+  const unfriend = useAuth((s) => s.unfriend);
   const join = useRoom((s) => s.join);
   const myCode = useRoom((s) => s.code);
   const [name, setName] = useState("");

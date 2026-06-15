@@ -7,7 +7,7 @@ import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, markCarouselPicked, finishCarouselEarlyIfReady, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate } from "@/game/engine/combat";
-import { getDef, spriteUrl, unitsForGenerations } from "@/game/data/mons";
+import { getDef, spriteUrl, unitsForGenerations, hasDef } from "@/game/data/mons";
 import { streakGold, roundKind, advanceRound, boardSizeForLevel } from "@/game/config";
 import { interest } from "@/game/engine/economy";
 import { MEGA_STONE, canMega } from "@/game/data/mega";
@@ -22,8 +22,16 @@ import type { UnitInstance, PokeType } from "@/game/types";
 
 // RTDB drops null values + empty arrays, so a synced unit can come back missing
 // `pos` (bench units) or `items`. Restore both invariants at the boundary.
+/** RTDB strips empty arrays and turns sparse ones into index-keyed objects, so a
+ *  unit's `items` can come back as undefined or {0:"x"}. Coerce to a dense array
+ *  (and default pos) — otherwise `for (const id of items)` in the sim throws. */
+function itemsArray(v: unknown): string[] {
+  if (Array.isArray(v)) return v.filter(Boolean);
+  if (v && typeof v === "object") return Object.values(v as Record<string, string>).filter(Boolean);
+  return [];
+}
 function normUnit(u: UnitInstance): UnitInstance {
-  return u.items && u.pos !== undefined ? u : { ...u, pos: u.pos ?? null, items: u.items ?? [] };
+  return { ...u, pos: u.pos ?? null, items: itemsArray(u.items) };
 }
 
 const ITEM_DEF_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
@@ -62,7 +70,8 @@ import { toggleFullscreen, isFullscreen } from "@/lib/fullscreen";
 function asBoard(b: unknown): UnitInstance[] {
   if (!b) return [];
   const arr = Array.isArray(b) ? b : Object.values(b as Record<string, UnitInstance>);
-  return (arr as UnitInstance[]).filter((u) => u && u.pos).map(normUnit);
+  // Mirror match.ts board(): drop unknown-def units so the client sim matches the host.
+  return (arr as UnitInstance[]).filter((u) => u && u.pos && hasDef(u.defId)).map(normUnit);
 }
 
 /** Cheap, stable signature of a frozen board for memo deps — changes whenever the

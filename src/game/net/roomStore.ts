@@ -411,6 +411,7 @@ function subscribe(code: string, uid: string, setState: (p: Partial<RoomState>) 
       setState({ liveRoom: next });
     }
   });
-  // mark ourselves connected (in case of rejoin)
-  update(ref(db(), `games/${code}/players/${uid}`), { connected: true });
+  // mark ourselves connected (in case of rejoin) — swallow transient
+  // permission/offline rejections so they don't surface as unhandled rejections.
+  update(ref(db(), `games/${code}/players/${uid}`), { connected: true }).catch(onWriteErr);
 }
