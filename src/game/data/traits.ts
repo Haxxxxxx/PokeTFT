@@ -32,9 +32,9 @@ const RAW: RawTrait[] = [
   {
     key: "grass", label: "Grass", description: "Grass mons steadily regenerate health.",
     tiers: [
-      { count: 3, effect: "Grass mons regen 2% max HP per second.", buff: { regenPerSec: 0.02 } },
-      { count: 6, effect: "Grass mons regen 4.5% max HP per second.", buff: { regenPerSec: 0.045 } },
-      { count: 9, effect: "Grass mons regen 8% max HP per second.", buff: { regenPerSec: 0.08 } },
+      { count: 3, effect: "Grass mons: +12% HP · regen 3% max HP/s.", buff: { hpMult: 1.12, regenPerSec: 0.03 } },
+      { count: 6, effect: "Grass mons: +25% HP · regen 6% max HP/s.", buff: { hpMult: 1.25, regenPerSec: 0.06 } },
+      { count: 9, effect: "Grass mons: +45% HP · regen 11% max HP/s.", buff: { hpMult: 1.45, regenPerSec: 0.11 } },
     ],
   },
   {
@@ -48,8 +48,9 @@ const RAW: RawTrait[] = [
   {
     key: "poison", label: "Poison", description: "Poison mons channel potent ability power.",
     tiers: [
-      { count: 3, effect: "Poison mons: +30% Ability Power.", buff: { apMult: 1.3 } },
-      { count: 5, effect: "Poison mons: +55% Ability Power.", buff: { apMult: 1.55 } },
+      { count: 2, effect: "Poison mons: +25% Ability Power · abilities poison (3% HP/s).", buff: { apMult: 1.25, burnDps: 0.03 } },
+      { count: 4, effect: "Poison mons: +45% Ability Power · poison 5% HP/s.", buff: { apMult: 1.45, burnDps: 0.05 } },
+      { count: 6, effect: "Poison mons: +70% Ability Power · poison 8% HP/s.", buff: { apMult: 1.7, burnDps: 0.08 } },
     ],
   },
   {
@@ -70,8 +71,8 @@ const RAW: RawTrait[] = [
   {
     key: "dragon", label: "Dragon", description: "Dragons are raw, overwhelming power.",
     tiers: [
-      { count: 2, effect: "Dragons: +35% Attack Damage & Ability Power.", buff: { adMult: 1.35, apMult: 1.35 } },
-      { count: 3, effect: "Dragons: +60% Attack Damage & Ability Power.", buff: { adMult: 1.6, apMult: 1.6 } },
+      { count: 2, effect: "Dragons: +22% Attack Damage & Ability Power.", buff: { adMult: 1.22, apMult: 1.22 } },
+      { count: 3, effect: "Dragons: +45% Attack Damage & Ability Power.", buff: { adMult: 1.45, apMult: 1.45 } },
     ],
   },
   {
@@ -128,8 +129,8 @@ const RAW: RawTrait[] = [
   {
     key: "steel", label: "Steel", description: "Steel mons are fortresses of iron.",
     tiers: [
-      { count: 2, effect: "Steel mons: +30 Armor & MR · immune to status.", buff: { armorAdd: 30, mrAdd: 30, statusImmune: true } },
-      { count: 4, effect: "+65 Armor & MR, +12% HP · immune to status.", buff: { armorAdd: 65, mrAdd: 65, hpMult: 1.12, statusImmune: true } },
+      { count: 2, effect: "Steel mons: +28 Armor & Magic Resist.", buff: { armorAdd: 28, mrAdd: 28 } },
+      { count: 4, effect: "+60 Armor & MR, +12% HP · immune to status.", buff: { armorAdd: 60, mrAdd: 60, hpMult: 1.12, statusImmune: true } },
       { count: 6, effect: "+110 Armor & MR, +25% HP · immune to status.", buff: { armorAdd: 110, mrAdd: 110, hpMult: 1.25, statusImmune: true } },
     ],
   },

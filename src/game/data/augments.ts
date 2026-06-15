@@ -29,14 +29,14 @@ export const AUGMENTS: Augment[] = [
   { id: "training",      name: "Training Regimen", nameFr: "Entraînement",      desc: "+4 XP right now.",                 descFr: "+4 XP immédiatement.",                 icon: "📈", kind: "instant", tier: "silver" },
   { id: "scholar",       name: "Scholar",          nameFr: "Érudit",            desc: "+2 XP every round.",               descFr: "+2 XP à chaque tour.",                 icon: "📚", kind: "passive", tier: "silver" },
   { id: "fast-learner",  name: "Fast Learner",     nameFr: "Apprentissage",     desc: "+3 XP every round.",               descFr: "+3 XP à chaque tour.",                 icon: "🧠", kind: "passive", tier: "silver" },
-  { id: "lucky",         name: "Lucky Rolls",      nameFr: "Coups de chance",   desc: "Reroll costs 1 gold.",             descFr: "Le reroll coûte 1 or.",                icon: "🎲", kind: "passive", tier: "silver" },
+  { id: "lucky",         name: "Lucky Rolls",      nameFr: "Coups de chance",   desc: "Reroll costs 1 gold.",             descFr: "Le reroll coûte 1 or.",                icon: "🎲", kind: "passive", tier: "gold" },
   // ── Gold ─────────────────────────────────────────────────────────────────
   { id: "recruiter",     name: "Recruiter",        nameFr: "Recruteur",         desc: "2 free units to your bench now.",  descFr: "2 unités gratuites sur le banc.",      icon: "🎯", kind: "instant", tier: "gold" },
   { id: "treasure",      name: "Treasure Trove",   nameFr: "Trésor caché",      desc: "2 random items now.",              descFr: "2 objets aléatoires immédiatement.",   icon: "🎁", kind: "instant", tier: "gold" },
   { id: "windfall",      name: "Windfall",         nameFr: "Aubaine",           desc: "+12 gold right now.",              descFr: "+12 or immédiatement.",                icon: "🪙", kind: "instant", tier: "gold" },
   { id: "component-cache", name: "Component Cache", nameFr: "Cache d'objets",   desc: "3 random items now.",              descFr: "3 objets aléatoires immédiatement.",   icon: "📦", kind: "instant", tier: "gold" },
   { id: "rich",          name: "Rich Get Richer",  nameFr: "Capital croissant", desc: "+1 gold every round.",             descFr: "+1 or à chaque tour.",                 icon: "🏦", kind: "passive", tier: "gold" },
-  { id: "compound-interest", name: "Compound Interest", nameFr: "Intérêts composés", desc: "+2 gold every round.",      descFr: "+2 or à chaque tour.",                 icon: "📊", kind: "passive", tier: "gold" },
+  { id: "compound-interest", name: "Compound Interest", nameFr: "Intérêts composés", desc: "+2 gold every round.",      descFr: "+2 or à chaque tour.",                 icon: "📊", kind: "passive", tier: "prismatic" },
   // ── Prismatic ────────────────────────────────────────────────────────────
   { id: "mega-gift",     name: "Mega Gift",        nameFr: "Cadeau Méga",       desc: "A Mega Stone now.",                descFr: "Une Méga-Gemme immédiatement.",        icon: "🔮", kind: "instant", tier: "prismatic" },
   { id: "draft-day",     name: "Draft Day",        nameFr: "Jour de draft",     desc: "3 free units to your bench now.",  descFr: "3 unités gratuites sur le banc.",      icon: "🌟", kind: "instant", tier: "prismatic" },

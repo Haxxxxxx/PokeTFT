@@ -130,12 +130,12 @@ export const STAGE_BASE_DAMAGE: Record<number, number> = {
   3: 2,
   4: 5,
   5: 8,
-  6: 12,
-  7: 16,
+  6: 11,
+  7: 14,
 };
 
 export function stageBaseDamage(stage: number): number {
-  return STAGE_BASE_DAMAGE[stage] ?? 18;
+  return STAGE_BASE_DAMAGE[stage] ?? 16;
 }
 
 /** Board geometry — each player owns a 7-wide x 4-deep hex grid. */

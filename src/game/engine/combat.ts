@@ -188,6 +188,13 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
     if (e.sash) sash = true;
     if (e.statusImmune) statusImmune = true;
   }
+  // Cap the ITEM stat multipliers (traits stack on top, but they're bounded to one
+  // tier per type). One or two items stay full-strength; this just defuses the
+  // degenerate 3-identical-item stack (e.g. 3 Choice Bands = 1.8³ ≈ 5.8× AD).
+  const ITEM_MULT_CAP = 2.6;
+  adMult = Math.min(ITEM_MULT_CAP, adMult);
+  apMult = Math.min(ITEM_MULT_CAP, apMult);
+  hpMult = Math.min(ITEM_MULT_CAP, hpMult);
   ad = Math.round(ad * adMult);
   hp = Math.round(hp * hpMult);
 
