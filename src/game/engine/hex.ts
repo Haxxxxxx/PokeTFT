@@ -8,6 +8,15 @@ export type Hex = { c: number; r: number };
 /** Combined battlefield: 7 columns x 8 rows (player bottom, enemy top). */
 export const FIELD = { cols: 7, rows: 8 } as const;
 
+/** Shared on-screen tile size. The planning board and the combat field both draw
+ *  with this, so your half sits in the EXACT same pixels in both phases — the
+ *  board never jumps or resizes when planning flips to combat. Sized to make the
+ *  board a generous centerpiece that spreads across the fullscreen layout. */
+export const TILE = { w: 106, h: 100 } as const;
+
+/** Rows the local player owns: the bottom 4 of the 8-row field. */
+export const ALLY_ROW0 = FIELD.rows - 4;
+
 /** Map a player's local board cell (7x4) to the bottom half of the field. */
 export function allyToField(c: number, r: number): Hex {
   return { c, r: r + 4 };

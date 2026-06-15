@@ -28,7 +28,7 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
       .sort((a, b) => a.cost - b.cost);
 
   return (
-    <div className="w-[220px] shrink-0 p-3 rounded-xl bg-slate-900/70 border border-slate-700/50">
+    <div className="w-full h-full min-h-0 overflow-y-auto p-3 rounded-xl bg-slate-900/70 border border-slate-700/50">
       <h2 className="text-xs uppercase tracking-wide text-slate-400 mb-2">Synergies</h2>
       {traits.length === 0 && <p className="text-xs text-slate-500">Place mons to activate traits.</p>}
       <div className="flex flex-col gap-1.5">

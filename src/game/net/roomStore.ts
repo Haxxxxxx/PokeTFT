@@ -32,6 +32,9 @@ export type RoomPlayer = {
   streak: number;
   /** Previous round's opponent uid (for rematch avoidance). */
   lastOpp?: string;
+  /** "stage-round" key of the carousel this player already picked from — lets the
+   *  host end the carousel early once everyone has chosen. */
+  carouselPicked?: string;
   /** The player's current on-board units (synced during planning). */
   board?: UnitInstance[];
   /** Full economy snapshot for reconnect (synced during planning). */
@@ -58,6 +61,11 @@ export type CombatAssign = {
   ghost: boolean;
   /** PvE round — fight wild creeps, no HP loss. */
   pve?: boolean;
+  /** True for the "enemy"-side player of a PvP pair. Both players replay the SAME
+   *  canonical simulate(attacker, defender); the flipped side mirrors the view so
+   *  their team still shows at the bottom. Guarantees identical outcomes on every
+   *  screen (no per-perspective re-sim divergence). */
+  flip?: boolean;
   won: boolean;
   survivors: number;
   dmg: number;

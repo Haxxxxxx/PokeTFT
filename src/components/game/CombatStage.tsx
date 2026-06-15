@@ -1,16 +1,36 @@
 "use client";
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 import { sfx } from "@/lib/audio";
-import { hexToPixel, fieldPixelSize, hexDistance, FIELD } from "@/game/engine/hex";
+import { hexToPixel, fieldPixelSize, hexDistance, FIELD, TILE } from "@/game/engine/hex";
 import { TYPE_COLOR } from "@/game/ui";
 import { serverNow } from "@/game/net/serverTime";
 import type { CombatResult, FrameUnit } from "@/game/engine/combat";
 
-const TILE_W = 80;
-const TILE_H = 76;
+/** Mirror a replay through the field centre (180° rotation) and swap teams, so
+ *  the "enemy"-side player of a shared canonical sim still sees THEIR team at the
+ *  bottom. Pure view transform — the underlying sim is byte-identical on both
+ *  screens, which is what guarantees matching outcomes. */
+function mirrorResult(r: CombatResult): CombatResult {
+  return {
+    ...r,
+    winner: r.winner === "ally" ? "enemy" : r.winner === "enemy" ? "ally" : "draw",
+    frames: r.frames.map((f) => ({
+      ...f,
+      units: f.units.map((u) => ({
+        ...u,
+        team: u.team === "ally" ? "enemy" : "ally",
+        c: FIELD.cols - 1 - u.c,
+        r: FIELD.rows - 1 - u.r,
+      })),
+    })),
+  };
+}
+
+const TILE_W = TILE.w;
+const TILE_H = TILE.h;
 const SIM_DT = 1 / 16;
 const HEX_CLIP = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
 
@@ -24,7 +44,8 @@ function hpColor(f: number): string {
 }
 
 export function CombatStage({
-  result,
+  result: rawResult,
+  flip = false,
   opponentName,
   onResolve,
   autoResolve = false,
@@ -34,6 +55,8 @@ export function CombatStage({
   syncWindowMs,
 }: {
   result: CombatResult;
+  /** Mirror the view (this player is the canonical sim's "enemy" side). */
+  flip?: boolean;
   opponentName: string;
   onResolve: (won: boolean, survivors: number) => void;
   /** Multiplayer: the host clock advances the round, so hide the Continue button. */
@@ -52,6 +75,7 @@ export function CombatStage({
   /** Multiplayer: length of the combat phase in ms (COMBAT_MS). */
   syncWindowMs?: number;
 }) {
+  const result = useMemo(() => (flip ? mirrorResult(rawResult) : rawResult), [rawResult, flip]);
   const frames = result.frames;
   const last = frames.length - 1;
   const totalTime = frames[last].t;
@@ -59,6 +83,7 @@ export function CombatStage({
   const t = useT();
   const [idx, setIdx] = useState(0);
   const [finished, setFinished] = useState(false);
+  const [recapOpen, setRecapOpen] = useState(true);
   const [speed, setSpeed] = useState(1.5);
   const speedRef = useRef(speed);
   useEffect(() => { speedRef.current = speed; }, [speed]);
@@ -128,34 +153,33 @@ export function CombatStage({
 
   return (
     <div className={inline
-      ? "w-full flex flex-col items-center rounded-2xl border border-slate-700/50 bg-slate-950/60 p-3"
-      : "fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4"}>
-      {/* Scoreboard header: both teams + survivor counts */}
-      <div className="flex items-stretch gap-3 mb-2 w-full max-w-[600px]">
-        <div className="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50">
-          <span className="text-2xl font-extrabold tabular-nums text-emerald-300">{aliveAlly}</span>
-          <span className="text-[11px] font-bold uppercase tracking-wide text-emerald-400/80 leading-tight">{t.cs_your_team}</span>
-        </div>
-        <div className="flex flex-col items-center justify-center px-1">
-          <span className={`text-xs font-extrabold ${a.overtime ? "text-rose-400 animate-pulse" : "text-slate-500"}`}>
-            {a.overtime ? t.cs_overtime : t.cs_vs}
-          </span>
-        </div>
-        <div className={`flex-1 flex items-center justify-end gap-2 px-3 py-1.5 rounded-lg border ${pve ? "bg-emerald-950/40 border-emerald-800/50" : "bg-rose-950/40 border-rose-800/50"}`}>
-          {pve && <span className="text-sm">🌿</span>}
-          <span className={`text-[11px] font-bold uppercase tracking-wide leading-tight text-right truncate ${pve ? "text-emerald-400/80" : "text-rose-400/80"}`}>{opponentName}</span>
-          <span className={`text-2xl font-extrabold tabular-nums ${pve ? "text-emerald-300" : "text-rose-300"}`}>{aliveEnemy}</span>
-        </div>
+      ? "absolute inset-0 flex items-center justify-center"
+      : "fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"}>
+      {/* Combat chrome (scoreboard + timer) FLOATS at the top so the battlefield
+          stays vertically centered in the exact same box as the planning board —
+          the layout never shifts between phases. */}
+      <div className="absolute top-0 inset-x-0 flex flex-col items-center">
+      {/* Subtle one-line matchup (was a big scoreboard bar) — survivor counts +
+          opponent, kept minimal so it doesn't dominate the fight view. */}
+      <div className="flex items-center justify-center gap-2 mb-1 text-[11px] font-bold max-w-[460px]">
+        <span className="tabular-nums text-emerald-300">{aliveAlly}</span>
+        <span className={a.overtime ? "text-rose-400 animate-pulse" : "text-slate-500"}>{a.overtime ? t.cs_overtime : t.cs_vs}</span>
+        <span className={`truncate ${pve ? "text-emerald-300" : "text-rose-300"}`}>{pve ? "🌿 " : ""}{opponentName} <span className="tabular-nums">{aliveEnemy}</span></span>
       </div>
 
       {/* Combat timer */}
-      <div className="w-full max-w-[600px] h-1.5 rounded-full bg-slate-800 overflow-hidden mb-3">
+      <div className="w-full max-w-[460px] h-1 rounded-full bg-slate-800 overflow-hidden">
         <div className={`h-full ${a.overtime ? "bg-rose-500" : "bg-slate-400/70"}`} style={{ width: `${(a.t / totalTime) * 100}%` }} />
       </div>
+      </div>
 
-      {/* Battlefield */}
+      {/* Battlefield (the focus) + a compact side recap with DMG/TANK/HEAL tabs.
+          Inline (multiplayer) pins the battlefield to the LEFT so it lines up
+          pixel-for-pixel with the planning board; the recap overflows to the
+          right into the reserved rail space. Fullscreen centers the pair. */}
+      <div className={`flex items-start gap-3 w-full ${inline ? "justify-start" : "justify-center"}`}>
       <div
-        className="relative rounded-2xl border border-slate-700/50 overflow-hidden"
+        className="relative shrink-0 rounded-2xl border border-slate-700/50 overflow-hidden"
         style={{ width: w + 24, height: h + 24, padding: 12, background: "radial-gradient(120% 90% at 50% 50%, #18243f 0%, #0a1020 75%)" }}
       >
         <div className="absolute" style={{ left: 12, top: 12, width: w, height: h }}>
@@ -251,11 +275,22 @@ export function CombatStage({
         </div>
       </div>
 
-      {/* Live damage / tank / heal recap for your team. */}
-      <CombatRecap units={a.units} label={t.cs_your_team} />
+      {recapOpen ? (
+        <CombatRecapTabs units={a.units} label={t.cs_your_team} onClose={() => setRecapOpen(false)} />
+      ) : (
+        <button
+          onClick={() => setRecapOpen(true)}
+          title={t.cs_show_recap}
+          className="self-stretch w-7 shrink-0 rounded-xl bg-slate-900/60 border border-slate-700/40 flex flex-col items-center justify-center gap-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors"
+        >
+          <span className="text-sm">📊</span>
+          <span className="[writing-mode:vertical-rl] rotate-180 text-[9px] font-extrabold uppercase tracking-wider">{t.cs_recap}</span>
+        </button>
+      )}
+      </div>
 
-      {/* Controls */}
-      <div className="flex items-center gap-2 mt-3 min-h-[40px]">
+      {/* Controls — floated at the bottom of the same box (keeps the field static). */}
+      <div className="absolute bottom-0 inset-x-0 flex items-center justify-center gap-2 min-h-[40px]">
         {!finished ? (
           clockDriven ? (
             // Lockstep with the shared clock — no local speed/skip (would desync visuals).
@@ -299,32 +334,51 @@ export function CombatStage({
   );
 }
 
-/** Compact per-mon contribution recap (your team): damage dealt, tank, heal. */
-function CombatRecap({ units, label }: { units: FrameUnit[]; label: string }) {
+const RECAP_TABS = [
+  { key: "dmgDealt", label: "DMG", color: "#fb7185", bar: "bg-rose-500", text: "text-rose-300" },
+  { key: "dmgTaken", label: "TANK", color: "#38bdf8", bar: "bg-sky-500", text: "text-sky-300" },
+  { key: "healed", label: "HEAL", color: "#34d399", bar: "bg-emerald-500", text: "text-emerald-300" },
+] as const;
+
+/** Side recap panel for your team with DMG / TANK / HEAL tabs — pick a metric and
+ *  the bars filter + re-sort to just that stat. */
+function CombatRecapTabs({ units, label, onClose }: { units: FrameUnit[]; label: string; onClose: () => void }) {
+  const t = useT();
+  const [tab, setTab] = useState<(typeof RECAP_TABS)[number]["key"]>("dmgDealt");
   const mine = units.filter((u) => u.team === "ally" && (u.dmgDealt + u.dmgTaken + u.healed) > 0);
-  if (mine.length === 0) return null;
-  const max = Math.max(1, ...mine.map((u) => Math.max(u.dmgDealt, u.dmgTaken)));
-  // Top contributors only, capped so the recap can't balloon the combat column
-  // (and push the whole page taller than the viewport).
-  const sorted = [...mine].sort((a, b) => b.dmgDealt - a.dmgDealt).slice(0, 6);
+  const active = RECAP_TABS.find((t) => t.key === tab)!;
+  const val = (u: FrameUnit) => u[tab] as number;
+  const max = Math.max(1, ...mine.map(val));
+  const sorted = [...mine].sort((a, b) => val(b) - val(a)).slice(0, 8);
+
   return (
-    <div className="mt-2 w-full max-w-[600px] rounded-lg bg-slate-900/60 border border-slate-700/40 p-2">
-      <div className="flex items-center justify-between text-[9px] uppercase tracking-wider text-slate-500 mb-1 px-0.5">
-        <span>{label}</span>
-        <span className="flex gap-2"><span className="text-rose-400">DMG</span><span className="text-sky-400">TANK</span><span className="text-emerald-400">HEAL</span></span>
+    <div className="w-[210px] shrink-0 rounded-xl bg-slate-900/60 border border-slate-700/40 p-2 self-stretch">
+      <div className="flex items-center justify-between mb-1.5 px-0.5">
+        <span className="text-[9px] uppercase tracking-wider text-slate-500">{label}</span>
+        <button onClick={onClose} title={t.cs_hide_recap} className="text-slate-500 hover:text-slate-200 text-xs leading-none">✕</button>
       </div>
-      <div className="flex flex-col gap-0.5">
+      <div className="flex gap-1 mb-2">
+        {RECAP_TABS.map((tb) => (
+          <button
+            key={tb.key}
+            onClick={() => setTab(tb.key)}
+            style={tab === tb.key ? { background: tb.color, color: "#0b1020" } : undefined}
+            className={`flex-1 text-[10px] font-extrabold py-1 rounded-md transition-colors ${tab === tb.key ? "" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}
+          >
+            {tb.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-col gap-1">
+        {sorted.length === 0 && <div className="text-[10px] text-slate-600 text-center py-2">—</div>}
         {sorted.map((u) => (
           <div key={u.id} className={`flex items-center gap-1.5 ${u.alive ? "" : "opacity-50"}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={spriteUrl(u.dex)} alt="" width={18} height={18} style={{ imageRendering: "pixelated" }} />
-            <div className="flex-1 flex flex-col gap-px min-w-0">
-              <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden"><div className="h-full bg-rose-500" style={{ width: `${(u.dmgDealt / max) * 100}%` }} /></div>
-              <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden"><div className="h-full bg-sky-500" style={{ width: `${(u.dmgTaken / max) * 100}%` }} /></div>
+            <img src={spriteUrl(u.dex)} alt="" width={20} height={20} style={{ imageRendering: "pixelated" }} />
+            <div className="flex-1 h-2 rounded-full bg-slate-800 overflow-hidden min-w-0">
+              <div className={`h-full rounded-full ${active.bar}`} style={{ width: `${(val(u) / max) * 100}%` }} />
             </div>
-            <span className="w-9 text-right text-[10px] tabular-nums text-rose-300">{u.dmgDealt}</span>
-            <span className="w-9 text-right text-[10px] tabular-nums text-sky-300">{u.dmgTaken}</span>
-            <span className="w-9 text-right text-[10px] tabular-nums text-emerald-300">{u.healed}</span>
+            <span className={`w-10 text-right text-[10px] tabular-nums font-semibold ${active.text}`}>{val(u)}</span>
           </div>
         ))}
       </div>

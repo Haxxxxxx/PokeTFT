@@ -16,9 +16,11 @@ import {
 import { useT } from "@/lib/i18n";
 import { playCry } from "@/lib/audio";
 
-/** Docked detail panel — sits to the right of the board, not a modal. */
+/** Docked detail panel — sits to the right of the board, not a modal. Shows the
+ *  inspected mon OR a held/inventory item's details. */
 export function UnitDetail() {
   const inspect = useUi((s) => s.inspect);
+  const inspectedItem = useUi((s) => s.inspectedItem);
   const clear = useUi((s) => s.clearInspect);
 
   useEffect(() => {
@@ -28,18 +30,54 @@ export function UnitDetail() {
   }, [clear]);
 
   return (
-    <aside className="w-[300px] shrink-0">
-      <div className="sticky top-4">
-        {inspect ? <Card key={`${inspect.defId}-${inspect.star}`} /> : <EmptyState />}
+    <div data-inspectable className="w-full h-full min-h-0">
+      {inspectedItem ? <ItemCard id={inspectedItem} />
+        : inspect ? <Card key={`${inspect.defId}-${inspect.star}`} />
+        : <EmptyState />}
+    </div>
+  );
+}
+
+/** Detail card for an inventory item (clicked in the ItemsPanel). */
+function ItemCard({ id }: { id: string }) {
+  const setInspectedItem = useUi((s) => s.setInspectedItem);
+  const armItem = useUi((s) => s.armItem);
+  const armed = useUi((s) => s.armedItem) === id;
+  const isMega = id === MEGA_STONE;
+  const def = ITEM_DEF[id];
+  const name = isMega ? "Mega Stone" : def?.name ?? id;
+  const effect = isMega ? "Holds on a Mega-capable mon → it Mega Evolves at combat start." : def?.effect ?? "";
+  const color = isMega ? "#f0abfc" : "#a78bfa";
+  return (
+    <div style={{ borderColor: `${color}aa`, boxShadow: `0 10px 40px -12px ${color}44` }} className="rounded-2xl border bg-[#0d1426] text-slate-100 overflow-hidden">
+      <div className="flex items-start gap-3 p-3 border-b border-white/5" style={{ background: `linear-gradient(105deg, ${color}1f, transparent 70%)` }}>
+        <div style={{ borderColor: `${color}99` }} className="rounded-xl border bg-black/30 w-14 h-14 flex items-center justify-center text-3xl shrink-0">
+          {isMega ? <MegaIcon size={34} /> : (def?.icon ?? "◆")}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-base font-bold tracking-tight">{name}</h2>
+          <span className="text-[10px] uppercase tracking-wide" style={{ color }}>{isMega ? "Mega Stone" : "Held item"}</span>
+        </div>
+        <button onClick={() => setInspectedItem(null)} aria-label="Close" className="text-slate-500 hover:text-white shrink-0"><CloseIcon size={16} /></button>
       </div>
-    </aside>
+      <p className="text-[12px] text-slate-300 leading-relaxed p-3">{effect}</p>
+      <div className="px-3 pb-3">
+        <button
+          onClick={() => armItem(armed ? null : id)}
+          style={armed ? { background: color, color: "#0b1020" } : undefined}
+          className={`w-full py-2 rounded-lg text-xs font-bold transition-colors ${armed ? "" : "bg-slate-800 hover:bg-slate-700 text-slate-200"}`}
+        >
+          {armed ? "Click a mon to equip · Esc" : "Equip on a mon"}
+        </button>
+      </div>
+    </div>
   );
 }
 
 function EmptyState() {
   const t = useT();
   return (
-    <div className="rounded-2xl border border-slate-700/50 bg-slate-900/50 p-6 text-center">
+    <div className="h-full min-h-[120px] rounded-2xl border border-slate-700/50 bg-slate-900/50 p-6 text-center flex flex-col items-center justify-center">
       <div className="flex justify-center text-slate-600 mb-2"><InfoIcon size={22} /></div>
       <p className="text-xs text-slate-500 leading-relaxed">{t.ud_click_hint}</p>
     </div>

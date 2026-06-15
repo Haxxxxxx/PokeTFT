@@ -87,6 +87,8 @@ type State = {
   moveToBoard: (iid: string, col: number, row: number) => void;
   deployUnit: (iid: string) => void;
   moveToBench: (iid: string) => void;
+  reorderBench: (iid: string, toIndex: number) => void;
+  fillBoard: () => void;
   toggleFreeze: () => void;
   endRound: (won: boolean, survivors?: number) => void;
   pveReward: (won: boolean) => void;
@@ -142,8 +144,9 @@ export const useGame = create<State>((set, get) => ({
     rng = makeRng((Math.floor(Math.random() * 0x7fffffff) ^ Date.now()) >>> 0);
     const pool = makePool(allowedIds);
     const unitsByCost = makeUnitsByCost(allowedIds);
-    // Free starter unit, auto-placed on the front row, so the opening PvE round
-    // is never an empty board (the main reason new players lost at 1-1).
+    // One free starter, auto-placed on the front row, so the opening PvE round is
+    // never an empty board. The first PvE rounds are kept deliberately soft (see
+    // generateCreepBoard) so this single mon can win them.
     const starters = unitsByCost[1] ?? [];
     const units: UnitInstance[] = [];
     if (starters.length) {
@@ -255,6 +258,55 @@ export const useGame = create<State>((set, get) => ({
     // Block board -> bench if the bench is already full (a board unit is no-op-ed).
     if (unit.pos !== null && state.benchUnits().length >= BENCH_SIZE) return;
     set({ units: state.units.map((u) => (u.iid === iid ? { ...u, pos: null } : u)) });
+  },
+
+  // Auto-deploy bench units onto empty board cells (centre-out, front rows first)
+  // until the level cap is reached or the bench runs dry — so one click fills the
+  // board instead of placing mons one at a time.
+  fillBoard: () => {
+    const state = get();
+    const cap = boardSizeForLevel(state.level);
+    const COL_ORDER = [3, 2, 4, 1, 5, 0, 6]; // centre column first, then outward
+    const units = [...state.units];
+    const benchOrder = units.filter((u) => u.pos === null); // leftmost bench unit first
+    const taken = new Set(units.filter((u) => u.pos !== null).map((u) => `${u.pos![0]}-${u.pos![1]}`));
+    let count = taken.size;
+    let placedAny = false;
+    for (const b of benchOrder) {
+      if (count >= cap) break;
+      let placed = false;
+      for (let row = BOARD.rows - 1; row >= 0 && !placed; row--) {
+        for (const col of COL_ORDER) {
+          if (!taken.has(`${col}-${row}`)) {
+            const idx = units.findIndex((u) => u.iid === b.iid);
+            units[idx] = { ...units[idx], pos: [col, row] as [number, number] };
+            taken.add(`${col}-${row}`);
+            count++; placed = true; placedAny = true; break;
+          }
+        }
+      }
+    }
+    if (placedAny) set({ units });
+  },
+
+  // Rearrange the bench: drop a bench unit onto slot `toIndex` — SWAP with the
+  // unit there, or move it to the end when the slot is empty. Bench order is the
+  // filtered order in `units`, so we rebuild that slice. (Bench order never
+  // affects combat — only on-board units are simulated.)
+  reorderBench: (iid, toIndex) => {
+    const state = get();
+    const board = state.units.filter((u) => u.pos !== null);
+    const bench = state.units.filter((u) => u.pos === null);
+    const from = bench.findIndex((u) => u.iid === iid);
+    if (from < 0) return;
+    const nb = [...bench];
+    if (toIndex < nb.length) {
+      [nb[from], nb[toIndex]] = [nb[toIndex], nb[from]]; // swap with the occupied slot
+    } else {
+      const [m] = nb.splice(from, 1); // move to the first empty slot (end of the run)
+      nb.push(m);
+    }
+    set({ units: [...board, ...nb] });
   },
 
   toggleFreeze: () => set({ frozen: !get().frozen }),

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRoom } from "@/game/net/roomStore";
 import { usePreLobby } from "@/game/store/preLobbyStore";
 import { beginMatch } from "@/game/net/match";
+import { enterFullscreen } from "@/lib/fullscreen";
 import { GameRulesPanel } from "./GameRulesPanel";
 import { unitsForGenerations } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
@@ -155,7 +156,7 @@ export function LobbyScreen() {
           </button>
         ) : (
           <div className="w-full max-w-md flex flex-col items-center gap-2">
-            <button disabled={!canStart} onClick={() => { beginMatch(room.code, room).catch((e) => console.error("[beginMatch]", e)); }}
+            <button disabled={!canStart} onClick={() => { enterFullscreen(); beginMatch(room.code, room).catch((e) => console.error("[beginMatch]", e)); }}
               className="w-full py-4 rounded-2xl font-extrabold text-base tracking-wide transition-all bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black shadow-lg shadow-amber-500/20 disabled:opacity-30 disabled:shadow-none disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500">
               {t.l_net_start}
             </button>

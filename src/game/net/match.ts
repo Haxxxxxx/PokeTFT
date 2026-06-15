@@ -21,6 +21,14 @@ function gamePath(code: string) {
   return ref(db(), `games/${code}`);
 }
 
+/** FNV-1a string hash → 32-bit uint. Used to fold stable identifiers (game code,
+ *  uid) into deterministic-but-varied seeds. */
+function hashStr(s: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
 /** A bot's board for a round, scaled by stage progress and difficulty. */
 function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string): UnitInstance[] {
   const cr = cumulativeRound(stage, round);
@@ -73,6 +81,7 @@ export async function beginMatch(code: string, room: Room): Promise<void> {
     u[`players/${p.uid}/streak`] = 0;
     u[`players/${p.uid}/board`] = null;
     u[`players/${p.uid}/save`] = null;
+    u[`players/${p.uid}/carouselPicked`] = null;
   }
   await update(gamePath(code), u);
 }
@@ -124,6 +133,9 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
       dmg: bWon || draw ? 0 : stageBaseDamage(stage) + r.survivors,
       selfBoard: bb,
       oppBoard: ba,
+      // B is the "enemy" side of the canonical simulate(ba, bb): B replays the
+      // exact same call and mirrors the view, so both screens share one outcome.
+      flip: true,
     };
   }
 }
@@ -214,11 +226,16 @@ export async function startCarousel(code: string, room: Room): Promise<void> {
   // Item rewards: a Mega Stone plus any held items the lobby enabled.
   const itemPool = [MEGA_STONE, ...(room.rules?.itemsEnabled ?? [])];
   const carousel: Record<string, string[]> = {};
+  // Per-GAME entropy: the room code is unique to each match, so folding it in
+  // makes carousels differ from game to game (they used to seed only on
+  // stage/round/uid.length, which is identical across every game). The host
+  // writes this once, so it just needs to vary — not be client-reproducible.
+  const gameSeed = hashStr(code);
   for (const p of alivePlayers(room)) {
     if (p.isBot) continue;
-    const salt = room.meta.stage * 31 + room.meta.round * 7 + p.uid.length;
+    const salt = (gameSeed ^ hashStr(p.uid) ^ Math.imul(room.meta.stage * 31 + room.meta.round * 7 + 1, 2654435761)) >>> 0;
     // Rotate which item is offered per player/round so it varies but stays sync-free (host-written).
-    const item = itemPool[(salt + room.meta.round) % itemPool.length];
+    const item = itemPool[(salt >>> 3) % itemPool.length];
     carousel[p.uid] = [item, ...pickCarouselOptions(room.meta.stage, salt, 4)];
   }
   await update(gamePath(code), {
@@ -226,6 +243,24 @@ export async function startCarousel(code: string, room: Room): Promise<void> {
     "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow(),
     combat: null, carousel,
   });
+}
+
+/** Client: mark that I've taken my carousel pick this round (so the host can end
+ *  the carousel as soon as everyone has chosen). */
+export async function markCarouselPicked(code: string, uid: string, key: string): Promise<void> {
+  await update(ref(db(), `games/${code}/players/${uid}`), { carouselPicked: key });
+}
+
+/** Host: if every alive human has already picked this carousel, end it early
+ *  instead of waiting out the timer. Implemented by parking the deadline to now
+ *  so the normal endCarousel path fires on the next host tick. */
+export async function finishCarouselEarlyIfReady(code: string, room: Room): Promise<void> {
+  if (room.meta?.phase !== "carousel") return;
+  if (serverNow() >= room.meta.deadline) return; // already ending
+  const key = `${room.meta.stage}-${room.meta.round}`;
+  const humans = alivePlayers(room).filter((p) => !p.isBot && p.connected);
+  if (humans.length === 0 || !humans.every((p) => p.carouselPicked === key)) return;
+  await update(ref(db(), `games/${code}/meta`), { deadline: serverNow(), updatedAt: serverNow() });
 }
 
 /** Host: carousel → next planning round. */
@@ -291,6 +326,33 @@ export async function endCombat(code: string, room: Room): Promise<void> {
   }
   u["meta/hostBeat"] = serverNow();
   u["meta/updatedAt"] = serverNow();
+  await update(gamePath(code), u);
+}
+
+/** End screen → rematch: send the whole room back to the pre-game lobby. Resets
+ *  every player's match state (the next start re-rolls fresh) and clears the
+ *  finished game. Any player may trigger it — everyone returns to the lobby
+ *  together the moment the shared phase flips. */
+export async function returnToLobby(code: string, room: Room): Promise<void> {
+  const hp = room.rules?.startingHp ?? 100;
+  const u: Updates = {
+    "meta/phase": "lobby",
+    "meta/updatedAt": serverNow(),
+    "meta/hostBeat": serverNow(),
+    combat: null,
+    carousel: null,
+  };
+  for (const p of Object.values(room.players ?? {})) {
+    u[`players/${p.uid}/hp`] = hp;
+    u[`players/${p.uid}/alive`] = true;
+    u[`players/${p.uid}/place`] = null;
+    u[`players/${p.uid}/streak`] = 0;
+    u[`players/${p.uid}/level`] = 1;
+    u[`players/${p.uid}/board`] = null;
+    u[`players/${p.uid}/save`] = null;
+    u[`players/${p.uid}/lastOpp`] = null;
+    u[`players/${p.uid}/carouselPicked`] = null;
+  }
   await update(gamePath(code), u);
 }
 

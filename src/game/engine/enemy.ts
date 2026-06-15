@@ -87,7 +87,10 @@ export function generateCreepBoard(stage: number, round: number, seed: number): 
   // Stage 1 stays deliberately soft so newcomers win the opening PvE and build
   // economy: one weak creep at 1-1, ramping by round. Later stages scale up.
   if (stage === 1) {
-    const count = Math.min(round, 3); // 1-1 → 1, 1-2 → 2, 1-3 → 3
+    // The opening 3 PvE rounds are deliberately soft so a fresh board (a single
+    // starter + a couple of shop buys) wins them comfortably: 1-1 → 1 creep,
+    // 1-2 → 1, 1-3 → 2, all weakest-tier 1-cost 1-stars.
+    const count = round >= 3 ? 2 : 1;
     return generateBoard(1, count, seed * 13 + 101);
   }
   const level = Math.min(1 + Math.floor(stage / 2), 6);
