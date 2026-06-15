@@ -16,6 +16,22 @@
         "source": "**",
         "destination": "/index.html"
       }
+    ],
+    "headers": [
+      {
+        "comment": "Never cache HTML — it points at the content-hashed JS chunks, so a stale index.html keeps loading old code after a deploy (the rules-not-applying bug).",
+        "source": "**/*.html",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        ]
+      },
+      {
+        "comment": "Hashed build assets are immutable — safe to cache forever (a new build = new hashes).",
+        "source": "/_next/static/**",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        ]
+      }
     ]
   }
 }
