@@ -86,12 +86,12 @@ export function WelcomeScreen() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "radial-gradient(120% 80% at 50% -10%, #1a2540 0%, #0a1020 60%)" }}>
+    <div className="min-h-screen flex flex-col tft-shell">
       {/* Top nav bar */}
-      <header className="flex items-center justify-between gap-3 px-4 sm:px-6 h-16 border-b border-slate-800/80 bg-slate-950/40 backdrop-blur shrink-0">
+      <header className="flex items-center justify-between gap-3 px-4 sm:px-6 h-16 border-b border-[color:var(--panel-edge)] bg-slate-950/50 backdrop-blur shrink-0">
         <div className="flex items-center gap-2.5">
-          <span className="text-rose-500 text-2xl">⬡</span>
-          <span className="font-extrabold tracking-tight text-xl text-slate-100">Poké<span className="text-amber-400">TFT</span></span>
+          <span className="text-gold text-2xl drop-shadow-[0_0_8px_rgba(212,175,55,0.5)]">⬡</span>
+          <span className="font-extrabold tracking-tight text-xl">Poké<span className="gild-text">TFT</span></span>
         </div>
         <div className="flex items-center gap-4">
           <button onClick={() => setHowTo(true)} className="text-xs font-bold text-slate-400 hover:text-sky-300 uppercase tracking-wide">{t.w_how_to_play}</button>
@@ -123,8 +123,8 @@ export function WelcomeScreen() {
       <div className="flex-1 w-full max-w-[1320px] mx-auto flex flex-col lg:flex-row gap-6 p-4 sm:p-6 items-stretch">
         {/* Hero / play */}
         <main className="flex-1 flex flex-col min-h-[420px]">
-          <div className="flex-1 flex flex-col justify-center items-center gap-8 rounded-3xl border border-slate-800 bg-slate-900/40 backdrop-blur p-10 relative overflow-hidden"
-            style={{ background: "radial-gradient(70% 80% at 50% 30%, rgba(251,191,36,0.08), transparent 60%), rgba(15,23,42,0.5)" }}>
+          <div className="gilded-strong gilded flex-1 flex flex-col justify-center items-center gap-8 rounded-3xl p-10 relative overflow-hidden"
+            style={{ backgroundImage: "radial-gradient(70% 80% at 50% 28%, rgba(212,175,55,0.1), transparent 60%)" }}>
             {/* Decorative floating mons */}
             <div className="absolute inset-0 pointer-events-none select-none">
               {heroMons.map((m, i) => (
@@ -202,8 +202,8 @@ export function WelcomeScreen() {
         {/* Right rail: friends + settings */}
         <aside className="w-full lg:w-80 shrink-0 flex flex-col gap-4">
           <FriendsPanel />
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur p-5">
-            <h2 className="text-xs font-extrabold uppercase tracking-widest text-slate-400 mb-3 border-b border-slate-800 pb-2">{t.s_title}</h2>
+          <div className="gilded rounded-2xl p-5">
+            <h2 className="text-xs font-extrabold uppercase tracking-widest text-gold mb-3 border-b border-[color:var(--panel-edge)] pb-2">{t.s_title}</h2>
             <AppSettingsPanel />
           </div>
         </aside>
