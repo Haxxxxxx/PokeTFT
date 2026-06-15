@@ -114,7 +114,6 @@ export function NetGameClient() {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 140, tolerance: 8 } }),
   );
-  const [, setTick] = useState(0);
   const roomRef = useRef(room);
   useEffect(() => { roomRef.current = room; }, [room]);
   const lastRoundKey = useRef<string | null>(null);
@@ -155,12 +154,10 @@ export function NetGameClient() {
     return () => clearTimeout(id);
   }, []);
 
-  // server time + a 250ms repaint so the shared timer counts down smoothly
-  useEffect(() => {
-    startServerTime();
-    const id = setInterval(() => setTick((t) => t + 1), 250);
-    return () => clearInterval(id);
-  }, []);
+  // Sync the shared clock. The countdowns tick inside their own components
+  // (PhaseTimer / Countdown) so the heavy game tree is NOT re-rendered every
+  // 250ms — that periodic full re-render was a big source of the stutter.
+  useEffect(() => { startServerTime(); }, []);
 
   // Click anywhere that isn't a mon / item / the detail panel closes the details.
   useEffect(() => {
@@ -357,9 +354,6 @@ export function NetGameClient() {
 
   if (!room || !meta || !myUid) return null;
 
-  const secondsLeft = Math.max(0, Math.ceil((meta.deadline - serverNow()) / 1000));
-  const totalMs = phase === "combat" ? COMBAT_MS : PLAN_MS;
-  const pct = Math.max(0, Math.min(100, ((meta.deadline - serverNow()) / totalMs) * 100));
   const isHost = meta.hostUid === myUid;
   const ladder = Object.values(players).sort((a, b) => Number(b.alive) - Number(a.alive) || b.hp - a.hp);
   const aliveCount = Object.values(players).filter((p) => p.alive).length;
@@ -529,16 +523,9 @@ export function NetGameClient() {
             </div>
           )}
 
-          {/* Phase + timer (prominent, takes the remaining width). */}
-          <div className="flex-1 min-w-[220px] flex flex-col gap-1 px-2">
-            <div className="flex justify-between items-baseline">
-              <span className={`text-xs font-extrabold uppercase tracking-wide ${phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{phaseLabel}</span>
-              <span className="text-sm font-bold tabular-nums text-slate-200">{secondsLeft}s</span>
-            </div>
-            <div className="h-2.5 rounded-full bg-slate-800 overflow-hidden">
-              <div className={`h-full transition-all ${phase === "combat" ? "bg-rose-400" : "bg-sky-400"}`} style={{ width: `${pct}%` }} />
-            </div>
-          </div>
+          {/* Phase + timer — isolated so it ticks on its own without re-rendering
+              the whole game tree every 250ms (the old global tick caused jank). */}
+          <PhaseTimer phase={phase} phaseLabel={phaseLabel} deadline={meta.deadline} totalMs={phase === "combat" ? COMBAT_MS : PLAN_MS} />
 
           {isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1 shrink-0">{t.net_host_badge}</span>}
           <div className="flex items-center gap-2 shrink-0">
@@ -614,7 +601,7 @@ export function NetGameClient() {
                 </div>
                 <div className="relative flex-1 min-h-0 flex items-center justify-center">
                   {phase === "combat" && spectateCombatResult ? (
-                    <CombatStage result={spectateCombatResult} flip={!!spectateCombat?.flip} opponentName={spectateCombat?.oppName ?? "Rival"} autoResolve inline syncStart={meta.deadline - COMBAT_MS} syncWindowMs={COMBAT_MS} onResolve={() => {}} />
+                    <CombatStage result={spectateCombatResult} flip={!!spectateCombat?.flip} authWon={spectateCombat?.won} opponentName={spectateCombat?.oppName ?? "Rival"} autoResolve inline syncStart={meta.deadline - COMBAT_MS} syncWindowMs={COMBAT_MS} onResolve={() => {}} />
                   ) : (
                     <Board units={spectateUnits ?? []} interactive={false} />
                   )}
@@ -632,6 +619,7 @@ export function NetGameClient() {
                   <CombatStage
                     result={combatResult}
                     flip={!!myCombat?.flip}
+                    authWon={myCombat?.won}
                     opponentName={myCombat?.oppName ?? "Rival"}
                     pve={!!myCombat?.pve}
                     autoResolve
@@ -739,7 +727,7 @@ export function NetGameClient() {
                 <h2 className="text-2xl font-extrabold text-amber-300 tracking-tight">{lang === "fr" ? "Carrousel" : "Carousel"}</h2>
               </div>
               <p className="text-xs text-slate-300/80">{picked ? (lang === "fr" ? "Choisi — en attente du tour…" : "Picked — waiting for the round…") : (lang === "fr" ? "Choisis une récompense gratuite." : "Pick one free reward.")}</p>
-              <div className="text-[11px] tabular-nums font-bold text-amber-200/70 mt-0.5 mb-5">{secondsLeft}s</div>
+              <div className="text-[11px] tabular-nums font-bold text-amber-200/70 mt-0.5 mb-5"><Countdown deadline={meta.deadline} />s</div>
             {!picked && (
               <div className="flex gap-3 justify-center items-start">
                 {opts.map((pick, i) => {
@@ -992,6 +980,41 @@ function OrnateAugmentCard({ onClick, icon, name, desc }: { onClick: () => void;
         <span className="text-[11px] text-slate-300 leading-snug">{desc}</span>
       </div>
     </OrnateFrame>
+  );
+}
+
+/** Self-ticking countdown (seconds remaining to a server-time deadline). Lives in
+ *  its own component so updating it doesn't re-render the whole game. */
+function useClockTick(active: boolean, ms = 250) {
+  const [, setN] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setN((n) => n + 1), ms);
+    return () => clearInterval(id);
+  }, [active, ms]);
+}
+
+function Countdown({ deadline }: { deadline: number }) {
+  useClockTick(true);
+  return <>{Math.max(0, Math.ceil((deadline - serverNow()) / 1000))}</>;
+}
+
+/** Phase label + countdown + progress bar; ticks internally so the heavy game
+ *  tree isn't re-rendered every frame for the timer. */
+function PhaseTimer({ phase, phaseLabel, deadline, totalMs }: { phase?: string; phaseLabel: string; deadline: number; totalMs: number }) {
+  useClockTick(true);
+  const secondsLeft = Math.max(0, Math.ceil((deadline - serverNow()) / 1000));
+  const pct = Math.max(0, Math.min(100, ((deadline - serverNow()) / totalMs) * 100));
+  return (
+    <div className="flex-1 min-w-[220px] flex flex-col gap-1 px-2">
+      <div className="flex justify-between items-baseline">
+        <span className={`text-xs font-extrabold uppercase tracking-wide ${phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{phaseLabel}</span>
+        <span className="text-sm font-bold tabular-nums text-slate-200">{secondsLeft}s</span>
+      </div>
+      <div className="h-2.5 rounded-full bg-slate-800 overflow-hidden">
+        <div className={`h-full transition-all ${phase === "combat" ? "bg-rose-400" : "bg-sky-400"}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
   );
 }
 

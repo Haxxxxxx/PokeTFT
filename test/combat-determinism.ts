@@ -38,5 +38,41 @@ for (let trial = 0; trial < 24; trial++) {
 }
 
 console.log(`${pass}/${pass + fail} deterministic + flip-parity`);
-if (fail > 0) { console.error("\n❌ combat is non-deterministic"); process.exit(1); }
-console.log("✅ combat is deterministic and flip-parity holds");
+
+// --- Host -> RTDB -> client path parity ---------------------------------------
+// The host computes the authoritative winner from in-memory boards, writes them
+// to RTDB, and clients re-simulate the read-back boards. RTDB strips empty arrays
+// and can turn arrays into index-keyed objects. Replicate that mangling and
+// confirm the client's winner still matches the host's — i.e. you can never see a
+// loss while the host recorded a win.
+type U = ReturnType<typeof generateBoard>[number];
+function rtdbMangle(board: U[]): unknown {
+  // JSON round-trip, drop empty `items`, and key the list like a sparse RTDB object.
+  const obj: Record<string, unknown> = {};
+  board.forEach((u, i) => {
+    const c: Record<string, unknown> = { iid: u.iid, defId: u.defId, star: u.star, pos: u.pos };
+    if (u.items && u.items.length) c.items = u.items;
+    obj[i] = JSON.parse(JSON.stringify(c));
+  });
+  return obj;
+}
+function clientCoerce(b: unknown): U[] {
+  const arr = Array.isArray(b) ? b : Object.values(b as Record<string, U>);
+  return (arr as U[]).filter((u) => u && u.pos).map((u) => ({ ...u, pos: u.pos ?? null, items: u.items ?? [] })) as U[];
+}
+let netPass = 0, netFail = 0;
+for (let trial = 0; trial < 24; trial++) {
+  const ba = generateBoard(2 + (trial % 7), 4 + (trial % 4), 2000 + trial * 13);
+  const bb = generateBoard(2 + ((trial + 4) % 7), 4 + ((trial + 1) % 4), 7000 + trial * 17);
+  // Give a couple of units items so item handling is exercised on both paths.
+  if (ba[0]) ba[0].items = ["choice-band"];
+  if (bb[0]) bb[0].items = ["life-orb"];
+  const host = simulate(ba, bb);                                   // authoritative
+  const client = simulate(clientCoerce(rtdbMangle(ba)), clientCoerce(rtdbMangle(bb)));
+  const ok = host.winner === client.winner && host.survivors === client.survivors;
+  if (ok) netPass++; else { netFail++; console.error(`net trial ${trial}: FAIL host=${host.winner} client=${client.winner}`); }
+}
+console.log(`${netPass}/${netPass + netFail} host->RTDB->client winner parity`);
+
+if (fail > 0 || netFail > 0) { console.error("\n❌ combat parity broken"); process.exit(1); }
+console.log("✅ combat is deterministic, flip-parity holds, and survives the RTDB round-trip");
