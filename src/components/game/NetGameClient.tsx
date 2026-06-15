@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
 import { useGame } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
@@ -434,44 +434,53 @@ export function NetGameClient() {
       <div className="fixed inset-0 flex justify-center items-center overflow-hidden">
       <div
         style={{ width: DESIGN_W, height: DESIGN_H, transform: `scale(${scale})`, transformOrigin: "center" }}
-        className="flex flex-col gap-3 p-3 shrink-0"
+        className="flex flex-col gap-2 px-3 py-2 shrink-0"
       >
-        {/* Round timeline: current stage + the next two, tagged by kind, with
-            past results colored win/loss and the current round highlighted. */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-700/40 overflow-x-auto">
-          <span className="text-[10px] uppercase tracking-wider text-slate-500 shrink-0">Timeline</span>
+        {/* Round tracker (TFT-style): an icon per round — ⚔ PvP, 🌿 PvE, 🎡
+            carousel — grouped by stage. The current round glows; past PvP rounds
+            colour win/loss and stay clickable for a recap. */}
+        <div className="relative flex items-center justify-center gap-2 px-3 py-1 rounded-lg bg-slate-900/50 border border-slate-700/30 overflow-x-auto">
           <div className="flex items-center gap-1">
-            {schedule.map(({ stage, round, kind }) => {
+            {schedule.map(({ stage, round, kind }, idx) => {
               const key = `${stage}-${round}`;
               const result = resultByKey.get(key);
               const isCurrent = stage === meta.stage && round === meta.round;
               const isPast = result !== undefined;
-              // Color: past → win/loss; else by kind.
-              const bg = isPast
-                ? (result ? "bg-emerald-500/90 text-black" : "bg-rose-500/90 text-black")
-                : kind === "carousel" ? "bg-fuchsia-600/40 text-fuchsia-100"
-                : kind === "pve" ? "bg-amber-600/30 text-amber-100"
-                : "bg-slate-700/60 text-slate-300";
-              const label = kind === "carousel" ? "◆" : `${stage}-${round}`;
+              const icon = kind === "carousel" ? "🎡" : kind === "pve" ? "🌿" : "⚔️";
+              const newStage = idx === 0 || schedule[idx - 1].stage !== stage;
               const recap = recapByKey.get(key);
-              // Past PvP rounds are clickable: drop a recap + jump to that rival's board.
               const clickable = isPast && !!recap && !recap.pve && recap.oppUid !== myUid && !!players[recap.oppUid];
               const open = recapKey === key;
+              // State styling: current glows; past = win/loss tint; future = kind tint.
+              const cls = isCurrent
+                ? "bg-sky-500/25 ring-2 ring-sky-300 scale-[1.18] shadow-[0_0_14px_-2px_rgba(56,189,248,0.7)] z-10"
+                : isPast
+                  ? (result ? "bg-emerald-600/25 ring-1 ring-emerald-400/50" : "bg-rose-600/25 ring-1 ring-rose-400/50")
+                  : kind === "carousel" ? "bg-fuchsia-900/25 ring-1 ring-fuchsia-500/30"
+                  : kind === "pve" ? "bg-amber-900/20 ring-1 ring-amber-600/30"
+                  : "bg-slate-800/60 ring-1 ring-slate-600/40";
               return (
-                <button
-                  key={key}
-                  type="button"
-                  disabled={!clickable}
-                  onClick={() => {
-                    if (!clickable || !recap) return;
-                    if (open) { setRecapKey(null); }
-                    else { setRecapKey(key); setSpectate(recap.oppUid); }
-                  }}
-                  title={`${key} · ${kind}${isPast ? (result ? " · Win" : " · Loss") : ""}${clickable ? " · click for recap" : ""}`}
-                  className={`relative w-7 h-6 shrink-0 rounded-md flex items-center justify-center text-[8px] font-bold ${bg} ${isCurrent ? "ring-2 ring-sky-400 scale-110" : ""} ${open ? "ring-2 ring-amber-300" : ""} ${clickable ? "cursor-pointer hover:brightness-110" : "cursor-default"} ${round === 1 ? "ml-1.5" : ""}`}
-                >
-                  {label}
-                </button>
+                <Fragment key={key}>
+                  {newStage && (
+                    <span className="shrink-0 text-[9px] font-extrabold text-slate-600 tabular-nums pl-1 pr-0.5" title={`Stage ${stage}`}>{stage}</span>
+                  )}
+                  <button
+                    type="button"
+                    disabled={!clickable}
+                    onClick={() => {
+                      if (!clickable || !recap) return;
+                      if (open) setRecapKey(null);
+                      else { setRecapKey(key); setSpectate(recap.oppUid); }
+                    }}
+                    title={`${key} · ${kind}${isPast ? (result ? " · Win" : " · Loss") : ""}${clickable ? " · click for recap" : ""}`}
+                    className={`relative w-5 h-5 shrink-0 rounded flex items-center justify-center text-[11px] leading-none grayscale-[0.15] transition-all ${cls} ${open ? "ring-2 ring-amber-300" : ""} ${clickable ? "cursor-pointer hover:brightness-125" : "cursor-default"}`}
+                  >
+                    <span className={isPast && !isCurrent ? "opacity-80" : ""}>{icon}</span>
+                    {isPast && !isCurrent && (
+                      <span className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-slate-900 ${result ? "bg-emerald-400" : "bg-rose-400"}`} />
+                    )}
+                  </button>
+                </Fragment>
               );
             })}
           </div>
@@ -479,7 +488,7 @@ export function NetGameClient() {
             const r = recapByKey.get(recapKey)!;
             const opp = players[r.oppUid];
             return (
-              <div className="ml-auto flex items-center gap-3 px-3 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 shrink-0">
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-3 px-3 py-1 rounded-lg bg-slate-800/95 border border-slate-700/60 shrink-0 shadow-lg">
                 <span className="text-[10px] font-bold text-slate-400">{recapKey}</span>
                 <span className="flex items-center gap-1.5">
                   {opp?.photoURL
@@ -498,11 +507,11 @@ export function NetGameClient() {
 
         {/* Top HUD bar: a prominent stage badge, a row of stat chips, then the
             phase/timer segment and session controls. */}
-        <div className="flex items-center gap-2.5 flex-wrap p-2.5 rounded-xl bg-gradient-to-b from-slate-900/85 to-slate-900/60 border border-slate-700/50">
+        <div className="flex items-center gap-2 flex-wrap px-3 py-1.5 rounded-lg bg-gradient-to-b from-slate-900/85 to-slate-900/55 border border-slate-700/50">
           {/* Stage badge */}
-          <div className="flex flex-col items-center justify-center px-3.5 py-1 rounded-lg bg-slate-800/70 border border-slate-700/50 shrink-0">
-            <span className="text-[8px] uppercase tracking-[0.2em] text-slate-500 leading-none">{t.net_stage}</span>
-            <span className="text-xl font-extrabold tabular-nums text-slate-100 leading-tight">{meta.stage}-{meta.round}</span>
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-800/70 border border-slate-700/50 shrink-0">
+            <span className="text-[8px] uppercase tracking-[0.15em] text-slate-500 leading-none">{t.net_stage}</span>
+            <span className="text-base font-extrabold tabular-nums text-slate-100 leading-none">{meta.stage}-{meta.round}</span>
           </div>
 
           <StatChip label={t.net_hp} accent="#ff6b6b" value={Math.max(0, me?.hp ?? 0)} />
@@ -988,8 +997,8 @@ function OrnateAugmentCard({ onClick, icon, name, desc }: { onClick: () => void;
 
 function StatChip({ label, value, accent, sub }: { label: string; value: ReactNode; accent?: string; sub?: string }) {
   return (
-    <div className="flex flex-col px-2.5 py-1 rounded-lg bg-slate-800/50 border border-slate-700/40 shrink-0">
-      <span className="text-[8px] uppercase tracking-wider text-slate-500 leading-none mb-0.5">{label}</span>
+    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800/50 border border-slate-700/40 shrink-0">
+      <span className="text-[8px] uppercase tracking-wider text-slate-500 leading-none">{label}</span>
       <span className="text-sm font-extrabold leading-none inline-flex items-baseline gap-1" style={{ color: accent }}>
         {value}{sub && <span className="text-[9px] font-bold text-slate-500">{sub}</span>}
       </span>
