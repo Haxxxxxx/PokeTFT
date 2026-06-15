@@ -150,6 +150,10 @@ export function NetGameClient() {
     useSensor(TouchSensor, { activationConstraint: { delay: 140, tolerance: 8 } }),
   );
   const lastRoundKey = useRef<string | null>(null);
+  // Synchronous latch so a rapid double-click (or two cards clicked before the
+  // re-render hides them) can't claim TWO carousel/augment rewards for one slot —
+  // setState is async, so the `picked`/`showAugment` gate alone isn't enough.
+  const pickLatch = useRef<string | null>(null);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const actedDeadline = useRef(-1);
   const [roundLog, setRoundLog] = useState<{ stage: number; round: number; won: boolean; pve: boolean; oppUid: string; oppName: string; dmg: number; survivors: number }[]>([]);
@@ -327,6 +331,11 @@ export function NetGameClient() {
     return () => clearInterval(id);
   }, [phase, myUid]);
 
+  // Cheap board signatures, memoized so they're not recomputed (asBoard+sort+join)
+  // on every render of this hot component — only when the frozen board ref changes.
+  const mySelfSig = useMemo(() => boardSig(myCombat?.selfBoard), [myCombat?.selfBoard]);
+  const myOppSig = useMemo(() => boardSig(myCombat?.oppBoard), [myCombat?.oppBoard]);
+
   // Replay from the boards the host FROZE into the combat assignment, so the
   // result shown always matches the host's authoritative outcome.
   const combatResult = useMemo(() => {
@@ -339,15 +348,17 @@ export function NetGameClient() {
     // Re-run when the frozen boards themselves change (host failover re-freeze or a
     // late buzzer-beater sync for the same stage/round/opp) — not just on round id,
     // else the replay frames can drift from the authoritative win flag.
-  }, [phase, meta?.stage, meta?.round, myCombat?.oppUid, myCombat?.flip, boardSig(myCombat?.selfBoard), boardSig(myCombat?.oppBoard)]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, meta?.stage, meta?.round, myCombat?.oppUid, myCombat?.flip, mySelfSig, myOppSig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Live replay of the rival I'm spectating (from the host's frozen boards).
   const spectateCombat = spectate && spectate !== myUid ? room?.combat?.[spectate] : undefined;
+  const specSelfSig = useMemo(() => boardSig(spectateCombat?.selfBoard), [spectateCombat?.selfBoard]);
+  const specOppSig = useMemo(() => boardSig(spectateCombat?.oppBoard), [spectateCombat?.oppBoard]);
   const spectateCombatResult = useMemo(() => {
     if (phase !== "combat" || !spectateCombat) return null;
     const [p1, p2] = spectateCombat.flip ? [spectateCombat.oppBoard, spectateCombat.selfBoard] : [spectateCombat.selfBoard, spectateCombat.oppBoard];
     return simulate(asBoard(p1), asBoard(p2));
-  }, [phase, meta?.stage, meta?.round, spectate, spectateCombat?.oppUid, spectateCombat?.flip, boardSig(spectateCombat?.selfBoard), boardSig(spectateCombat?.oppBoard)]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, meta?.stage, meta?.round, spectate, spectateCombat?.oppUid, spectateCombat?.flip, specSelfSig, specOppSig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Augment round? (stage 2/3/4 round 1). Show the pick until this slot is taken.
   const augSlotNow = meta && phase === "planning" && me?.alive && room?.rules?.augmentsEnabled !== false ? augmentSlot(meta.stage, meta.round) : null;
@@ -363,9 +374,12 @@ export function NetGameClient() {
     return a.slice(0, 3);
   }, [augSlotNow, myUid]);
 
-  // Planning hotkeys: R reroll · L buy XP · S sell the inspected unit.
+  // Planning hotkeys: R reroll · L buy XP · S sell the inspected unit. Disabled
+  // while spectating a rival — otherwise R/L/S silently mutate YOUR own economy
+  // (reroll/buy-xp/sell-last-inspected) while you're looking at someone else's board.
   useEffect(() => {
-    if (phase !== "planning") return;
+    // Disabled while spectating a rival (you'd otherwise mutate your OWN econ).
+    if (phase !== "planning" || (!!spectate && spectate !== myUid)) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
@@ -378,7 +392,7 @@ export function NetGameClient() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [phase, reroll, buyXp, sell]);
+  }, [phase, spectate, myUid, reroll, buyXp, sell]);
 
   // When you're eliminated, default to watching the current leader.
   useEffect(() => {
@@ -846,7 +860,7 @@ export function NetGameClient() {
               return (
               <div className="flex gap-3 justify-center items-start">
                 {opts.map((pick, i) => {
-                  const onPick = () => { netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); };
+                  const onPick = () => { if (pickLatch.current === `c-${key}`) return; pickLatch.current = `c-${key}`; netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); };
                   if (pick === MEGA_STONE) return <CarouselCard key={i} onClick={onPick} color="#f0abfc" name="Mega Stone" sub={lang === "fr" ? "Méga-Évolution" : "Mega Evolve"} art={<span className="text-fuchsia-300"><MegaIcon size={56} /></span>} />;
                   const item = ITEM_DEF_BY_ID[pick];
                   if (item) return <CarouselCard key={i} onClick={onPick} color={RARITY_COLOR[item.rarity] ?? "#fbbf24"} name={lang === "fr" ? item.nameFr : item.name} sub={lang === "fr" ? item.textFr : item.text} art={<span className="text-5xl">{item.icon}</span>} />;
@@ -902,7 +916,7 @@ export function NetGameClient() {
             {augOptions.map((a) => (
               <OrnateAugmentCard
                 key={a.id}
-                onClick={() => { pickAugment(a.id); flushSync(); }}
+                onClick={() => { const lk = `a-${augSlotNow}`; if (pickLatch.current === lk) return; pickLatch.current = lk; pickAugment(a.id); flushSync(); }}
                 icon={a.icon}
                 name={lang === "fr" ? a.nameFr : a.name}
                 desc={lang === "fr" ? a.descFr : a.desc}
