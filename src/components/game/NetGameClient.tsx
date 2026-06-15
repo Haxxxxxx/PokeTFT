@@ -51,6 +51,7 @@ import { CombatStage } from "./CombatStage";
 import { CoinIcon, TrophyIcon } from "./icons";
 import { useT } from "@/lib/i18n";
 import { sfx } from "@/lib/audio";
+import { toggleFullscreen, isFullscreen } from "@/lib/fullscreen";
 
 function asBoard(b: unknown): UnitInstance[] {
   if (!b) return [];
@@ -118,6 +119,10 @@ export function NetGameClient() {
   // Carousel/augment: hide the choice cards (revealing the live board behind the
   // overlay) and toggle them back. Resets whenever a new pick screen opens.
   const [revealBoard, setRevealBoard] = useState(false);
+  // Brief boot veil at match start: gives every client a moment to load sprites
+  // and sync the room before the board appears, so nobody sees a half-loaded /
+  // out-of-sync first frame.
+  const [booting, setBooting] = useState(true);
 
   // Scale-to-fit the fixed design canvas onto any screen. The canvas is a
   // CONSTANT size (DESIGN_W × DESIGN_H, sized for the tallest phase), so the
@@ -133,6 +138,12 @@ export function NetGameClient() {
     fit();
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
+  }, []);
+
+  // Lift the boot veil after a short beat (sprites + room sync settle).
+  useEffect(() => {
+    const id = setTimeout(() => setBooting(false), 1900);
+    return () => clearTimeout(id);
   }, []);
 
   // server time + a 250ms repaint so the shared timer counts down smoothly
@@ -221,9 +232,29 @@ export function NetGameClient() {
     syncTimer.current = setTimeout(() => {
       const g = useGame.getState();
       syncBoard(room.code, myUid, g.units, g.exportSave());
-    }, 400);
+    }, 250);
     return () => { if (syncTimer.current) clearTimeout(syncTimer.current); };
   }, [units, gold, phase, myUid]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Buzzer-beater guard: the host freezes each board for combat the instant the
+  // planning deadline passes. A debounced sync can be dropped if you place a unit
+  // in the last moment, freezing a STALE board — so the fight wouldn't match the
+  // cards you placed. In the final stretch of planning we push the live board
+  // every 200ms (and right up to the freeze), guaranteeing the host sees your
+  // actual final board. (The sim itself is already deterministic; this just keeps
+  // the FROZEN input honest.)
+  useEffect(() => {
+    if (!myUid || phase !== "planning") return;
+    const id = setInterval(() => {
+      const r = roomRef.current;
+      if (!r?.meta || r.meta.phase !== "planning") return;
+      if (r.meta.deadline - serverNow() <= 2500) {
+        const g = useGame.getState();
+        syncBoard(r.code, myUid, g.units, g.exportSave());
+      }
+    }, 200);
+    return () => clearInterval(id);
+  }, [phase, myUid]);
 
   // Replay from the boards the host FROZE into the combat assignment, so the
   // result shown always matches the host's authoritative outcome.
@@ -464,7 +495,10 @@ export function NetGameClient() {
             </div>
           )}
           {isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1">{t.net_host_badge}</span>}
-          <button onClick={leave} className="ml-auto px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.net_leave}</button>
+          <div className="ml-auto flex items-center gap-2">
+            <FullscreenButton />
+            <button onClick={leave} className="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.net_leave}</button>
+          </div>
         </div>
 
         {/* Pinned 3-column layout: a fixed-width sidebar, a fixed-width FIELD
@@ -767,7 +801,52 @@ export function NetGameClient() {
         </div>
         );
       })()}
+
+      {booting && <BootVeil label={lang === "fr" ? "Synchronisation avec les dresseurs…" : "Syncing with trainers…"} />}
     </DndContext>
+  );
+}
+
+/** Pokéball boot veil shown briefly at match start while sprites load + the room
+ *  syncs, so the first frame everyone sees is fully loaded and in lockstep. */
+function BootVeil({ label }: { label: string }) {
+  return (
+    <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-5 bg-[#070b16]" style={{ animation: "bootfade 0.4s ease-out 1.5s forwards" }}>
+      <div className="relative w-16 h-16 animate-spin" style={{ animationDuration: "1s" }}>
+        <div className="absolute inset-0 rounded-full" style={{ background: "linear-gradient(#ef4444 0 calc(50% - 3px), #0f172a calc(50% - 3px) calc(50% + 3px), #f1f5f9 calc(50% + 3px) 100%)", boxShadow: "0 0 0 3px #0f172a, 0 0 22px 3px #ef444455" }} />
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-100 border-[4px] border-slate-900" />
+      </div>
+      <div className="flex flex-col items-center gap-1">
+        <div className="text-lg font-extrabold tracking-wide text-slate-100">Poké<span className="text-amber-400">TFT</span></div>
+        <div className="text-xs text-slate-400">{label}</div>
+      </div>
+      <style>{`@keyframes bootfade { to { opacity: 0; visibility: hidden; } }`}</style>
+    </div>
+  );
+}
+
+/** Top-bar fullscreen toggle. Tracks the current fullscreen state so the icon
+ *  reflects whether you're in or out. */
+function FullscreenButton() {
+  const [fs, setFs] = useState(false);
+  useEffect(() => {
+    const on = () => setFs(isFullscreen());
+    on();
+    document.addEventListener("fullscreenchange", on);
+    document.addEventListener("webkitfullscreenchange", on);
+    return () => {
+      document.removeEventListener("fullscreenchange", on);
+      document.removeEventListener("webkitfullscreenchange", on);
+    };
+  }, []);
+  return (
+    <button
+      onClick={() => toggleFullscreen()}
+      title={fs ? "Exit fullscreen" : "Fullscreen"}
+      className="px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-300 leading-none"
+    >
+      {fs ? "⤢" : "⛶"}
+    </button>
   );
 }
 
