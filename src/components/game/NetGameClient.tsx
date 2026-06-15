@@ -33,11 +33,11 @@ const ITEM_DEF_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 // column is a fixed height in both phases — see CENTER_H), so the canvas size is
 // constant and nothing jumps between phases.
 const DESIGN_W = 1500;
-const DESIGN_H = 1090;
+const DESIGN_H = 1130;
 // The middle row (field column) is locked to this height in BOTH phases so the
 // battlefield stays put and the bench/shop below it never move when the phase
 // flips. Sized to hold the 8-row field plus the floating combat chrome.
-const CENTER_H = 706;
+const CENTER_H = 748;
 // Let the canvas scale UP (not just down) so big monitors aren't left with huge
 // empty margins — capped so it doesn't become cartoonishly large.
 const MAX_SCALE = 1.5;
@@ -501,7 +501,7 @@ export function NetGameClient() {
             column, and a fixed-width right rail. Because every track is a
             constant width, the battlefield sits in the exact same place in
             planning and combat — it never shifts when the phase flips. */}
-        <div className="grid items-start gap-3" style={{ gridTemplateColumns: "220px 748px 300px", justifyContent: "center" }}>
+        <div className="grid items-start gap-4" style={{ gridTemplateColumns: "230px 824px 320px", justifyContent: "center" }}>
           {/* Left sidebar: scoreboard + synergies */}
           <div className="flex flex-col gap-3">
           <div className="w-full p-2 rounded-xl bg-slate-900/70 border border-slate-700/50">
@@ -595,7 +595,7 @@ export function NetGameClient() {
           {/* Right rail: items inventory + details (planning). During combat the
               recap (with tabs) lives inside CombatStage; the 300px track stays
               reserved so the field column doesn't move. */}
-          <div className="w-[300px]">
+          <div className="w-[320px]">
             {phase !== "combat" && !spectating && (
               <div className="flex flex-col gap-3">
                 <ItemsPanel />
