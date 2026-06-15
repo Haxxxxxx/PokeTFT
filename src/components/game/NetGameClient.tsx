@@ -120,7 +120,9 @@ export function NetGameClient() {
   const lastRoundKey = useRef<string | null>(null);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const actedDeadline = useRef(-1);
-  const [roundLog, setRoundLog] = useState<{ stage: number; round: number; won: boolean; pve: boolean }[]>([]);
+  const [roundLog, setRoundLog] = useState<{ stage: number; round: number; won: boolean; pve: boolean; oppUid: string; oppName: string; dmg: number; survivors: number }[]>([]);
+  // Past timeline chip the player tapped to see a fight recap (null = closed).
+  const [recapKey, setRecapKey] = useState<string | null>(null);
   const [pickedKey, setPickedKey] = useState<string | null>(null);
   const [spectate, setSpectate] = useState<string | null>(null);
   // Carousel/augment: hide the choice cards (revealing the live board behind the
@@ -335,7 +337,7 @@ export function NetGameClient() {
       setRoundLog((h) => {
         const last = h[h.length - 1];
         if (last && `${last.stage}-${last.round}` === key) return h;
-        return [...h, { stage: meta.stage, round: meta.round, won: myCombat.won, pve: !!myCombat.pve }];
+        return [...h, { stage: meta.stage, round: meta.round, won: myCombat.won, pve: !!myCombat.pve, oppUid: myCombat.oppUid, oppName: myCombat.oppName, dmg: myCombat.dmg ?? 0, survivors: myCombat.survivors ?? 0 }];
       });
     }
   }, [phase, meta?.stage, meta?.round, myCombat?.oppUid, myCombat?.pve, meta]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -415,6 +417,7 @@ export function NetGameClient() {
   // Forward-looking timeline: the current stage + the next two, each round
   // tagged with its kind (PvE / carousel / PvP) and overlaid with past results.
   const resultByKey = new Map(roundLog.map((h) => [`${h.stage}-${h.round}`, h.won]));
+  const recapByKey = new Map(roundLog.map((h) => [`${h.stage}-${h.round}`, h]));
   const schedule: { stage: number; round: number; kind: ReturnType<typeof roundKind> }[] = [];
   {
     let s = meta.stage, r = 1; // start at round 1 of the current stage
@@ -450,17 +453,47 @@ export function NetGameClient() {
                 : kind === "pve" ? "bg-amber-600/30 text-amber-100"
                 : "bg-slate-700/60 text-slate-300";
               const label = kind === "carousel" ? "◆" : `${stage}-${round}`;
+              const recap = recapByKey.get(key);
+              // Past PvP rounds are clickable: drop a recap + jump to that rival's board.
+              const clickable = isPast && !!recap && !recap.pve && recap.oppUid !== myUid && !!players[recap.oppUid];
+              const open = recapKey === key;
               return (
-                <span
+                <button
                   key={key}
-                  title={`${key} · ${kind}${isPast ? (result ? " · Win" : " · Loss") : ""}`}
-                  className={`relative w-7 h-6 shrink-0 rounded-md flex items-center justify-center text-[8px] font-bold ${bg} ${isCurrent ? "ring-2 ring-sky-400 scale-110" : ""} ${round === 1 ? "ml-1.5" : ""}`}
+                  type="button"
+                  disabled={!clickable}
+                  onClick={() => {
+                    if (!clickable || !recap) return;
+                    if (open) { setRecapKey(null); }
+                    else { setRecapKey(key); setSpectate(recap.oppUid); }
+                  }}
+                  title={`${key} · ${kind}${isPast ? (result ? " · Win" : " · Loss") : ""}${clickable ? " · click for recap" : ""}`}
+                  className={`relative w-7 h-6 shrink-0 rounded-md flex items-center justify-center text-[8px] font-bold ${bg} ${isCurrent ? "ring-2 ring-sky-400 scale-110" : ""} ${open ? "ring-2 ring-amber-300" : ""} ${clickable ? "cursor-pointer hover:brightness-110" : "cursor-default"} ${round === 1 ? "ml-1.5" : ""}`}
                 >
                   {label}
-                </span>
+                </button>
               );
             })}
           </div>
+          {recapKey && recapByKey.get(recapKey) && (() => {
+            const r = recapByKey.get(recapKey)!;
+            const opp = players[r.oppUid];
+            return (
+              <div className="ml-auto flex items-center gap-3 px-3 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 shrink-0">
+                <span className="text-[10px] font-bold text-slate-400">{recapKey}</span>
+                <span className="flex items-center gap-1.5">
+                  {opp?.photoURL
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={opp.photoURL} alt="" width={18} height={18} className="rounded" style={{ imageRendering: "pixelated" }} />
+                    : null}
+                  <span className="text-[11px] font-bold text-slate-200">{r.oppName}</span>
+                </span>
+                <span className={`text-[11px] font-extrabold ${r.won ? "text-emerald-300" : "text-rose-300"}`}>{r.won ? (lang === "fr" ? "Victoire" : "Win") : (lang === "fr" ? "Défaite" : "Loss")}</span>
+                {!r.won && r.dmg > 0 && <span className="text-[10px] text-rose-300/80">−{r.dmg} PV</span>}
+                <button onClick={() => { setRecapKey(null); setSpectate(null); }} className="text-slate-500 hover:text-slate-200 text-xs leading-none">✕</button>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Top HUD bar: a prominent stage badge, a row of stat chips, then the
