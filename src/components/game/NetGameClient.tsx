@@ -545,10 +545,10 @@ export function NetGameClient() {
         {/* Columns spread to the edges (TFT-style) so wide screens use the side
             space; the centre field column is fixed-width + centred, so it stays
             pinned across phases. */}
-        <div className="grid items-start gap-4" style={{ gridTemplateColumns: "260px 824px 340px", justifyContent: "space-between" }}>
-          {/* Left sidebar: scoreboard + synergies */}
-          <div className="flex flex-col gap-3">
-          <div className="w-full p-2 rounded-xl bg-slate-900/70 border border-slate-700/50">
+        <div className="grid items-stretch gap-4" style={{ gridTemplateColumns: "260px 824px 340px", justifyContent: "space-between" }}>
+          {/* Left sidebar: scoreboard + synergies, a full-height rail beside the board. */}
+          <div className="flex flex-col gap-3 min-h-0">
+          <div className="w-full p-2 rounded-xl bg-slate-900/70 border border-slate-700/50 shrink-0">
             <h2 className="text-[10px] uppercase tracking-wider text-slate-500 px-1 mb-1.5">{t.net_trainers(aliveCount)}</h2>
             <div className="flex flex-col gap-1">
               {ladder.map((p, i) => {
@@ -586,7 +586,9 @@ export function NetGameClient() {
               })}
             </div>
           </div>
-            <TraitPanel units={spectateUnits ?? undefined} />
+            <div className="flex-1 min-h-0 flex flex-col">
+              <TraitPanel units={spectateUnits ?? undefined} />
+            </div>
           </div>
 
           {/* Center: the shared field. Locked to CENTER_H in EVERY phase so the
@@ -639,11 +641,13 @@ export function NetGameClient() {
           {/* Right rail: items inventory + details (planning). During combat the
               recap (with tabs) lives inside CombatStage; the 300px track stays
               reserved so the field column doesn't move. */}
-          <div className="w-[340px]">
+          <div className="w-[340px] min-h-0">
             {phase !== "combat" && !spectating && (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 h-full">
                 <ItemsPanel />
-                <UnitDetail />
+                <div className="flex-1 min-h-0 flex flex-col">
+                  <UnitDetail />
+                </div>
               </div>
             )}
           </div>

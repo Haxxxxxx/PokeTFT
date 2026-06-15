@@ -30,7 +30,7 @@ export function UnitDetail() {
   }, [clear]);
 
   return (
-    <div data-inspectable className="w-full">
+    <div data-inspectable className="w-full h-full min-h-0">
       {inspectedItem ? <ItemCard id={inspectedItem} />
         : inspect ? <Card key={`${inspect.defId}-${inspect.star}`} />
         : <EmptyState />}
@@ -77,7 +77,7 @@ function ItemCard({ id }: { id: string }) {
 function EmptyState() {
   const t = useT();
   return (
-    <div className="rounded-2xl border border-slate-700/50 bg-slate-900/50 p-6 text-center">
+    <div className="h-full min-h-[120px] rounded-2xl border border-slate-700/50 bg-slate-900/50 p-6 text-center flex flex-col items-center justify-center">
       <div className="flex justify-center text-slate-600 mb-2"><InfoIcon size={22} /></div>
       <p className="text-xs text-slate-500 leading-relaxed">{t.ud_click_hint}</p>
     </div>

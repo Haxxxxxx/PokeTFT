@@ -67,7 +67,8 @@ export function Board({ units, interactive = true }: { units?: UnitInstance[]; i
         width: w + 28,
         height: h + 28,
         padding: 14,
-        background: "radial-gradient(120% 80% at 50% 80%, #16213c 0%, #0a1020 82%)",
+        background: "radial-gradient(115% 78% at 50% 88%, #1b2748 0%, #0d1729 52%, #070c18 100%)",
+        boxShadow: "inset 0 1px 0 rgba(148,163,184,0.08), inset 0 -28px 60px -30px rgba(56,189,248,0.18), 0 18px 50px -24px rgba(0,0,0,0.8)",
       }}
     >
       <div className="absolute" style={{ left: 14, top: 14, width: w, height: h }}>
