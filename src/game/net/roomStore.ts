@@ -105,7 +105,13 @@ type Status = "idle" | "connecting" | "connected" | "error";
 type RoomState = {
   code: string | null;
   myUid: string | null;
+  /** Reactive room used for RENDER — updated only when a render-meaningful field
+   *  changes (NOT on the 700ms heartbeat), so the game tree doesn't re-render
+   *  every heartbeat. */
   room: Room | null;
+  /** Always-fresh snapshot (incl. meta.hostBeat) for the host loop / failover.
+   *  Read via getState() — nothing subscribes to it for render. */
+  liveRoom: Room | null;
   status: Status;
   error: string | null;
   /** True while reconnect() is re-attaching to a saved room after a refresh. */
@@ -166,6 +172,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
   code: null,
   myUid: null,
   room: null,
+  liveRoom: null,
   status: "idle",
   error: null,
   reconnecting: false,
@@ -315,26 +322,48 @@ export const useRoom = create<RoomState>((setState, getState) => ({
   },
 }));
 
+/** Signature of the RENDER-meaningful room fields — everything EXCEPT the
+ *  high-churn `meta.hostBeat` / `meta.updatedAt`, which only the host loop cares
+ *  about. When two snapshots share this signature, the only change was a
+ *  heartbeat, so we must NOT bump the reactive `room` (that would re-render the
+ *  whole game tree ~every 700ms). */
+function roomSig(room: Room): string {
+  const m = room.meta as Record<string, unknown>;
+  const meta = { ...m, hostBeat: 0, updatedAt: 0 };
+  return JSON.stringify({ meta, players: room.players, combat: room.combat, carousel: room.carousel, rules: room.rules });
+}
+let lastSig: string | null = null;
+
 function subscribe(code: string, uid: string, setState: (p: Partial<RoomState>) => void) {
   if (unsub) unsub();
+  lastSig = null;
   const r = roomRef(code);
   unsub = onValue(r, (snap) => {
     if (!snap.exists()) {
-      setState({ room: null });
+      lastSig = null;
+      setState({ room: null, liveRoom: null });
       return;
     }
     const val = snap.val();
     if (!val || typeof val !== "object" || !val.meta) return; // ignore malformed snapshots
-    setState({
-      room: {
-        code,
-        meta: val.meta,
-        rules: val.rules ?? { startingHp: 100, maxPlayers: 8 },
-        players: val.players ?? {},
-        combat: val.combat ?? {},
-        carousel: val.carousel ?? {},
-      },
-    });
+    const next: Room = {
+      code,
+      meta: val.meta,
+      rules: val.rules ?? { startingHp: 100, maxPlayers: 8 },
+      players: val.players ?? {},
+      combat: val.combat ?? {},
+      carousel: val.carousel ?? {},
+    };
+    const sig = roomSig(next);
+    if (sig !== lastSig) {
+      // A render-meaningful change: update both the reactive room and the live one.
+      lastSig = sig;
+      setState({ room: next, liveRoom: next });
+    } else {
+      // Heartbeat-only churn: keep the host loop's snapshot fresh, but DON'T
+      // re-render `room` subscribers.
+      setState({ liveRoom: next });
+    }
   });
   // mark ourselves connected (in case of rejoin)
   update(ref(db(), `games/${code}/players/${uid}`), { connected: true });
