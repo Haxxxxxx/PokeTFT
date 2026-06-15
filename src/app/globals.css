@@ -34,6 +34,21 @@ body {
   animation: combat-cast 0.5s ease-out forwards;
 }
 
+/* Ability VFX: a fading impact burst and a sweeping beam (line moves). */
+@keyframes combat-burst {
+  0% { opacity: 0; transform: scale(0.4); }
+  28% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1.3); }
+}
+.combat-burst { animation: combat-burst 0.5s ease-out forwards; }
+
+@keyframes combat-beam {
+  0% { opacity: 0; }
+  18% { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+.combat-beam { animation: combat-beam 0.42s ease-out forwards; }
+
 @keyframes combat-hitflash {
   0% { opacity: 0.65; }
   100% { opacity: 0; }

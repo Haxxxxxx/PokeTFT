@@ -7,7 +7,8 @@ import { sfx } from "@/lib/audio";
 import { hexToPixel, fieldPixelSize, hexDistance, FIELD, TILE } from "@/game/engine/hex";
 import { TYPE_COLOR } from "@/game/ui";
 import { serverNow } from "@/game/net/serverTime";
-import type { CombatResult, FrameUnit } from "@/game/engine/combat";
+import type { CombatResult, FrameUnit, CombatEvent } from "@/game/engine/combat";
+import type { PokeType } from "@/game/types";
 
 /** Mirror a replay through the field centre (180° rotation) and swap teams, so
  *  the "enemy"-side player of a shared canonical sim still sees THEIR team at the
@@ -83,7 +84,6 @@ export function CombatStage({
   const result = useMemo(() => (flip ? mirrorResult(rawResult) : rawResult), [rawResult, flip]);
   const frames = result.frames;
   const last = frames.length - 1;
-  const totalTime = frames[last].t;
   const clockDriven = syncStart != null && syncWindowMs != null;
   const t = useT();
   const [idx, setIdx] = useState(0);
@@ -138,6 +138,24 @@ export function CombatStage({
   const bMap = new Map(b.units.map((u) => [u.id, u]));
   const aMap = new Map(a.units.map((u) => [u.id, u]));
 
+  // Discrete combat feedback (hits + casts) from a TRAILING WINDOW of frames, not
+  // just the current one. When playback advances several frames in one paint
+  // (low fps / compressed window) every action is still shown — fixing the
+  // "jumping / skipping / looks different on each screen" problem. Keys are the
+  // event's identity so each effect mounts once and its animation plays out.
+  const FX_TRAIL = 9;
+  const recentFx: { fk: string; e: CombatEvent; pos: Map<string, FrameUnit> }[] = [];
+  const recentHit = new Set<string>(); // units hit anywhere in the window (for the flash)
+  for (let f = Math.max(0, fi - FX_TRAIL); f <= fi; f++) {
+    const fr = frames[f];
+    if (!fr) continue;
+    const pm = f === fi ? aMap : new Map(fr.units.map((u) => [u.id, u]));
+    fr.events.forEach((e, k) => {
+      if (e.kind === "hit") { recentFx.push({ fk: `${f}-${k}`, e, pos: pm }); if (f >= fi - 1) recentHit.add(e.to); }
+      else if (e.kind === "cast") recentFx.push({ fk: `${f}-${k}`, e, pos: pm });
+    });
+  }
+
   // Trust the host's authoritative outcome for the banner (falls back to the
   // local sim only when not provided) — so "you win/lose" always matches the HP
   // the host applied, even if a board edge-case made the local replay diverge.
@@ -175,10 +193,7 @@ export function CombatStage({
         <span className={`truncate ${pve ? "text-emerald-300" : "text-rose-300"}`}>{pve ? "🌿 " : ""}{opponentName} <span className="tabular-nums">{aliveEnemy}</span></span>
       </div>
 
-      {/* Combat timer */}
-      <div className="w-full max-w-[460px] h-1 rounded-full bg-slate-800 overflow-hidden">
-        <div className={`h-full ${a.overtime ? "bg-rose-500" : "bg-slate-400/70"}`} style={{ width: `${(a.t / totalTime) * 100}%` }} />
-      </div>
+      {a.overtime && <span className="text-[9px] font-extrabold text-rose-400 animate-pulse tracking-wider mt-0.5">{t.cs_overtime}</span>}
       </div>
 
       {/* Battlefield (the focus) + a compact side recap with DMG/TANK/HEAL tabs.
@@ -209,7 +224,7 @@ export function CombatStage({
             const hpFrac = lerp(u.hpFrac, bu.hpFrac, frac);
             const manaFrac = lerp(u.manaFrac, bu.manaFrac, frac);
             const attackEv = a.events.find((e) => e.kind === "attack" && e.from === u.id);
-            const hitThisFrame = a.events.some((e) => e.kind === "hit" && e.to === u.id);
+            const hitThisFrame = recentHit.has(u.id);
             // Lunge toward the thing we're hitting.
             let lunge = { dx: 0, dy: 0 };
             if (attackEv && attackEv.kind === "attack") {
@@ -236,19 +251,17 @@ export function CombatStage({
             );
           })}
 
-          {/* Projectiles for ranged attacks + casts */}
+          {/* Projectiles for ranged BASIC attacks (abilities get their own VFX). */}
           {a.events.map((e, k) => {
-            if (e.kind !== "attack" && e.kind !== "cast") return null;
+            if (e.kind !== "attack") return null;
             const from = aMap.get(e.from);
             const to = aMap.get(e.to);
             if (!from || !to) return null;
-            const cast = e.kind === "cast";
-            if (!cast && hexDistance({ c: from.c, r: from.r }, { c: to.c, r: to.r }) <= 1) return null; // melee, no projectile
+            if (hexDistance({ c: from.c, r: from.r }, { c: to.c, r: to.r }) <= 1) return null; // melee, no projectile
             const pa = hexToPixel({ c: from.c, r: from.r }, TILE_W, TILE_H);
             const pb = hexToPixel({ c: to.c, r: to.r }, TILE_W, TILE_H);
             const t = easeOut(frac);
-            const color = e.kind === "cast" ? TYPE_COLOR[e.moveType] : "#e2e8f0";
-            const size = cast ? 14 : 8;
+            const size = 8;
             return (
               <div
                 key={`p-${fi}-${k}`}
@@ -257,28 +270,29 @@ export function CombatStage({
                   left: lerp(pa.x, pb.x, t) - size / 2,
                   top: lerp(pa.y, pb.y, t) - size / 2,
                   width: size, height: size,
-                  background: color,
-                  boxShadow: `0 0 10px 2px ${color}`,
+                  background: "#e2e8f0",
+                  boxShadow: "0 0 8px 2px #e2e8f0",
                 }}
               />
             );
           })}
 
-          {/* Cast rings + damage numbers */}
-          {a.events.map((e, k) => {
+          {/* Cast effects + damage numbers — from the trailing window so nothing
+              is skipped; ability VFX vary by the move's TYPE and SHAPE. */}
+          {recentFx.map(({ fk, e, pos }) => {
             if (e.kind === "cast") {
-              const c = aMap.get(e.from);
+              const c = pos.get(e.from);
+              const tg = pos.get(e.to);
               if (!c) return null;
-              const p = hexToPixel({ c: c.c, r: c.r }, TILE_W, TILE_H);
-              return <CastFlash key={`cf-${fi}-${k}`} x={p.x} y={p.y} eff={e.eff} />;
+              const cp = hexToPixel({ c: c.c, r: c.r }, TILE_W, TILE_H);
+              const tp = tg ? hexToPixel({ c: tg.c, r: tg.r }, TILE_W, TILE_H) : cp;
+              return <AbilityFx key={`cf-${fk}`} x={cp.x} y={cp.y} tx={tp.x} ty={tp.y} moveType={e.moveType} shape={e.shape} eff={e.eff} />;
             }
-            if (e.kind === "hit") {
-              const t = aMap.get(e.to);
-              if (!t) return null;
-              const p = hexToPixel({ c: t.c, r: t.r }, TILE_W, TILE_H);
-              return <DamageNumber key={`dn-${fi}-${k}`} x={p.x} y={p.y} dmg={e.dmg} crit={e.crit} sup={e.sup} />;
-            }
-            return null;
+            if (e.kind !== "hit") return null;
+            const t = pos.get(e.to);
+            if (!t) return null;
+            const p = hexToPixel({ c: t.c, r: t.r }, TILE_W, TILE_H);
+            return <DamageNumber key={`dn-${fk}`} x={p.x} y={p.y} dmg={e.dmg} crit={e.crit} sup={e.sup} />;
           })}
         </div>
       </div>
@@ -484,7 +498,38 @@ function DamageNumber({ x, y, dmg, crit, sup }: { x: number; y: number; dmg: num
   );
 }
 
-function CastFlash({ x, y, eff }: { x: number; y: number; eff: number }) {
-  const color = eff > 1 ? "#fbbf24" : eff < 1 ? "#64748b" : "#a78bfa";
-  return <div className="absolute pointer-events-none rounded-full combat-cast" style={{ left: x - 24, top: y - 24, width: 48, height: 48, border: `3px solid ${color}` }} />;
+/** Ability visual — varies by the move's TYPE (colour) and SHAPE so different
+ *  mons' attacks read distinctly:
+ *   · splash → an expanding ring that bursts on the target
+ *   · line   → a beam from the caster through the target
+ *   · single → a focused impact burst on the target
+ *  A super-effective hit (eff>1) flares brighter. */
+function AbilityFx({ x, y, tx, ty, moveType, shape, eff }: { x: number; y: number; tx: number; ty: number; moveType: PokeType; shape: "single" | "splash" | "line"; eff: number }) {
+  const color = TYPE_COLOR[moveType] ?? "#a78bfa";
+  const boost = eff > 1 ? 1.25 : 1;
+  if (shape === "splash") {
+    const s = 64 * boost;
+    return (
+      <>
+        <span className="absolute pointer-events-none rounded-full combat-cast" style={{ left: tx - s / 2, top: ty - s / 2, width: s, height: s, border: `3px solid ${color}` }} />
+        <span className="absolute pointer-events-none rounded-full combat-burst" style={{ left: tx - 22, top: ty - 22, width: 44, height: 44, background: `radial-gradient(circle, ${color}, ${color}00 70%)` }} />
+      </>
+    );
+  }
+  if (shape === "line") {
+    const dx = tx - x, dy = ty - y;
+    const len = Math.max(40, Math.hypot(dx, dy) + 30);
+    const ang = (Math.atan2(dy, dx) * 180) / Math.PI;
+    return (
+      <span
+        className="absolute pointer-events-none combat-beam"
+        style={{ left: x, top: y - 4, width: len, height: 8, transformOrigin: "0 50%", transform: `rotate(${ang}deg)`, borderRadius: 4, background: `linear-gradient(90deg, ${color}, ${color}cc 60%, ${color}00)`, boxShadow: `0 0 14px 2px ${color}aa` }}
+      />
+    );
+  }
+  // single — focused impact burst on the target
+  const s = 46 * boost;
+  return (
+    <span className="absolute pointer-events-none rounded-full combat-burst" style={{ left: tx - s / 2, top: ty - s / 2, width: s, height: s, background: `radial-gradient(circle, ${color}, ${color}00 70%)`, boxShadow: `0 0 20px 5px ${color}aa` }} />
+  );
 }
