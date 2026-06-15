@@ -275,8 +275,12 @@ export function NetGameClient() {
       if (mySave === undefined) return; // still loading; re-runs when it resolves
       lastRoundKey.current = key;
       const save = mySave ?? me?.save; // private path first, legacy public save as fallback
-      if (save) importSave({ ...save, units: asUnits(save.units) });
-      else newGame(room.rules?.startingHp ?? 100, rosterForGenerations(room.rules?.generations ?? [1], room.rules?.draftPoolSize, codeSeed(room.code)));
+      // Same roster the host uses (selected gens, drawn to the draft size, seeded
+      // by the room code) — passed to BOTH paths so the shop pool always respects
+      // the lobby's region/draft rules, even on a reconnect/restore.
+      const roster = rosterForGenerations(room.rules?.generations ?? [1], room.rules?.draftPoolSize, codeSeed(room.code));
+      if (save) importSave({ ...save, units: asUnits(save.units) }, roster);
+      else newGame(room.rules?.startingHp ?? 100, roster);
     } else {
       lastRoundKey.current = key;
       netRound(meta.stage, meta.round, me?.streak ?? 0);
@@ -626,7 +630,7 @@ export function NetGameClient() {
         {/* Columns spread to the edges (TFT-style) so wide screens use the side
             space; the centre field column is fixed-width + centred, so it stays
             pinned across phases. */}
-        <div className="grid items-stretch gap-4" style={{ gridTemplateColumns: "260px 824px 340px", justifyContent: "space-between" }}>
+        <div className="grid items-stretch gap-4" style={{ gridTemplateColumns: "260px 824px 340px", justifyContent: "space-between", height: CENTER_H }}>
           {/* Left sidebar: scoreboard + synergies, a full-height rail beside the board. */}
           <div className="flex flex-col gap-3 min-h-0">
           <div className="gilded w-full p-2 rounded-xl shrink-0">

@@ -110,7 +110,7 @@ type State = {
   pickAugment: (id: string) => void;
   /** Multiplayer: snapshot / restore the local economy for reconnect. */
   exportSave: () => { gold: number; xp: number; level: number; units: UnitInstance[]; shop: (string | null)[]; items: string[]; augments: string[] };
-  importSave: (save: { gold: number; xp: number; level: number; units?: UnitInstance[]; shop?: (string | null)[]; items?: string[]; augments?: string[] }) => void;
+  importSave: (save: { gold: number; xp: number; level: number; units?: UnitInstance[]; shop?: (string | null)[]; items?: string[]; augments?: string[] }, allowedIds?: string[]) => void;
   grantItem: (itemId: string) => void;
   equipItem: (iid: string, itemId: string) => void;
   unequipItem: (iid: string, itemId: string) => void;
@@ -449,7 +449,12 @@ export const useGame = create<State>((set, get) => ({
     return { gold: s.gold, xp: s.xp, level: s.level, units: s.units, shop: s.shop, items: s.items, augments: s.augments };
   },
 
-  importSave: (save) => set({
+  importSave: (save, allowedIds) => set({
+    // Rebuild the shop pool from the room's roster — otherwise a restore leaves
+    // pool/unitsByCost at the store's default makePool() (ALL generations), so the
+    // shop would offer out-of-region mons even though the rules restrict the pool.
+    pool: makePool(allowedIds),
+    unitsByCost: makeUnitsByCost(allowedIds),
     // Derive level from XP so it always matches (a stale/dropped synced `level`
     // can't stick after a reconnect and show the wrong level all game).
     gold: save.gold, xp: save.xp, level: levelFromXp(save.xp ?? 0),
