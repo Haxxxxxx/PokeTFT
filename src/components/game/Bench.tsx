@@ -12,10 +12,10 @@ function BenchSlot({ index, unit, interactive, canDeploy }: { index: number; uni
   return (
     <div
       ref={setNodeRef}
-      className={`w-[72px] h-[72px] rounded-md border flex items-center justify-center transition-colors
+      className={`w-[92px] h-[92px] rounded-lg border flex items-center justify-center transition-colors
         ${isOver ? "border-sky-400 bg-sky-400/15" : "border-slate-700/50 bg-slate-800/30"}`}
     >
-      {unit && <UnitChip unit={unit} size={68} interactive={interactive} canDeploy={canDeploy} />}
+      {unit && <UnitChip unit={unit} size={86} interactive={interactive} canDeploy={canDeploy} />}
     </div>
   );
 }
@@ -33,7 +33,7 @@ export function Bench({ interactive = true, canDeploy = true }: { interactive?: 
   return (
     <div
       ref={setNodeRef}
-      className={`flex gap-1.5 p-2 rounded-xl border transition-colors
+      className={`flex gap-2.5 p-2.5 rounded-xl border transition-colors
         ${isOver ? "border-sky-400/60 bg-sky-400/5" : "border-slate-700/60 bg-slate-900/50"}`}
     >
       {Array.from({ length: BENCH_SIZE }).map((_, i) => (
