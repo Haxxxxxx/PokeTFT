@@ -3,7 +3,7 @@
  *  /users/{uid}/friends/{friendUid} = true   (symmetric)
  *  /usernames/{lower} = uid                   (lookup index, claim-once)
  */
-import { ref, get, set, update, remove, onValue, onDisconnect, serverTimestamp } from "firebase/database";
+import { ref, get, set, update, remove, onValue, onDisconnect, serverTimestamp, runTransaction, query, orderByChild, limitToLast } from "firebase/database";
 import { db } from "./firebase";
 
 export type UserProfile = {
@@ -15,7 +15,49 @@ export type UserProfile = {
   currentGame?: string | null;
   online?: boolean;
   friends?: Record<string, boolean>;
+  /** Ranked rating (Elo-like; starts at START_RATING). */
+  rating?: number;
 };
+
+/** Everyone starts here; placement nudges it up/down each game. */
+export const START_RATING = 1000;
+
+/** Rating → cosmetic tier (name + accent), TFT-ladder flavour. */
+export function ratingTier(rating: number): { name: string; color: string } {
+  if (rating >= 1600) return { name: "Master", color: "#c084fc" };
+  if (rating >= 1400) return { name: "Diamond", color: "#60a5fa" };
+  if (rating >= 1200) return { name: "Platinum", color: "#22d3ee" };
+  if (rating >= 1000) return { name: "Gold", color: "#fbbf24" };
+  if (rating >= 800) return { name: "Silver", color: "#cbd5e1" };
+  return { name: "Bronze", color: "#b45309" };
+}
+
+/** Rating delta for a finished game: linear by placement around the midpoint, so 1st
+ *  gains the most and last loses the most, scaled to the lobby size. */
+export function ratingDelta(place: number, players: number): number {
+  const mid = (players + 1) / 2;
+  return Math.round((mid - place) * 8);
+}
+
+export type LeaderEntry = { uid: string; username: string; rating: number; photoURL?: string | null };
+
+/** Apply a finished game's placement to the player's rating (transaction) and mirror it
+ *  to the public, queryable leaderboard node. */
+export async function applyRankedResult(uid: string, place: number, players: number, username: string, photoURL?: string | null): Promise<void> {
+  const delta = ratingDelta(place, players);
+  const res = await runTransaction(ref(db(), `users/${uid}/rating`), (cur) => Math.max(0, (cur ?? START_RATING) + delta));
+  const rating = (res.snapshot.val() as number) ?? START_RATING;
+  await set(ref(db(), `leaderboard/${uid}`), { username, rating, photoURL: photoURL ?? null }).catch(() => {});
+}
+
+/** Top-rated players, highest first. */
+export async function getLeaderboard(limit = 50): Promise<LeaderEntry[]> {
+  const snap = await get(query(ref(db(), "leaderboard"), orderByChild("rating"), limitToLast(limit)));
+  if (!snap.exists()) return [];
+  const out: LeaderEntry[] = [];
+  snap.forEach((c) => { out.push({ uid: c.key!, ...(c.val() as Omit<LeaderEntry, "uid">) }); });
+  return out.sort((a, b) => b.rating - a.rating);
+}
 
 const usersRef = (uid: string) => ref(db(), `users/${uid}`);
 const nameIndexRef = (lower: string) => ref(db(), `usernames/${lower}`);

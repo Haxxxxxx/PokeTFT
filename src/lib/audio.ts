@@ -100,3 +100,65 @@ export const sfx = {
     tone(330, 0.14, "sine", 0.09);
   },
 };
+
+// ── Generative ambient background music ──────────────────────────────────────
+// A slow, looping chord progression synthesised with Web Audio (no asset files —
+// works with the static export). Low in the mix so it sits under the SFX.
+let musicGain: GainNode | null = null;
+let musicTimer: ReturnType<typeof setInterval> | null = null;
+let musicStep = 0;
+
+// Gentle minor-ish progression (Am · F · C · G), each as a 3-note chord (Hz).
+const CHORDS = [
+  [220.0, 261.63, 329.63],
+  [174.61, 220.0, 261.63],
+  [261.63, 329.63, 392.0],
+  [196.0, 246.94, 293.66],
+];
+
+function pad(freq: number, when: number, dur: number, vol: number): void {
+  const c = getCtx();
+  if (!c || !musicGain) return;
+  const osc = c.createOscillator();
+  const g = c.createGain();
+  osc.type = "sine";
+  osc.frequency.value = freq;
+  osc.connect(g);
+  g.connect(musicGain);
+  g.gain.setValueAtTime(0.0001, when);
+  g.gain.exponentialRampToValueAtTime(vol, when + 0.9);      // slow swell in
+  g.gain.exponentialRampToValueAtTime(0.0001, when + dur);   // slow fade out
+  osc.start(when);
+  osc.stop(when + dur + 0.05);
+}
+
+function scheduleChord(): void {
+  const c = getCtx();
+  if (!c || !soundEnabled()) return;
+  const chord = CHORDS[musicStep % CHORDS.length];
+  const t = c.currentTime + 0.05;
+  chord.forEach((f, i) => pad(f, t, 4.4, 0.05 - i * 0.008));
+  pad(chord[0] / 2, t, 4.6, 0.035);                 // soft sub-bass root
+  if (musicStep % 2 === 0) pad(chord[2] * 2, t + 2.1, 1.6, 0.022); // occasional sparkle
+  musicStep++;
+}
+
+export const music = {
+  /** Start the loop (idempotent; no-op while sound is off). */
+  start(): void {
+    if (musicTimer || !soundEnabled()) return;
+    const c = getCtx();
+    if (!c) return;
+    if (!musicGain) { musicGain = c.createGain(); musicGain.gain.value = 0.55; musicGain.connect(c.destination); }
+    scheduleChord();
+    musicTimer = setInterval(scheduleChord, 4000);
+  },
+  stop(): void {
+    if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
+  },
+  /** Follow the sound setting: play when on, silence when off. */
+  sync(): void {
+    if (soundEnabled()) this.start();
+    else this.stop();
+  },
+};

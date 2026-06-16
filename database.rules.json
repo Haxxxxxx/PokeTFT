@@ -17,6 +17,15 @@
         ".write": "auth != null && ((newData.exists() && newData.val() === auth.uid && (!data.exists() || data.val() === auth.uid)) || (!newData.exists() && data.val() === auth.uid))"
       }
     },
+    "leaderboard": {
+      ".read": "auth != null",
+      ".indexOn": ["rating"],
+      "$uid": {
+        ".write": "auth != null && $uid === auth.uid",
+        "rating":   { ".validate": "newData.isNumber()" },
+        "username": { ".validate": "newData.isString() && newData.val().length <= 16" }
+      }
+    },
     "priv": {
       "$code": {
         "$uid": {

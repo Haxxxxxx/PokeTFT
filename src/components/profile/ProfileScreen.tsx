@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/game/net/authStore";
 import { useAppStore } from "@/game/store/appStore";
-import { getHistory, type GameResult } from "@/game/net/users";
+import { getHistory, ratingTier, START_RATING, type GameResult } from "@/game/net/users";
 import { GEN_LABELS } from "@/game/data/generations";
 import { ArrowLeft, Trophy, Medal, Swords, Crown } from "lucide-react";
 
@@ -66,10 +66,20 @@ export function ProfileScreen() {
               <span className="text-2xl font-bold text-amber-200/70">{name.slice(0, 1).toUpperCase()}</span>
             )}
           </span>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="text-xl font-bold gild-text truncate">{name}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">{user?.isAnonymous ? tr("Guest account", "Compte invité") : user?.email}</div>
+            <div className="text-[11px] text-slate-500 mt-0.5 truncate">{user?.email}</div>
           </div>
+          {(() => {
+            const rating = profile?.rating ?? START_RATING;
+            const tier = ratingTier(rating);
+            return (
+              <div className="text-right shrink-0">
+                <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: tier.color }}>{tier.name}</div>
+                <div className="text-lg font-extrabold tabular-nums text-slate-200">{rating}</div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Aggregate stats */}

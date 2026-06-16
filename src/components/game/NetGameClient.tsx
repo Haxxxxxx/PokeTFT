@@ -15,7 +15,7 @@ import { ITEM_POOL, RARITY_COLOR, COMPONENT_IDS } from "@/game/data/itemPool";
 import { enemyToField } from "@/game/engine/hex";
 import { ItemGlyph, AugmentGlyph } from "./ItemGlyph";
 import { finishCarouselEarly } from "@/game/net/serverGame";
-import { recordGameResult } from "@/game/net/users";
+import { recordGameResult, applyRankedResult } from "@/game/net/users";
 import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle } from "lucide-react";
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
@@ -551,12 +551,15 @@ export function NetGameClient() {
       if (myUid && room?.code) {
         const meP = ps[myUid];
         const place = meP?.place ?? (lastOneStanding ? 1 : Object.values(ps).filter((p) => !p.isBot).length);
+        const total = Object.values(ps).length;
         recordGameResult(myUid, room.code, {
           place,
-          players: Object.values(ps).length,
+          players: total,
           regions: room.rules?.generations ?? [1],
           won: place === 1 || meta?.winnerUid === myUid,
         }).catch(() => {});
+        // Ranked: nudge the player's rating by placement + mirror to the leaderboard.
+        applyRankedResult(myUid, place, total, meP?.name ?? "Player", meP?.photoURL).catch(() => {});
       }
     }
     prevPhase.current = phase ?? null;

@@ -16,6 +16,9 @@ export type AppStore = {
   /** Home-screen nav: when true (and not in a game), show the profile/history view. */
   profileOpen: boolean;
   setProfileOpen: (v: boolean) => void;
+  /** Home-screen nav: show the ranked leaderboard. */
+  leaderboardOpen: boolean;
+  setLeaderboardOpen: (v: boolean) => void;
 };
 
 export const useAppStore = create<AppStore>()(
@@ -28,6 +31,8 @@ export const useAppStore = create<AppStore>()(
       setSettings: (update) => set((s) => ({ settings: { ...s.settings, ...update } })),
       profileOpen: false,
       setProfileOpen: (v) => set({ profileOpen: v }),
+      leaderboardOpen: false,
+      setLeaderboardOpen: (v) => set({ leaderboardOpen: v }),
     }),
     {
       name: "poketft_settings",

@@ -11,7 +11,7 @@ import { ProfileTile } from "./ProfileTile";
 import { ProfileEditor } from "@/components/social/ProfileEditor";
 import { HowToPlay } from "@/components/HowToPlay";
 import { PokeballIcon } from "@/components/game/icons";
-import { Swords } from "lucide-react";
+import { Swords, Trophy } from "lucide-react";
 import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 
@@ -45,6 +45,8 @@ export function WelcomeScreen() {
   const profile = useAuth((s) => s.profile);
   const signOut = useAuth((s) => s.signOut);
   const setProfileOpen = useAppStore((s) => s.setProfileOpen);
+  const setLeaderboardOpen = useAppStore((s) => s.setLeaderboardOpen);
+  const lang = useAppStore((s) => s.settings.language);
   const [editProfile, setEditProfile] = useState(false);
   const [howTo, setHowTo] = useState(false);
   // Random showcase mons each visit (client-only to avoid hydration mismatch).
@@ -90,6 +92,7 @@ export function WelcomeScreen() {
           <span className="font-extrabold tracking-tight text-xl">Poké<span className="gild-text">TFT</span></span>
         </div>
         <div className="flex items-center gap-4">
+          <button onClick={() => setLeaderboardOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-amber-300 uppercase tracking-wide"><Trophy size={13} /> {lang === "fr" ? "Classement" : "Ranks"}</button>
           <button onClick={() => setHowTo(true)} className="text-xs font-bold text-slate-400 hover:text-sky-300 uppercase tracking-wide">{t.w_how_to_play}</button>
           {/* Profile chip */}
           <div className="flex items-center gap-2.5 pl-3 border-l border-slate-800">
