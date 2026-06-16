@@ -166,7 +166,9 @@ export async function syncBoard(code: string, uid: string, units: UnitInstance[]
   const pub: Record<string, unknown> = { board: onBoard };
   // Clamp to the valid range so a bad/edited client value can't get the whole update
   // rejected by the DB rule (level validates 1..10) — and the scoreboard stays sane.
-  if (typeof level === "number") pub.level = Math.max(1, Math.min(10, Math.round(level)));
+  // isFinite guard: a NaN would survive the typeof check and get the WHOLE player update
+  // (board + augments) rejected by RTDB, silently freezing this player's sync.
+  if (typeof level === "number" && Number.isFinite(level)) pub.level = Math.max(1, Math.min(10, Math.round(level)));
   // Only sync KNOWN augment ids, capped at 3 — keeps the public node clean and within
   // the DB rule even if local state somehow holds junk.
   if (augments) pub.augments = rtdbSafe(augments.filter((id) => AUGMENT_BY_ID[id]).slice(0, 3));

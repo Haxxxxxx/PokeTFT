@@ -9,6 +9,7 @@
  */
 import { simulate, type CombatResult } from "../src/game/engine/combat";
 import { generateBoard } from "../src/game/engine/enemy";
+import { teamBuffForAugments } from "../src/game/data/augments";
 
 function hashStr(s: string): number {
   let h = 2166136261 >>> 0;
@@ -124,5 +125,24 @@ for (let trial = 0; trial < 24; trial++) {
 }
 console.log(`${buffPass}/${buffPass + buffFail} combat-augment buff determinism + RTDB parity`);
 
-if (fail > 0 || netFail > 0 || ordFail > 0 || buffFail > 0) { console.error("\n❌ combat parity broken"); process.exit(1); }
+// --- Combat-augment fold: order-independent, correct, cap doesn't clip legit play ------
+// teamBuffForAugments runs on BOTH host and client; it must fold to the SAME buff
+// regardless of the synced array's order (it iterates the canonical AUGMENTS list).
+let augPass = 0, augFail = 0;
+{
+  const a = teamBuffForAugments(["swords-dance", "bulk-up", "focus-band"]);
+  const b = teamBuffForAugments(["focus-band", "bulk-up", "swords-dance"]); // different order
+  const orderOk = JSON.stringify(a) === JSON.stringify(b);
+  // swords-dance ad×1.18, bulk-up ad×1.22 hp×1.20, focus-band hp×1.12.
+  const correctOk = Math.abs((a.adMult ?? 0) - 1.18 * 1.22) < 1e-9
+    && Math.abs((a.hpMult ?? 0) - 1.20 * 1.12) < 1e-9;
+  const capOk = (a.adMult ?? 0) <= 1.8 && (a.hpMult ?? 0) <= 1.8 // never exceeds the ceiling
+    && (a.adMult ?? 0) > 1.4;                                    // …but a legit stack isn't clipped
+  const emptyOk = JSON.stringify(teamBuffForAugments([])) === "{}" && JSON.stringify(teamBuffForAugments(undefined)) === "{}";
+  if (orderOk && correctOk && capOk && emptyOk) augPass++;
+  else { augFail++; console.error(`aug fold FAIL order=${orderOk} correct=${correctOk} cap=${capOk} empty=${emptyOk}`); }
+}
+console.log(`${augPass}/${augPass + augFail} augment fold order-independence + cap`);
+
+if (fail > 0 || netFail > 0 || ordFail > 0 || buffFail > 0 || augFail > 0) { console.error("\n❌ combat parity broken"); process.exit(1); }
 console.log("✅ combat is deterministic, order-independent, flip-parity holds, and survives the RTDB round-trip");
