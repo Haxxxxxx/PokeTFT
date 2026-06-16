@@ -5,6 +5,7 @@ import { useRoom } from "@/game/net/roomStore";
 import { usePreLobby } from "@/game/store/preLobbyStore";
 import { beginMatch } from "@/game/net/match";
 import { PokeballIcon } from "@/components/game/icons";
+import { Settings } from "lucide-react";
 import { enterFullscreen } from "@/lib/fullscreen";
 import { GameRulesPanel } from "./GameRulesPanel";
 import { unitsForGenerations } from "@/game/data/mons";
@@ -162,7 +163,7 @@ export function LobbyScreen() {
             <span key={i} className="px-3 py-1.5 rounded-lg bg-slate-900/70 border border-slate-700/60 text-[11px] font-semibold text-slate-300">{chip}</span>
           ))}
           {isHost && (
-            <button onClick={() => setShowRules(true)} className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-sky-300">⚙ {t.l_rules}</button>
+            <button onClick={() => setShowRules(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-sky-300"><Settings size={13} /> {t.l_rules}</button>
           )}
         </div>
 

@@ -14,7 +14,7 @@ import { MEGA_STONE, canMega } from "@/game/data/mega";
 import { ITEM_POOL, RARITY_COLOR, COMPONENT_IDS } from "@/game/data/itemPool";
 import { enemyToField } from "@/game/engine/hex";
 import { ItemGlyph, AugmentGlyph } from "./ItemGlyph";
-import { Trash2, Eye, Sparkles } from "lucide-react";
+import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle } from "lucide-react";
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
 import { useUi } from "@/game/store/uiStore";
@@ -633,7 +633,7 @@ export function NetGameClient() {
         style={{ width: DESIGN_W, height: DESIGN_H, transform: `scale(${scale})`, transformOrigin: "center" }}
         className="flex flex-col gap-2 px-3 py-2 shrink-0"
       >
-        {/* Round tracker (TFT-style): an icon per round — ⚔ PvP, 🌿 PvE, 🎡
+        {/* Round tracker (TFT-style): an icon per round — Sword=PvP, Leaf=PvE, Gift=
             carousel — grouped by stage. The current round glows; past PvP rounds
             colour win/loss and stay clickable for a recap. */}
         <div className="gilded relative flex items-center gap-3 px-3 py-1.5 rounded-lg">
@@ -1009,7 +1009,7 @@ export function NetGameClient() {
             style={{ pointerEvents: "auto" }}
             className="absolute top-4 right-4 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-200 shadow-lg"
           >
-            👁 {revealBoard ? (lang === "fr" ? "Afficher les choix" : "Show choices") : (lang === "fr" ? "Voir mon plateau" : "Hide & view board")}
+            <Eye size={13} className="inline align-text-bottom mr-1" />{revealBoard ? (lang === "fr" ? "Afficher les choix" : "Show choices") : (lang === "fr" ? "Voir mon plateau" : "Hide & view board")}
           </button>
           {!revealBoard && (
           <div className="celebrate-pop flex flex-col items-center">
@@ -1168,7 +1168,7 @@ function FullscreenButton() {
       title={fs ? "Exit fullscreen" : "Fullscreen"}
       className="px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-300 leading-none"
     >
-      {fs ? "⤢" : "⛶"}
+      {fs ? <Minimize size={14} /> : <Maximize size={14} />}
     </button>
   );
 }
@@ -1228,7 +1228,7 @@ function Toasts() {
           boxShadow: "0 18px 50px -20px rgba(0,0,0,0.9), 0 0 24px -10px rgba(244,63,94,0.6)",
         }}
       >
-        <span className="text-rose-300">⚠</span>{toast.text}
+        <span className="text-rose-300 inline-flex items-center"><AlertTriangle size={13} /></span>{toast.text}
       </div>
     </div>
   );

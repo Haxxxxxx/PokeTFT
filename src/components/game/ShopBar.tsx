@@ -5,7 +5,8 @@ import { useUi } from "@/game/store/uiStore";
 import { getDef, spriteUrl } from "@/game/data/mons";
 import { computeTraits } from "@/game/engine/synergies";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
-import { COST_COLOR, TYPE_COLOR, TRAIT_ICON } from "@/game/ui";
+import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
+import { TraitGlyph } from "./TraitGlyph";
 import { ECONOMY, COPIES_TO_STAR, SHOP_ODDS, MAX_LEVEL, XP_TO_REACH, type Cost } from "@/game/config";
 import { RerollIcon, SnowIcon, CoinIcon, InfoIcon, StarIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
@@ -191,10 +192,10 @@ export function ShopBar() {
                   </span>
                 )}
                 {def.types.map((tt) => (
-                  <TraitChip key={tt} icon={TRAIT_ICON[tt]} label={TRAITS_BY_KEY[tt]?.label ?? tt} color={TYPE_COLOR[tt as PokeType]} active={activeTraits.has(tt)} />
+                  <TraitChip key={tt} traitKey={tt} label={TRAITS_BY_KEY[tt]?.label ?? tt} color={TYPE_COLOR[tt as PokeType]} active={activeTraits.has(tt)} />
                 ))}
                 {def.roles.map((r) => (
-                  <TraitChip key={r} icon={TRAIT_ICON[r]} label={TRAITS_BY_KEY[r]?.label ?? r} color="#94a3b8" active={activeTraits.has(r)} />
+                  <TraitChip key={r} traitKey={r} label={TRAITS_BY_KEY[r]?.label ?? r} color="#94a3b8" active={activeTraits.has(r)} />
                 ))}
               </div>
 
@@ -209,14 +210,14 @@ export function ShopBar() {
   );
 }
 
-function TraitChip({ label, color, active, icon }: { label: string; color: string; active: boolean; icon?: string }) {
+function TraitChip({ label, color, active, traitKey }: { label: string; color: string; active: boolean; traitKey: string }) {
   return (
     <span
       title={active ? `${label} (active)` : label}
       style={active ? { background: `${color}cc`, color: "#0b1020" } : { color: "#e2e8f0" }}
       className={`inline-flex items-center gap-1 text-[13px] leading-none px-2 py-[3px] rounded font-bold whitespace-nowrap backdrop-blur-sm ${active ? "ring-1 ring-white/70" : "bg-slate-950/60"}`}
     >
-      {icon && <span className="text-[14px] leading-none">{icon}</span>}
+      <TraitGlyph traitKey={traitKey} size={12} />
       {label}
     </span>
   );

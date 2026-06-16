@@ -8,6 +8,7 @@ import { AppSettingsPanel } from "./AppSettingsPanel";
 import { FriendsPanel } from "@/components/social/FriendsPanel";
 import { ProfileEditor } from "@/components/social/ProfileEditor";
 import { HowToPlay } from "@/components/HowToPlay";
+import { PokeballIcon } from "@/components/game/icons";
 import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 
@@ -92,7 +93,7 @@ export function WelcomeScreen() {
       {/* Top nav bar */}
       <header className="flex items-center justify-between gap-3 px-4 sm:px-6 h-16 border-b border-[color:var(--panel-edge)] bg-slate-950/50 backdrop-blur shrink-0">
         <div className="flex items-center gap-2.5">
-          <span className="text-gold text-2xl drop-shadow-[0_0_8px_rgba(212,175,55,0.5)]">⬡</span>
+          <span className="text-gold drop-shadow-[0_0_8px_rgba(212,175,55,0.5)]"><PokeballIcon size={26} /></span>
           <span className="font-extrabold tracking-tight text-xl">Poké<span className="gild-text">TFT</span></span>
         </div>
         <div className="flex items-center gap-4">
