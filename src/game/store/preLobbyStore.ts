@@ -75,7 +75,10 @@ const DEFAULT_RULES: GameRules = {
   itemsEnabled: DEFAULT_ITEMS_ENABLED,
   maxPlayers: 8,
   augmentsEnabled: true,
-  serverDriven: false,
+  // Authoritative server drives every game by default (#110): Cloud Functions own the
+  // phase transitions, combat resolution and the winner, so outcomes can't diverge
+  // between players. The client keeps a 4s fallback if the server is ever late.
+  serverDriven: true,
 };
 
 export const usePreLobby = create<PreLobbyState>((set, get) => ({

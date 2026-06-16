@@ -168,12 +168,12 @@ export function GameRulesPanel({ isHost }: { isHost: boolean }) {
                   onClick={() => setRules({ serverDriven: on })}
                   className={`px-4 py-1.5 ${chipBase} ${active ? chipActive : chipIdle} disabled:opacity-50`}
                 >
-                  {on ? (lang === "fr" ? "Serveur" : "Server") : (lang === "fr" ? "Hôte (défaut)" : "Host (default)")}
+                  {on ? (lang === "fr" ? "Serveur (défaut)" : "Server (default)") : (lang === "fr" ? "Hôte" : "Host")}
                 </button>
               );
             })}
           </div>
-          <p className="text-[11px] text-slate-500 mt-2">{lang === "fr" ? "Le serveur pilote la partie (nécessite les Functions déployées)." : "The server drives the match (requires deployed Functions)."}</p>
+          <p className="text-[11px] text-slate-500 mt-2">{lang === "fr" ? "Le serveur pilote la partie — transitions, combats et vainqueur font autorité (anti-désync)." : "The server drives the match — transitions, combat and the winner are authoritative (anti-desync)."}</p>
         </SectionCard>
       </div>
 
