@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/game/net/authStore";
 import { useAppStore } from "@/game/store/appStore";
-import { getLeaderboard, ratingTier, type LeaderEntry } from "@/game/net/users";
+import { getLeaderboard, rankOf, type LeaderEntry } from "@/game/net/users";
 import { ArrowLeft, Trophy } from "lucide-react";
 
 export function LeaderboardScreen() {
@@ -39,7 +39,7 @@ export function LeaderboardScreen() {
           ) : (
             <div className="flex flex-col gap-1">
               {rows.map((r, i) => {
-                const tier = ratingTier(r.rating);
+                const rank = rankOf(r.rating);
                 const me = r.uid === myUid;
                 return (
                   <div key={r.uid} className={`flex items-center gap-3 px-2.5 py-2 rounded-lg border ${me ? "bg-amber-500/10 border-amber-500/30" : "bg-white/[0.02] border-white/[0.05]"}`}>
@@ -52,9 +52,11 @@ export function LeaderboardScreen() {
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className={`block text-[13px] font-bold truncate ${me ? "text-amber-300" : "text-slate-200"}`}>{r.username}</span>
-                      <span className="text-[10px] font-bold" style={{ color: tier.color }}>{tier.name}</span>
+                      <span className="text-[10px] font-bold" style={{ color: rank.color }}>{rank.label}</span>
                     </span>
-                    <span className="text-sm font-extrabold tabular-nums text-slate-300">{r.rating}</span>
+                    <span className="text-right shrink-0">
+                      <span className="block text-[13px] font-extrabold tabular-nums" style={{ color: rank.color }}>{rank.lp}<span className="text-[9px] text-slate-500 font-semibold"> LP</span></span>
+                    </span>
                   </div>
                 );
               })}

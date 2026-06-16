@@ -19,17 +19,34 @@ export type UserProfile = {
   rating?: number;
 };
 
-/** Everyone starts here; placement nudges it up/down each game. */
+/** Everyone starts here; placement nudges it up/down each game. (Silver II) */
 export const START_RATING = 1000;
 
-/** Rating → cosmetic tier (name + accent), TFT-ladder flavour. */
-export function ratingTier(rating: number): { name: string; color: string } {
-  if (rating >= 1600) return { name: "Master", color: "#c084fc" };
-  if (rating >= 1400) return { name: "Diamond", color: "#60a5fa" };
-  if (rating >= 1200) return { name: "Platinum", color: "#22d3ee" };
-  if (rating >= 1000) return { name: "Gold", color: "#fbbf24" };
-  if (rating >= 800) return { name: "Silver", color: "#cbd5e1" };
-  return { name: "Bronze", color: "#b45309" };
+const RANK_TIERS = [
+  { name: "Iron", color: "#9ca3af" },
+  { name: "Bronze", color: "#b45309" },
+  { name: "Silver", color: "#cbd5e1" },
+  { name: "Gold", color: "#fbbf24" },
+  { name: "Platinum", color: "#22d3ee" },
+  { name: "Diamond", color: "#60a5fa" },
+];
+const ROMAN = ["", "I", "II", "III", "IV"];
+const RATING_PER_DIV = 100;          // 100 "LP" per division
+const APEX_RATING = RANK_TIERS.length * 4 * RATING_PER_DIV; // 2400 → Master
+
+export type Rank = { tier: string; division: number; lp: number; lpMax: number; color: string; label: string; apex: boolean };
+
+/** Map a continuous rating to a TFT-style tier + division + LP, with a promotion
+ *  threshold of 100 LP per division (Iron IV … Diamond I, then open-ended Master). */
+export function rankOf(rating: number): Rank {
+  const r = Math.max(0, rating);
+  if (r >= APEX_RATING) {
+    return { tier: "Master", division: 0, lp: Math.round(r - APEX_RATING), lpMax: 0, color: "#c084fc", label: "Master", apex: true };
+  }
+  const band = Math.floor(r / RATING_PER_DIV);   // 0..23
+  const tier = RANK_TIERS[Math.floor(band / 4)];
+  const division = 4 - (band % 4);               // IV(4) … I(1)
+  return { tier: tier.name, division, lp: Math.round(r % RATING_PER_DIV), lpMax: RATING_PER_DIV, color: tier.color, label: `${tier.name} ${ROMAN[division]}`, apex: false };
 }
 
 /** Rating delta for a finished game: linear by placement around the midpoint, so 1st

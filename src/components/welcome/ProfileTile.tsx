@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/game/net/authStore";
 import { useAppStore } from "@/game/store/appStore";
-import { getHistory, type GameResult } from "@/game/net/users";
+import { getHistory, rankOf, START_RATING, type GameResult } from "@/game/net/users";
 import { Crown, Swords, ChevronRight } from "lucide-react";
 
 /** Launcher profile tile — avatar, name, a couple of headline stats, and a tap-through
@@ -50,7 +50,12 @@ export function ProfileTile() {
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-base font-bold gild-text truncate">{name}</div>
-          <div className="text-[11px] text-slate-500 flex items-center gap-1">View profile <ChevronRight size={11} className="group-hover:translate-x-0.5 transition-transform" /></div>
+          {(() => { const rank = rankOf(profile?.rating ?? START_RATING); return (
+            <div className="text-[11px] font-bold flex items-center gap-1.5" style={{ color: rank.color }}>
+              {rank.label}<span className="text-slate-500 font-semibold">· {rank.lp} LP</span>
+            </div>
+          ); })()}
+          <div className="text-[10px] text-slate-500 flex items-center gap-1">View profile <ChevronRight size={11} className="group-hover:translate-x-0.5 transition-transform" /></div>
         </div>
       </div>
       <div className="grid grid-cols-3 gap-2 mt-3.5">

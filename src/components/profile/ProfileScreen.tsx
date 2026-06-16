@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/game/net/authStore";
 import { useAppStore } from "@/game/store/appStore";
-import { getHistory, ratingTier, START_RATING, type GameResult } from "@/game/net/users";
+import { getHistory, rankOf, START_RATING, type GameResult } from "@/game/net/users";
 import { GEN_LABELS } from "@/game/data/generations";
 import { getDef, spriteUrl } from "@/game/data/mons";
 import { TraitGlyph } from "@/components/game/TraitGlyph";
@@ -74,12 +74,16 @@ export function ProfileScreen() {
             <div className="text-[11px] text-slate-500 mt-0.5 truncate">{user?.email}</div>
           </div>
           {(() => {
-            const rating = profile?.rating ?? START_RATING;
-            const tier = ratingTier(rating);
+            const rank = rankOf(profile?.rating ?? START_RATING);
             return (
-              <div className="text-right shrink-0">
-                <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: tier.color }}>{tier.name}</div>
-                <div className="text-lg font-extrabold tabular-nums text-slate-200">{rating}</div>
+              <div className="text-right shrink-0 w-32">
+                <div className="text-sm font-extrabold" style={{ color: rank.color }}>{rank.label}</div>
+                <div className="text-[10px] text-slate-400 tabular-nums">{rank.lp} {rank.apex ? "LP" : `/ ${rank.lpMax} LP`}</div>
+                {!rank.apex && (
+                  <div className="mt-1 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${(rank.lp / rank.lpMax) * 100}%`, background: rank.color }} />
+                  </div>
+                )}
               </div>
             );
           })()}
