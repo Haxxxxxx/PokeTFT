@@ -94,7 +94,6 @@ export type Dict = {
   sh_drag_sell: string;
   sh_view_details: string;
   sh_max: string;
-  sh_headliner: string;
   sh_odds: string;
   sh_items_title: string;
   it_empty: string;
@@ -225,7 +224,6 @@ export const FR: Dict = {
   sh_drag_sell: "Glisser pour vendre",
   sh_view_details: "Voir les détails",
   sh_max: "MAX",
-  sh_headliner: "Vedette",
   sh_odds: "Chances",
   sh_items_title: "Objets",
   it_empty: "Aucun objet — gagne-les en carrousel ou PvE.",
@@ -354,7 +352,6 @@ export const EN: Dict = {
   sh_drag_sell: "Drag here to sell",
   sh_view_details: "View details",
   sh_max: "MAX",
-  sh_headliner: "Headliner",
   sh_odds: "Odds",
   sh_items_title: "Items",
   it_empty: "No items yet — win them in carousel or PvE.",

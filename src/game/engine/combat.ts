@@ -209,8 +209,6 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
   hpMult = Math.min(ITEM_MULT_CAP, hpMult);
   ad = Math.round(ad * adMult);
   hp = Math.round(hp * hpMult);
-  // Headliner ("Chosen") combat perk: +15% HP and a head start on its first cast.
-  if (u.chosen) { hp = Math.round(hp * 1.15); manaAdd += 15; }
 
   return {
     id: `${team}-${u.iid}`,

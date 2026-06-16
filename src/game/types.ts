@@ -75,9 +75,6 @@ export type UnitInstance = {
   /** Deterministic HP/ATK multiplier (<1 weakens). Used to soften early PvE creeps
    *  so the opening rounds are reliably winnable. Undefined = 1 (no scaling). */
   statScale?: number;
-  /** Headliner ("Chosen"): the trait key this unit grants +1 to. Set when bought as a
-   *  shop headliner; also gives the unit a small combat bonus. Carried through combines. */
-  chosen?: string;
 };
 
 /** Concrete combat buff a trait tier grants. Applied at combat start. `scope`

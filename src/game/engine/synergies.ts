@@ -38,11 +38,6 @@ export function computeTraits(boardUnits: UnitInstance[]): ActiveTrait[] {
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
   }
-  // Headliners ("Chosen") grant +1 to their chosen trait, on top of the unit's own
-  // contribution — so a Chosen mon counts as 2 for that trait (TFT-style, per instance).
-  for (const u of boardUnits) {
-    if (u.chosen) counts.set(u.chosen, (counts.get(u.chosen) ?? 0) + 1);
-  }
 
   const result: ActiveTrait[] = [];
   for (const [key, count] of counts) {

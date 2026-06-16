@@ -33,7 +33,6 @@ function ownedByDef(units: UnitInstance[]): Map<string, Owned> {
 
 export function ShopBar() {
   const shop = useGame((s) => s.shop);
-  const shopChosen = useGame((s) => s.shopChosen);
   const gold = useGame((s) => s.gold);
   const level = useGame((s) => s.level);
   const xp = useGame((s) => s.xp);
@@ -131,9 +130,7 @@ export function ShopBar() {
           }
           const def = getDef(defId);
           const color = COST_COLOR[def.cost];
-          const chosenTrait = shopChosen?.[i] ?? null;
-          const price = def.cost + (chosenTrait ? 2 : 0); // Headliner premium
-          const affordable = gold >= price;
+          const affordable = gold >= def.cost;
           const own = owned.get(defId);
 
           // Star-up progress toward the next tier.
@@ -153,7 +150,7 @@ export function ShopBar() {
                 else { sfx.buy(); playCry(def.dex[0]); }
               }}
               disabled={!affordable}
-              style={{ boxShadow: chosenTrait ? "inset 0 0 0 2px #e879f9, 0 0 16px -3px #d946ef" : own ? `inset 0 0 0 1.5px ${color}` : undefined }}
+              style={{ boxShadow: own ? `inset 0 0 0 1.5px ${color}` : undefined }}
               className={`group relative flex-1 self-stretch min-h-[148px] overflow-hidden rounded-lg border border-slate-700/60 bg-slate-900 hover:brightness-125 disabled:opacity-50
                 transition ${oneFromStar ? "ring-2 ring-amber-300/80 ring-inset" : ""}`}
             >
@@ -171,14 +168,7 @@ export function ShopBar() {
               {/* Left-to-right legibility scrim so the traits/name read over the art. */}
               <span className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(90deg, rgba(9,13,24,0.96) 32%, rgba(9,13,24,0.55) 62%, rgba(9,13,24,0.05) 100%)" }} />
               {/* Rarity bar across the top (cost colour). */}
-              <span className="absolute top-0 inset-x-0 h-[3px]" style={{ background: chosenTrait ? "#e879f9" : color }} />
-
-              {/* Headliner ribbon — a Chosen unit grants +1 to the named trait. */}
-              {chosenTrait && (
-                <span className="absolute top-1 left-1/2 -translate-x-1/2 z-20 inline-flex items-center gap-1 rounded-full bg-fuchsia-500 px-2 py-[2px] text-[8px] font-extrabold uppercase tracking-wide text-black shadow">
-                  <StarIcon size={8} /> {t.sh_headliner} · {TRAITS_BY_KEY[chosenTrait]?.label ?? chosenTrait}
-                </span>
-              )}
+              <span className="absolute top-0 inset-x-0 h-[3px]" style={{ background: color }} />
 
               {/* Info button, top-right. */}
               <span
@@ -211,7 +201,7 @@ export function ShopBar() {
 
               {/* Name bottom-left, cost bottom-right (TFT-style). */}
               <span className="absolute bottom-1.5 left-2 z-10 max-w-[78%] truncate text-[13px] font-extrabold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">{def.name}</span>
-              <span style={{ color: chosenTrait ? "#e879f9" : color }} className="absolute bottom-1.5 right-2 z-10 inline-flex items-center gap-0.5 text-[11px] font-extrabold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"><CoinIcon size={11} />{price}</span>
+              <span style={{ color }} className="absolute bottom-1.5 right-2 z-10 inline-flex items-center gap-0.5 text-[11px] font-extrabold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"><CoinIcon size={11} />{def.cost}</span>
             </button>
           );
         })}
