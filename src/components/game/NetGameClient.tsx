@@ -925,7 +925,10 @@ export function NetGameClient() {
       {phase === "carousel" && me?.alive && (() => {
         const opts = room.carousel?.[myUid];
         const key = `${meta.stage}-${meta.round}`;
-        const picked = pickedKey === key;
+        // Also honour the SERVER-backed pick flag (me.carouselPicked) so a reconnect /
+        // refresh can't re-show the cards and grant a SECOND free reward — local
+        // pickedKey/pickLatch don't survive a remount.
+        const picked = pickedKey === key || me?.carouselPicked === key;
         if (!opts) return null;
         return (
           <div
