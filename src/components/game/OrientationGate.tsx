@@ -16,8 +16,10 @@ export function OrientationGate() {
   const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
-    const coarse = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
     const check = () => {
+      // Re-evaluate the pointer type each time — a hybrid device (tablet + mouse)
+      // can switch between coarse and fine after the first render.
+      const coarse = window.matchMedia?.("(pointer: coarse)").matches;
       const portrait = window.innerHeight > window.innerWidth;
       // Only gate real handhelds: coarse pointer AND a small short edge (tablets in
       // portrait with plenty of width stay playable, so we leave them alone).

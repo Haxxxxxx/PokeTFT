@@ -422,7 +422,7 @@ export function NetGameClient() {
         // has room, auto-deploy them just before the fight (NOT on every level-up).
         useGame.getState().fillBoard();
         const g = useGame.getState();
-        syncBoard(r.code, myUid, g.units, g.exportSave());
+        syncBoard(r.code, myUid, g.units, g.exportSave(), g.level);
       }
     }, 200);
     return () => clearInterval(id);

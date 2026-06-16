@@ -299,7 +299,7 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
     // outcome the player sees always matches what the host recorded.
     for (const p of alive) {
       const self = rtdbSafe(board(room.players[p.uid]));
-      const creeps = rtdbSafe(generateCreepBoard(stage, room.meta.round, stage * 97 + room.meta.round * 13 + p.uid.length, allowed));
+      const creeps = rtdbSafe(generateCreepBoard(stage, room.meta.round, stage * 97 + room.meta.round * 13 + hashStr(p.uid), allowed));
       const r = simulate(self, creeps);
       combat[p.uid] = { oppUid: p.uid, oppName: pveName, ghost: true, pve: true, won: r.winner === "ally", survivors: 0, dmg: 0, selfBoard: self, oppBoard: creeps };
     }

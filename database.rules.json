@@ -72,7 +72,7 @@
             ".write": "auth != null && ($uid === auth.uid || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)",
             "name":  { ".validate": "newData.isString() && newData.val().length <= 24" },
             "hp":    { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500" },
-            "level": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 20" }
+            "level": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10" }
           }
         }
       }

@@ -132,7 +132,7 @@ export function combineKey(a: string, b: string): string {
   return [a, b].sort().join("|");
 }
 
-/** Recipe table: every unordered pair of the 6 components → a completed item. */
+/** Recipe table: every unordered pair of the 7 components → a completed item. */
 export const RECIPES: Record<string, string> = {
   [combineKey("c-ad", "c-ad")]: "choice-band",
   [combineKey("c-ap", "c-ap")]: "choice-specs",

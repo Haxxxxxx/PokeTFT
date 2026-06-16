@@ -241,7 +241,9 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
     range: Math.max(1, s.range), // floor at melee — range 0 could never reach a target and would idle until overtime
     mana: Math.min(s.maxMana, s.startMana + manaAdd),
     maxMana: s.maxMana,
-    manaPerAttack: manaPerAtk,
+    // Cap stacked mana acceleration for the same reason item multipliers are capped:
+    // 3 identical caster items shouldn't let a unit cast every other tick.
+    manaPerAttack: Math.min(15, manaPerAtk),
     apMult,
     mega: !!mega,
     pos,
