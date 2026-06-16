@@ -220,3 +220,25 @@ body {
 .hero-float {
   animation: hero-float 6s ease-in-out infinite;
 }
+
+/* ── Accessibility ─────────────────────────────────────────────────────────── */
+
+/* Respect the OS "reduce motion" setting: kill decorative/looping animations and
+   collapse transitions so the UI stays usable for motion-sensitive players. The
+   combat result still happens — only the easing/float/pulse chrome is removed. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .hero-float, .animate-pulse, .animate-spin { animation: none !important; }
+}
+
+/* Visible keyboard focus ring (only for keyboard nav, not mouse clicks). */
+:focus-visible {
+  outline: 2px solid #fbbf24;
+  outline-offset: 2px;
+  border-radius: 4px;
+}

@@ -27,6 +27,8 @@ export function OptionsMenu() {
       <button
         onClick={() => setOpen((o) => !o)}
         title={fr ? "Options" : "Options"}
+        aria-label="Options"
+        aria-expanded={open}
         className={`flex items-center justify-center w-8 h-8 rounded-md border transition-colors ${open ? "bg-amber-500 text-black border-amber-400" : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"}`}
       >
         <Settings2 size={15} />

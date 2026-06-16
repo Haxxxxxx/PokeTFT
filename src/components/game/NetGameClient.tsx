@@ -1329,6 +1329,7 @@ function FullscreenButton() {
     <button
       onClick={() => toggleFullscreen()}
       title={fs ? "Exit fullscreen" : "Fullscreen"}
+      aria-label={fs ? "Exit fullscreen" : "Enter fullscreen"}
       className="px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-300 leading-none"
     >
       {fs ? <Minimize size={14} /> : <Maximize size={14} />}

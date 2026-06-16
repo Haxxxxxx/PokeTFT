@@ -12,8 +12,9 @@ import { FriendsPanel } from "@/components/social/FriendsPanel";
 import { ProfileTile } from "./ProfileTile";
 import { ProfileEditor } from "@/components/social/ProfileEditor";
 import { HowToPlay } from "@/components/HowToPlay";
+import { NewsModal, hasUnseenNews, markNewsSeen } from "@/components/NewsModal";
 import { PokeballIcon } from "@/components/game/icons";
-import { Swords, Trophy } from "lucide-react";
+import { Swords, Trophy, Megaphone } from "lucide-react";
 import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 
@@ -53,6 +54,11 @@ export function WelcomeScreen() {
   const [invites, setInvites] = useState<Invite[]>([]);
   const [editProfile, setEditProfile] = useState(false);
   const [howTo, setHowTo] = useState(false);
+  const [news, setNews] = useState(false);
+  const [unseenNews, setUnseenNews] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setUnseenNews(hasUnseenNews()); }, []);
+  const openNews = () => { setNews(true); markNewsSeen(); setUnseenNews(false); };
   // Random showcase mons each visit (client-only to avoid hydration mismatch).
   const [heroMons, setHeroMons] = useState(() => HERO_SLOTS.map((s, i) => ({ ...s, dex: SHOWCASE_DEX[i] })));
   useEffect(() => {
@@ -100,6 +106,7 @@ export function WelcomeScreen() {
         </div>
         <div className="flex items-center gap-4">
           <button onClick={() => setLeaderboardOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-amber-300 uppercase tracking-wide"><Trophy size={13} /> {lang === "fr" ? "Classement" : "Ranks"}</button>
+          <button onClick={openNews} aria-label={lang === "fr" ? "Nouveautés" : "What's new"} className="relative inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-emerald-300 uppercase tracking-wide"><Megaphone size={13} /> {lang === "fr" ? "Actus" : "News"}{unseenNews && <span className="absolute -top-1 -right-2 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}</button>
           <button onClick={() => setHowTo(true)} className="text-xs font-bold text-slate-400 hover:text-sky-300 uppercase tracking-wide">{t.w_how_to_play}</button>
           {/* Profile chip */}
           <div className="flex items-center gap-2.5 pl-3 border-l border-slate-800">
@@ -215,6 +222,7 @@ export function WelcomeScreen() {
 
       {editProfile && <ProfileEditor onClose={() => setEditProfile(false)} />}
       {howTo && <HowToPlay onClose={() => setHowTo(false)} />}
+      {news && <NewsModal onClose={() => setNews(false)} />}
     </div>
   );
 }
