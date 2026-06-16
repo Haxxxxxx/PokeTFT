@@ -1119,7 +1119,7 @@ export function NetGameClient() {
         if (!opts) return null;
         return (
           <div
-            className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4"
+            className="fixed inset-0 z-50 overflow-y-auto"
             style={revealBoard
               // Transparent but still CAPTURING clicks — you can see your board
               // through the veil but can't edit it (picks aren't placement turns).
@@ -1131,11 +1131,13 @@ export function NetGameClient() {
             <button
               onClick={() => setRevealBoard((v) => !v)}
               style={{ pointerEvents: "auto" }}
-              className="absolute top-4 right-4 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-200 shadow-lg"
+              className="absolute top-4 right-4 z-10 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-200 shadow-lg"
             >
               <Eye size={13} className="inline align-text-bottom mr-1" />{revealBoard ? (lang === "fr" ? "Afficher les choix" : "Show choices") : (lang === "fr" ? "Voir mon plateau" : "Hide & view board")}
             </button>
             {!revealBoard && (
+            // min-h-full centers when there's room, scrolls instead of clipping on a short viewport.
+            <div className="min-h-full flex flex-col items-center justify-center p-4">
             <div className="celebrate-pop flex flex-col items-center">
               <div className="flex items-center gap-2.5 mb-1">
                 <span><Sparkles size={24} /></span>
@@ -1194,6 +1196,7 @@ export function NetGameClient() {
               );
             })()}
             </div>
+            </div>
             )}
           </div>
         );
@@ -1202,7 +1205,7 @@ export function NetGameClient() {
       {/* Augment pick — 3 TFT-style boosts at the start of stages 2/3/4. */}
       {showAugment && (
         <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4"
+          className="fixed inset-0 z-50 overflow-y-auto"
           style={revealBoard
             // Transparent but still capturing clicks — view-only board peek.
             ? { background: "transparent" }
@@ -1211,11 +1214,14 @@ export function NetGameClient() {
           <button
             onClick={() => setRevealBoard((v) => !v)}
             style={{ pointerEvents: "auto" }}
-            className="absolute top-4 right-4 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-200 shadow-lg"
+            className="absolute top-4 right-4 z-10 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-200 shadow-lg"
           >
             <Eye size={13} className="inline align-text-bottom mr-1" />{revealBoard ? (lang === "fr" ? "Afficher les choix" : "Show choices") : (lang === "fr" ? "Voir mon plateau" : "Hide & view board")}
           </button>
           {!revealBoard && (
+          // min-h-full centers the choices when there's room, but lets them scroll
+          // instead of clipping on a short (landscape-phone) viewport.
+          <div className="min-h-full flex flex-col items-center justify-center p-4">
           <div className="celebrate-pop flex flex-col items-center">
             <div className="flex items-center gap-2.5 mb-1">
               <span><Sparkles size={24} /></span>
@@ -1236,6 +1242,7 @@ export function NetGameClient() {
               />
             ))}
             </div>
+          </div>
           </div>
           )}
         </div>
