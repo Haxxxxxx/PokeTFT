@@ -28,7 +28,6 @@ export function LobbyScreen() {
   const clearMySave = useRoom((s) => s.clearMySave);
   const preRules = usePreLobby((s) => s.rules);
   const setPreRules = usePreLobby((s) => s.setRules);
-  const [copied, setCopied] = useState(false);
   const [showRules, setShowRules] = useState(false);
 
   const isHost = room?.meta?.hostUid === myUid;
@@ -79,8 +78,6 @@ export function LobbyScreen() {
   const poolCount = unitsForGenerations(gens).length;
   const items = room.rules?.itemsEnabled ?? [];
 
-  const copyCode = () => navigator.clipboard?.writeText(room.code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {});
-
   const Portrait = ({ name, photo, ready, isBot }: { name?: string; photo?: string | null; ready?: boolean; isBot?: boolean }) => (
     <div className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center text-xl font-extrabold overflow-hidden shrink-0 transition-all ${isBot ? "bg-violet-950/50 border-violet-600 text-violet-300" : ready ? "bg-slate-800 border-emerald-500/70 shadow-[0_0_18px_-4px_rgba(16,185,129,0.7)] text-emerald-200" : "bg-slate-800 border-slate-600 text-slate-300"}`}>
       {isBot ? "AI" : photo
@@ -102,13 +99,6 @@ export function LobbyScreen() {
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <button onClick={copyCode} className="group flex items-center gap-2 sm:gap-3 pl-3 pr-2 sm:pr-3 py-1.5 rounded-xl bg-slate-900/70 border border-slate-700 hover:border-amber-500/60 transition-colors">
-            <span className="flex flex-col items-start leading-none">
-              <span className="text-[8px] sm:text-[9px] uppercase tracking-widest text-slate-500">{t.l_code}</span>
-              <span className="font-mono font-extrabold text-base sm:text-lg text-amber-400 tracking-[0.15em] sm:tracking-[0.25em]">{room.code}</span>
-            </span>
-            <span className="text-[10px] font-bold px-1.5 sm:px-2 py-1 rounded-md bg-slate-800 text-slate-300 group-hover:bg-amber-500 group-hover:text-black transition-colors">{copied ? "✓" : t.l_copy}</span>
-          </button>
           <button onClick={leave} className="px-2.5 sm:px-3 py-2 rounded-lg bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.l_net_leave}</button>
         </div>
       </header>

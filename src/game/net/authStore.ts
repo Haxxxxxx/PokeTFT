@@ -4,7 +4,7 @@ import { create } from "zustand";
 import {
   onAuthStateChanged, GoogleAuthProvider, signInWithPopup,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signInAnonymously, signOut as fbSignOut, type User,
+  signOut as fbSignOut, type User,
 } from "firebase/auth";
 import { auth } from "./firebase";
 import {
@@ -35,7 +35,6 @@ type AuthState = {
   signInGoogle: () => Promise<void>;
   signInEmail: (email: string, pw: string) => Promise<void>;
   signUpEmail: (email: string, pw: string) => Promise<void>;
-  signInGuest: () => Promise<void>;
   signOut: () => Promise<void>;
   saveUsername: (name: string) => Promise<boolean>;
   setAvatar: (photoURL: string) => Promise<void>;
@@ -112,13 +111,6 @@ export const useAuth = create<AuthState>((set, get) => ({
   signUpEmail: async (email, pw) => {
     set({ busy: true, error: null });
     try { await createUserWithEmailAndPassword(auth(), email.trim(), pw); }
-    catch (e) { set({ error: authErr(e) }); }
-    finally { set({ busy: false }); }
-  },
-
-  signInGuest: async () => {
-    set({ busy: true, error: null });
-    try { await signInAnonymously(auth()); }
     catch (e) { set({ error: authErr(e) }); }
     finally { set({ busy: false }); }
   },

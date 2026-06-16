@@ -14,7 +14,6 @@ import { Swords } from "lucide-react";
 import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 
-type Mode = "idle" | "join";
 const GEN_NAMES = ["", "Kanto", "Johto", "Hoenn", "Sinnoh", "Unova", "Kalos", "Alola", "Galar", "Paldea"];
 
 // Decorative hero composition — random showcase mons scattered behind the play CTA.
@@ -45,11 +44,6 @@ export function WelcomeScreen() {
   const profile = useAuth((s) => s.profile);
   const signOut = useAuth((s) => s.signOut);
   const setProfileOpen = useAppStore((s) => s.setProfileOpen);
-  const isGuest = useAuth((s) => s.user?.isAnonymous ?? false);
-  const [username, setUsername] = useState(profile?.username ?? "");
-  const [mode, setMode] = useState<Mode>("idle");
-  const [joinCode, setJoinCode] = useState("");
-  const [joinError, setJoinError] = useState(false);
   const [editProfile, setEditProfile] = useState(false);
   const [howTo, setHowTo] = useState(false);
   // Random showcase mons each visit (client-only to avoid hydration mismatch).
@@ -75,7 +69,7 @@ export function WelcomeScreen() {
     } catch { /* ignore */ }
   }, []);
 
-  const name = (isGuest ? username : profile?.username ?? "").trim();
+  const name = (profile?.username ?? "").trim();
   const canProceed = name.length > 0;
   const busy = status === "connecting";
 
@@ -84,11 +78,6 @@ export function WelcomeScreen() {
     // Forward the FULL rules object — previously draftPoolSize + augmentsEnabled were
     // dropped here and only patched back by a racy lobby heal effect.
     await host(name, rules);
-  }
-  async function handleJoin() {
-    if (!canProceed || joinCode.trim().length < 6) { setJoinError(true); return; }
-    setJoinError(false);
-    await join(joinCode.trim(), name);
   }
 
   return (
@@ -110,16 +99,11 @@ export function WelcomeScreen() {
                 : <span className="text-sm font-extrabold text-slate-500">{(name || "?").slice(0, 1).toUpperCase()}</span>}
             </span>
             <div className="flex flex-col leading-tight">
-              {isGuest ? (
-                <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t.w_username_placeholder} maxLength={24}
-                  className="bg-transparent text-sm font-bold text-amber-300 w-28 focus:outline-none placeholder:text-slate-600" />
-              ) : (
-                <span className="text-sm font-bold text-amber-300">{profile?.username}</span>
-              )}
+              <span className="text-sm font-bold text-amber-300">{profile?.username}</span>
               <span className="flex gap-2 text-[10px]">
                 <button onClick={() => setProfileOpen(true)} className="text-amber-400 hover:text-amber-300 font-semibold">{t.w_profile}</button>
-                {!isGuest && <button onClick={() => setEditProfile(true)} className="text-sky-400 hover:text-sky-300">Edit</button>}
-                <button onClick={signOut} className="text-slate-500 hover:text-rose-400">{isGuest ? "Sign in" : "Sign out"}</button>
+                <button onClick={() => setEditProfile(true)} className="text-sky-400 hover:text-sky-300">Edit</button>
+                <button onClick={signOut} className="text-slate-500 hover:text-rose-400">Sign out</button>
               </span>
             </div>
           </div>
@@ -148,8 +132,7 @@ export function WelcomeScreen() {
               <p className="text-slate-500 text-[13px] mt-2.5">{t.w_subtitle}</p>
             </div>
 
-            {mode === "idle" ? (
-              <div className="flex flex-col items-center gap-3 w-full max-w-sm">
+            <div className="flex flex-col items-center gap-3 w-full max-w-sm">
                 <button data-testid="create-game" onClick={handleCreate} disabled={!canProceed || busy}
                   className="w-full py-3 rounded-xl font-bold text-[15px] tracking-wide bg-amber-500/95 hover:bg-amber-400 text-black disabled:opacity-30 transition-colors">
                   {busy ? "…" : <span className="inline-flex items-center justify-center gap-2"><Swords size={17} /> {t.w_create_btn}</span>}
@@ -183,28 +166,8 @@ export function WelcomeScreen() {
                   </div>
                 </div>
 
-                <button onClick={() => setMode("join")} disabled={!canProceed} className="text-[11px] text-slate-500 hover:text-sky-300 underline disabled:opacity-40">
-                  {t.w_join_by_code}
-                </button>
-                {!canProceed && <p className="text-[11px] text-slate-600">{t.w_username_placeholder}</p>}
                 {netError && <p className="text-xs text-rose-400">{netError}</p>}
               </div>
-            ) : (
-              <div className="flex flex-col gap-3 w-full max-w-sm">
-                <label className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400">{t.w_join_code_label}</label>
-                <input value={joinCode} onChange={(e) => { setJoinCode(e.target.value.toUpperCase()); setJoinError(false); }}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleJoin(); }} placeholder={t.w_join_code_placeholder} maxLength={6} autoFocus
-                  className={`w-full bg-slate-800 border rounded-xl px-4 py-3 text-center text-lg font-mono font-bold text-amber-400 tracking-[0.3em] placeholder:tracking-normal placeholder:text-slate-600 focus:outline-none ${joinError ? "border-rose-600" : "border-slate-700 focus:border-sky-500"}`} />
-                {joinError && <p className="text-xs text-rose-400">{t.w_join_error}</p>}
-                <div className="flex gap-3">
-                  <button onClick={handleJoin} disabled={!canProceed || busy}
-                    className="flex-1 py-3 rounded-xl font-extrabold text-sm bg-sky-600 hover:bg-sky-500 text-white disabled:opacity-30 transition-all">{busy ? "…" : t.w_join_btn}</button>
-                  <button onClick={() => { setMode("idle"); setJoinCode(""); setJoinError(false); }}
-                    className="px-5 py-3 rounded-xl font-bold text-sm bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700">{t.w_back}</button>
-                </div>
-                {netError && <p className="text-xs text-rose-400">{netError}</p>}
-              </div>
-            )}
           </div>
         </main>
 

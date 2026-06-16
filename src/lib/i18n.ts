@@ -8,16 +8,10 @@ export type Dict = {
   w_hero_title: string;
   w_how_to_play: string;
   w_profile: string;
-  w_username_placeholder: string;
   w_open_games: string;
   w_no_games: string;
-  w_join_by_code: string;
   w_create_btn: string;
-  w_back: string;
-  w_join_code_label: string;
-  w_join_code_placeholder: string;
   w_join_btn: string;
-  w_join_error: string;
   // Settings panel
   s_title: string;
   s_lang: string;
@@ -28,8 +22,6 @@ export type Dict = {
   s_lang_en: string;
   // Lobby (legacy offline)
   l_rules: string;
-  l_code: string;
-  l_copy: string;
   l_lobby: string;
   l_items_short: string;
   // Lobby (networked)
@@ -143,16 +135,10 @@ export const FR: Dict = {
   w_hero_title: "Prêt au combat ?",
   w_how_to_play: "Comment jouer",
   w_profile: "Profil",
-  w_username_placeholder: "Choisis un pseudo…",
   w_open_games: "Parties ouvertes",
   w_no_games: "Aucune partie ouverte — crées-en une !",
-  w_join_by_code: "Rejoindre avec un code",
   w_create_btn: "Créer",
-  w_back: "Retour",
-  w_join_code_label: "Code du lobby",
-  w_join_code_placeholder: "Ex: AB3X7K",
   w_join_btn: "Rejoindre",
-  w_join_error: "Code invalide — 6 caractères requis.",
   s_title: "Paramètres généraux",
   s_lang: "Langue",
   s_sound: "Son",
@@ -161,8 +147,6 @@ export const FR: Dict = {
   s_lang_fr: "Français",
   s_lang_en: "English",
   l_rules: "Règles de partie",
-  l_code: "Code lobby",
-  l_copy: "Copier",
   l_lobby: "Salon",
   l_items_short: "objets",
   l_net_players: (n, max) => `${n} / ${max} joueur${n > 1 ? "s" : ""} · slots vides jouent comme fantômes`,
@@ -268,16 +252,10 @@ export const EN: Dict = {
   w_hero_title: "Ready to battle?",
   w_how_to_play: "How to play",
   w_profile: "Profile",
-  w_username_placeholder: "Choose a username…",
   w_open_games: "Open games",
   w_no_games: "No open games — host one!",
-  w_join_by_code: "Join with a code",
   w_create_btn: "Create",
-  w_back: "Back",
-  w_join_code_label: "Lobby code",
-  w_join_code_placeholder: "Ex: AB3X7K",
   w_join_btn: "Join",
-  w_join_error: "Invalid code — 6 characters required.",
   s_title: "General settings",
   s_lang: "Language",
   s_sound: "Sound",
@@ -286,8 +264,6 @@ export const EN: Dict = {
   s_lang_fr: "Français",
   s_lang_en: "English",
   l_rules: "Game rules",
-  l_code: "Lobby code",
-  l_copy: "Copy",
   l_lobby: "Lobby",
   l_items_short: "items",
   l_net_players: (n, max) => `${n} / ${max} player${n > 1 ? "s" : ""} · empty slots play as ghosts`,
