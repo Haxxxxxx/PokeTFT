@@ -11,7 +11,8 @@ import { getDef, spriteUrl, rosterForGenerations, hasDef } from "@/game/data/mon
 import { streakGold, roundKind, advanceRound, boardSizeForLevel } from "@/game/config";
 import { interest } from "@/game/engine/economy";
 import { MEGA_STONE, canMega } from "@/game/data/mega";
-import { ITEM_POOL, RARITY_COLOR } from "@/game/data/itemPool";
+import { ITEM_POOL, RARITY_COLOR, COMPONENT_IDS } from "@/game/data/itemPool";
+import { enemyToField } from "@/game/engine/hex";
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
 import { useUi } from "@/game/store/uiStore";
@@ -185,6 +186,7 @@ export function NetGameClient() {
   const gold = useGame((s) => s.gold);
   const level = useGame((s) => s.level);
   const fillBoard = useGame((s) => s.fillBoard);
+  const spawnDrops = useGame((s) => s.spawnDrops);
 
   // Mouse drags on a 5px move; touch drags on a short press-and-hold so finger
   // scrolling still works on mobile.
@@ -198,6 +200,7 @@ export function NetGameClient() {
   // late-arriving save (slow network) heal a premature fresh-start, and gates the
   // save-sync so a not-yet-hydrated client can't overwrite its real priv save.
   const hydrated = useRef<"none" | "fresh" | "save">("none");
+  const droppedFor = useRef<string | null>(null); // PvE round key we've already spawned loot for
   // Synchronous latch so a rapid double-click (or two cards clicked before the
   // re-render hides them) can't claim TWO carousel/augment rewards for one slot —
   // setState is async, so the `picked`/`showAugment` gate alone isn't enough.
@@ -485,6 +488,25 @@ export function NetGameClient() {
       });
     }
   }, [phase, meta?.stage, meta?.round, myCombat?.oppUid, myCombat?.pve, meta]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // PvE loot: when a wild fight resolves, drop an item component AT a slain creep's
+  // position (the enemy half) so loot lands where the mob fell, not bunched together.
+  // Deterministic per round (so a reconnect re-spawns the identical drop, deduped).
+  useEffect(() => {
+    if (phase !== "combat" || !myCombat?.pve || !meta) return;
+    const key = `${meta.stage}-${meta.round}`;
+    if (droppedFor.current === key) return;
+    droppedFor.current = key;
+    const h = (meta.stage * 131 + meta.round * 17) >>> 0;
+    // Opening (stage-1) creeps always drop; later wild rounds ~45%.
+    if (meta.stage !== 1 && h % 100 >= 45) return;
+    const creeps = asBoard(myCombat.oppBoard).filter((u) => u.pos);
+    if (!creeps.length) return;
+    const creep = creeps[(h >> 3) % creeps.length];
+    const fieldCell = enemyToField(creep.pos![0], creep.pos![1]);
+    const itemId = COMPONENT_IDS[h % COMPONENT_IDS.length];
+    spawnDrops([{ id: `drop-${key}`, itemId, cell: [fieldCell.c, fieldCell.r] }]);
+  }, [phase, meta?.stage, meta?.round, myCombat?.pve, myOppSig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Play victory/defeat sound when the game ends. Computed inline (the `iWon`
   // const is derived after the early-return guard, so it isn't in scope here).

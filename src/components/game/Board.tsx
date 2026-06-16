@@ -91,9 +91,9 @@ export function Board({ units, interactive = true }: { units?: UnitInstance[]; i
             <HexCell key={`${c}-${r}`} c={c} r={r} unit={r >= ALLY_ROW0 ? unitAt(c, r) : undefined} interactive={interactive} />
           )),
         )}
-        {/* Loot drops — click to collect into your inventory. */}
+        {/* Loot drops — sit where the creep fell (field coords); click to collect. */}
         {showDrops && drops.map((d) => {
-          const { x, y } = hexToPixel({ c: d.cell[0], r: d.cell[1] + ALLY_ROW0 }, TILE_W, TILE_H);
+          const { x, y } = hexToPixel({ c: d.cell[0], r: d.cell[1] }, TILE_W, TILE_H);
           return (
             <button
               key={d.id}

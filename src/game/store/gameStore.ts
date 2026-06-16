@@ -69,8 +69,9 @@ function advancePartial(state: State, gold: number) {
   return { gold, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false };
 }
 
-/** A PvE item component dropped onto a board cell, waiting to be clicked to collect.
- *  `cell` is a LOCAL ally board coordinate [col, row(0..3)]. */
+/** A PvE item component dropped onto the board at a slain creep's position, waiting to
+ *  be clicked to collect. `cell` is a FULL-FIELD coordinate [col(0..6), row(0..7)] so
+ *  the drop sits exactly where the mob fell (the enemy half), not bunched on your side. */
 export type ItemDrop = { id: string; itemId: string; cell: [number, number] };
 
 type State = {
@@ -131,6 +132,9 @@ type State = {
   exportSave: () => { gold: number; xp: number; level: number; units: UnitInstance[]; shop: (string | null)[]; items: string[]; augments: string[]; pension: State["pension"] };
   importSave: (save: { gold: number; xp: number; level: number; units?: UnitInstance[]; shop?: (string | null)[]; items?: string[]; augments?: string[]; pension?: State["pension"] }, allowedIds?: string[], enabledItems?: string[]) => void;
   grantItem: (itemId: string) => void;
+  /** Spawn loot drops at slain-creep positions (called at PvE combat-end). Idempotent
+   *  per id so a re-render / reconnect can't double-drop. */
+  spawnDrops: (drops: ItemDrop[]) => void;
   /** Collect a dropped item from the board into the inventory. */
   collectDrop: (id: string) => void;
   equipItem: (iid: string, itemId: string) => void;
@@ -416,33 +420,16 @@ export const useGame = create<State>((set, get) => ({
     const newXp = state.xp + ECONOMY.passiveXpPerRound + augXp;
     const shop = state.frozen ? state.shop : rollShop(levelFromXp(newXp), state.pool, rng, state.unitsByCost);
 
-    // PvE loot: if the round we just finished was a PvE round, drop extra gold and
-    // occasionally an item or a free low-cost unit — keeps the economy moving.
+    // PvE loot: extra gold + an occasional free low-cost unit. (Item components now
+    // drop at the slain creep's position — spawned at combat-end via spawnDrops — so
+    // they appear where the mob fell instead of bunched on your board.)
     let bonusGold = 0;
     // Auto-collect any drops the player didn't click last round (never lose an item).
     let items = [...state.items, ...state.drops.map((d) => d.itemId)];
     let units = state.units;
-    let drops: ItemDrop[] = [];
     const prev = round > 1 ? { stage, round: round - 1 } : { stage: stage - 1, round: roundsInStage(stage - 1) };
     if (prev.stage >= 1 && roundKind(prev.stage, prev.round) === "pve") {
       bonusGold = 2 + Math.floor(stage / 2);
-      // A free cell to drop loot on (prefer the back rows, away from the front line).
-      const occupied = new Set(units.filter((u) => u.pos).map((u) => `${u.pos![0]},${u.pos![1]}`));
-      const freeCell = (): [number, number] | null => {
-        for (let r = BOARD.rows - 1; r >= 0; r--) for (let c = 0; c < BOARD.cols; c++) {
-          const k = `${c},${r}`;
-          if (!occupied.has(k)) { occupied.add(k); return [c, r]; }
-        }
-        return null;
-      };
-      // Reliable item economy: the opening (stage-1) PvE rounds always drop an
-      // item component, like TFT's creep rounds; later PvE rounds drop one ~45%.
-      if (prev.stage === 1 || rng() < 0.45) {
-        const itemId = COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)];
-        const cell = freeCell();
-        if (cell) drops.push({ id: `drop-${stage}-${round}-${drops.length}`, itemId, cell });
-        else items = [...items, itemId]; // board full → straight to the inventory
-      }
       const cheap = [...(state.unitsByCost[1] ?? []), ...(state.unitsByCost[2] ?? [])];
       if (rng() < 0.25 && cheap.length && units.filter((u) => u.pos === null).length < BENCH_SIZE) {
         const pickId = cheap[randInt(rng, cheap.length)];
@@ -455,7 +442,7 @@ export const useGame = create<State>((set, get) => ({
     // Pension trains one planning round closer to maturity (down to 0 = ready).
     const pension = state.pension ? { ...state.pension, roundsLeft: Math.max(0, state.pension.roundsLeft - 1) } : null;
 
-    set({ gold: state.gold + income + bonusGold, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false, items, units, drops, pension, pool: { ...state.pool } });
+    set({ gold: state.gold + income + bonusGold, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false, items, units, drops: [], pension, pool: { ...state.pool } });
   },
 
   netCarouselPick: (pick) => {
@@ -546,6 +533,14 @@ export const useGame = create<State>((set, get) => ({
 
   // Add an item to the inventory (carousel pick / loot).
   grantItem: (itemId) => set({ items: [...get().items, itemId] }),
+
+  spawnDrops: (incoming) => {
+    const state = get();
+    const have = new Set(state.drops.map((d) => d.id));
+    const fresh = incoming.filter((d) => !have.has(d.id));
+    if (!fresh.length) return;
+    set({ drops: [...state.drops, ...fresh] });
+  },
 
   collectDrop: (id) => {
     const state = get();
