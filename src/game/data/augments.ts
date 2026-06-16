@@ -99,6 +99,19 @@ export function teamBuffForAugments(ids: string[] | undefined | null): TeamBuff 
     // only the larger, by design.
     if (c.lifeSteal) buff.lifeSteal = Math.max(buff.lifeSteal ?? 0, c.lifeSteal);
   }
+  // Hard ceilings on the folded buff. A legit 3-augment stack peaks around ~1.7x / +47
+  // armor, so these never touch real play — but they bound a fabricated or future
+  // over-tuned augment set so the combat sim can't be driven to absurd values. Applied
+  // here (the shared fold) → identical on host + client, so determinism is preserved.
+  if (buff.adMult) buff.adMult = Math.min(1.8, buff.adMult);
+  if (buff.apMult) buff.apMult = Math.min(1.8, buff.apMult);
+  if (buff.asMult) buff.asMult = Math.min(1.8, buff.asMult);
+  if (buff.hpMult) buff.hpMult = Math.min(1.8, buff.hpMult);
+  if (buff.armorAdd) buff.armorAdd = Math.min(60, buff.armorAdd);
+  if (buff.mrAdd) buff.mrAdd = Math.min(60, buff.mrAdd);
+  if (buff.critAdd) buff.critAdd = Math.min(0.5, buff.critAdd);
+  if (buff.manaStart) buff.manaStart = Math.min(40, buff.manaStart);
+  if (buff.lifeSteal) buff.lifeSteal = Math.min(0.4, buff.lifeSteal);
   return buff;
 }
 

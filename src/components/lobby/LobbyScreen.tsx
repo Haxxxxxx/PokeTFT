@@ -38,6 +38,13 @@ export function LobbyScreen() {
   const [showInvite, setShowInvite] = useState(false);
   const [invited, setInvited] = useState<Record<string, boolean>>({});
   const [startError, setStartError] = useState<string | null>(null);
+  // Auto-clear the start error so a transient failure message doesn't linger after the
+  // host fixes the lobby and the next attempt is fine.
+  useEffect(() => {
+    if (!startError) return;
+    const id = setTimeout(() => setStartError(null), 5000);
+    return () => clearTimeout(id);
+  }, [startError]);
 
   const isHost = room?.meta?.hostUid === myUid;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/game/net/authStore";
 import { useRoom } from "@/game/net/roomStore";
 import { useAppStore } from "@/game/store/appStore";
@@ -19,6 +19,9 @@ export function FriendsPanel() {
   const openUserProfile = useAppStore((s) => s.openUserProfile);
   const [name, setName] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  // Track the message-clear timer so we never setState on an unmounted panel.
+  const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (msgTimer.current) clearTimeout(msgTimer.current); }, []);
 
   const isGuest = user?.isAnonymous;
 
@@ -33,7 +36,8 @@ export function FriendsPanel() {
       // rejection that could leave the panel in a broken state.
       setMsg("Network error — try again");
     }
-    setTimeout(() => setMsg(null), 2500);
+    if (msgTimer.current) clearTimeout(msgTimer.current);
+    msgTimer.current = setTimeout(() => setMsg(null), 2500);
   };
 
   return (

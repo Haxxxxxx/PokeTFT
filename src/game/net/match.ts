@@ -7,7 +7,7 @@ import { rosterForGenerations, hasDef } from "../data/mons";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
 import { COMPONENT_IDS, EMBLEM_IDS } from "../data/items";
-import { teamBuffForAugments } from "../data/augments";
+import { teamBuffForAugments, AUGMENT_BY_ID } from "../data/augments";
 import type { UnitInstance } from "../types";
 import type { Room, RoomPlayer, CombatAssign, BotDifficulty } from "./roomStore";
 
@@ -164,8 +164,12 @@ export async function syncBoard(code: string, uid: string, units: UnitInstance[]
   // TFT), and combat augments must be public so the host AND every client resolve the
   // identical team buffs. The full econ save stays private under priv/.
   const pub: Record<string, unknown> = { board: onBoard };
-  if (typeof level === "number") pub.level = level;
-  if (augments) pub.augments = rtdbSafe(augments);
+  // Clamp to the valid range so a bad/edited client value can't get the whole update
+  // rejected by the DB rule (level validates 1..10) — and the scoreboard stays sane.
+  if (typeof level === "number") pub.level = Math.max(1, Math.min(10, Math.round(level)));
+  // Only sync KNOWN augment ids, capped at 3 — keeps the public node clean and within
+  // the DB rule even if local state somehow holds junk.
+  if (augments) pub.augments = rtdbSafe(augments.filter((id) => AUGMENT_BY_ID[id]).slice(0, 3));
   await dbAdapter().update(`games/${code}/players/${uid}`, pub);
   if (save) await dbAdapter().update(`priv/${code}/${uid}`, { save: rtdbSafe(save) });
 }
@@ -590,7 +594,8 @@ export async function maybeClaimHost(code: string, room: Room, myUid: string): P
   if (humans[0] !== myUid) return false;
 
   const res = await dbAdapter().transaction<{ hostUid?: string; hostBeat?: number }>(`games/${code}/meta`, (m) => {
-    if (!m) return m;
+    if (!m) return undefined; // abort (NOT return null — that would delete meta); a stale
+                              // cold-cache read retries with server data on the next pass
     if (serverNow() - (m.hostBeat ?? 0) >= HOST_TIMEOUT || !m.hostUid) {
       m.hostUid = myUid;
       m.hostBeat = serverNow();
