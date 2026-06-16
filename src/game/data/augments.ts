@@ -94,6 +94,9 @@ export function teamBuffForAugments(ids: string[] | undefined | null): TeamBuff 
     if (c.mrAdd) buff.mrAdd = (buff.mrAdd ?? 0) + c.mrAdd;
     if (c.critAdd) buff.critAdd = (buff.critAdd ?? 0) + c.critAdd;
     if (c.manaStart) buff.manaStart = (buff.manaStart ?? 0) + c.manaStart;
+    // lifeSteal does NOT stack additively — the highest source wins (matches the item
+    // layer in combat.ts). If a 2nd lifeSteal augment is ever added, taking both grants
+    // only the larger, by design.
     if (c.lifeSteal) buff.lifeSteal = Math.max(buff.lifeSteal ?? 0, c.lifeSteal);
   }
   return buff;

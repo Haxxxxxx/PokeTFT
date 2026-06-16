@@ -720,11 +720,13 @@ export function NetGameClient() {
   }
 
   // Push the current economy + board to RTDB immediately (bypassing the debounce).
-  // Carousel/augment picks must persist before the round can flip, or they're lost.
+  // Carousel/augment picks must persist before the round can flip, or they're lost —
+  // so this MUST carry level + augments too (a freshly-picked combat augment has to be
+  // public before the host resolves the next fight, or it applies the OLD buff set).
   function flushSync() {
     if (!room || !myUid) return;
     const g = useGame.getState();
-    syncBoard(room.code, myUid, g.units, g.exportSave());
+    syncBoard(room.code, myUid, g.units, g.exportSave(), g.level, g.augments);
   }
 
   const streak = me?.streak ?? 0;

@@ -140,6 +140,7 @@ export async function beginMatch(code: string, room: Room): Promise<void> {
     u[`players/${p.uid}/board`] = null;
     u[`players/${p.uid}/save`] = null;
     u[`players/${p.uid}/carouselPicked`] = null;
+    u[`players/${p.uid}/augments`] = null; // clear public combat augments from a prior game
   }
   await dbAdapter().update(gamePath(code), u);
 }
@@ -545,6 +546,7 @@ export async function returnToLobby(code: string, room: Room): Promise<void> {
     u[`players/${p.uid}/save`] = null;
     u[`players/${p.uid}/lastOpp`] = null;
     u[`players/${p.uid}/carouselPicked`] = null;
+    u[`players/${p.uid}/augments`] = null; // clear public combat augments from the finished game
     // Re-ready everyone so the host can immediately start again (bots stay ready).
     u[`players/${p.uid}/ready`] = true;
   }
