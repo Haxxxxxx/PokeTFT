@@ -289,7 +289,10 @@ export function NetGameClient() {
           // detection still works even though `room` no longer churns on heartbeats.
           const r = useRoom.getState().liveRoom;
           if (!r) return;
-          if (r.meta?.serverDriven) return; // a dedicated server drives this game (#110 Phase 2)
+          // A dedicated server drives this game (#110 Phase 2) — but if it's >8s late on
+          // a deadline (down / erroring), the client takes back over so a server hiccup
+          // can never permanently freeze the match.
+          if (r.meta?.serverDriven && serverNow() < (r.meta.deadline ?? 0) + 8000) return;
           await maybeClaimHost(r.code, r, myUid);
           if (r.meta?.hostUid !== myUid) return;
           await heartbeat(r.code);
