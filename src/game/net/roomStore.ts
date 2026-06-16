@@ -276,7 +276,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       const code = genCode();
       await set(roomRef(code), {
         meta: { hostUid: uid, phase: "lobby", stage: 1, round: 1, deadline: 0, updatedAt: serverTimestamp() },
-        rules: { startingHp, maxPlayers, generations: rules?.generations ?? [1], itemsEnabled: rules?.itemsEnabled ?? [], draftPoolSize: rules?.draftPoolSize ?? 90, augmentsEnabled: rules?.augmentsEnabled !== false, serverDriven: rules?.serverDriven === true },
+        rules: { startingHp, maxPlayers, generations: rules?.generations ?? [1], itemsEnabled: rules?.itemsEnabled ?? [], draftPoolSize: rules?.draftPoolSize ?? 60, augmentsEnabled: rules?.augmentsEnabled !== false, serverDriven: rules?.serverDriven === true },
         players: { [uid]: newPlayer(uid, name || "Host", true, startingHp) },
       });
       subscribe(code, uid, setState);

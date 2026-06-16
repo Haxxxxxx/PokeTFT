@@ -7,7 +7,7 @@ import { makePool, makeUnitsByCost, rollShop, takeFromPool, returnToPool, type P
 import { roundIncome, sellValue, interest } from "../engine/economy";
 import { applyCombines, makeInstance } from "../engine/combine";
 import { MEGA_STONE, canMega } from "../data/mega";
-import { ITEM_POOL, COMPONENT_IDS, RECIPES, combineKey, isComponent } from "../data/itemPool";
+import { ITEM_POOL, ITEM_BY_ID, COMPONENT_IDS, COMPLETED_IDS, EMBLEM_IDS, RECIPES, combineKey, isComponent, isEmblem } from "../data/itemPool";
 import { AUGMENT_BY_ID } from "../data/augments";
 import { useUi } from "./uiStore";
 import { useAppStore } from "./appStore";
@@ -159,6 +159,11 @@ type State = {
   collectDrop: (id: string) => void;
   equipItem: (iid: string, itemId: string) => void;
   unequipItem: (iid: string, itemId: string) => void;
+  /** Anvil: reforge an inventory completed item / emblem into a random different one
+   *  of the same class. */
+  reforgeItem: (itemId: string) => void;
+  /** Anvil: forge a completed item into a random Spatula emblem (trait grantor). */
+  forgeEmblem: (itemId: string) => void;
   /** Pension: drop a 1★ mon into the Day Care to train it into a 2★. */
   depositToPension: (iid: string) => void;
   /** Pension: retrieve a matured mon (back to the bench, one star higher). */
@@ -636,6 +641,37 @@ export const useGame = create<State>((set, get) => ({
       items: [...state.items, itemId],
       units: state.units.map((u) => (u.iid === iid ? { ...u, items: newItems } : u)),
     });
+  },
+
+  // Anvil: reforge an inventory completed item / emblem into a random DIFFERENT one
+  // of the same class. Random (not chosen), so it's a gamble — same as TFT's reforger.
+  reforgeItem: (itemId) => {
+    const state = get();
+    const idx = state.items.indexOf(itemId);
+    if (idx < 0) return;
+    const def = ITEM_BY_ID[itemId];
+    if (!def || def.kind === "component") { toast("Only completed items can be reforged", "Seuls les objets complets peuvent être reforgés"); return; }
+    const pool = (def.kind === "emblem" ? EMBLEM_IDS : COMPLETED_IDS).filter((x) => x !== itemId);
+    if (!pool.length) return;
+    const next = pool[randInt(rng, pool.length)];
+    const items = [...state.items];
+    items[idx] = next;
+    set({ items });
+    toast(`Reforged → ${ITEM_BY_ID[next]?.name ?? next}`, `Reforgé → ${ITEM_BY_ID[next]?.nameFr ?? next}`);
+  },
+
+  // Anvil: sacrifice a completed item to forge a random Spatula emblem (a trait grantor).
+  forgeEmblem: (itemId) => {
+    const state = get();
+    const idx = state.items.indexOf(itemId);
+    if (idx < 0) return;
+    const def = ITEM_BY_ID[itemId];
+    if (!def || def.kind !== "completed") { toast("Forge an emblem from a completed item", "Forgez un emblème depuis un objet complet"); return; }
+    const next = EMBLEM_IDS[randInt(rng, EMBLEM_IDS.length)];
+    const items = [...state.items];
+    items[idx] = next;
+    set({ items });
+    toast(`Forged → ${ITEM_BY_ID[next]?.name ?? next}`, `Forgé → ${ITEM_BY_ID[next]?.nameFr ?? next}`);
   },
 
   // Pension (day-care breeding): deposit a 1★ mon; after PENSION_ROUNDS planning

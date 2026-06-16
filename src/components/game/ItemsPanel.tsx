@@ -5,7 +5,8 @@ import { useDraggable } from "@dnd-kit/core";
 import { useGame } from "@/game/store/gameStore";
 import { useUi } from "@/game/store/uiStore";
 import { MEGA_STONE } from "@/game/data/mega";
-import { ITEM_POOL, RARITY_COLOR } from "@/game/data/itemPool";
+import { ITEM_POOL, RARITY_COLOR, isEmblem } from "@/game/data/itemPool";
+import { Hammer, Sparkles } from "lucide-react";
 import { MegaIcon } from "./icons";
 import { ItemGlyph } from "./ItemGlyph";
 import { useT } from "@/lib/i18n";
@@ -42,6 +43,8 @@ function ItemButton({ id, n, selected, onClick }: { id: string; n: number; selec
 export function ItemsPanel() {
   const t = useT();
   const items = useGame((s) => s.items);
+  const reforgeItem = useGame((s) => s.reforgeItem);
+  const forgeEmblem = useGame((s) => s.forgeEmblem);
   const inspectedItem = useUi((s) => s.inspectedItem);
   const setInspectedItem = useUi((s) => s.setInspectedItem);
 
@@ -79,6 +82,28 @@ export function ItemsPanel() {
             ))}
           </div>
           <p className="mt-2 text-[10px] text-slate-500 leading-snug">{t.it_drag_equip}</p>
+          {/* Anvil — reforge a selected completed item / emblem into a random other,
+              or forge a completed item into a Spatula emblem (trait grantor). */}
+          {inspectedItem && ITEM_BY_ID[inspectedItem] && ITEM_BY_ID[inspectedItem].kind !== "component" && inspectedItem !== MEGA_STONE && (
+            <div className="mt-2 flex gap-1.5">
+              <button
+                onClick={() => reforgeItem(inspectedItem)}
+                className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-amber-900/50 border border-slate-700 text-[10px] font-bold text-amber-200"
+                title="Reforge into a random different item of the same class"
+              >
+                <Hammer size={12} /> {t.it_reforge}
+              </button>
+              {!isEmblem(inspectedItem) && (
+                <button
+                  onClick={() => forgeEmblem(inspectedItem)}
+                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-fuchsia-900/50 border border-slate-700 text-[10px] font-bold text-fuchsia-200"
+                  title="Forge this item into a random trait Emblem"
+                >
+                  <Sparkles size={12} /> {t.it_forge_emblem}
+                </button>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>

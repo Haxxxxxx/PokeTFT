@@ -67,7 +67,10 @@ function randomCode(): string {
 
 const DEFAULT_RULES: GameRules = {
   generations: [1],
-  draftPoolSize: 90,
+  // 60 < any single region's pool, so each game randomly drafts a DIFFERENT subset of
+  // the region (seeded by room code) — variety game-to-game, whole dex reachable over
+  // time. Pick the ★ "full" option in the lobby to play the entire region every game.
+  draftPoolSize: 60,
   startingHp: 100,
   itemsEnabled: DEFAULT_ITEMS_ENABLED,
   maxPlayers: 8,

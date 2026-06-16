@@ -1,8 +1,9 @@
 "use client";
 
 import { Sword, Sparkles, Zap, Heart, Shield, Crosshair, Gem, Coins, GraduationCap, Dices, Users, Package, Star, type LucideIcon } from "lucide-react";
-import { ITEM_EFFECT } from "@/game/data/items";
+import { ITEM_EFFECT, EMBLEM_TRAIT, isEmblem } from "@/game/data/items";
 import { MEGA_STONE } from "@/game/data/mega";
+import { TraitGlyph } from "./TraitGlyph";
 
 /** Pick a real (library) icon for an item from WHAT IT DOES — its dominant effect —
  *  so every item shows a meaningful glyph instead of an emoji. */
@@ -34,6 +35,8 @@ function augmentIcon(id: string): LucideIcon {
 }
 
 export function ItemGlyph({ id, size = 16 }: { id: string; size?: number }) {
+  // Emblems show the synergy they grant (the trait's own glyph).
+  if (isEmblem(id)) return <TraitGlyph traitKey={EMBLEM_TRAIT[id]} size={size} />;
   const Icon = itemIcon(id);
   return <Icon size={size} />;
 }

@@ -95,6 +95,12 @@ export function CombatStage({
   const speedRef = useRef(speed);
   useEffect(() => { speedRef.current = speed; }, [speed]);
   const lastTs = useRef<number | null>(null);
+  // Pre-fight stare-down: hold both teams on their opening hexes for PREFIGHT_MS
+  // while a bar fills 0→full, so you get a beat to read the enemy board before the
+  // sim animates. `preview` is the 0..1 fill (1 = preview done, fight rolling).
+  const PREFIGHT_MS = 2000;
+  const [preview, setPreview] = useState(0);
+  const localStartTs = useRef<number | null>(null);
 
   useEffect(() => {
     let raf = 0;
@@ -102,16 +108,35 @@ export function CombatStage({
     // finishing at 85% of the window so the result banner shows before the
     // round transitions. Identical on every client (deterministic frames +
     // constant window), so nobody sees a different ending.
+    const preS = PREFIGHT_MS / 1000;
     const loopSynced = () => {
-      const playWindow = (syncWindowMs! / 1000) * 0.85;
       const elapsed = (serverNow() - syncStart!) / 1000;
-      const p = Math.max(0, Math.min(1, elapsed / playWindow));
+      // Stare-down first: pin the opening frame, fill the readiness bar.
+      if (elapsed < preS) {
+        setIdx(0);
+        setPreview(elapsed / preS);
+        raf = requestAnimationFrame(loopSynced);
+        return;
+      }
+      setPreview(1);
+      // Replay over the rest of the window (minus the preview we just spent), still
+      // finishing at 85% of the window so the banner shows before the transition.
+      const playWindow = (syncWindowMs! / 1000) * 0.85 - preS;
+      const p = Math.max(0, Math.min(1, (elapsed - preS) / playWindow));
       setIdx(p * last);
       if (p >= 1) { setFinished(true); return; }
       raf = requestAnimationFrame(loopSynced);
     };
     const loopLocal = (ts: number) => {
-      if (lastTs.current == null) lastTs.current = ts;
+      if (localStartTs.current == null) localStartTs.current = ts;
+      const sinceStart = (ts - localStartTs.current) / 1000;
+      if (sinceStart < preS) {
+        setPreview(sinceStart / preS);
+        raf = requestAnimationFrame(loopLocal);
+        return;
+      }
+      setPreview(1);
+      if (lastTs.current == null) lastTs.current = ts; // first post-preview frame → dt 0
       const dtReal = (ts - lastTs.current) / 1000;
       lastTs.current = ts;
       setIdx((prev) => {
@@ -216,6 +241,16 @@ export function CombatStage({
       </div>
 
       {a.overtime && <span className="text-[9px] font-extrabold text-rose-400 animate-pulse tracking-wider mt-0.5">{t.cs_overtime}</span>}
+
+      {/* Pre-fight stare-down bar — fills 0→full over PREFIGHT_MS, then the fight rolls. */}
+      {preview < 1 && !finished && (
+        <div className="flex flex-col items-center gap-1 mt-0.5 w-[240px]">
+          <span className="text-[10px] font-extrabold uppercase tracking-[0.25em] text-amber-200/80 animate-pulse">{t.cs_get_ready}</span>
+          <div className="h-1.5 w-full rounded-full bg-black/50 overflow-hidden" style={{ outline: "1px solid rgba(212,175,55,0.3)" }}>
+            <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-300" style={{ width: `${preview * 100}%`, transition: "width 80ms linear" }} />
+          </div>
+        </div>
+      )}
       </div>
 
       {/* Battlefield (the focus) + a compact side recap with DMG/TANK/HEAL tabs.

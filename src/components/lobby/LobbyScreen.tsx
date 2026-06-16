@@ -56,7 +56,7 @@ export function LobbyScreen() {
       startingHp: room.rules?.startingHp ?? 100,
       generations: room.rules?.generations ?? [1],
       itemsEnabled: room.rules?.itemsEnabled ?? [],
-      draftPoolSize: room.rules?.draftPoolSize ?? 90,
+      draftPoolSize: room.rules?.draftPoolSize ?? 60,
       maxPlayers: room.rules?.maxPlayers ?? 8,
       augmentsEnabled: room.rules?.augmentsEnabled !== false,
     });

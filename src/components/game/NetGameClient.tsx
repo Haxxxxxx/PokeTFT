@@ -446,7 +446,11 @@ export function NetGameClient() {
   const augOptions = useMemo(() => {
     if (augSlotNow == null) return [];
     const owned = new Set(useGame.getState().augments);
-    const pool = AUGMENTS.filter((a) => !owned.has(a.id));
+    // Tier escalates with the slot (TFT-style): silver at 2-2, gold at 3-2,
+    // prismatic at 4-2. Fall back to the full pool if a tier runs dry.
+    const tier = (["silver", "gold", "prismatic"] as const)[augSlotNow] ?? "gold";
+    let pool = AUGMENTS.filter((a) => !owned.has(a.id) && a.tier === tier);
+    if (pool.length < 3) pool = AUGMENTS.filter((a) => !owned.has(a.id));
     let seed = augSlotNow * 9973 + 7;
     for (let i = 0; i < (myUid?.length ?? 0); i++) seed = (seed * 31 + myUid!.charCodeAt(i)) >>> 0;
     const r = makeRng(seed >>> 0);

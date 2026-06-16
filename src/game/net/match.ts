@@ -6,7 +6,7 @@ import { generatePlayerLikeBoard, generateCreepBoard, pickCarouselOptions } from
 import { rosterForGenerations, hasDef } from "../data/mons";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
-import { COMPONENT_IDS } from "../data/items";
+import { COMPONENT_IDS, EMBLEM_IDS } from "../data/items";
 import type { UnitInstance } from "../types";
 import type { Room, RoomPlayer, CombatAssign, BotDifficulty } from "./roomStore";
 
@@ -346,7 +346,11 @@ export async function startCarousel(code: string, room: Room): Promise<void> {
       if (p.isBot) continue;
       const salt = (gameSeed ^ hashStr(p.uid) ^ Math.imul(room.meta.stage * 31 + room.meta.round * 7 + 1, 2654435761)) >>> 0;
       // Rotate which item is offered per player/round so it varies but stays sync-free (host-written).
-      const item = itemPool[(salt >>> 3) % itemPool.length];
+      // From stage 3 on, ~1 in 4 carousels upgrades the reward to a Spatula emblem.
+      const wantEmblem = room.meta.stage >= 3 && (salt >>> 11) % 4 === 0;
+      const item = wantEmblem
+        ? EMBLEM_IDS[(salt >>> 5) % EMBLEM_IDS.length]
+        : itemPool[(salt >>> 3) % itemPool.length];
       carousel[p.uid] = [item, ...pickCarouselOptions(room.meta.stage, salt, 4, rosterFor(room))];
     }
     await dbAdapter().update(gamePath(code), {

@@ -134,10 +134,13 @@ export type Dict = {
   it_equip_hint: string;
   it_equip_mega: string;
   it_drag_equip: string;
+  it_reforge: string;
+  it_forge_emblem: string;
   // Combat stage
   cs_your_team: string;
   cs_vs: string;
   cs_overtime: string;
+  cs_get_ready: string;
   cs_continue: string;
   cs_victory: string;
   cs_defeat: string;
@@ -296,9 +299,12 @@ export const FR: Dict = {
   it_equip_hint: "Clique un mon pour l'équiper · Échap pour annuler",
   it_equip_mega: "Clique un mon Méga-capable pour l'équiper",
   it_drag_equip: "Glisse un objet sur un mon pour l'équiper.",
+  it_reforge: "Reforger",
+  it_forge_emblem: "Emblème",
   cs_your_team: "Votre équipe",
   cs_vs: "VS",
   cs_overtime: "PROLONGATION",
+  cs_get_ready: "Préparez-vous !",
   cs_recap: "Bilan",
   cs_show_recap: "Afficher le bilan",
   cs_hide_recap: "Masquer le bilan",
@@ -456,9 +462,12 @@ export const EN: Dict = {
   it_equip_hint: "Click a mon to equip · Esc to cancel",
   it_equip_mega: "Click a Mega-capable mon to equip",
   it_drag_equip: "Drag an item onto a mon to equip it.",
+  it_reforge: "Reforge",
+  it_forge_emblem: "Emblem",
   cs_your_team: "Your Team",
   cs_vs: "VS",
   cs_overtime: "OVERTIME",
+  cs_get_ready: "Get ready!",
   cs_recap: "Recap",
   cs_show_recap: "Show recap",
   cs_hide_recap: "Hide recap",

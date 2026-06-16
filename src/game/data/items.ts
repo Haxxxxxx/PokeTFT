@@ -1,6 +1,9 @@
 /** Item system with TFT-style combining: 6 components combine (2 → 1) into 21
  *  completed items. Effects are a structured object the combat engine applies
- *  generically (deterministic — no per-id branching in the sim). */
+ *  generically (deterministic — no per-id branching in the sim). Spatula-style
+ *  EMBLEMS additionally grant their holder a synergy trait. */
+
+import { TRAITS } from "./traits";
 
 export type ItemRarity = "common" | "rare" | "legendary";
 
@@ -30,8 +33,10 @@ export type ItemDef = {
   nameFr: string;
   icon: string;
   rarity: ItemRarity;
-  kind: "component" | "completed";
+  kind: "component" | "completed" | "emblem";
   effect: ItemEffect;
+  /** Emblems only: the synergy trait key this item grants its holder. */
+  grantsTrait?: string;
   /** Short human-readable effect summary. */
   text: string;
   textFr: string;
@@ -79,11 +84,39 @@ export const COMPLETED: ItemDef[] = [
   { id: "edge-night",   name: "Edge of Night",  nameFr: "Lame de Nuit",  icon: "🌑", rarity: "rare",     kind: "completed", effect: { armorAdd: 35, mrAdd: 35, critAdd: 0.25, sash: true }, text: "+35 def, +25% crit, survives one blow", textFr: "+35 déf, +25% crit, survit à un coup" },
 ];
 
-export const ITEM_POOL: ItemDef[] = [...COMPONENTS, ...COMPLETED];
+/** Spatula-style EMBLEMS — grant the holder a synergy trait (TFT emblems). One per
+ *  trait, minus the team-wide count-1 traits (an emblem there would trivially flip a
+ *  global buff on). The granted trait is read by the synergy counter, not the sim, so
+ *  combat stays deterministic. A small defensive stat keeps them worth a slot. */
+const NO_EMBLEM = new Set(["eeveelution", "kanto-mythic", "mythic", "legendary"]);
+export const EMBLEMS: ItemDef[] = TRAITS.filter((t) => !NO_EMBLEM.has(t.key)).map((t) => ({
+  id: `emblem-${t.key}`,
+  name: `${t.label} Emblem`,
+  nameFr: `Emblème ${t.label}`,
+  icon: "🥄",
+  rarity: "legendary" as const,
+  kind: "emblem" as const,
+  effect: { armorAdd: 12, mrAdd: 12 },
+  grantsTrait: t.key as string,
+  text: `Holder gains the ${t.label} trait, +12 Armor & MR.`,
+  textFr: `Le porteur gagne le trait ${t.label}, +12 Déf & Déf Spé.`,
+}));
+
+/** item id → the trait key it grants (empty for non-emblems). */
+export const EMBLEM_TRAIT: Record<string, string> = Object.fromEntries(
+  EMBLEMS.map((e) => [e.id, e.grantsTrait!]),
+);
+export const EMBLEM_IDS = EMBLEMS.map((e) => e.id);
+export function isEmblem(id: string): boolean {
+  return id in EMBLEM_TRAIT;
+}
+
+export const ITEM_POOL: ItemDef[] = [...COMPONENTS, ...COMPLETED, ...EMBLEMS];
 export const ITEM_BY_ID: Record<string, ItemDef> = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 export const ITEM_EFFECT: Record<string, ItemEffect> = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i.effect]));
 
 export const COMPONENT_IDS = COMPONENTS.map((c) => c.id);
+export const COMPLETED_IDS = COMPLETED.map((c) => c.id);
 /** Rules panel lists the completed items (the build targets). */
 export const DEFAULT_ITEMS_ENABLED = COMPLETED.map((i) => i.id);
 

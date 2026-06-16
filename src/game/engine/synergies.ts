@@ -1,6 +1,7 @@
 import type { UnitInstance } from "../types";
 import { getDef, typesForStar } from "../data/mons";
 import { activeTier, TRAITS_BY_KEY } from "../data/traits";
+import { EMBLEM_TRAIT } from "../data/items";
 
 export type ActiveTrait = {
   key: string;
@@ -14,12 +15,26 @@ export type ActiveTrait = {
 export function computeTraits(boardUnits: UnitInstance[]): ActiveTrait[] {
   const counts = new Map<string, number>();
   // Each distinct unit definition contributes once per trait, using its HIGHEST star
-  // on the board so an evolved mon's gained typing (typesByStar) counts.
+  // on the board so an evolved mon's gained typing (typesByStar) counts. Spatula
+  // emblems add their granted trait to whichever def carries them (deduped via a Set
+  // so an emblem matching a native trait can't double-count that def).
   const maxStar = new Map<string, number>();
-  for (const u of boardUnits) maxStar.set(u.defId, Math.max(maxStar.get(u.defId) ?? 0, u.star));
+  const emblemTraits = new Map<string, Set<string>>();
+  for (const u of boardUnits) {
+    maxStar.set(u.defId, Math.max(maxStar.get(u.defId) ?? 0, u.star));
+    const items = Array.isArray(u.items) ? u.items : u.items ? Object.values(u.items as Record<string, string>) : [];
+    for (const id of items) {
+      const t = EMBLEM_TRAIT[id];
+      if (!t) continue;
+      if (!emblemTraits.has(u.defId)) emblemTraits.set(u.defId, new Set());
+      emblemTraits.get(u.defId)!.add(t);
+    }
+  }
   for (const [defId, star] of maxStar) {
     const def = getDef(defId);
-    for (const key of [...typesForStar(def, star), ...def.roles]) {
+    const keys = new Set<string>([...typesForStar(def, star), ...def.roles]);
+    for (const t of emblemTraits.get(defId) ?? []) keys.add(t);
+    for (const key of keys) {
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
   }
