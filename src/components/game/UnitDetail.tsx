@@ -8,6 +8,7 @@ import { getDef, spriteUrl, archetypeOf, type Archetype } from "@/game/data/mons
 import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { ITEM_POOL, RARITY_COLOR } from "@/game/data/itemPool";
 import { ITEM_EFFECT } from "@/game/data/items";
+import { ItemGlyph } from "./ItemGlyph";
 import { megaFormFor, MEGA_STONE } from "@/game/data/mega";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import type { PokeType } from "@/game/types";
@@ -54,7 +55,7 @@ function ItemCard({ id }: { id: string }) {
     <div style={{ borderColor: `${color}aa`, boxShadow: `0 10px 40px -12px ${color}44` }} className="rounded-2xl border bg-[#0d1426] text-slate-100 overflow-hidden">
       <div className="flex items-start gap-3 p-3 border-b border-white/5" style={{ background: `linear-gradient(105deg, ${color}1f, transparent 70%)` }}>
         <div style={{ borderColor: `${color}99` }} className="rounded-xl border bg-black/30 w-14 h-14 flex items-center justify-center text-3xl shrink-0">
-          {isMega ? <MegaIcon size={34} /> : (def?.icon ?? "◆")}
+          {isMega ? <MegaIcon size={34} /> : <ItemGlyph id={id} size={30} />}
         </div>
         <div className="flex-1 min-w-0">
           <h2 className="text-base font-bold tracking-tight">{name}</h2>
@@ -254,7 +255,7 @@ function HeldItems({ iid }: { iid?: string }) {
           const def = ITEM_DEF[id];
           return (
             <div key={i} className="flex items-center gap-2 p-2 rounded-lg border border-slate-700/60 bg-slate-800/40">
-              <span className="text-lg shrink-0">{isMega ? <MegaIcon size={18} /> : (def?.icon ?? "◆")}</span>
+              <span className="text-lg shrink-0">{isMega ? <MegaIcon size={18} /> : <ItemGlyph id={id} size={16} />}</span>
               <div className="min-w-0 flex-1">
                 <div className="text-[11px] font-bold text-slate-200">{isMega ? "Mega Stone" : (lang === "fr" ? def?.nameFr : def?.name) ?? id}</div>
                 <div className="text-[10px] text-slate-400 leading-snug">{isMega ? "Mega Evolves at combat start." : (lang === "fr" ? def?.textFr : def?.text) ?? ""}</div>

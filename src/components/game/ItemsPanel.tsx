@@ -7,6 +7,7 @@ import { useUi } from "@/game/store/uiStore";
 import { MEGA_STONE } from "@/game/data/mega";
 import { ITEM_POOL, RARITY_COLOR } from "@/game/data/itemPool";
 import { MegaIcon } from "./icons";
+import { ItemGlyph } from "./ItemGlyph";
 import { useT } from "@/lib/i18n";
 
 const ITEM_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
@@ -29,7 +30,7 @@ function ItemButton({ id, n, selected, onClick }: { id: string; n: number; selec
         ${selected ? "bg-fuchsia-500/15 ring-1 ring-fuchsia-400/70" : "bg-slate-900 hover:bg-slate-800"}`}
       title={isMega ? "Mega Stone" : def?.name ?? id}
     >
-      <span className="text-base shrink-0">{isMega ? <MegaIcon size={18} /> : (def?.icon ?? "◆")}</span>
+      <span className="text-base shrink-0">{isMega ? <MegaIcon size={18} /> : <ItemGlyph id={id} size={16} />}</span>
       <span className="text-[10px] font-semibold text-slate-200 truncate flex-1">{isMega ? "Mega Stone" : def?.name ?? id}</span>
       {n > 1 && <span className="text-[9px] font-bold text-slate-400 shrink-0">×{n}</span>}
     </button>

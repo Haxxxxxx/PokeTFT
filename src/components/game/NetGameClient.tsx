@@ -13,6 +13,7 @@ import { interest } from "@/game/engine/economy";
 import { MEGA_STONE, canMega } from "@/game/data/mega";
 import { ITEM_POOL, RARITY_COLOR, COMPONENT_IDS } from "@/game/data/itemPool";
 import { enemyToField } from "@/game/engine/hex";
+import { ItemGlyph, AugmentGlyph } from "./ItemGlyph";
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
 import { useUi } from "@/game/store/uiStore";
@@ -63,7 +64,7 @@ import { TraitPanel } from "./TraitPanel";
 import { UnitDetail } from "./UnitDetail";
 import { ItemsPanel } from "./ItemsPanel";
 import { CombatStage } from "./CombatStage";
-import { CoinIcon, TrophyIcon } from "./icons";
+import { CoinIcon, TrophyIcon, PawIcon, SwordIcon, GiftIcon } from "./icons";
 import { useT } from "@/lib/i18n";
 import { sfx } from "@/lib/audio";
 import { toggleFullscreen, isFullscreen } from "@/lib/fullscreen";
@@ -124,7 +125,7 @@ function PensionZone() {
         className={`w-[120px] shrink-0 flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed transition-all
           ${isOver ? "border-emerald-400 bg-emerald-500/25 text-emerald-100 scale-[1.03]" : "border-[var(--panel-edge)] bg-black/25 text-amber-200/55 hover:border-emerald-700/60 hover:text-emerald-300/80"}`}
       >
-        <span className={`text-xl leading-none ${isOver ? "scale-125" : ""}`}>🏡</span>
+        <span className={`leading-none ${isOver ? "scale-125" : ""}`}><PawIcon size={22} /></span>
         <span className="text-[9px] font-extrabold uppercase tracking-wider text-center leading-tight px-1">{title}</span>
       </div>
     );
@@ -646,7 +647,7 @@ export function NetGameClient() {
               const result = resultByKey.get(key);
               const isCurrent = stage === meta.stage && round === meta.round;
               const isPast = result !== undefined;
-              const icon = kind === "carousel" ? "🎡" : kind === "pve" ? "🌿" : "⚔️";
+              const icon = kind === "carousel" ? <GiftIcon size={14} /> : kind === "pve" ? <PawIcon size={14} /> : <SwordIcon size={14} />;
               const recap = recapByKey.get(key);
               const clickable = isPast && !!recap && !recap.pve && recap.oppUid !== myUid && !!players[recap.oppUid];
               const open = recapKey === key;
@@ -716,7 +717,7 @@ export function NetGameClient() {
             const opp = room && myUid ? predictOpponent(room, myUid) : null;
             if (!opp) return null;
             return <StatChip label={lang === "fr" ? "Prochain" : "Next"} accent="#f0abfc"
-              value={<span className="text-sm font-bold">{opp.pve ? (lang === "fr" ? "Sauvages" : "Wild") : `vs ${opp.name}`}{opp.ghost ? " 👻" : ""}</span>}
+              value={<span className="text-sm font-bold">{opp.pve ? (lang === "fr" ? "Sauvages" : "Wild") : `vs ${opp.name}`}{opp.ghost ? (lang === "fr" ? " (clone)" : " (copy)") : ""}</span>}
               title={opp.ghost ? (lang === "fr" ? "Combat fantôme (copie d'un adversaire)" : "Ghost fight (a copy of a rival)") : undefined} />;
           })()}
 
@@ -724,7 +725,7 @@ export function NetGameClient() {
             <div className="flex items-center gap-1 shrink-0" title="Augments">
               {augments.map((id, i) => {
                 const a = AUGMENTS.find((x) => x.id === id);
-                return <span key={i} className="w-7 h-7 rounded-md bg-violet-900/40 border border-violet-500/50 flex items-center justify-center text-sm" title={a ? (lang === "fr" ? `${a.nameFr} — ${a.descFr}` : `${a.name} — ${a.desc}`) : id}>{a?.icon ?? "◆"}</span>;
+                return <span key={i} className="w-7 h-7 rounded-md bg-violet-900/40 border border-violet-500/50 flex items-center justify-center text-violet-200" title={a ? (lang === "fr" ? `${a.nameFr} — ${a.descFr}` : `${a.name} — ${a.desc}`) : id}><AugmentGlyph id={id} size={15} /></span>;
               })}
             </div>
           )}
@@ -967,7 +968,7 @@ export function NetGameClient() {
                   const onPick = () => { if (pickLatch.current === `c-${key}`) return; pickLatch.current = `c-${key}`; netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); };
                   if (pick === MEGA_STONE) return <CarouselCard key={i} onClick={onPick} color="#f0abfc" name="Mega Stone" sub={lang === "fr" ? "Méga-Évolution" : "Mega Evolve"} art={<span className="text-fuchsia-300"><MegaIcon size={56} /></span>} />;
                   const item = ITEM_DEF_BY_ID[pick];
-                  if (item) return <CarouselCard key={i} onClick={onPick} color={RARITY_COLOR[item.rarity] ?? "#fbbf24"} name={lang === "fr" ? item.nameFr : item.name} sub={lang === "fr" ? item.textFr : item.text} art={<span className="text-5xl">{item.icon}</span>} />;
+                  if (item) return <CarouselCard key={i} onClick={onPick} color={RARITY_COLOR[item.rarity] ?? "#fbbf24"} name={lang === "fr" ? item.nameFr : item.name} sub={lang === "fr" ? item.textFr : item.text} art={<span style={{ color: RARITY_COLOR[item.rarity] ?? "#fbbf24" }}><ItemGlyph id={item.id} size={46} /></span>} />;
                   const def = getDef(pick);
                   return (
                     <CarouselCard
@@ -1021,7 +1022,7 @@ export function NetGameClient() {
               <OrnateAugmentCard
                 key={a.id}
                 onClick={() => { const lk = `a-${augSlotNow}`; if (pickLatch.current === lk) return; pickLatch.current = lk; pickAugment(a.id); flushSync(); }}
-                icon={a.icon}
+                icon={<AugmentGlyph id={a.id} size={34} />}
                 name={lang === "fr" ? a.nameFr : a.name}
                 desc={lang === "fr" ? a.descFr : a.desc}
                 tier={a.tier}
@@ -1047,7 +1048,9 @@ export function NetGameClient() {
         // Final standings: every player ranked by placement (winner = #1), with
         // their final team so you can see how everyone finished before a rematch.
         const standings = Object.values(players).sort((a, b) => (a.place ?? 99) - (b.place ?? 99));
-        const medal = (place: number) => (place === 1 ? "🥇" : place === 2 ? "🥈" : place === 3 ? "🥉" : `#${place}`);
+        const medal = (place: number) => (place <= 3
+          ? <TrophyIcon size={18} style={{ color: place === 1 ? "#fbbf24" : place === 2 ? "#cbd5e1" : "#d97706" }} />
+          : `#${place}`);
         return (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm gap-5 p-4">
           <div className={`celebrate-pop flex flex-col items-center gap-2 ${iWon ? "text-amber-300" : "text-slate-200"}`}>
@@ -1257,11 +1260,11 @@ function CarouselCard({ onClick, color, name, sub, cost, types, art, disabled, n
 
 /** Augment choice in the ornate frame: icon in a gilded tile, name, then the
  *  effect on the dark panel — matching the TFT "Select an Augment" look. */
-function OrnateAugmentCard({ onClick, icon, name, desc, tier, frame }: { onClick: () => void; icon: string; name: string; desc: string; tier: string; frame: string }) {
+function OrnateAugmentCard({ onClick, icon, name, desc, tier, frame }: { onClick: () => void; icon: ReactNode; name: string; desc: string; tier: string; frame: string }) {
   return (
     <OrnateFrame onClick={onClick} frame={frame} height={272}>
       <div className="flex flex-col items-center pt-5 px-3">
-        <div className="w-16 h-16 rounded-lg flex items-center justify-center text-4xl" style={{ background: `${frame}1f`, border: `1px solid ${frame}66`, boxShadow: `inset 0 0 14px ${frame}40` }}>{icon}</div>
+        <div className="w-16 h-16 rounded-lg flex items-center justify-center" style={{ background: `${frame}1f`, border: `1px solid ${frame}66`, boxShadow: `inset 0 0 14px ${frame}40`, color: frame }}>{icon}</div>
         <span className="mt-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em]" style={{ color: frame }}>{tier}</span>
         <span className="mt-1 text-[15px] font-extrabold text-amber-50 text-center leading-tight drop-shadow">{name}</span>
       </div>

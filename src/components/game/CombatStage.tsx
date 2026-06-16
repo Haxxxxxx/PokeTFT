@@ -6,6 +6,7 @@ import { useT } from "@/lib/i18n";
 import { sfx } from "@/lib/audio";
 import { hexToPixel, fieldPixelSize, hexDistance, FIELD, TILE } from "@/game/engine/hex";
 import { TYPE_COLOR } from "@/game/ui";
+import { SnowIcon } from "./icons";
 import { serverNow } from "@/game/net/serverTime";
 import type { CombatResult, FrameUnit, CombatEvent } from "@/game/engine/combat";
 import type { PokeType } from "@/game/types";
@@ -503,9 +504,8 @@ function CombatUnit({
         {unit.mega && (
           <span className="absolute -top-1.5 -right-1.5 text-[8px] font-extrabold bg-fuchsia-500 text-black rounded px-0.5 leading-tight">M</span>
         )}
-        {(unit.burning || unit.disabled) && (
-          <span className="absolute -top-1.5 -left-1.5 text-[10px] leading-none drop-shadow">{unit.disabled ? "❄️" : "🔥"}</span>
-        )}
+        {unit.disabled && <span className="absolute -top-1.5 -left-1.5 text-sky-300 drop-shadow"><SnowIcon size={12} /></span>}
+        {unit.burning && !unit.disabled && <span className="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-full bg-orange-500 shadow-[0_0_6px_2px_rgba(249,115,22,0.7)]" />}
       </div>
     </div>
   );

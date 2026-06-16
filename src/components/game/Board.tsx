@@ -4,10 +4,8 @@ import { useDroppable } from "@dnd-kit/core";
 import { FIELD, TILE, ALLY_ROW0, hexToPixel, fieldPixelSize } from "@/game/engine/hex";
 import { useGame } from "@/game/store/gameStore";
 import { UnitChip } from "./UnitChip";
-import { ITEM_POOL } from "@/game/data/itemPool";
+import { ItemGlyph } from "./ItemGlyph";
 import type { UnitInstance } from "@/game/types";
-
-const ITEM_ICON: Record<string, string> = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i.icon]));
 
 // Same tessellation + tile size as the combat field: the planning board IS the
 // bottom half of the 8-row battlefield. Rendering the whole field (your 4 rows
@@ -83,7 +81,7 @@ export function Board({ units, interactive = true }: { units?: UnitInstance[]; i
       <div className="absolute" style={{ left: 14, top: 14, width: w, height: h }}>
         {/* Enemy half cue — your opponent's army drops in here for combat. */}
         <span className="absolute left-1/2 -translate-x-1/2 top-1 text-[9px] font-bold uppercase tracking-[0.25em] text-rose-300/30 pointer-events-none">
-          ⚔ Enemy
+          Enemy
         </span>
         <div className="absolute pointer-events-none" style={{ left: 0, top: splitY, width: w, height: 1, background: "linear-gradient(90deg, transparent, rgba(148,163,184,0.28), transparent)" }} />
         {Array.from({ length: FIELD.rows }).flatMap((_, r) =>
@@ -100,9 +98,9 @@ export function Board({ units, interactive = true }: { units?: UnitInstance[]; i
               onClick={() => collectDrop(d.id)}
               title="Collect item"
               className="absolute z-20 flex items-center justify-center rounded-full bg-amber-400/90 hover:bg-amber-300 text-black shadow-[0_0_14px_4px_rgba(251,191,36,0.5)] animate-bounce"
-              style={{ left: x - 16, top: y - 16, width: 32, height: 32, fontSize: 16 }}
+              style={{ left: x - 16, top: y - 16, width: 32, height: 32 }}
             >
-              {ITEM_ICON[d.itemId] ?? "◆"}
+              <ItemGlyph id={d.itemId} size={18} />
             </button>
           );
         })}

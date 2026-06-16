@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRoom } from "@/game/net/roomStore";
 import { usePreLobby } from "@/game/store/preLobbyStore";
 import { beginMatch } from "@/game/net/match";
+import { PokeballIcon } from "@/components/game/icons";
 import { enterFullscreen } from "@/lib/fullscreen";
 import { GameRulesPanel } from "./GameRulesPanel";
 import { unitsForGenerations } from "@/game/data/mons";
@@ -92,7 +93,7 @@ export function LobbyScreen() {
       {/* Top bar */}
       <header className="flex items-center justify-between gap-3 px-4 sm:px-6 h-16 border-b border-slate-800/80 bg-slate-950/40 backdrop-blur shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="text-rose-500 text-2xl shrink-0">⬡</span>
+          <span className="text-amber-400 shrink-0"><PokeballIcon size={26} /></span>
           <div className="min-w-0">
             <h1 className="font-extrabold tracking-tight text-base sm:text-lg text-slate-100 truncate">Poké<span className="text-amber-400">TFT</span><span className="text-slate-500 font-normal text-sm ml-2 hidden sm:inline">— {t.l_lobby}</span></h1>
             <p className="text-[11px] text-slate-500 -mt-0.5 truncate">{t.l_net_players(players.length, maxPlayers)}</p>
