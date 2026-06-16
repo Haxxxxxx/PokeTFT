@@ -1,10 +1,10 @@
 import { create } from "zustand";
-import { ECONOMY, XP_TO_REACH, MAX_LEVEL, BOARD, boardSizeForLevel, roundKind, roundsInStage, advanceRound, stageBaseDamage, streakGold, type Cost, type RoundKind } from "../config";
+import { ECONOMY, XP_TO_REACH, MAX_LEVEL, BOARD, boardSizeForLevel, roundKind, roundsInStage, streakGold, type Cost } from "../config";
 import type { UnitInstance } from "../types";
 import { getDef } from "../data/mons";
 import { makeRng, randInt, type Rng } from "../engine/rng";
 import { makePool, makeUnitsByCost, rollShop, takeFromPool, returnToPool, type Pool, type UnitsByCost } from "../engine/shop";
-import { roundIncome, sellValue, interest } from "../engine/economy";
+import { sellValue, interest } from "../engine/economy";
 import { applyCombines, makeInstance } from "../engine/combine";
 import { MEGA_STONE, canMega } from "../data/mega";
 import { ITEM_POOL, ITEM_BY_ID, COMPONENT_IDS, COMPLETED_IDS, EMBLEM_IDS, RECIPES, combineKey, isComponent } from "../data/itemPool";
@@ -78,17 +78,6 @@ function levelFromXp(xp: number): number {
   return lvl;
 }
 
-export type RoundOutcome = "win" | "loss" | "pve" | "carousel";
-export type RoundRecord = { stage: number; round: number; kind: RoundKind; outcome: RoundOutcome };
-
-/** Shared round-advance: passive XP, income, next round/stage, fresh shop. */
-function advancePartial(state: State, gold: number) {
-  const { stage, round } = advanceRound(state.stage, state.round);
-  const newXp = state.xp + ECONOMY.passiveXpPerRound;
-  const shop = state.frozen ? state.shop : rollShop(levelFromXp(newXp), state.pool, rng, state.unitsByCost);
-  return { gold, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false };
-}
-
 /** A PvE item component dropped onto the board at a slain creep's position, waiting to
  *  be clicked to collect. `cell` is a FULL-FIELD coordinate [col(0..6), row(0..7)] so
  *  the drop sits exactly where the mob fell (the enemy half), not bunched on your side. */
@@ -98,10 +87,7 @@ type State = {
   gold: number;
   xp: number;
   level: number;
-  health: number;
   streak: number;
-  stage: number;
-  round: number;
   pool: Pool;
   unitsByCost: UnitsByCost;
   /** Completed item ids the lobby enabled. null/empty = all allowed. A component
@@ -110,7 +96,6 @@ type State = {
   units: UnitInstance[];
   shop: (string | null)[];
   frozen: boolean;
-  history: RoundRecord[];
   /** Unequipped items in the player's inventory (e.g. Mega Stones). */
   items: string[];
   /** PvE loot dropped onto the board, waiting to be clicked to collect. Auto-collected
@@ -125,10 +110,9 @@ type State = {
   // selectors
   benchUnits: () => UnitInstance[];
   boardUnits: () => UnitInstance[];
-  xpProgress: () => { current: number; needed: number | null };
 
   // actions
-  newGame: (startingHp?: number, allowedIds?: string[], enabledItems?: string[]) => void;
+  newGame: (allowedIds?: string[], enabledItems?: string[]) => void;
   reroll: () => void;
   buyXp: () => void;
   buyUnit: (slot: number) => void;
@@ -139,9 +123,6 @@ type State = {
   reorderBench: (iid: string, toIndex: number) => void;
   fillBoard: () => void;
   toggleFreeze: () => void;
-  endRound: (won: boolean, survivors?: number) => void;
-  pveReward: (won: boolean) => void;
-  carouselTake: (defId: string) => void;
   /** Multiplayer: grant a planning round's economy (income/xp/shop) for a host-driven round. */
   netRound: (stage: number, round: number, streak: number) => void;
   /** Multiplayer: take a carousel pick (unit or Mega Stone) without advancing the round. */
@@ -151,7 +132,6 @@ type State = {
   /** Multiplayer: snapshot / restore the local economy for reconnect. */
   exportSave: () => { gold: number; xp: number; level: number; units: UnitInstance[]; shop: (string | null)[]; items: string[]; augments: string[]; pension: State["pension"] };
   importSave: (save: { gold: number; xp: number; level: number; units?: UnitInstance[]; shop?: (string | null)[]; items?: string[]; augments?: string[]; pension?: State["pension"] }, allowedIds?: string[], enabledItems?: string[]) => void;
-  grantItem: (itemId: string) => void;
   /** Spawn loot drops at slain-creep positions (called at PvE combat-end). Idempotent
    *  per id so a re-render / reconnect can't double-drop. */
   spawnDrops: (drops: ItemDrop[]) => void;
@@ -177,10 +157,7 @@ export const useGame = create<State>((set, get) => ({
   gold: 4,
   xp: 0,
   level: 1,
-  health: ECONOMY.startingHealth,
   streak: 0,
-  stage: 1,
-  round: 1,
   pool: makePool(),
   unitsByCost: makeUnitsByCost(),
   enabledItems: null,
@@ -188,22 +165,14 @@ export const useGame = create<State>((set, get) => ({
   units: [],
   shop: [],
   frozen: false,
-  history: [],
   items: [],
   drops: [],
   augments: [],
 
   benchUnits: () => get().units.filter((u) => u.pos === null),
   boardUnits: () => get().units.filter((u) => u.pos !== null),
-  xpProgress: () => {
-    const { xp, level } = get();
-    if (level >= MAX_LEVEL) return { current: xp, needed: null };
-    const base = XP_TO_REACH[level];
-    const next = XP_TO_REACH[level + 1];
-    return { current: xp - base, needed: next - base };
-  },
 
-  newGame: (startingHp = ECONOMY.startingHealth, allowedIds?: string[], enabledItems?: string[]) => {
+  newGame: (allowedIds?: string[], enabledItems?: string[]) => {
     // Fresh, independent randomness each game (and per player) — not a fixed seed,
     // so every player's shop rolls differently.
     rng = makeRng((Math.floor(Math.random() * 0x7fffffff) ^ Date.now()) >>> 0);
@@ -222,8 +191,8 @@ export const useGame = create<State>((set, get) => ({
     set({
       pool, unitsByCost, enabledItems: enabledItems && enabledItems.length ? enabledItems : null,
       pension: null,
-      gold: 4, xp: 0, level: 1, health: startingHp,
-      streak: 0, stage: 1, round: 1, units, frozen: false, history: [], items: [], drops: [], augments: [],
+      gold: 4, xp: 0, level: 1,
+      streak: 0, units, frozen: false, items: [], drops: [], augments: [],
       shop: rollShop(1, pool, rng, unitsByCost),
     });
   },
@@ -378,63 +347,8 @@ export const useGame = create<State>((set, get) => ({
 
   toggleFreeze: () => set({ frozen: !get().frozen }),
 
-  endRound: (won, survivors = 0) => {
-    const state = get();
-    const newStreak = won
-      ? state.streak >= 0 ? state.streak + 1 : 1
-      : state.streak <= 0 ? state.streak - 1 : -1;
-    const income = roundIncome(state.gold, newStreak);
-
-    // HP damage on a loss = stage base + surviving enemy units.
-    const damage = won ? 0 : stageBaseDamage(state.stage) + survivors;
-    const health = Math.max(0, state.health - damage);
-
-    const record: RoundRecord = { stage: state.stage, round: state.round, kind: "pvp", outcome: won ? "win" : "loss" };
-    set({
-      ...advancePartial(state, state.gold + income),
-      streak: newStreak,
-      health,
-      history: [...state.history, record],
-    });
-  },
-
-  // PvE round: keep your streak, take no HP damage, earn loot gold on a win.
-  pveReward: (won) => {
-    const state = get();
-    const income = roundIncome(state.gold, state.streak);
-    const loot = won ? 3 : 1;
-    const record: RoundRecord = { stage: state.stage, round: state.round, kind: "pve", outcome: "pve" };
-    set({
-      ...advancePartial(state, state.gold + income + loot),
-      history: [...state.history, record],
-    });
-  },
-
-  // Carousel: take one free pick (a unit, or a Mega Stone), then advance the round.
-  carouselTake: (pick) => {
-    const state = get();
-    let units = state.units;
-    let items = state.items;
-    if (pick === MEGA_STONE) {
-      items = [...state.items, MEGA_STONE];
-    } else if (state.units.filter((u) => u.pos === null).length < BENCH_SIZE) {
-      takeFromPool(state.pool, pick); // carousel mons come from the shared bag — debit it
-      const r = applyCombines([...state.units, makeInstance(pick)]);
-      units = r.units; items = [...items, ...r.dropped];
-    }
-    const income = roundIncome(state.gold, state.streak);
-    const record: RoundRecord = { stage: state.stage, round: state.round, kind: "carousel", outcome: "carousel" };
-    set({
-      ...advancePartial(state, state.gold + income),
-      units,
-      items,
-      pool: { ...state.pool },
-      history: [...state.history, record],
-    });
-  },
-
-  // Multiplayer: economy for a host-driven planning round (no stage/round of its
-  // own — both come from the room; health is room-authoritative, not touched here).
+  // Multiplayer: economy for a host-driven planning round (stage/round/HP all come
+  // from the room — this only grants the local econ: income, XP, shop, loot).
   netRound: (stage, round, streak) => {
     const state = get();
     // Passive augments: extra gold / XP each round.
@@ -472,7 +386,7 @@ export const useGame = create<State>((set, get) => ({
     // Pension trains one planning round closer to maturity (down to 0 = ready).
     const pension = state.pension ? { ...state.pension, roundsLeft: Math.max(0, state.pension.roundsLeft - 1) } : null;
 
-    set({ gold: state.gold + income + bonusGold, xp: newXp, level: lvl, stage, round, shop, frozen: false, items, units, drops: [], pension, pool: { ...state.pool } });
+    set({ gold: state.gold + income + bonusGold, xp: newXp, level: lvl, shop, frozen: false, items, units, drops: [], pension, pool: { ...state.pool } });
   },
 
   netCarouselPick: (pick) => {
@@ -565,9 +479,6 @@ export const useGame = create<State>((set, get) => ({
       pension: restoredPension,
     });
   },
-
-  // Add an item to the inventory (carousel pick / loot).
-  grantItem: (itemId) => set({ items: [...get().items, itemId] }),
 
   spawnDrops: (incoming) => {
     const state = get();
@@ -715,5 +626,3 @@ export const useGame = create<State>((set, get) => ({
     set({ units, items: [...state.items, ...dropped], pension: null, pool });
   },
 }));
-
-export { roundKind };

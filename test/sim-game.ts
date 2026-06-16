@@ -44,7 +44,7 @@ function ownedCopies(units: UnitInstance[], pension: { star: number } | null): n
 function playGame(seed: number): void {
   const g = useGame.getState();
   const roster = rosterForGenerations([1, 2, 3], 90, seed);
-  g.newGame(100, roster);
+  g.newGame(roster);
 
   // The conserved total: full bag for the roster (the starter was already debited
   // from the pool during newGame, and counts in ownedCopies — so the sum is fixed).

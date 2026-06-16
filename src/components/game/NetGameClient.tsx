@@ -355,7 +355,7 @@ export function NetGameClient() {
       // save can still heal it via the self-heal branch below — a slow priv read can
       // never permanently wipe an in-progress game.
       if (save) { importSave({ ...save, units: asUnits(save.units) }, roster(), enabledItems); hydrated.current = "save"; }
-      else { newGame(room.rules?.startingHp ?? 100, roster(), enabledItems); hydrated.current = "fresh"; }
+      else { newGame(roster(), enabledItems); hydrated.current = "fresh"; }
       // Mark the current planning round consumed so netRound doesn't double-grant it.
       lastRoundKey.current = phase === "planning" ? `${meta.stage}-${meta.round}` : "__hydrated__";
       return;
