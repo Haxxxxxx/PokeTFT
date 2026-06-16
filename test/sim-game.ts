@@ -92,7 +92,7 @@ function playGame(seed: number): void {
       assert(result.frames.length > 0 && result.frames.length < 5000, `fight didn't terminate sanely (${result.frames.length} frames)`, ctx);
       assert(result.winner === "ally" || result.winner === "enemy" || result.winner === "draw", `bad winner ${result.winner}`, ctx);
       if (kind !== "pve" && result.winner === "enemy") {
-        health -= stageBaseDamage(stage) + result.survivors;
+        health -= stageBaseDamage(stage) + result.survivorDamage;
         streak = streak >= 0 ? -1 : streak - 1;
       } else if (result.winner === "ally") {
         streak = streak <= 0 ? 1 : streak + 1;

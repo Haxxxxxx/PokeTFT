@@ -127,11 +127,21 @@ export type Frame = { t: number; overtime: boolean; units: FrameUnit[]; events: 
 
 export type CombatResult = {
   winner: Team | "draw";
-  /** Surviving units of the winning team (for HP-damage calc). */
+  /** Surviving units of the winning team (head-count, shown to the player). */
   survivors: number;
+  /** Weighted player damage from those survivors — like TFT, a stronger surviving
+   *  board hurts more: each unit contributes its star (1/2/3) plus +1 for a 4/5-cost
+   *  carry. This (not the raw count) is what the loser's HP is docked by. */
+  survivorDamage: number;
   frames: Frame[];
   duration: number;
 };
+
+/** Per-surviving-unit player-damage weight: ★ value + a carry bonus for 4/5-costs. */
+function survivorWeight(u: Combatant): number {
+  const cost = getDef(u.defId).cost;
+  return u.star + (cost >= 4 ? 1 : 0);
+}
 
 // Tuning.
 const DT = 1 / 16; // 16 sim steps per second
@@ -617,23 +627,25 @@ function finalize(units: Combatant[], frames: Frame[], duration: number): Combat
   const enemyAlive = units.filter((u) => u.alive && u.team === "enemy");
 
   let winner: Team | "draw";
-  let survivors: number;
+  let winningUnits: Combatant[];
   if (allyAlive.length && !enemyAlive.length) {
     winner = "ally";
-    survivors = allyAlive.length;
+    winningUnits = allyAlive;
   } else if (enemyAlive.length && !allyAlive.length) {
     winner = "enemy";
-    survivors = enemyAlive.length;
+    winningUnits = enemyAlive;
   } else if (!allyAlive.length && !enemyAlive.length) {
     winner = "draw";
-    survivors = 0;
+    winningUnits = [];
   } else {
     // Timeout — most remaining total HP wins.
     const allyHp = allyAlive.reduce((s, u) => s + u.hp, 0);
     const enemyHp = enemyAlive.reduce((s, u) => s + u.hp, 0);
     winner = allyHp === enemyHp ? "draw" : allyHp > enemyHp ? "ally" : "enemy";
-    survivors = winner === "ally" ? allyAlive.length : winner === "enemy" ? enemyAlive.length : 0;
+    winningUnits = winner === "ally" ? allyAlive : winner === "enemy" ? enemyAlive : [];
   }
 
-  return { winner, survivors, frames, duration };
+  const survivors = winningUnits.length;
+  const survivorDamage = winningUnits.reduce((s, u) => s + survivorWeight(u), 0);
+  return { winner, survivors, survivorDamage, frames, duration };
 }
