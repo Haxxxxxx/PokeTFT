@@ -23,11 +23,11 @@ function itemIcon(id: string): LucideIcon {
 /** Library icon for an augment, by id (its reward category). */
 function augmentIcon(id: string): LucideIcon {
   switch (id) {
-    case "pumped-up": case "windfall": case "rich": case "compound-interest": return Coins;
-    case "training": case "scholar": case "fast-learner": case "big-brain": return GraduationCap;
+    case "pumped-up": case "pocket-change": case "windfall": case "jackpot": case "rich": case "compound-interest": return Coins;
+    case "training": case "study-hall": case "scholar": case "fast-learner": case "big-brain": case "prodigy": return GraduationCap;
     case "lucky": return Dices;
     case "recruiter": case "draft-day": return Users;
-    case "treasure": case "component-cache": return Package;
+    case "treasure": case "component-cache": case "merchant": case "prospector": return Package;
     case "mega-gift": return Gem;
     default: return Star;
   }

@@ -439,6 +439,11 @@ export const useGame = create<State>((set, get) => ({
       }
     }
 
+    // Prospector augment: a free item component every 3rd round.
+    if (state.augments.includes("prospector") && round % 3 === 0) {
+      items = [...items, COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)]];
+    }
+
     // Pension trains one planning round closer to maturity (down to 0 = ready).
     const pension = state.pension ? { ...state.pension, roundsLeft: Math.max(0, state.pension.roundsLeft - 1) } : null;
 
@@ -464,9 +469,14 @@ export const useGame = create<State>((set, get) => ({
     // Instant effects fire on pick; passive ones are applied each round in netRound.
     switch (id) {
       case "pumped-up": gold += 8; break;
+      case "pocket-change": gold += 5; break;
       case "windfall": gold += 12; break;
+      case "jackpot": gold += 18; break;
       case "training": xp += 4; break;
+      case "study-hall": xp += 6; break;
       case "big-brain": xp += 8; break;
+      case "prodigy": xp += 12; break;
+      case "merchant": gold += 6; items = [...items, COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)]]; break;
       case "mega-gift": items = [...items, MEGA_STONE]; break;
       case "treasure":
         for (let i = 0; i < 2; i++) items = [...items, COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)]];
