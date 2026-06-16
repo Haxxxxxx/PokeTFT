@@ -12,12 +12,16 @@ export function LeaderboardScreen() {
   const openUserProfile = useAppStore((s) => s.openUserProfile);
   const lang = useAppStore((s) => s.settings.language);
   const [rows, setRows] = useState<LeaderEntry[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let alive = true;
-    getLeaderboard(100).then((r) => alive && setRows(r)).catch(() => setRows([]));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRows(null); setFailed(false);
+    getLeaderboard(100).then((r) => { if (alive) setRows(r); }).catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
-  }, []);
+  }, [reloadKey]);
 
   const tr = (en: string, fr: string) => (lang === "fr" ? fr : en);
   const rankColor = (i: number) => (i === 0 ? "#fbbf24" : i === 1 ? "#cbd5e1" : i === 2 ? "#d97706" : "#64748b");
@@ -33,7 +37,12 @@ export function LeaderboardScreen() {
         </div>
 
         <div className="panel rounded-2xl p-3">
-          {rows === null ? (
+          {failed ? (
+            <div className="py-8 flex flex-col items-center gap-3">
+              <p className="text-[12px] text-rose-400 text-center">{tr("Couldn't load the leaderboard.", "Échec du chargement du classement.")}</p>
+              <button onClick={() => setReloadKey((k) => k + 1)} className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200">{tr("Retry", "Réessayer")}</button>
+            </div>
+          ) : rows === null ? (
             <p className="text-[12px] text-slate-500 py-8 text-center">{tr("Loading…", "Chargement…")}</p>
           ) : rows.length === 0 ? (
             <p className="text-[12px] text-slate-600 py-8 text-center">{tr("No ranked games yet — play a match!", "Aucune partie classée — lance une partie !")}</p>

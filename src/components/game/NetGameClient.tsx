@@ -619,7 +619,20 @@ export function NetGameClient() {
     return () => clearTimeout(id);
   }, [stageBanner]);
 
-  if (!room || !meta || !myUid) return null;
+  // A partial/glitched room sync (room present but meta/myUid briefly missing) used to
+  // render a bare blank canvas with no way out. Show a reconnecting veil with an escape
+  // hatch so a stuck sync never traps the player on a black screen.
+  if (!room || !meta || !myUid) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 app-bg text-center px-6">
+        <div className="w-8 h-8 rounded-full border-2 border-amber-400/40 border-t-amber-400 animate-spin" />
+        <p className="text-sm text-slate-400">{lang === "fr" ? "Reconnexion à la partie…" : "Reconnecting to your game…"}</p>
+        <button onClick={leave} className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-300">
+          {lang === "fr" ? "Retour à l'accueil" : "Back to home"}
+        </button>
+      </div>
+    );
+  }
 
   const isHost = meta.hostUid === myUid;
   const ladder = Object.values(players).sort((a, b) => Number(b.alive) - Number(a.alive) || b.hp - a.hp);

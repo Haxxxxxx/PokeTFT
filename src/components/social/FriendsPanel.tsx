@@ -24,9 +24,15 @@ export function FriendsPanel() {
 
   const add = async () => {
     if (!name.trim()) return;
-    const res = await addFriendByName(name);
-    setMsg(res.ok ? `Added ${name.trim()}` : res.error ?? "Failed");
-    if (res.ok) setName("");
+    try {
+      const res = await addFriendByName(name);
+      setMsg(res.ok ? `Added ${name.trim()}` : res.error ?? "Failed");
+      if (res.ok) setName("");
+    } catch {
+      // A network/permission failure must surface as a message, not an unhandled
+      // rejection that could leave the panel in a broken state.
+      setMsg("Network error — try again");
+    }
     setTimeout(() => setMsg(null), 2500);
   };
 

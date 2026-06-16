@@ -37,6 +37,7 @@ export function LobbyScreen() {
   const [showRules, setShowRules] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [invited, setInvited] = useState<Record<string, boolean>>({});
+  const [startError, setStartError] = useState<string | null>(null);
 
   const isHost = room?.meta?.hostUid === myUid;
 
@@ -223,15 +224,17 @@ export function LobbyScreen() {
         ) : (
           <div className="w-full max-w-md flex flex-col items-center gap-2">
             <button data-testid="start-game" disabled={!canStart} onClick={() => {
+              setStartError(null);
               enterFullscreen();
               beginMatch(room.code, room)
                 .then(() => kickoffServerGame(room.code)) // every game is server-driven (#110)
-                .catch((e) => console.error("[beginMatch]", e));
+                .catch((e) => { console.error("[beginMatch]", e); setStartError(lang === "fr" ? "Échec du lancement. Réessaie." : "Couldn't start the match. Try again."); });
             }}
               className="w-full py-4 rounded-2xl font-extrabold text-base tracking-wide transition-all bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black shadow-lg shadow-amber-500/20 disabled:opacity-30 disabled:shadow-none disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500">
               <span className="inline-flex items-center justify-center gap-2"><Swords size={18} /> {t.l_net_start}</span>
             </button>
             {!canStart && <p className="text-xs text-slate-600">{t.l_net_wait_ready}</p>}
+            {startError && <p className="text-xs text-rose-400 font-semibold">{startError}</p>}
           </div>
         )}
       </main>

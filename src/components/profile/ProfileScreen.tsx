@@ -32,13 +32,20 @@ export function ProfileScreen() {
   const uid = viewUid ?? user?.uid;
   // For another user, pull their public profile node; for self, use the live auth store.
   const [otherProfile, setOtherProfile] = useState<UserProfile | null>(null);
+  const [otherLoaded, setOtherLoaded] = useState(false);
   const profile = isOther ? otherProfile : myProfile;
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!isOther || !uid) { setOtherProfile(null); return; }
+    if (!isOther || !uid) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOtherProfile(null); setOtherLoaded(false);
+      return;
+    }
     let alive = true;
-    getProfile(uid).then((p) => { if (alive) setOtherProfile(p); }).catch(() => {});
+    setOtherLoaded(false);
+    getProfile(uid)
+      .then((p) => { if (alive) { setOtherProfile(p); setOtherLoaded(true); } })
+      .catch(() => { if (alive) { setOtherProfile(null); setOtherLoaded(true); } });
     return () => { alive = false; };
   }, [isOther, uid]);
 
@@ -63,8 +70,9 @@ export function ProfileScreen() {
   const name = profile?.username || (isOther ? "" : user?.displayName) || "Trainer";
   const photo = profile?.photoURL ?? (isOther ? null : user?.photoURL) ?? null;
   const tr = (en: string, fr: string) => (lang === "fr" ? fr : en);
-  // Still loading another user's public profile node.
-  const loadingOther = isOther && otherProfile === null;
+  // Still loading another user's public profile node (vs loaded-but-missing).
+  const loadingOther = isOther && !otherLoaded;
+  const missingOther = isOther && otherLoaded && !otherProfile;
 
   return (
     <div className="min-h-screen w-full app-bg flex flex-col items-center px-4 py-8">
@@ -91,8 +99,8 @@ export function ProfileScreen() {
             )}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-xl font-bold gild-text truncate">{loadingOther ? "…" : name}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5 truncate">{isOther ? (profile?.currentGame ? tr("In a game", "En partie") : tr("Trainer", "Dresseur")) : user?.email}</div>
+            <div className="text-xl font-bold gild-text truncate">{loadingOther ? "…" : missingOther ? tr("Unavailable", "Indisponible") : name}</div>
+            <div className="text-[11px] text-slate-500 mt-0.5 truncate">{missingOther ? tr("This trainer's profile couldn't be loaded.", "Profil introuvable.") : isOther ? (profile?.currentGame ? tr("In a game", "En partie") : tr("Trainer", "Dresseur")) : user?.email}</div>
           </div>
           {(() => {
             const rank = rankOf(profile?.rating ?? START_RATING);
