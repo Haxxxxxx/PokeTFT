@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useUi } from "@/game/store/uiStore";
 import { useGame } from "@/game/store/gameStore";
 import { useAppStore } from "@/game/store/appStore";
-import { getDef, spriteUrl, archetypeOf, type Archetype } from "@/game/data/mons";
+import { getDef, spriteUrl, archetypeOf, typesForStar, type Archetype } from "@/game/data/mons";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { ITEM_POOL, RARITY_COLOR } from "@/game/data/itemPool";
 import { ITEM_EFFECT } from "@/game/data/items";
@@ -155,7 +155,7 @@ function Card() {
             </span>
           </div>
           <div className="flex flex-wrap gap-1 mt-1.5">
-            {def.types.map((t) => (
+            {typesForStar(def, star).map((t) => (
               <Badge key={t} color={TYPE_COLOR[t as PokeType]} text={traitLabel(t)} solid />
             ))}
             {def.roles.map((r) => (

@@ -111,6 +111,8 @@ type DefInput = {
   name: string;
   cost: Cost;
   types: PokeType[];
+  /** Per-star typing override (see UnitDef.typesByStar). */
+  typesByStar?: PokeType[][];
   roles?: RoleTrait[];
   dex: [number, number, number];
   stageNames: [string, string, string];
@@ -130,6 +132,7 @@ function def(d: DefInput): UnitDef {
 export const UNITS: UnitDef[] = [
   // ───────────── 1-cost ─────────────
   def({ id: "charmander", name: "Charmander", cost: 1, types: ["fire"], roles: ["starter", "evolver"],
+    typesByStar: [["fire"], ["fire"], ["fire", "flying"]], // Charizard gains Flying
     dex: [4, 5, 6], stageNames: ["Charmander", "Charmeleon", "Charizard"], move: move("Ember", "fire", 180, "splash") }),
   def({ id: "bulbasaur", name: "Bulbasaur", cost: 1, types: ["grass", "poison"], roles: ["starter", "evolver"],
     dex: [1, 2, 3], stageNames: ["Bulbasaur", "Ivysaur", "Venusaur"], move: move("Vine Whip", "grass", 170) }),
@@ -137,6 +140,7 @@ export const UNITS: UnitDef[] = [
     dex: [7, 8, 9], stageNames: ["Squirtle", "Wartortle", "Blastoise"], move: move("Water Gun", "water", 175, "line"),
     patch: { range: 3, hp: [520, 936, 1685] } }),
   def({ id: "caterpie", name: "Caterpie", cost: 1, types: ["bug"], roles: ["swarm", "evolver"],
+    typesByStar: [["bug"], ["bug"], ["bug", "flying"]], // Butterfree gains Flying
     dex: [10, 11, 12], stageNames: ["Caterpie", "Metapod", "Butterfree"], move: move("Gust", "flying", 160) }),
   def({ id: "weedle", name: "Weedle", cost: 1, types: ["bug", "poison"], roles: ["swarm", "evolver"],
     dex: [13, 14, 15], stageNames: ["Weedle", "Kakuna", "Beedrill"], move: move("Poison Sting", "poison", 150) }),
@@ -216,6 +220,7 @@ export const UNITS: UnitDef[] = [
 
   // ───────────── 4-cost ─────────────
   def({ id: "dratini", name: "Dratini", cost: 4, types: ["dragon"], roles: ["pseudo-legendary", "evolver"],
+    typesByStar: [["dragon"], ["dragon"], ["dragon", "flying"]], // Dragonite gains Flying
     dex: [147, 148, 149], stageNames: ["Dratini", "Dragonair", "Dragonite"], move: move("Dragon Rush", "dragon", 380, "splash") }),
   def({ id: "lapras", name: "Lapras", cost: 4, types: ["water", "ice"],
     dex: [131, 131, 131], stageNames: ["Lapras", "Lapras", "Lapras"], move: move("Ice Beam", "ice", 360, "line"),
@@ -885,6 +890,13 @@ export function hasDef(id: string): boolean {
 
 export function getDef(id: string): UnitDef {
   return UNITS_BY_ID[id] ?? placeholderDef(id);
+}
+
+/** The mon's typing at a given star (1..3). Falls back to base `types` for any star a
+ *  line doesn't override. Used by combat, synergies and the detail panel so a mon that
+ *  changes type as it evolves is reflected everywhere. */
+export function typesForStar(def: UnitDef, star: number): PokeType[] {
+  return def.typesByStar?.[star - 1] ?? def.types;
 }
 
 /** Combat-role archetype, derived from a mon's 1★ stats. Physical = auto-attack

@@ -46,6 +46,11 @@ export type UnitDef = {
   name: string;
   cost: Cost;
   types: PokeType[];
+  /** Optional per-star typing — index 0 = ★, 1 = ★★, 2 = ★★★. When a line gains/shifts
+   *  a type as it evolves (e.g. Charizard gains Flying at ★★★), list it here; absent
+   *  stars fall back to `types`. Drives combat type-effectiveness, synergies and the
+   *  detail panel's type chips for the unit's current star. */
+  typesByStar?: PokeType[][];
   roles: RoleTrait[];
   /** National dex ids for each star tier; reuse the same id if a line is shorter. */
   dex: [number, number, number];

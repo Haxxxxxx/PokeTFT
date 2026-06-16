@@ -7,7 +7,7 @@
  */
 
 import type { UnitInstance, PokeType, Move } from "../types";
-import { getDef } from "../data/mons";
+import { getDef, typesForStar } from "../data/mons";
 import { effectiveness } from "../data/typeChart";
 import { isMegaActive, megaFormFor } from "../data/mega";
 import { ITEM_EFFECT } from "../data/items";
@@ -158,7 +158,10 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
 
   // Mega Evolution applies at combat start when the mon holds a Mega Stone.
   const mega = isMegaActive(u.defId, items) ? megaFormFor(u.defId) : undefined;
-  const types = mega?.addType && !def.types.includes(mega.addType) ? [...def.types, mega.addType] : def.types;
+  // Base typing at this star (a line can gain/shift a type as it evolves), then the
+  // Mega's type shift on top.
+  const starTypes = typesForStar(def, u.star);
+  const types = mega?.addType && !starTypes.includes(mega.addType) ? [...starTypes, mega.addType] : starTypes;
   // Deterministic stat-scale (early-PvE creeps come in weakened so the opening
   // rounds are winnable). Applies before items/traits; undefined = 1.
   const scale = u.statScale ?? 1;
@@ -264,7 +267,9 @@ function applyTraitBuffs(units: Combatant[], board: UnitInstance[], team: Team) 
     for (const c of units) {
       if (c.team !== team) continue;
       const def = getDef(c.defId);
-      const carries = (def.types as string[]).includes(tr.key) || (def.roles as string[]).includes(tr.key);
+      // Use the combatant's RESOLVED typing (per-star + Mega) so an evolved/mega'd mon
+      // benefits from its current types, not just its base form.
+      const carries = (c.types as string[]).includes(tr.key) || (def.roles as string[]).includes(tr.key);
       if (buff.scope !== "team" && !carries) continue;
       if (buff.hpMult) { c.maxHp = Math.round(c.maxHp * buff.hpMult); c.hp = c.maxHp; }
       if (buff.shieldPct) { const extra = Math.round(c.maxHp * buff.shieldPct); c.maxHp += extra; c.hp += extra; }

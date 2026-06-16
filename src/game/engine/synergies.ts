@@ -1,5 +1,5 @@
 import type { UnitInstance } from "../types";
-import { getDef } from "../data/mons";
+import { getDef, typesForStar } from "../data/mons";
 import { activeTier, TRAITS_BY_KEY } from "../data/traits";
 
 export type ActiveTrait = {
@@ -13,14 +13,13 @@ export type ActiveTrait = {
 /** Counts each trait across DISTINCT board units (TFT counts unique units, not copies). */
 export function computeTraits(boardUnits: UnitInstance[]): ActiveTrait[] {
   const counts = new Map<string, number>();
-  const seenDef = new Set<string>();
-
-  for (const u of boardUnits) {
-    // Each distinct unit definition contributes once per trait.
-    const def = getDef(u.defId);
-    if (seenDef.has(def.id)) continue;
-    seenDef.add(def.id);
-    for (const key of [...def.types, ...def.roles]) {
+  // Each distinct unit definition contributes once per trait, using its HIGHEST star
+  // on the board so an evolved mon's gained typing (typesByStar) counts.
+  const maxStar = new Map<string, number>();
+  for (const u of boardUnits) maxStar.set(u.defId, Math.max(maxStar.get(u.defId) ?? 0, u.star));
+  for (const [defId, star] of maxStar) {
+    const def = getDef(defId);
+    for (const key of [...typesForStar(def, star), ...def.roles]) {
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
   }
