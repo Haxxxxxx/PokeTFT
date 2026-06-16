@@ -14,6 +14,9 @@ export const FIELD = { cols: 7, rows: 8 } as const;
  *  board a generous centerpiece that spreads across the fullscreen layout. */
 export const TILE = { w: 106, h: 100 } as const;
 
+/** CSS clip-path for the pointy-top hex token (shared by the board, chips and combat). */
+export const HEX_CLIP = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
+
 /** Rows the local player owns: the bottom 4 of the 8-row field. */
 export const ALLY_ROW0 = FIELD.rows - 4;
 

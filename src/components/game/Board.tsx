@@ -1,7 +1,7 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
-import { FIELD, TILE, ALLY_ROW0, hexToPixel, fieldPixelSize } from "@/game/engine/hex";
+import { FIELD, TILE, ALLY_ROW0, HEX_CLIP, hexToPixel, fieldPixelSize } from "@/game/engine/hex";
 import { useGame } from "@/game/store/gameStore";
 import { UnitChip } from "./UnitChip";
 import { ItemGlyph } from "./ItemGlyph";
@@ -13,7 +13,6 @@ import type { UnitInstance } from "@/game/types";
 // pixels in both phases — nothing jumps when planning flips to combat.
 const TILE_W = TILE.w;
 const TILE_H = TILE.h;
-const HEX_CLIP = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
 
 function HexCell({ c, r, unit, interactive }: { c: number; r: number; unit?: UnitInstance; interactive: boolean }) {
   // `r` is a FIELD row (0..7). Your droppable cells are the bottom 4 rows; their

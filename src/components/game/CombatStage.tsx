@@ -4,7 +4,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 import { sfx } from "@/lib/audio";
-import { hexToPixel, fieldPixelSize, hexDistance, FIELD, TILE } from "@/game/engine/hex";
+import { hexToPixel, fieldPixelSize, hexDistance, FIELD, TILE, HEX_CLIP } from "@/game/engine/hex";
 import { TYPE_COLOR } from "@/game/ui";
 import { SnowIcon } from "./icons";
 import { Leaf, BarChart3 } from "lucide-react";
@@ -35,7 +35,6 @@ function mirrorResult(r: CombatResult): CombatResult {
 const TILE_W = TILE.w;
 const TILE_H = TILE.h;
 const SIM_DT = 1 / 16;
-const HEX_CLIP = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const easeOut = (t: number) => 1 - (1 - t) * (1 - t);

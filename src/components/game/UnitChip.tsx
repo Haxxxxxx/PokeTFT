@@ -6,6 +6,7 @@ import { COST_COLOR } from "@/game/ui";
 import { useUi } from "@/game/store/uiStore";
 import { useGame } from "@/game/store/gameStore";
 import { MEGA_STONE, canMega, isMegaActive } from "@/game/data/mega";
+import { HEX_CLIP } from "@/game/engine/hex";
 import { StarIcon, MegaIcon } from "./icons";
 import { ItemGlyph } from "./ItemGlyph";
 import type { UnitInstance } from "@/game/types";
@@ -33,8 +34,6 @@ export function Stars({ star }: { star: number }) {
     </div>
   );
 }
-
-const HEX_CLIP = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
 
 export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true, shape = "square" }: { unit: UnitInstance; size?: number; interactive?: boolean; canDeploy?: boolean; shape?: "square" | "hex" }) {
   const def = getDef(unit.defId);
