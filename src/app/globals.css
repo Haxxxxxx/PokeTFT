@@ -77,6 +77,19 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
 }
 
+/* Thin, arrow-less scrollbars everywhere — kills the native increment/decrement
+   buttons ("scroll arrows") that showed in the round-tracker + scrolling panels. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.28) transparent;
+}
+*::-webkit-scrollbar { width: 7px; height: 7px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.28); border-radius: 4px; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.45); }
+*::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+*::-webkit-scrollbar-corner { background: transparent; }
+
 @keyframes combat-float {
   0% { transform: translateY(0); opacity: 1; }
   100% { transform: translateY(-26px); opacity: 0; }

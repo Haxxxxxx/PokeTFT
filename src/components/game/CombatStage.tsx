@@ -55,6 +55,7 @@ export function CombatStage({
   pve = false,
   authWon,
   hpLost,
+  suppressRecap = false,
   syncStart,
   syncWindowMs,
 }: {
@@ -63,6 +64,8 @@ export function CombatStage({
   flip?: boolean;
   /** HP the player lost this round (0 on a win / PvE breather) — shown in the banner. */
   hpLost?: number;
+  /** Hide the side recap (e.g. while a unit's detail card occupies the rail). */
+  suppressRecap?: boolean;
   /** Host-authoritative win flag for THIS player. When set, the result banner
    *  uses it (instead of the local re-sim) so the outcome shown can never
    *  disagree with the HP the host actually applied. */
@@ -361,7 +364,7 @@ export function CombatStage({
         </div>
       </div>
 
-      {recapOpen ? (
+      {suppressRecap ? null : recapOpen ? (
         <CombatRecapTabs units={a.units} label={t.cs_your_team} onClose={() => setRecapOpen(false)} />
       ) : (
         <button

@@ -1,13 +1,13 @@
 import { create } from "zustand";
 import { ECONOMY, XP_TO_REACH, MAX_LEVEL, BOARD, boardSizeForLevel, roundKind, roundsInStage, streakGold, type Cost } from "../config";
 import type { UnitInstance } from "../types";
-import { getDef } from "../data/mons";
+import { getDef, typesForStar } from "../data/mons";
 import { makeRng, randInt, type Rng } from "../engine/rng";
 import { makePool, makeUnitsByCost, rollShop, takeFromPool, returnToPool, type Pool, type UnitsByCost } from "../engine/shop";
 import { sellValue, interest } from "../engine/economy";
 import { applyCombines, makeInstance } from "../engine/combine";
 import { MEGA_STONE, canMega } from "../data/mega";
-import { ITEM_POOL, ITEM_BY_ID, COMPONENT_IDS, COMPLETED_IDS, EMBLEM_IDS, RECIPES, combineKey, isComponent } from "../data/itemPool";
+import { ITEM_POOL, ITEM_BY_ID, COMPONENT_IDS, COMPLETED_IDS, EMBLEM_IDS, EMBLEM_TRAIT, RECIPES, combineKey, isComponent, isEmblem } from "../data/itemPool";
 import { AUGMENT_BY_ID } from "../data/augments";
 import { useUi } from "./uiStore";
 import { useAppStore } from "./appStore";
@@ -507,6 +507,13 @@ export const useGame = create<State>((set, get) => ({
     if (itemId === MEGA_STONE) {
       if (!canMega(unit.defId)) { toast("This mon can't Mega Evolve", "Ce Pokémon ne peut pas Méga-évoluer"); return; }
       if (unit.star < 3) { toast("Mega Stone needs the final form (★★★)", "La Méga-Gemme nécessite la forme finale (★★★)"); return; }
+    }
+
+    // An emblem on a mon that already has that trait is wasted — block it.
+    if (isEmblem(itemId)) {
+      const def = getDef(unit.defId);
+      const native = new Set<string>([...typesForStar(def, unit.star), ...def.roles]);
+      if (native.has(EMBLEM_TRAIT[itemId])) { toast("Already has this trait", "Possède déjà ce trait"); return; }
     }
 
     // Combining: dragging a COMPONENT onto a unit that already holds a component

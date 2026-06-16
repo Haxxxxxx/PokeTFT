@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useGame } from "@/game/store/gameStore";
 import { computeTraits } from "@/game/engine/synergies";
@@ -8,6 +8,7 @@ import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { TYPE_COLOR, COST_COLOR } from "@/game/ui";
 import { TraitGlyph } from "./TraitGlyph";
 import { getDef, spriteUrl } from "@/game/data/mons";
+import { EMBLEM_TRAIT } from "@/game/data/itemPool";
 
 import type { UnitInstance } from "@/game/types";
 
@@ -25,11 +26,20 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
     () => [1, 2, 3, 4, 5].flatMap((c) => unitsByCost[c as 1 | 2 | 3 | 4 | 5] ?? []),
     [unitsByCost],
   );
-  const membersFor = (key: string) =>
-    rosterIds
+  const membersFor = (key: string) => {
+    const native = rosterIds
       .map(getDef)
-      .filter((d) => (d.types as string[]).includes(key) || ((d.roles as string[] | undefined) ?? []).includes(key))
-      .sort((a, b) => a.cost - b.cost);
+      .filter((d) => (d.types as string[]).includes(key) || ((d.roles as string[] | undefined) ?? []).includes(key));
+    const nativeIds = new Set(native.map((d) => d.id));
+    // Board mons that gained this trait via an emblem (not native carriers) belong in
+    // the table too — so an emblem'd unit shows up under the synergy it now grants.
+    const seen = new Set<string>();
+    const viaEmblem = board
+      .filter((u) => (u.items ?? []).some((it) => EMBLEM_TRAIT[it] === key))
+      .map((u) => getDef(u.defId))
+      .filter((d) => !nativeIds.has(d.id) && !seen.has(d.id) && seen.add(d.id));
+    return [...native, ...viaEmblem].sort((a, b) => a.cost - b.cost);
+  };
 
   // How many carriers of each trait the active region pool even HAS — so a synergy
   // that can't reach its next tier in this region (e.g. only 1 Dragon in Kanto) is
@@ -46,6 +56,16 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
   // Hovered row → a portaled tooltip (escapes the scroll container so it's never
   // clipped, even when the synergy list is long enough to scroll).
   const [hover, setHover] = useState<{ key: string; top: number; left: number } | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openHover = (key: string, top: number, left: number) => {
+    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
+    setHover({ key, top, left });
+  };
+  const scheduleClose = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setHover(null), 160);
+  };
+  const cancelClose = () => { if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; } };
   const hovered = hover ? traits.find((t) => t.key === hover.key) : null;
 
   return (
@@ -63,8 +83,8 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
           return (
             <div
               key={t.key}
-              onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setHover({ key: t.key, top: r.top, left: r.right + 8 }); }}
-              onMouseLeave={() => setHover((h) => (h?.key === t.key ? null : h))}
+              onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); openHover(t.key, r.top, r.right + 8); }}
+              onMouseLeave={scheduleClose}
               className={`flex items-center gap-2 px-2 py-1 rounded-md cursor-help shrink-0 ${active ? "bg-slate-800" : "bg-slate-900/40 opacity-60"}`}
             >
               <span
@@ -82,7 +102,7 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
         })}
       </div>
       {hovered && hover && createPortal(
-        <TraitTooltip t={hovered} top={hover.top} left={hover.left} members={membersFor(hovered.key)} board={board} />,
+        <TraitTooltip t={hovered} top={hover.top} left={hover.left} members={membersFor(hovered.key)} board={board} onEnter={cancelClose} onLeave={scheduleClose} />,
         document.body,
       )}
     </div>
@@ -90,14 +110,14 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
 }
 
 /** Portaled hover card for a synergy: progress, tiers, and the roster carrying it. */
-function TraitTooltip({ t, top, left, members, board }: { t: Trait; top: number; left: number; members: ReturnType<typeof getDef>[]; board: UnitInstance[] }) {
+function TraitTooltip({ t, top, left, members, board, onEnter, onLeave }: { t: Trait; top: number; left: number; members: ReturnType<typeof getDef>[]; board: UnitInstance[]; onEnter: () => void; onLeave: () => void }) {
   const color = (TYPE_COLOR as Record<string, string>)[t.key] ?? "#64748b";
   const nextBp = t.breakpoints.find((b) => b > t.count);
   const desc = TRAITS_BY_KEY[t.key]?.description ?? "";
   const onBoard = new Set(board.map((u) => u.defId));
   const ownedCount = members.filter((d) => onBoard.has(d.id)).length;
   return (
-    <div style={{ position: "fixed", top, left, borderColor: color }} className="z-[80] w-[240px] p-3 rounded-lg border bg-[#0d1426] text-slate-100 shadow-2xl pointer-events-none">
+    <div onMouseEnter={onEnter} onMouseLeave={onLeave} style={{ position: "fixed", top, left, borderColor: color }} className="z-[80] w-[240px] p-3 rounded-lg border bg-[#0d1426] text-slate-100 shadow-2xl">
       <div className="flex items-center gap-2 mb-1.5">
         <span style={{ borderColor: color }} className="w-5 h-5 rounded border flex items-center justify-center"><TraitGlyph traitKey={t.key} size={12} /></span>
         <span className="font-bold text-sm">{t.label}</span>

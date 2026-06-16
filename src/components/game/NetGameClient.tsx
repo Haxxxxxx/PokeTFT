@@ -929,6 +929,7 @@ export function NetGameClient() {
                     flip={!!myCombat?.flip}
                     authWon={myCombat?.won}
                     hpLost={myCombat?.dmg}
+                    suppressRecap={!!(inspect || inspectedItem)}
                     opponentName={myCombat?.oppName ?? "Rival"}
                     pve={!!myCombat?.pve}
                     autoResolve
