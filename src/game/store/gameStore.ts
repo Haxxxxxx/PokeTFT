@@ -69,6 +69,10 @@ function advancePartial(state: State, gold: number) {
   return { gold, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false };
 }
 
+/** A PvE item component dropped onto a board cell, waiting to be clicked to collect.
+ *  `cell` is a LOCAL ally board coordinate [col, row(0..3)]. */
+export type ItemDrop = { id: string; itemId: string; cell: [number, number] };
+
 type State = {
   gold: number;
   xp: number;
@@ -88,6 +92,9 @@ type State = {
   history: RoundRecord[];
   /** Unequipped items in the player's inventory (e.g. Mega Stones). */
   items: string[];
+  /** PvE loot dropped onto the board, waiting to be clicked to collect. Auto-collected
+   *  the following planning round so a missed click never loses an item. */
+  drops: ItemDrop[];
   /** Chosen augment ids (TFT-style persistent boosts). */
   augments: string[];
   /** Pokémon Pension (Day Care): a single 1★ mon training to a 2★. `roundsLeft`
@@ -124,6 +131,8 @@ type State = {
   exportSave: () => { gold: number; xp: number; level: number; units: UnitInstance[]; shop: (string | null)[]; items: string[]; augments: string[]; pension: State["pension"] };
   importSave: (save: { gold: number; xp: number; level: number; units?: UnitInstance[]; shop?: (string | null)[]; items?: string[]; augments?: string[]; pension?: State["pension"] }, allowedIds?: string[], enabledItems?: string[]) => void;
   grantItem: (itemId: string) => void;
+  /** Collect a dropped item from the board into the inventory. */
+  collectDrop: (id: string) => void;
   equipItem: (iid: string, itemId: string) => void;
   unequipItem: (iid: string, itemId: string) => void;
   /** Pension: drop a 1★ mon into the Day Care to train it into a 2★. */
@@ -152,6 +161,7 @@ export const useGame = create<State>((set, get) => ({
   frozen: false,
   history: [],
   items: [],
+  drops: [],
   augments: [],
 
   benchUnits: () => get().units.filter((u) => u.pos === null),
@@ -184,7 +194,7 @@ export const useGame = create<State>((set, get) => ({
       pool, unitsByCost, enabledItems: enabledItems && enabledItems.length ? enabledItems : null,
       pension: null,
       gold: 4, xp: 0, level: 1, health: startingHp,
-      streak: 0, stage: 1, round: 1, units, frozen: false, history: [], items: [], augments: [],
+      streak: 0, stage: 1, round: 1, units, frozen: false, history: [], items: [], drops: [], augments: [],
       shop: rollShop(1, pool, rng, unitsByCost),
     });
   },
@@ -409,14 +419,30 @@ export const useGame = create<State>((set, get) => ({
     // PvE loot: if the round we just finished was a PvE round, drop extra gold and
     // occasionally an item or a free low-cost unit — keeps the economy moving.
     let bonusGold = 0;
-    let items = state.items;
+    // Auto-collect any drops the player didn't click last round (never lose an item).
+    let items = [...state.items, ...state.drops.map((d) => d.itemId)];
     let units = state.units;
+    let drops: ItemDrop[] = [];
     const prev = round > 1 ? { stage, round: round - 1 } : { stage: stage - 1, round: roundsInStage(stage - 1) };
     if (prev.stage >= 1 && roundKind(prev.stage, prev.round) === "pve") {
       bonusGold = 2 + Math.floor(stage / 2);
+      // A free cell to drop loot on (prefer the back rows, away from the front line).
+      const occupied = new Set(units.filter((u) => u.pos).map((u) => `${u.pos![0]},${u.pos![1]}`));
+      const freeCell = (): [number, number] | null => {
+        for (let r = BOARD.rows - 1; r >= 0; r--) for (let c = 0; c < BOARD.cols; c++) {
+          const k = `${c},${r}`;
+          if (!occupied.has(k)) { occupied.add(k); return [c, r]; }
+        }
+        return null;
+      };
       // Reliable item economy: the opening (stage-1) PvE rounds always drop an
       // item component, like TFT's creep rounds; later PvE rounds drop one ~45%.
-      if (prev.stage === 1 || rng() < 0.45) items = [...items, COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)]];
+      if (prev.stage === 1 || rng() < 0.45) {
+        const itemId = COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)];
+        const cell = freeCell();
+        if (cell) drops.push({ id: `drop-${stage}-${round}-${drops.length}`, itemId, cell });
+        else items = [...items, itemId]; // board full → straight to the inventory
+      }
       const cheap = [...(state.unitsByCost[1] ?? []), ...(state.unitsByCost[2] ?? [])];
       if (rng() < 0.25 && cheap.length && units.filter((u) => u.pos === null).length < BENCH_SIZE) {
         const pickId = cheap[randInt(rng, cheap.length)];
@@ -429,7 +455,7 @@ export const useGame = create<State>((set, get) => ({
     // Pension trains one planning round closer to maturity (down to 0 = ready).
     const pension = state.pension ? { ...state.pension, roundsLeft: Math.max(0, state.pension.roundsLeft - 1) } : null;
 
-    set({ gold: state.gold + income + bonusGold, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false, items, units, pension, pool: { ...state.pool } });
+    set({ gold: state.gold + income + bonusGold, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false, items, units, drops, pension, pool: { ...state.pool } });
   },
 
   netCarouselPick: (pick) => {
@@ -479,7 +505,9 @@ export const useGame = create<State>((set, get) => ({
 
   exportSave: () => {
     const s = get();
-    return { gold: s.gold, xp: s.xp, level: s.level, units: s.units, shop: s.shop, items: s.items, augments: s.augments, pension: s.pension };
+    // Fold any uncollected board drops into the synced items so a reconnect banks
+    // them (the board-drop layer is purely a local visual; the item is never lost).
+    return { gold: s.gold, xp: s.xp, level: s.level, units: s.units, shop: s.shop, items: [...s.items, ...s.drops.map((d) => d.itemId)], augments: s.augments, pension: s.pension };
   },
 
   importSave: (save, allowedIds, enabledItems) => {
@@ -510,6 +538,7 @@ export const useGame = create<State>((set, get) => ({
       units,
       shop: toArray<string>(save.shop, ECONOMY.shopSlots),
       items: toArray<string>(save.items).filter(Boolean) as string[],
+      drops: [], // synced saves bank drops as items (see exportSave)
       augments: toArray<string>(save.augments).filter(Boolean) as string[],
       pension: restoredPension,
     });
@@ -517,6 +546,13 @@ export const useGame = create<State>((set, get) => ({
 
   // Add an item to the inventory (carousel pick / loot).
   grantItem: (itemId) => set({ items: [...get().items, itemId] }),
+
+  collectDrop: (id) => {
+    const state = get();
+    const drop = state.drops.find((d) => d.id === id);
+    if (!drop) return;
+    set({ items: [...state.items, drop.itemId], drops: state.drops.filter((d) => d.id !== id) });
+  },
 
   // Move an item from the inventory onto a unit.
   equipItem: (iid, itemId) => {

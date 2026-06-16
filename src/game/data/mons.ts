@@ -22,6 +22,49 @@ function move(name: string, type: PokeType, basePower: number, shape: Move["shap
   return { name, type, power: [basePower, Math.round(basePower * 1.7), Math.round(basePower * 2.9)], shape };
 }
 
+// Well-known national-dex sets used to give GENERATED units their role traits (their
+// raw data ships none, so role synergies were curated-only). Base-form dex is enough;
+// a generated unit whose dex falls here gets the matching role. `evolver` is left to
+// the curated lines on purpose (already ~124 carriers — auto-tagging would flood it).
+const LEGENDARY_DEX = new Set<number>([
+  144, 145, 146, 150,                                   // Gen1 (Mewtwo also kanto-mythic)
+  243, 244, 245, 249, 250,                               // Gen2
+  377, 378, 379, 380, 381, 382, 383, 384,                // Gen3
+  480, 481, 482, 483, 484, 485, 486, 487, 488,           // Gen4
+  638, 639, 640, 641, 642, 643, 644, 645, 646,           // Gen5
+  716, 717, 718,                                         // Gen6
+  785, 786, 787, 788, 791, 792, 800,                     // Gen7
+  888, 889, 890, 894, 895, 896, 897, 898,                // Gen8
+  1001, 1002, 1003, 1004, 1007, 1008, 1014, 1015, 1016, 1017, 1024, // Gen9
+]);
+const MYTHIC_DEX = new Set<number>([
+  151, 251, 385, 386, 489, 490, 491, 492, 493, 494,
+  647, 648, 649, 719, 720, 721, 801, 802, 807, 808, 809,
+  893, 1025,
+]);
+const KANTO_MYTHIC_DEX = new Set<number>([150, 151]); // Mewtwo, Mew — the trait's namesakes
+const PSEUDO_DEX = new Set<number>([
+  147, 148, 149, 246, 247, 248, 371, 372, 373, 443, 444, 445,
+  633, 634, 635, 704, 705, 706, 782, 783, 784, 885, 886, 887, 996, 997, 998,
+]);
+const FOSSIL_DEX = new Set<number>([
+  138, 139, 140, 141, 142, 345, 346, 347, 348, 408, 409, 410, 411,
+  564, 565, 566, 567, 696, 697, 698, 699, 880, 881, 882, 883,
+]);
+const EEVEE_DEX = new Set<number>([133, 134, 135, 136, 196, 197, 470, 471, 700]);
+
+/** Role traits for a generated unit, inferred from its base-form national dex. */
+function rolesForGeneratedDex(dex0: number): RoleTrait[] {
+  const out: RoleTrait[] = [];
+  if (KANTO_MYTHIC_DEX.has(dex0)) out.push("kanto-mythic");
+  if (LEGENDARY_DEX.has(dex0)) out.push("legendary");
+  if (MYTHIC_DEX.has(dex0)) out.push("mythic");
+  if (PSEUDO_DEX.has(dex0)) out.push("pseudo-legendary");
+  if (FOSSIL_DEX.has(dex0)) out.push("fossil");
+  if (EEVEE_DEX.has(dex0)) out.push("eeveelution");
+  return out;
+}
+
 // Types that read as durable frontliners vs glass-cannon special attackers — used to
 // bias each generated species' build so a Steel mon ≠ a Psychic mon at the same cost.
 const BULKY_TYPES = new Set<PokeType>(["rock", "steel", "ground", "ice"]);
@@ -799,7 +842,7 @@ export const UNITS: UnitDef[] = [
     ids.add(g.id);
     g.dex.forEach((d) => dexSeen.add(d));
     UNITS.push(def({
-      id: g.id, name: g.name, cost: g.cost, types: g.types, roles: [],
+      id: g.id, name: g.name, cost: g.cost, types: g.types, roles: rolesForGeneratedDex(g.dex[0]),
       dex: g.dex, stageNames: g.stageNames,
       move: move(g.move.name, g.move.type, g.move.power, g.move.shape),
       // Variance layered OVER the raw patch: it always differentiates hp/ad/as/armor,

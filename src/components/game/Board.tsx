@@ -4,7 +4,10 @@ import { useDroppable } from "@dnd-kit/core";
 import { FIELD, TILE, ALLY_ROW0, hexToPixel, fieldPixelSize } from "@/game/engine/hex";
 import { useGame } from "@/game/store/gameStore";
 import { UnitChip } from "./UnitChip";
+import { ITEM_POOL } from "@/game/data/itemPool";
 import type { UnitInstance } from "@/game/types";
+
+const ITEM_ICON: Record<string, string> = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i.icon]));
 
 // Same tessellation + tile size as the combat field: the planning board IS the
 // bottom half of the 8-row battlefield. Rendering the whole field (your 4 rows
@@ -53,9 +56,14 @@ function HexCell({ c, r, unit, interactive }: { c: number; r: number; unit?: Uni
 
 export function Board({ units, interactive = true }: { units?: UnitInstance[]; interactive?: boolean }) {
   const storeUnits = useGame((s) => s.units);
+  const drops = useGame((s) => s.drops);
+  const collectDrop = useGame((s) => s.collectDrop);
   const source = units ?? storeUnits;
   const board = source.filter((u) => u.pos !== null);
   const unitAt = (c: number, r: number) => board.find((u) => u.pos?.[0] === c && u.pos?.[1] === r - ALLY_ROW0);
+  // Drops are YOUR loot — only on your own live board (not when spectating a rival,
+  // i.e. when an external `units` array is passed in).
+  const showDrops = interactive && !units;
   const { w, h } = fieldPixelSize(TILE_W, TILE_H);
   // Divider between the enemy half (top) and your half (bottom).
   const splitY = hexToPixel({ c: 0, r: ALLY_ROW0 }, TILE_W, TILE_H).y - TILE_H / 2;
@@ -82,6 +90,21 @@ export function Board({ units, interactive = true }: { units?: UnitInstance[]; i
             <HexCell key={`${c}-${r}`} c={c} r={r} unit={r >= ALLY_ROW0 ? unitAt(c, r) : undefined} interactive={interactive} />
           )),
         )}
+        {/* Loot drops — click to collect into your inventory. */}
+        {showDrops && drops.map((d) => {
+          const { x, y } = hexToPixel({ c: d.cell[0], r: d.cell[1] + ALLY_ROW0 }, TILE_W, TILE_H);
+          return (
+            <button
+              key={d.id}
+              onClick={() => collectDrop(d.id)}
+              title="Collect item"
+              className="absolute z-20 flex items-center justify-center rounded-full bg-amber-400/90 hover:bg-amber-300 text-black shadow-[0_0_14px_4px_rgba(251,191,36,0.5)] animate-bounce"
+              style={{ left: x - 16, top: y - 16, width: 32, height: 32, fontSize: 16 }}
+            >
+              {ITEM_ICON[d.itemId] ?? "◆"}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
