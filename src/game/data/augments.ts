@@ -62,4 +62,3 @@ export function augmentSlot(stage: number, round: number): number | null {
   return null;
 }
 
-export const AUGMENT_SLOTS = 3;

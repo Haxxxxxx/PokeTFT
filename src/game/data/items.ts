@@ -47,7 +47,6 @@ export const RARITY_COLOR: Record<ItemRarity, string> = {
   rare: "#38bdf8",
   legendary: "#fbbf24",
 };
-export const RARITY_WEIGHT: Record<ItemRarity, number> = { common: 1, rare: 0.5, legendary: 0.16 };
 
 /** The 6 building-block components — these are what drops; players combine them. */
 export const COMPONENTS: ItemDef[] = [
