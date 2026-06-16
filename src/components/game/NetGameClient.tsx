@@ -534,23 +534,27 @@ export function NetGameClient() {
     }
   }, [phase, meta?.stage, meta?.round, room, myUid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // PvE loot: when a wild fight resolves, drop an item component AT a slain creep's
-  // position (the enemy half) so loot lands where the mob fell, not bunched together.
-  // Deterministic per round (so a reconnect re-spawns the identical drop, deduped).
+  // PvE loot: when a wild fight resolves, drop item components AT slain creep
+  // positions (the enemy half) so loot lands where the mob fell. GUARANTEED like TFT —
+  // every wild round yields components (no feast/famine RNG); bigger encounters drop
+  // more. Deterministic per round (a reconnect re-spawns identical drops, deduped).
   useEffect(() => {
     if (phase !== "combat" || !myCombat?.pve || !meta) return;
     const key = `${meta.stage}-${meta.round}`;
     if (droppedFor.current === key) return;
     droppedFor.current = key;
-    const h = (meta.stage * 131 + meta.round * 17) >>> 0;
-    // Opening (stage-1) creeps always drop; later wild rounds ~45%.
-    if (meta.stage !== 1 && h % 100 >= 45) return;
     const creeps = asBoard(myCombat.oppBoard).filter((u) => u.pos);
     if (!creeps.length) return;
-    const creep = creeps[(h >> 3) % creeps.length];
-    const fieldCell = enemyToField(creep.pos![0], creep.pos![1]);
-    const itemId = COMPONENT_IDS[h % COMPONENT_IDS.length];
-    spawnDrops([{ id: `drop-${key}`, itemId, cell: [fieldCell.c, fieldCell.r] }]);
+    const h = (meta.stage * 131 + meta.round * 17) >>> 0;
+    // Guaranteed component count: 1 in the early game, 2 once the Apex/Legendary
+    // encounters arrive (stage 4+). Capped by how many creeps actually fell.
+    const count = Math.min(creeps.length, meta.stage >= 4 ? 2 : 1);
+    const drops = Array.from({ length: count }, (_, i) => {
+      const creep = creeps[((h >> 3) + i) % creeps.length];
+      const fieldCell = enemyToField(creep.pos![0], creep.pos![1]);
+      return { id: `drop-${key}-${i}`, itemId: COMPONENT_IDS[(h + i * 7) % COMPONENT_IDS.length], cell: [fieldCell.c, fieldCell.r] as [number, number] };
+    });
+    spawnDrops(drops);
   }, [phase, meta?.stage, meta?.round, myCombat?.pve, myOppSig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Play victory/defeat sound when the game ends. Computed inline (the `iWon`
