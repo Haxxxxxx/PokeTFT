@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/game/net/authStore";
+import { PokeballIcon } from "@/components/game/icons";
 
 export function SignInScreen() {
   const { signInGoogle, signInEmail, signUpEmail, signInGuest, error, busy } = useAuth();
@@ -19,7 +20,7 @@ export function SignInScreen() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-[400px] flex flex-col gap-5 rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur p-8">
         <div className="flex flex-col items-center gap-1 pb-3 border-b border-slate-800">
-          <span className="text-rose-500 text-3xl">⬡</span>
+          <span className="text-amber-400"><PokeballIcon size={32} /></span>
           <h1 className="font-extrabold tracking-tight text-3xl text-slate-100">Poké<span className="text-amber-400">TFT</span></h1>
           <p className="text-slate-500 text-sm">Sign in to play with friends</p>
         </div>

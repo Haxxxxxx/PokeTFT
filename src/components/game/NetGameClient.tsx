@@ -14,6 +14,7 @@ import { MEGA_STONE, canMega } from "@/game/data/mega";
 import { ITEM_POOL, RARITY_COLOR, COMPONENT_IDS } from "@/game/data/itemPool";
 import { enemyToField } from "@/game/engine/hex";
 import { ItemGlyph, AugmentGlyph } from "./ItemGlyph";
+import { Trash2, Eye, Sparkles } from "lucide-react";
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
 import { useUi } from "@/game/store/uiStore";
@@ -102,7 +103,7 @@ function SellZone() {
       className={`w-[150px] shrink-0 flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed transition-all
         ${isOver ? "border-rose-400 bg-rose-500/25 text-rose-100 scale-[1.03] shadow-[0_0_22px_-6px_rgba(244,63,94,0.7)]" : "border-slate-700/70 bg-slate-900/30 text-slate-500 hover:border-rose-700/60 hover:text-rose-300/80"}`}
     >
-      <span className={`text-2xl leading-none transition-transform ${isOver ? "scale-125" : ""}`}>🗑️</span>
+      <span className={`leading-none transition-transform ${isOver ? "scale-125" : ""}`}><Trash2 size={24} /></span>
       <span className="text-[10px] font-extrabold uppercase tracking-wider text-center leading-tight px-2">{t.sh_drag_sell}</span>
     </div>
   );
@@ -939,12 +940,12 @@ export function NetGameClient() {
               style={{ pointerEvents: "auto" }}
               className="absolute top-4 right-4 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-200 shadow-lg"
             >
-              👁 {revealBoard ? (lang === "fr" ? "Afficher les choix" : "Show choices") : (lang === "fr" ? "Voir mon plateau" : "Hide & view board")}
+              <Eye size={13} className="inline align-text-bottom mr-1" />{revealBoard ? (lang === "fr" ? "Afficher les choix" : "Show choices") : (lang === "fr" ? "Voir mon plateau" : "Hide & view board")}
             </button>
             {!revealBoard && (
             <div className="celebrate-pop flex flex-col items-center">
               <div className="flex items-center gap-2.5 mb-1">
-                <span className="text-2xl">🎡</span>
+                <span><Sparkles size={24} /></span>
                 <h2 className="text-2xl font-extrabold text-amber-300 tracking-tight">{lang === "fr" ? "Carrousel" : "Carousel"}</h2>
               </div>
               <p className="text-xs text-slate-300/80">{picked ? (() => {
@@ -1013,7 +1014,7 @@ export function NetGameClient() {
           {!revealBoard && (
           <div className="celebrate-pop flex flex-col items-center">
             <div className="flex items-center gap-2.5 mb-1">
-              <span className="text-2xl">✨</span>
+              <span><Sparkles size={24} /></span>
               <h2 className="text-2xl font-extrabold text-violet-300 tracking-tight">Augment {augSlotNow! + 1}/3</h2>
             </div>
             <p className="text-xs text-slate-300/80 mb-5">{lang === "fr" ? "Choisis un bonus permanent." : "Pick one permanent boost."}</p>

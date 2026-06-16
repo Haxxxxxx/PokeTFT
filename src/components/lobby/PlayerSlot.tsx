@@ -3,6 +3,7 @@
 import type { PlayerSlot as PlayerSlotType, BotDifficulty } from "@/game/store/preLobbyStore";
 import { usePreLobby } from "@/game/store/preLobbyStore";
 import { useT } from "@/lib/i18n";
+import { User, Bot } from "lucide-react";
 
 const DIFFICULTY_COLORS: Record<BotDifficulty, string> = {
   easy: "text-emerald-400 border-emerald-700 bg-emerald-950/40",
@@ -83,7 +84,7 @@ export function PlayerSlot({ slot, index, isHost }: Props) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-lg">👤</span>
+          <span className="text-slate-300"><User size={18} /></span>
           {isFirst ? (
             <input
               value={slot.name}
@@ -127,7 +128,7 @@ export function PlayerSlot({ slot, index, isHost }: Props) {
         )}
       </div>
       <div className="flex items-center gap-2">
-        <span className="text-lg">🤖</span>
+        <span className="text-violet-300"><Bot size={18} /></span>
         <span className="text-sm font-semibold text-slate-200">{t.p_bot_name}</span>
         <span className={`text-[10px] uppercase font-bold tracking-wide px-2 py-0.5 rounded-full border ml-auto ${DIFFICULTY_COLORS[slot.botDifficulty]}`}>
           {diffLabels[slot.botDifficulty]}

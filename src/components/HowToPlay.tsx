@@ -3,47 +3,48 @@
 import { useState } from "react";
 import { useAppStore } from "@/game/store/appStore";
 import { spriteUrl } from "@/game/data/mons";
+import { Coins, Hexagon, Swords, Sparkles, Keyboard, Gamepad2, type LucideIcon } from "lucide-react";
 
-type Slide = { icon: string; dex: number; accent: string; title: { en: string; fr: string }; body: { en: string; fr: string } };
+type Slide = { icon: LucideIcon; dex: number; accent: string; title: { en: string; fr: string }; body: { en: string; fr: string } };
 
 const SLIDES: Slide[] = [
   {
-    icon: "⬡", dex: 25, accent: "#fbbf24",
+    icon: Gamepad2, dex: 25, accent: "#fbbf24",
     title: { en: "Welcome to PokéTFT", fr: "Bienvenue sur PokéTFT" },
     body: {
       en: "Build a team of Pokémon and auto-battle up to 8 trainers. Lose a fight and you lose HP — the last trainer standing wins.",
       fr: "Construis une équipe de Pokémon et affronte jusqu'à 8 dresseurs. Perdre un combat coûte des PV — le dernier debout gagne.",
     },
   },
-  { icon: "🪙", dex: 6, accent: "#fb923c",
+  { icon: Coins, dex: 6, accent: "#fb923c",
     title: { en: "Shop & economy", fr: "Boutique & économie" },
     body: {
-      en: "Buy Pokémon from the shop with gold. Three copies of one Pokémon merge into a stronger ⭐⭐ form (its evolution). Earn interest on saved gold and bonus gold on win/loss streaks.",
-      fr: "Achète des Pokémon avec de l'or. Trois exemplaires fusionnent en une forme ⭐⭐ (l'évolution). Gagne des intérêts sur ton or et des bonus sur les séries.",
+      en: "Buy Pokémon from the shop with gold. Three copies of one Pokémon merge into a stronger ★★ form (its evolution). Earn interest on saved gold and bonus gold on win/loss streaks.",
+      fr: "Achète des Pokémon avec de l'or. Trois exemplaires fusionnent en une forme ★★ (l'évolution). Gagne des intérêts sur ton or et des bonus sur les séries.",
     },
   },
-  { icon: "⬢", dex: 94, accent: "#a78bfa",
+  { icon: Hexagon, dex: 94, accent: "#a78bfa",
     title: { en: "Board & links", fr: "Plateau & synergies" },
     body: {
       en: "Drag Pokémon onto the hex board to fight (your board size = your level). Matching types and roles activate Link bonuses — the synergy panel shows your active links and how close you are to the next tier.",
       fr: "Place tes Pokémon sur le plateau hexagonal (taille = ton niveau). Les types et rôles communs activent des synergies — le panneau montre tes liens actifs et les prochains paliers.",
     },
   },
-  { icon: "⚔", dex: 149, accent: "#f87171",
+  { icon: Swords, dex: 149, accent: "#f87171",
     title: { en: "Combat & types", fr: "Combat & types" },
     body: {
       en: "Rounds resolve automatically. Pokémon type-effectiveness applies real damage multipliers, and Mega Stones evolve compatible mons at combat start. Watch the live damage/tank/heal recap to see who's carrying.",
       fr: "Les manches se résolvent automatiquement. L'efficacité des types applique de vrais multiplicateurs, et les Méga-Gemmes méga-évoluent au début du combat. Le récap dégâts/tank/soin montre qui porte l'équipe.",
     },
   },
-  { icon: "✨", dex: 133, accent: "#34d399",
+  { icon: Sparkles, dex: 133, accent: "#34d399",
     title: { en: "Carousel, items & augments", fr: "Carrousel, objets & augments" },
     body: {
       en: "Carousel rounds give a free pick. Equip held items onto your mons for buffs. At stages 2, 3 and 4 you pick a powerful Augment that lasts the whole game.",
       fr: "Les carrousels offrent un choix gratuit. Équipe des objets sur tes Pokémon. Aux stages 2, 3 et 4, choisis un Augment puissant pour toute la partie.",
     },
   },
-  { icon: "⌨", dex: 143, accent: "#60a5fa",
+  { icon: Keyboard, dex: 143, accent: "#60a5fa",
     title: { en: "Shortcuts", fr: "Raccourcis" },
     body: {
       en: "During planning: R rerolls the shop, L buys XP, S sells the inspected unit. Double-click a bench unit to deploy it.",
@@ -69,7 +70,7 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
             <span className="absolute inset-0 rounded-full blur-2xl" style={{ background: `${s.accent}44` }} />
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={spriteUrl(s.dex)} alt="" width={96} height={96} className="relative" style={{ imageRendering: "pixelated" }} />
-            <span className="absolute -bottom-1 -right-1 text-2xl drop-shadow">{s.icon}</span>
+            <span className="absolute -bottom-1 -right-1 drop-shadow bg-slate-900/80 rounded-full p-1" style={{ color: s.accent }}><s.icon size={20} /></span>
           </div>
         </div>
 

@@ -7,6 +7,7 @@ import { sfx } from "@/lib/audio";
 import { hexToPixel, fieldPixelSize, hexDistance, FIELD, TILE } from "@/game/engine/hex";
 import { TYPE_COLOR } from "@/game/ui";
 import { SnowIcon } from "./icons";
+import { Leaf, BarChart3 } from "lucide-react";
 import { serverNow } from "@/game/net/serverTime";
 import type { CombatResult, FrameUnit, CombatEvent } from "@/game/engine/combat";
 import type { PokeType } from "@/game/types";
@@ -211,7 +212,7 @@ export function CombatStage({
       <div className="flex items-center justify-center gap-2 mb-1 text-[11px] font-bold max-w-[460px]">
         <span className="tabular-nums text-emerald-300">{aliveAlly}</span>
         <span className={a.overtime ? "text-rose-400 animate-pulse" : "text-slate-500"}>{a.overtime ? t.cs_overtime : t.cs_vs}</span>
-        <span className={`truncate ${pve ? "text-emerald-300" : "text-rose-300"}`}>{pve ? "🌿 " : ""}{opponentName} <span className="tabular-nums">{aliveEnemy}</span></span>
+        <span className={`inline-flex items-center gap-1 truncate ${pve ? "text-emerald-300" : "text-rose-300"}`}>{pve && <Leaf size={13} />}{opponentName} <span className="tabular-nums">{aliveEnemy}</span></span>
       </div>
 
       {a.overtime && <span className="text-[9px] font-extrabold text-rose-400 animate-pulse tracking-wider mt-0.5">{t.cs_overtime}</span>}
@@ -331,7 +332,7 @@ export function CombatStage({
           title={t.cs_show_recap}
           className="gilded self-stretch w-7 shrink-0 rounded-xl flex flex-col items-center justify-center gap-1.5 text-amber-200/70 hover:text-amber-100 transition-colors"
         >
-          <span className="text-sm">📊</span>
+          <span><BarChart3 size={14} /></span>
           <span className="[writing-mode:vertical-rl] rotate-180 text-[9px] font-extrabold uppercase tracking-wider">{t.cs_recap}</span>
         </button>
       )}
