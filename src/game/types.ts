@@ -64,6 +64,9 @@ export type UnitInstance = {
   /** null while on bench; [col,row] while on board. */
   pos: [number, number] | null;
   items: string[];
+  /** Deterministic HP/ATK multiplier (<1 weakens). Used to soften early PvE creeps
+   *  so the opening rounds are reliably winnable. Undefined = 1 (no scaling). */
+  statScale?: number;
 };
 
 /** Concrete combat buff a trait tier grants. Applied at combat start. `scope`

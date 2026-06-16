@@ -106,13 +106,20 @@ export function generateCreepBoard(stage: number, round: number, seed: number, a
   if (stage === 1) {
     // The opening 3 PvE rounds are deliberately soft so a fresh board (a single
     // starter + a couple of shop buys) wins them comfortably: 1-1 → 1 creep,
-    // 1-2 → 1, 1-3 → 2, all weakest-tier 1-cost 1-stars.
+    // 1-2 → 1, 1-3 → 2, all weakest-tier 1-cost 1-stars, at HALF stats.
     const count = round >= 3 ? 2 : 1;
-    return generateBoard(1, count, seed * 13 + 101, allowedIds);
+    return weaken(generateBoard(1, count, seed * 13 + 101, allowedIds), 0.5);
   }
   const level = Math.min(1 + Math.floor(stage / 2), 6);
   const count = Math.min(stage + 1, 6);
-  return generateBoard(level, count, seed * 13 + 101, allowedIds);
+  // Stages 2–3 PvE stay easier than a real board so they remain a build breather.
+  const scale = stage === 2 ? 0.7 : stage === 3 ? 0.85 : 1;
+  return weaken(generateBoard(level, count, seed * 13 + 101, allowedIds), scale);
+}
+
+/** Apply a deterministic stat-scale to every creep on a board (no-op at >=1). */
+function weaken(board: UnitInstance[], scale: number): UnitInstance[] {
+  return scale >= 1 ? board : board.map((u) => ({ ...u, statScale: scale }));
 }
 
 /** Free unit choices offered on a carousel round. */

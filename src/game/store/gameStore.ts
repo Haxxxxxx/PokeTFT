@@ -572,8 +572,9 @@ export const useGame = create<State>((set, get) => ({
     });
   },
 
-  // Pension: deposit a 1★ mon to train into a 2★ over PENSION_ROUNDS planning
-  // rounds (costs gold, one slot). Its held items return to the inventory.
+  // Pension (day-care breeding): deposit a 1★ mon; after PENSION_ROUNDS planning
+  // rounds you collect it back PLUS one bred copy of the same species (costs gold,
+  // one slot). Its held items return to the inventory while it's away.
   depositToPension: (iid) => {
     const state = get();
     if (state.pension) { toast("Pension is occupied", "La Pension est occupée"); return; }
@@ -589,20 +590,25 @@ export const useGame = create<State>((set, get) => ({
     });
   },
 
-  // Pension: retrieve a matured mon onto the bench, one star higher.
+  // Pension: collect the matured mon back PLUS one bred copy of the same species
+  // (both at the deposited star). The copies may chain-combine if you already own
+  // more of that mon.
   collectPension: () => {
     const state = get();
     const p = state.pension;
     if (!p || p.roundsLeft > 0) return;
-    if (state.units.filter((u) => u.pos === null).length >= BENCH_SIZE) { toast("Bench full", "Banc plein"); return; }
-    const grownStar = Math.min(3, p.star + 1) as 1 | 2 | 3;
-    // Keep pool scarcity honest: the deposited 1★ only debited 1 copy, but the
-    // returned 2★ represents 3 copies — debit the difference, or a deposit→collect
-    // →sell loop would inject phantom copies into the shared pool.
+    // Keep pool scarcity honest: the deposited mon's copies were already debited at
+    // buy time and stayed "out" while training — only the NEW bred copy is a fresh
+    // draw from the bag, so debit just that. (A deposit→collect→sell loop then nets
+    // zero on the original and −then-+ on the copy: no phantom copies minted.)
     const pool = { ...state.pool };
-    takeFromPool(pool, p.defId, copiesForStar(grownStar) - copiesForStar(p.star));
-    const grown = { ...makeInstance(p.defId), star: grownStar };
-    const { units, dropped } = applyCombines([...state.units, grown]); // may chain-combine into a 3★
+    takeFromPool(pool, p.defId, copiesForStar(p.star));
+    const original = { ...makeInstance(p.defId), star: p.star }; // the mon you deposited, returned
+    const copy = { ...makeInstance(p.defId), star: p.star };      // its bred copy
+    const { units, dropped } = applyCombines([...state.units, original, copy]);
+    // Guard bench overflow AFTER combines (two new mons may merge into one, or into
+    // an existing pair) — if it still wouldn't fit, abort without mutating anything.
+    if (units.filter((u) => u.pos === null).length > BENCH_SIZE) { toast("Bench full", "Banc plein"); return; }
     set({ units, items: [...state.items, ...dropped], pension: null, pool });
   },
 }));

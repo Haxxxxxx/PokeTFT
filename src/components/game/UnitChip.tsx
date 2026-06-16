@@ -38,7 +38,7 @@ export function Stars({ star }: { star: number }) {
 
 const HEX_CLIP = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
 
-export function UnitChip({ unit, size = 56, interactive = true, shape = "square" }: { unit: UnitInstance; size?: number; interactive?: boolean; shape?: "square" | "hex" }) {
+export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true, shape = "square" }: { unit: UnitInstance; size?: number; interactive?: boolean; canDeploy?: boolean; shape?: "square" | "hex" }) {
   const def = getDef(unit.defId);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: unit.iid, disabled: !interactive });
   const setInspect = useUi((s) => s.setInspect);
@@ -67,8 +67,10 @@ export function UnitChip({ unit, size = 56, interactive = true, shape = "square"
   }
 
   // Double-click a bench unit to quick-deploy it onto the first free board cell.
+  // `canDeploy` is separate from `interactive`: the bench stays draggable during
+  // combat (so you can still sell), but the board is locked then — no deploy.
   function onDoubleClick() {
-    if (interactive && unit.pos === null) deployUnit(unit.iid);
+    if (interactive && canDeploy && unit.pos === null) deployUnit(unit.iid);
   }
 
   const ring = megaReady ? "#f0abfc" : color;

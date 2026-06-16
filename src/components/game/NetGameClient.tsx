@@ -119,7 +119,7 @@ function PensionZone() {
     return (
       <div
         ref={setNodeRef}
-        title={lang === "fr" ? `Glissez un ★ pour l'entraîner en ★★ (${PENSION_COST} or, ${PENSION_ROUNDS} tours)` : `Drag a ★ mon to train it to ★★ (${PENSION_COST} gold, ${PENSION_ROUNDS} rounds)`}
+        title={lang === "fr" ? `Glissez un ★ pour élever une copie (${PENSION_COST} or, ${PENSION_ROUNDS} tours)` : `Drag a ★ mon to breed a copy of it (${PENSION_COST} gold, ${PENSION_ROUNDS} rounds)`}
         className={`w-[120px] shrink-0 flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed transition-all
           ${isOver ? "border-emerald-400 bg-emerald-500/25 text-emerald-100 scale-[1.03]" : "border-[var(--panel-edge)] bg-black/25 text-amber-200/55 hover:border-emerald-700/60 hover:text-emerald-300/80"}`}
       >
@@ -138,8 +138,8 @@ function PensionZone() {
         {!ready && <span className="absolute inset-0 flex items-center justify-center text-sm font-extrabold text-amber-200 drop-shadow">{pension.roundsLeft}</span>}
       </div>
       {ready ? (
-        <button onClick={collect} className="px-2 py-0.5 rounded-md bg-amber-500 hover:bg-amber-400 text-black text-[10px] font-extrabold leading-none">
-          {lang === "fr" ? "Récupérer ★★" : "Collect ★★"}
+        <button onClick={collect} className="px-2 py-0.5 rounded-md bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-extrabold leading-none">
+          {lang === "fr" ? "Récupérer +1" : "Collect +1"}
         </button>
       ) : (
         <span className="text-[9px] font-bold text-amber-200/70 leading-none">{lang === "fr" ? `${pension.roundsLeft} tour${pension.roundsLeft > 1 ? "s" : ""}` : `${pension.roundsLeft} round${pension.roundsLeft > 1 ? "s" : ""}`}</span>
@@ -866,12 +866,17 @@ export function NetGameClient() {
                 </div>
               );
             })()}
-            <Bench interactive={phase === "planning" && (!spectate || spectate === myUid)} />
+            <Bench
+              interactive={(phase === "planning" || phase === "combat") && (!spectate || spectate === myUid)}
+              canDeploy={phase === "planning" && (!spectate || spectate === myUid)}
+            />
           </div>
           <div className="flex gap-3 w-full max-w-[1480px]">
+            {/* Pension on the far LEFT and Sell on the far RIGHT — separated by the
+                whole shop so a drag-to-sell can't accidentally land in the Day Care. */}
+            <PensionZone />
             <ShopSellDrop><ShopBar /></ShopSellDrop>
             <SellZone />
-            <PensionZone />
           </div>
           {/* Shortcut hints live in-flow (scaled with the canvas) so they never
               float over the shop. */}

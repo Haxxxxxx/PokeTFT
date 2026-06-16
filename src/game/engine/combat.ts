@@ -159,8 +159,11 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
   // Mega Evolution applies at combat start when the mon holds a Mega Stone.
   const mega = isMegaActive(u.defId, items) ? megaFormFor(u.defId) : undefined;
   const types = mega?.addType && !def.types.includes(mega.addType) ? [...def.types, mega.addType] : def.types;
-  let hp = mega ? Math.round(s.hp[i] * mega.hpMult) : s.hp[i];
-  let ad = mega ? Math.round(s.ad[i] * mega.adMult) : s.ad[i];
+  // Deterministic stat-scale (early-PvE creeps come in weakened so the opening
+  // rounds are winnable). Applies before items/traits; undefined = 1.
+  const scale = u.statScale ?? 1;
+  let hp = Math.round((mega ? s.hp[i] * mega.hpMult : s.hp[i]) * scale);
+  let ad = Math.round((mega ? s.ad[i] * mega.adMult : s.ad[i]) * scale);
 
   // Held-item stat modifiers (deterministic; items synced on the unit). Effects
   // are data-driven (ITEM_EFFECT) so combining produces items the sim applies
