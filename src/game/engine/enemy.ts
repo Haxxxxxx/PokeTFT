@@ -32,7 +32,8 @@ const ROW_ORDER = [1, 0, 2, 3];
 
 const MAX_BOARD = COL_ORDER.length * ROW_ORDER.length;
 
-/** Build a board of `count` mons at shop-`level` quality. */
+/** Build a board of `count` mons at shop-`level` quality. Exported for the test
+ *  harnesses; in-app it's wrapped by generateCreepBoard / generatePlayerLikeBoard. */
 export function generateBoard(level: number, count: number, seed: number, allowedIds?: string[]): UnitInstance[] {
   const rng: Rng = makeRng(seed >>> 0);
   const odds = SHOP_ODDS[Math.min(Math.max(level, 1), 10)];

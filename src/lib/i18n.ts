@@ -8,14 +8,10 @@ export type Dict = {
   w_hero_title: string;
   w_how_to_play: string;
   w_profile: string;
-  w_username_label: string;
   w_username_placeholder: string;
-  w_create: string;
-  w_join: string;
   w_open_games: string;
   w_no_games: string;
   w_join_by_code: string;
-  w_create_desc: string;
   w_create_btn: string;
   w_back: string;
   w_join_code_label: string;
@@ -34,12 +30,6 @@ export type Dict = {
   s_anim_normal: string;
   s_anim_fast: string;
   // Lobby (legacy offline)
-  l_players: (n: number, max: number) => string;
-  l_slots: string;
-  l_start: string;
-  l_need_more: string;
-  l_wait_ready: string;
-  l_starting: string;
   l_rules: string;
   l_code: string;
   l_copy: string;
@@ -56,8 +46,6 @@ export type Dict = {
   l_net_leave: string;
   l_net_host: string;
   l_net_you: string;
-  l_net_bot: string;
-  l_net_offline: string;
   // Rules panel
   r_gens: string;
   r_pool: (n: number) => string;
@@ -67,32 +55,10 @@ export type Dict = {
   r_hp_unit: string;
   r_items: string;
   // Player slot (legacy)
-  p_slot: (n: number) => string;
-  p_add_human: string;
-  p_add_bot: string;
-  p_ready: string;
-  p_waiting: string;
-  p_ready_btn: string;
-  p_cancel_btn: string;
-  p_bot_name: string;
-  p_username_placeholder: string;
   p_diff_easy: string;
   p_diff_medium: string;
   p_diff_hard: string;
   // Top bar (offline GameClient)
-  t_stage: string;
-  t_health: string;
-  t_gold: string;
-  t_interest: string;
-  t_streak_win: string;
-  t_streak_loss: string;
-  t_board: string;
-  t_level: string;
-  t_max: string;
-  t_buy_xp: string;
-  t_pve: string;
-  t_carousel: string;
-  t_pvp: string;
   // NetGameClient HUD
   net_stage: string;
   net_hp: string;
@@ -114,7 +80,6 @@ export type Dict = {
   net_placed: (n: number) => string;
   net_viewing: (name: string) => string;
   net_back_to_mine: string;
-  net_back_menu: string;
   net_victory: string;
   net_gameover: string;
   net_spectating: string;
@@ -133,7 +98,6 @@ export type Dict = {
   sh_odds: string;
   sh_items_title: string;
   it_empty: string;
-  it_equip_hint: string;
   it_equip_mega: string;
   it_drag_equip: string;
   it_reforge: string;
@@ -183,14 +147,10 @@ export const FR: Dict = {
   w_hero_title: "Prêt au combat ?",
   w_how_to_play: "Comment jouer",
   w_profile: "Profil",
-  w_username_label: "Ton pseudo",
   w_username_placeholder: "Choisis un pseudo…",
-  w_create: "⚔ Créer une partie",
-  w_join: "🔗 Rejoindre",
   w_open_games: "Parties ouvertes",
   w_no_games: "Aucune partie ouverte — crées-en une !",
   w_join_by_code: "Rejoindre avec un code",
-  w_create_desc: "Tu seras l'hôte de la partie. Les autres joueurs pourront rejoindre avec le code du lobby.",
   w_create_btn: "⚔ Créer",
   w_back: "Retour",
   w_join_code_label: "Code du lobby",
@@ -207,12 +167,6 @@ export const FR: Dict = {
   s_lang_en: "English",
   s_anim_normal: "Normal",
   s_anim_fast: "Rapide",
-  l_players: (n, max) => `${n} / ${max} joueur${n > 1 ? "s" : ""}`,
-  l_slots: "Slots",
-  l_start: "⚔ Lancer la partie",
-  l_need_more: "Il faut au moins 2 joueurs.",
-  l_wait_ready: "Attente que tous les joueurs soient prêts.",
-  l_starting: "Démarrage de la partie…",
   l_rules: "Règles de partie",
   l_code: "Code lobby",
   l_copy: "Copier",
@@ -228,8 +182,6 @@ export const FR: Dict = {
   l_net_leave: "Quitter",
   l_net_host: "Hôte",
   l_net_you: "Vous",
-  l_net_bot: "Bot IA",
-  l_net_offline: " ·hors ligne",
   r_gens: "Générations",
   r_pool: (n) => `Pool éligible : ${n} Pokémon`,
   r_draft: "Taille du draft",
@@ -237,31 +189,9 @@ export const FR: Dict = {
   r_hp: "PV de départ",
   r_hp_unit: "PV",
   r_items: "Objets disponibles",
-  p_slot: (n) => `Slot ${n}`,
-  p_add_human: "+ Humain",
-  p_add_bot: "+ Bot IA",
-  p_ready: "Prêt",
-  p_waiting: "En attente",
-  p_ready_btn: "✓ Prêt",
-  p_cancel_btn: "Annuler",
-  p_bot_name: "Bot IA",
-  p_username_placeholder: "Ton nom",
   p_diff_easy: "Facile",
   p_diff_medium: "Moyen",
   p_diff_hard: "Difficile",
-  t_stage: "Stage",
-  t_health: "Santé",
-  t_gold: "Or",
-  t_interest: "Intérêts",
-  t_streak_win: "Victoires",
-  t_streak_loss: "Défaites",
-  t_board: "Board",
-  t_level: "Niveau",
-  t_max: "MAX",
-  t_buy_xp: "Acheter XP",
-  t_pve: "Combat Sauvage",
-  t_carousel: "Carousel",
-  t_pvp: "Lancer le combat",
   net_stage: "Stage",
   net_hp: "PV",
   net_gold: "Or",
@@ -282,7 +212,6 @@ export const FR: Dict = {
   net_placed: (n) => `Classé #${n}`,
   net_viewing: (name) => `Plateau de ${name}`,
   net_back_to_mine: "Retour au mien",
-  net_back_menu: "Retour au menu",
   net_victory: "Victoire Royale",
   net_gameover: "Game Over",
   net_spectating: "spectateur",
@@ -300,7 +229,6 @@ export const FR: Dict = {
   sh_odds: "Chances",
   sh_items_title: "Objets",
   it_empty: "Aucun objet — gagne-les en carrousel ou PvE.",
-  it_equip_hint: "Clique un mon pour l'équiper · Échap pour annuler",
   it_equip_mega: "Clique un mon Méga-capable pour l'équiper",
   it_drag_equip: "Glisse un objet sur un mon pour l'équiper.",
   it_reforge: "Reforger",
@@ -348,14 +276,10 @@ export const EN: Dict = {
   w_hero_title: "Ready to battle?",
   w_how_to_play: "How to play",
   w_profile: "Profile",
-  w_username_label: "Your username",
   w_username_placeholder: "Choose a username…",
-  w_create: "⚔ Create a game",
-  w_join: "🔗 Join",
   w_open_games: "Open games",
   w_no_games: "No open games — host one!",
   w_join_by_code: "Join with a code",
-  w_create_desc: "You'll be the host. Other players can join using the lobby code.",
   w_create_btn: "⚔ Create",
   w_back: "Back",
   w_join_code_label: "Lobby code",
@@ -372,12 +296,6 @@ export const EN: Dict = {
   s_lang_en: "English",
   s_anim_normal: "Normal",
   s_anim_fast: "Fast",
-  l_players: (n, max) => `${n} / ${max} player${n > 1 ? "s" : ""}`,
-  l_slots: "Slots",
-  l_start: "⚔ Start game",
-  l_need_more: "At least 2 players required.",
-  l_wait_ready: "Waiting for all players to be ready.",
-  l_starting: "Starting game…",
   l_rules: "Game rules",
   l_code: "Lobby code",
   l_copy: "Copy",
@@ -393,8 +311,6 @@ export const EN: Dict = {
   l_net_leave: "Leave",
   l_net_host: "Host",
   l_net_you: "You",
-  l_net_bot: "Bot",
-  l_net_offline: " ·offline",
   r_gens: "Generations",
   r_pool: (n) => `Eligible pool: ${n} Pokémon`,
   r_draft: "Draft size",
@@ -402,31 +318,9 @@ export const EN: Dict = {
   r_hp: "Starting HP",
   r_hp_unit: "HP",
   r_items: "Available items",
-  p_slot: (n) => `Slot ${n}`,
-  p_add_human: "+ Human",
-  p_add_bot: "+ Bot AI",
-  p_ready: "Ready",
-  p_waiting: "Waiting",
-  p_ready_btn: "✓ Ready",
-  p_cancel_btn: "Cancel",
-  p_bot_name: "Bot AI",
-  p_username_placeholder: "Your name",
   p_diff_easy: "Easy",
   p_diff_medium: "Medium",
   p_diff_hard: "Hard",
-  t_stage: "Stage",
-  t_health: "Health",
-  t_gold: "Gold",
-  t_interest: "Interest",
-  t_streak_win: "Win",
-  t_streak_loss: "Loss",
-  t_board: "Board",
-  t_level: "Level",
-  t_max: "MAX",
-  t_buy_xp: "Buy XP",
-  t_pve: "Battle Wild",
-  t_carousel: "Carousel",
-  t_pvp: "Start Combat",
   net_stage: "Stage",
   net_hp: "HP",
   net_gold: "Gold",
@@ -447,7 +341,6 @@ export const EN: Dict = {
   net_placed: (n) => `You placed #${n}`,
   net_viewing: (name) => `${name}'s board`,
   net_back_to_mine: "Back to mine",
-  net_back_menu: "Back to menu",
   net_victory: "Victory Royale",
   net_gameover: "Game Over",
   net_spectating: "spectating",
@@ -465,7 +358,6 @@ export const EN: Dict = {
   sh_odds: "Odds",
   sh_items_title: "Items",
   it_empty: "No items yet — win them in carousel or PvE.",
-  it_equip_hint: "Click a mon to equip · Esc to cancel",
   it_equip_mega: "Click a Mega-capable mon to equip",
   it_drag_equip: "Drag an item onto a mon to equip it.",
   it_reforge: "Reforge",
