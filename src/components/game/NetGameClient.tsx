@@ -399,7 +399,7 @@ export function NetGameClient() {
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
       const g = useGame.getState();
-      syncBoard(room.code, myUid, g.units, g.exportSave());
+      syncBoard(room.code, myUid, g.units, g.exportSave(), g.level);
     }, 250);
     return () => { if (syncTimer.current) clearTimeout(syncTimer.current); };
   }, [units, gold, phase, myUid]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -909,8 +909,12 @@ export function NetGameClient() {
                       ) : <span className="text-[9px] text-slate-600">{p.name.slice(0, 1).toUpperCase()}</span>}
                     </span>
                     <span className="flex-1 min-w-0">
-                      <span className={`block text-[11px] font-semibold truncate ${p.uid === myUid ? "text-amber-300" : "text-slate-200"}`}>
-                        {p.name}{!p.connected && t.net_offline}
+                      <span className="flex items-center gap-1.5">
+                        <span className={`block text-[11px] font-semibold truncate ${p.uid === myUid ? "text-amber-300" : "text-slate-200"}`}>
+                          {p.name}{!p.connected && t.net_offline}
+                        </span>
+                        {/* Scouting: rivals' levels are public (TFT-style). */}
+                        <span className="shrink-0 text-[8px] font-bold px-1 rounded bg-slate-700/80 text-slate-300 leading-tight tabular-nums">Lv{p.level ?? 1}</span>
                       </span>
                       <span className="flex items-center gap-1">
                         <span className="flex-1 h-1.5 rounded-full bg-slate-700 overflow-hidden">

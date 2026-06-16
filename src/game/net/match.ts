@@ -150,9 +150,13 @@ function rtdbSafe<T>(v: T): T {
  *  full economy snapshot (gold, shop roll, items, bench) is PRIVATE — written to
  *  priv/{code}/{uid}, readable only by me — so opponents can't scout my gold or
  *  shop. A refresh rehydrates my own state from there. */
-export async function syncBoard(code: string, uid: string, units: UnitInstance[], save?: unknown): Promise<void> {
+export async function syncBoard(code: string, uid: string, units: UnitInstance[], save?: unknown, level?: number): Promise<void> {
   const onBoard = rtdbSafe(units.filter((un) => un.pos !== null));
-  await dbAdapter().update(`games/${code}/players/${uid}`, { board: onBoard });
+  // `board` + `level` are PUBLIC (scoreboard scouting shows each rival's level, like
+  // TFT); the full econ save stays private under priv/.
+  const pub: Record<string, unknown> = { board: onBoard };
+  if (typeof level === "number") pub.level = level;
+  await dbAdapter().update(`games/${code}/players/${uid}`, pub);
   if (save) await dbAdapter().update(`priv/${code}/${uid}`, { save: rtdbSafe(save) });
 }
 
