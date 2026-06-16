@@ -66,6 +66,7 @@ import { UnitChip } from "./UnitChip";
 import { ShopBar } from "./ShopBar";
 import { TraitPanel } from "./TraitPanel";
 import { UnitDetail } from "./UnitDetail";
+import { OptionsMenu } from "./OptionsMenu";
 import { ItemsPanel } from "./ItemsPanel";
 import { CombatStage } from "./CombatStage";
 import { CoinIcon, TrophyIcon, PawIcon, SwordIcon, GiftIcon } from "./icons";
@@ -820,6 +821,7 @@ export function NetGameClient() {
 
           {isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1 shrink-0">{t.net_host_badge}</span>}
           <div className="flex items-center gap-2 shrink-0">
+            <OptionsMenu />
             <FullscreenButton />
             <button onClick={leave} className="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.net_leave}</button>
           </div>

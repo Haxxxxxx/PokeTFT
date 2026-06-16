@@ -21,7 +21,7 @@ export function playCry(dexId: number, volume = 0.35): void {
       cryCache.set(dexId, el);
     }
     const clone = el.cloneNode() as HTMLAudioElement;
-    clone.volume = volume;
+    clone.volume = Math.max(0, Math.min(1, volume * masterVol()));
     clone.play().catch(() => {});
   } catch {}
 }
@@ -49,7 +49,7 @@ function tone(freq: number, dur: number, type: OscillatorType = "sine", vol = 0.
   osc.type = type;
   osc.frequency.value = freq;
   const t0 = c.currentTime + delay;
-  gain.gain.setValueAtTime(vol, t0);
+  gain.gain.setValueAtTime(Math.max(0.0001, vol * masterVol()), t0);
   gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
   osc.start(t0);
   osc.stop(t0 + dur + 0.01);
@@ -57,6 +57,13 @@ function tone(freq: number, dur: number, type: OscillatorType = "sine", vol = 0.
 
 function soundEnabled(): boolean {
   return typeof window !== "undefined" && useAppStore.getState().settings.soundEnabled;
+}
+
+/** Master volume 0..1 (0 when muted) — scales every sound. */
+function masterVol(): number {
+  if (!soundEnabled()) return 0;
+  const v = useAppStore.getState().settings.volume;
+  return typeof v === "number" ? Math.max(0, Math.min(1, v)) : 0.7;
 }
 
 /** UI sound effects. */
@@ -149,12 +156,17 @@ export const music = {
     if (musicTimer || !soundEnabled()) return;
     const c = getCtx();
     if (!c) return;
-    if (!musicGain) { musicGain = c.createGain(); musicGain.gain.value = 0.55; musicGain.connect(c.destination); }
+    if (!musicGain) { musicGain = c.createGain(); musicGain.connect(c.destination); }
+    musicGain.gain.value = 0.5 * masterVol();
     scheduleChord();
     musicTimer = setInterval(scheduleChord, 4000);
   },
   stop(): void {
     if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
+  },
+  /** Live master-volume update for the music bed (slider drag). */
+  setVolume(): void {
+    if (musicGain) musicGain.gain.value = 0.5 * masterVol();
   },
   /** Follow the sound setting: play when on, silence when off. */
   sync(): void {

@@ -8,6 +8,8 @@ export type Language = "fr" | "en";
 export type AppSettings = {
   language: Language;
   soundEnabled: boolean;
+  /** Master volume 0..1 (scales music + SFX). */
+  volume: number;
 };
 
 export type AppStore = {
@@ -27,6 +29,7 @@ export const useAppStore = create<AppStore>()(
       settings: {
         language: "fr",
         soundEnabled: true,
+        volume: 0.7,
       },
       setSettings: (update) => set((s) => ({ settings: { ...s.settings, ...update } })),
       profileOpen: false,

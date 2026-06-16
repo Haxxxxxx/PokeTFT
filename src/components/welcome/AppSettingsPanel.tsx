@@ -2,6 +2,7 @@
 
 import { useAppStore } from "@/game/store/appStore";
 import type { Language } from "@/game/store/appStore";
+import { music } from "@/lib/audio";
 import { useT } from "@/lib/i18n";
 
 export function AppSettingsPanel() {
@@ -37,12 +38,24 @@ export function AppSettingsPanel() {
       <div className="flex items-center justify-between gap-3">
         <span className="text-[11px] font-semibold text-slate-400">{t.s_sound}</span>
         <button
-          onClick={() => setSettings({ soundEnabled: !settings.soundEnabled })}
+          onClick={() => { setSettings({ soundEnabled: !settings.soundEnabled }); music.sync(); }}
           className={`relative w-11 h-6 rounded-full transition-colors ${settings.soundEnabled ? "bg-emerald-500/80" : "bg-slate-700"}`}
           title={settings.soundEnabled ? t.s_sound_on : t.s_sound_off}
         >
           <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${settings.soundEnabled ? "left-[22px]" : "left-0.5"}`} />
         </button>
+      </div>
+
+      {/* Volume */}
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[11px] font-semibold text-slate-400">{settings.language === "fr" ? "Volume" : "Volume"}</span>
+        <input
+          type="range" min={0} max={100}
+          value={Math.round((typeof settings.volume === "number" ? settings.volume : 0.7) * 100)}
+          onChange={(e) => { setSettings({ volume: Number(e.target.value) / 100 }); music.setVolume(); }}
+          disabled={!settings.soundEnabled}
+          className="w-28 accent-amber-500 disabled:opacity-40"
+        />
       </div>
     </div>
   );
