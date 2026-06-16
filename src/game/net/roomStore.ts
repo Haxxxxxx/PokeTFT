@@ -37,6 +37,9 @@ export type RoomPlayer = {
   carouselPicked?: string;
   /** The player's current on-board units (synced during planning). */
   board?: UnitInstance[];
+  /** Public combat augments (synced so host + clients resolve identical team buffs,
+   *  and so rivals are scoutable). */
+  augments?: string[];
   /** Legacy public economy snapshot. Econ now lives in the private priv/{code}/{uid}
    *  node (see roomStore.mySave); kept optional only so reconnect can fall back to
    *  it for sessions that synced before the privacy migration. */

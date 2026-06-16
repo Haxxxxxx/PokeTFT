@@ -103,5 +103,26 @@ for (let trial = 0; trial < 24; trial++) {
 }
 console.log(`${ordPass}/${ordPass + ordFail} board array-order independence`);
 
-if (fail > 0 || netFail > 0 || ordFail > 0) { console.error("\n❌ combat parity broken"); process.exit(1); }
+// --- Combat-augment team-buff determinism -------------------------------------
+// Combat augments apply a team-wide buff at fight start, derived from PUBLIC augment
+// data on host AND client. The buff must (1) be pure: same boards + same buffs ->
+// identical fight, (2) survive the RTDB round-trip exactly like an unbuffed fight, and
+// (3) actually change the outcome (not be silently inert) — else buffed combats desync.
+let buffPass = 0, buffFail = 0;
+const ALLY_BUFF = { adMult: 1.18, hpMult: 1.2, manaStart: 12 };
+const ENEMY_BUFF = { apMult: 1.28, asMult: 1.18, armorAdd: 22 };
+for (let trial = 0; trial < 24; trial++) {
+  const a = generateBoard(2 + (trial % 7), 4 + (trial % 4), 4400 + trial * 13);
+  const b = generateBoard(2 + ((trial + 1) % 7), 4 + ((trial + 2) % 4), 9400 + trial * 17);
+  const pure1 = fingerprint(simulate(a, b, ALLY_BUFF, ENEMY_BUFF));
+  const pure2 = fingerprint(simulate(a, b, ALLY_BUFF, ENEMY_BUFF));     // identical inputs
+  const host = fingerprint(simulate(a, b, ALLY_BUFF, ENEMY_BUFF));
+  const client = fingerprint(simulate(clientCoerce(rtdbMangle(a)), clientCoerce(rtdbMangle(b)), ALLY_BUFF, ENEMY_BUFF));
+  const changed = fingerprint(simulate(a, b)) !== host;
+  if (pure1 === pure2 && host === client && changed) buffPass++;
+  else { buffFail++; console.error(`buff trial ${trial}: FAIL pure=${pure1 === pure2} parity=${host === client} changed=${changed}`); }
+}
+console.log(`${buffPass}/${buffPass + buffFail} combat-augment buff determinism + RTDB parity`);
+
+if (fail > 0 || netFail > 0 || ordFail > 0 || buffFail > 0) { console.error("\n❌ combat parity broken"); process.exit(1); }
 console.log("✅ combat is deterministic, order-independent, flip-parity holds, and survives the RTDB round-trip");

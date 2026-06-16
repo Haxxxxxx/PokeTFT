@@ -139,6 +139,21 @@ export type CombatResult = {
   duration: number;
 };
 
+/** A team-wide combat buff (from combat augments). Applied to every unit on the side
+ *  at combat start, ON TOP of the capped item multipliers — a separate bounded source,
+ *  like trait buffs. Derived from PUBLIC augment data so host + client stay identical. */
+export type TeamBuff = {
+  adMult?: number;
+  apMult?: number;
+  asMult?: number;
+  hpMult?: number;
+  armorAdd?: number;
+  mrAdd?: number;
+  critAdd?: number;
+  manaStart?: number;
+  lifeSteal?: number;
+};
+
 /** Per-surviving-unit player-damage weight: ★ value + a carry bonus for 4/5-costs. */
 function survivorWeight(u: Combatant): number {
   const cost = getDef(u.defId).cost;
@@ -158,7 +173,7 @@ function armorMult(armor: number): number {
   return 100 / (100 + Math.max(0, armor));
 }
 
-function toCombatant(u: UnitInstance, team: Team): Combatant {
+function toCombatant(u: UnitInstance, team: Team, buff?: TeamBuff): Combatant {
   const def = getDef(u.defId);
   const i = u.star - 1;
   const s = def.stats;
@@ -220,6 +235,20 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
   adMult = Math.min(ITEM_MULT_CAP, adMult);
   apMult = Math.min(ITEM_MULT_CAP, apMult);
   hpMult = Math.min(ITEM_MULT_CAP, hpMult);
+  // Team-wide augment buffs stack ON TOP of the capped item mults (a separate bounded
+  // source, like traits). Applied before the final ad/hp rounding so they compound
+  // correctly. Buff is derived from public augment data → identical host & client.
+  if (buff) {
+    adMult *= buff.adMult ?? 1;
+    apMult *= buff.apMult ?? 1;
+    hpMult *= buff.hpMult ?? 1;
+    attackSpeed *= buff.asMult ?? 1;
+    armor += buff.armorAdd ?? 0;
+    mr += buff.mrAdd ?? 0;
+    critAdd += buff.critAdd ?? 0;
+    manaAdd += buff.manaStart ?? 0;
+    lifeSteal = Math.max(lifeSteal, buff.lifeSteal ?? 0);
+  }
   ad = Math.round(ad * adMult);
   hp = Math.round(hp * hpMult);
 
@@ -336,10 +365,10 @@ function snapshot(units: Combatant[], t: number, events: CombatEvent[]): Frame {
   };
 }
 
-export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): CombatResult {
+export function simulate(allies: UnitInstance[], enemies: UnitInstance[], allyBuff?: TeamBuff, enemyBuff?: TeamBuff): CombatResult {
   const units: Combatant[] = [
-    ...allies.filter((u) => u.pos).map((u) => toCombatant(u, "ally")),
-    ...enemies.filter((u) => u.pos).map((u) => toCombatant(u, "enemy")),
+    ...allies.filter((u) => u.pos).map((u) => toCombatant(u, "ally", allyBuff)),
+    ...enemies.filter((u) => u.pos).map((u) => toCombatant(u, "enemy", enemyBuff)),
   ];
   // Stable iteration order, independent of the incoming array order (which RTDB
   // can reorder). Every per-tick loop below iterates `units`, and movement /

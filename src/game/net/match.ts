@@ -7,6 +7,7 @@ import { rosterForGenerations, hasDef } from "../data/mons";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
 import { COMPONENT_IDS, EMBLEM_IDS } from "../data/items";
+import { teamBuffForAugments } from "../data/augments";
 import type { UnitInstance } from "../types";
 import type { Room, RoomPlayer, CombatAssign, BotDifficulty } from "./roomStore";
 
@@ -104,6 +105,12 @@ function board(p: RoomPlayer | undefined): UnitInstance[] {
     .map((u) => ({ ...u, items: (Array.isArray(u.items) ? u.items : Object.values((u.items ?? {}) as Record<string, string>)).filter(Boolean) }));
 }
 
+/** A player's team-wide combat buff from their (public) combat augments. Computed the
+ *  same way on host and client → deterministic. */
+function teamBuffFor(p: RoomPlayer | undefined) {
+  return teamBuffForAugments(p?.augments);
+}
+
 /** Players still in the game (alive). Disconnected-but-alive players still fight
  *  with their last board — no free dodge. */
 function alivePlayers(room: Room): RoomPlayer[] {
@@ -150,12 +157,14 @@ function rtdbSafe<T>(v: T): T {
  *  full economy snapshot (gold, shop roll, items, bench) is PRIVATE — written to
  *  priv/{code}/{uid}, readable only by me — so opponents can't scout my gold or
  *  shop. A refresh rehydrates my own state from there. */
-export async function syncBoard(code: string, uid: string, units: UnitInstance[], save?: unknown, level?: number): Promise<void> {
+export async function syncBoard(code: string, uid: string, units: UnitInstance[], save?: unknown, level?: number, augments?: string[]): Promise<void> {
   const onBoard = rtdbSafe(units.filter((un) => un.pos !== null));
-  // `board` + `level` are PUBLIC (scoreboard scouting shows each rival's level, like
-  // TFT); the full econ save stays private under priv/.
+  // `board` + `level` + `augments` are PUBLIC: scouting shows each rival's level (like
+  // TFT), and combat augments must be public so the host AND every client resolve the
+  // identical team buffs. The full econ save stays private under priv/.
   const pub: Record<string, unknown> = { board: onBoard };
   if (typeof level === "number") pub.level = level;
+  if (augments) pub.augments = rtdbSafe(augments);
   await dbAdapter().update(`games/${code}/players/${uid}`, pub);
   if (save) await dbAdapter().update(`priv/${code}/${uid}`, { save: rtdbSafe(save) });
 }
@@ -172,7 +181,8 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
   // replay (the "I see a different fight / phantom loss" desync).
   const sa = rtdbSafe(board(room.players[aUid]));
   const sb = rtdbSafe(board(room.players[bUid]));
-  const r = simulate(sa, sb);
+  // Combat augments buff each side's team (ghost fights use the ghost's source player).
+  const r = simulate(sa, sb, teamBuffFor(room.players[aUid]), teamBuffFor(room.players[bUid]));
   const draw = r.winner === "draw";
   const aWon = r.winner === "ally";
   const bWon = r.winner === "enemy";
@@ -300,7 +310,8 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
     for (const p of alive) {
       const self = rtdbSafe(board(room.players[p.uid]));
       const creeps = rtdbSafe(generateCreepBoard(stage, room.meta.round, stage * 97 + room.meta.round * 13 + hashStr(p.uid), allowed));
-      const r = simulate(self, creeps);
+      // Player's augments buff their team; the wild creeps get no buff.
+      const r = simulate(self, creeps, teamBuffFor(room.players[p.uid]), undefined);
       combat[p.uid] = { oppUid: p.uid, oppName: pveName, ghost: true, pve: true, won: r.winner === "ally", survivors: 0, dmg: 0, selfBoard: self, oppBoard: creeps };
     }
   } else {

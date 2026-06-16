@@ -17,8 +17,8 @@ import { ItemGlyph, AugmentGlyph } from "./ItemGlyph";
 import { finishCarouselEarly } from "@/game/net/serverGame";
 import { recordGameResult, applyRankedResult } from "@/game/net/users";
 import { computeTraits } from "@/game/engine/synergies";
-import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle } from "lucide-react";
-import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR } from "@/game/data/augments";
+import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords } from "lucide-react";
+import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR, teamBuffForAugments } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
 import { useUi } from "@/game/store/uiStore";
 import { makeRng } from "@/game/engine/rng";
@@ -399,7 +399,7 @@ export function NetGameClient() {
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
       const g = useGame.getState();
-      syncBoard(room.code, myUid, g.units, g.exportSave(), g.level);
+      syncBoard(room.code, myUid, g.units, g.exportSave(), g.level, g.augments);
     }, 250);
     return () => { if (syncTimer.current) clearTimeout(syncTimer.current); };
   }, [units, gold, phase, myUid]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -422,7 +422,7 @@ export function NetGameClient() {
         // has room, auto-deploy them just before the fight (NOT on every level-up).
         useGame.getState().fillBoard();
         const g = useGame.getState();
-        syncBoard(r.code, myUid, g.units, g.exportSave(), g.level);
+        syncBoard(r.code, myUid, g.units, g.exportSave(), g.level, g.augments);
       }
     }, 200);
     return () => clearInterval(id);
@@ -441,7 +441,13 @@ export function NetGameClient() {
     // defender): the flipped (enemy-side) player passes opp,self so the args
     // match the host's a,b. Guarantees the same frames + outcome on every screen.
     const [p1, p2] = myCombat.flip ? [myCombat.oppBoard, myCombat.selfBoard] : [myCombat.selfBoard, myCombat.oppBoard];
-    return simulate(asBoard(p1), asBoard(p2));
+    // Combat-augment team buffs, applied to the SAME ally/enemy sides the host used.
+    // Owners of p1/p2 follow the flip; PvE creeps (p2 when pve) get no buff.
+    const pl = room?.players ?? {};
+    const [u1, u2] = myCombat.flip ? [myCombat.oppUid, myUid] : [myUid, myCombat.oppUid];
+    const allyBuff = teamBuffForAugments(pl[u1 ?? ""]?.augments);
+    const enemyBuff = myCombat.pve ? undefined : teamBuffForAugments(pl[u2 ?? ""]?.augments);
+    return simulate(asBoard(p1), asBoard(p2), allyBuff, enemyBuff);
     // Re-run when the frozen boards themselves change (host failover re-freeze or a
     // late buzzer-beater sync for the same stage/round/opp) — not just on round id,
     // else the replay frames can drift from the authoritative win flag.
@@ -454,7 +460,11 @@ export function NetGameClient() {
   const spectateCombatResult = useMemo(() => {
     if (phase !== "combat" || !spectateCombat) return null;
     const [p1, p2] = spectateCombat.flip ? [spectateCombat.oppBoard, spectateCombat.selfBoard] : [spectateCombat.selfBoard, spectateCombat.oppBoard];
-    return simulate(asBoard(p1), asBoard(p2));
+    const pl = room?.players ?? {};
+    const [u1, u2] = spectateCombat.flip ? [spectateCombat.oppUid, spectate] : [spectate, spectateCombat.oppUid];
+    const allyBuff = teamBuffForAugments(pl[u1 ?? ""]?.augments);
+    const enemyBuff = spectateCombat.pve ? undefined : teamBuffForAugments(pl[u2 ?? ""]?.augments);
+    return simulate(asBoard(p1), asBoard(p2), allyBuff, enemyBuff);
   }, [phase, meta?.stage, meta?.round, spectate, spectateCombat?.oppUid, spectateCombat?.flip, specSelfSig, specOppSig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Augment round? (stage 2/3/4 round 1). Show the pick until this slot is taken.
@@ -1206,6 +1216,7 @@ export function NetGameClient() {
                 desc={lang === "fr" ? a.descFr : a.desc}
                 tier={a.tier}
                 frame={AUGMENT_TIER_COLOR[a.tier]}
+                combat={!!a.combat}
               />
             ))}
             </div>
@@ -1444,12 +1455,15 @@ function CarouselCard({ onClick, color, name, sub, cost, types, art, disabled, n
 
 /** Augment choice in the ornate frame: icon in a gilded tile, name, then the
  *  effect on the dark panel — matching the TFT "Select an Augment" look. */
-function OrnateAugmentCard({ onClick, icon, name, desc, tier, frame }: { onClick: () => void; icon: ReactNode; name: string; desc: string; tier: string; frame: string }) {
+function OrnateAugmentCard({ onClick, icon, name, desc, tier, frame, combat }: { onClick: () => void; icon: ReactNode; name: string; desc: string; tier: string; frame: string; combat?: boolean }) {
   return (
     <OrnateFrame onClick={onClick} frame={frame} height={272}>
       <div className="flex flex-col items-center pt-5 px-3">
         <div className="w-16 h-16 rounded-lg flex items-center justify-center" style={{ background: `${frame}1f`, border: `1px solid ${frame}66`, boxShadow: `inset 0 0 14px ${frame}40`, color: frame }}>{icon}</div>
-        <span className="mt-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em]" style={{ color: frame }}>{tier}</span>
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <span className="text-[9px] font-extrabold uppercase tracking-[0.18em]" style={{ color: frame }}>{tier}</span>
+          {combat && <span className="inline-flex items-center gap-0.5 text-[8px] font-extrabold uppercase tracking-wide px-1 rounded bg-rose-500/20 text-rose-300 border border-rose-400/40"><Swords size={8} /> Combat</span>}
+        </div>
         <span className="mt-1 text-[15px] font-extrabold text-amber-50 text-center leading-tight drop-shadow">{name}</span>
       </div>
       <div className="mt-auto bg-slate-950/80 border-t border-amber-600/30 px-3 py-3 text-center">

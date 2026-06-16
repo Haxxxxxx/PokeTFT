@@ -1,6 +1,9 @@
 /** TFT-style augments: 3 are picked across a game, granting persistent boosts.
- *  All effects are economy/resource-level (applied in gameStore) so the
- *  deterministic combat sim is untouched and multiplayer stays in sync. */
+ *  Economy augments apply in gameStore; COMBAT augments carry a `combat` TeamBuff that
+ *  the deterministic sim applies to the whole team at fight start (derived from public
+ *  augment data, so multiplayer stays in sync). */
+
+import type { TeamBuff } from "../engine/combat";
 
 export type AugmentTier = "silver" | "gold" | "prismatic";
 
@@ -10,9 +13,12 @@ export type Augment = {
   nameFr: string;
   desc: string;
   descFr: string;
-  /** "instant" applies once on pick; "passive" applies every round. */
+  /** "instant" applies once on pick; "passive" applies every round (econ) or every
+   *  fight (combat). */
   kind: "instant" | "passive";
   tier: AugmentTier;
+  /** Combat augments only: a team-wide buff applied in the sim. */
+  combat?: TeamBuff;
 };
 
 /** Augment tier → accent colour (TFT silver / gold / prismatic). */
@@ -32,6 +38,10 @@ export const AUGMENTS: Augment[] = [
   { id: "fast-learner",  name: "Fast Learner",     nameFr: "Apprentissage",     desc: "+3 XP every round.",               descFr: "+3 XP à chaque tour.",                 kind: "passive", tier: "silver" },
   { id: "head-start",    name: "Head Start",       nameFr: "Longueur d'avance", desc: "+3 gold and a free unit now.",     descFr: "+3 or et une unité gratuite.",         kind: "instant", tier: "silver" },
   { id: "lucky",         name: "Lucky Rolls",      nameFr: "Coups de chance",   desc: "Reroll costs 1 gold.",             descFr: "Le reroll coûte 1 or.",                kind: "passive", tier: "gold" },
+  // ── Combat (silver) — team-wide buffs applied every fight ──────────────────
+  { id: "sharp-claws",   name: "Sharp Claws",      nameFr: "Griffes Acérées",   desc: "Your team gains +10% Attack.",      descFr: "Votre équipe gagne +10% Attaque.",     kind: "passive", tier: "silver", combat: { adMult: 1.10 } },
+  { id: "focus-band",    name: "Focus Band",       nameFr: "Bandeau",           desc: "Your team gains +12% Health.",      descFr: "Votre équipe gagne +12% PV.",          kind: "passive", tier: "silver", combat: { hpMult: 1.12 } },
+  { id: "meditate",      name: "Meditate",         nameFr: "Méditation",        desc: "Your team starts with +12 mana.",   descFr: "Votre équipe démarre avec +12 mana.",  kind: "passive", tier: "silver", combat: { manaStart: 12 } },
   // ── Gold ─────────────────────────────────────────────────────────────────
   { id: "spatula-set",   name: "Spatula Set",      nameFr: "Jeu de Spatules",   desc: "A random trait Emblem now.",       descFr: "Un emblème de trait aléatoire.",       kind: "instant", tier: "gold" },
   { id: "artisan",       name: "Artisan",          nameFr: "Artisan",           desc: "A random completed item now.",     descFr: "Un objet complet aléatoire.",          kind: "instant", tier: "gold" },
@@ -43,6 +53,12 @@ export const AUGMENTS: Augment[] = [
   { id: "component-cache", name: "Component Cache", nameFr: "Cache d'objets",   desc: "3 random items now.",              descFr: "3 objets aléatoires immédiatement.",   kind: "instant", tier: "gold" },
   { id: "rich",          name: "Rich Get Richer",  nameFr: "Capital croissant", desc: "+1 gold every round.",             descFr: "+1 or à chaque tour.",                 kind: "passive", tier: "gold" },
   { id: "compound-interest", name: "Compound Interest", nameFr: "Intérêts composés", desc: "+2 gold every round.",      descFr: "+2 or à chaque tour.",                 kind: "passive", tier: "prismatic" },
+  // ── Combat (gold) ──────────────────────────────────────────────────────────
+  { id: "swords-dance",  name: "Swords Dance",     nameFr: "Danse-Lames",       desc: "Your team gains +18% Attack.",      descFr: "Votre équipe gagne +18% Attaque.",     kind: "passive", tier: "gold", combat: { adMult: 1.18 } },
+  { id: "nasty-plot",    name: "Nasty Plot",       nameFr: "Machination",       desc: "Your team gains +20% Ability Power.", descFr: "Votre équipe gagne +20% Att. Spé.",  kind: "passive", tier: "gold", combat: { apMult: 1.20 } },
+  { id: "agility",       name: "Agility",          nameFr: "Hâte",              desc: "Your team gains +18% Attack Speed.", descFr: "Votre équipe gagne +18% Vitesse.",    kind: "passive", tier: "gold", combat: { asMult: 1.18 } },
+  { id: "iron-defense",  name: "Iron Defense",     nameFr: "Mur de Fer",        desc: "Your team gains +22 Armor & MR.",   descFr: "Votre équipe gagne +22 Déf & Déf Spé.", kind: "passive", tier: "gold", combat: { armorAdd: 22, mrAdd: 22 } },
+  { id: "giga-drain",    name: "Giga Drain",       nameFr: "Giga-Sangsue",      desc: "Your team gains 15% lifesteal.",    descFr: "Votre équipe gagne 15% vol de vie.",   kind: "passive", tier: "gold", combat: { lifeSteal: 0.15 } },
   // ── Prismatic ────────────────────────────────────────────────────────────
   { id: "trait-trove",   name: "Trait Trove",      nameFr: "Trésor de Traits",  desc: "2 random trait Emblems now.",      descFr: "2 emblèmes de trait aléatoires.",      kind: "instant", tier: "prismatic" },
   { id: "blacksmith",    name: "Blacksmith",       nameFr: "Forgeron",          desc: "2 random completed items now.",    descFr: "2 objets complets aléatoires.",        kind: "instant", tier: "prismatic" },
@@ -51,9 +67,37 @@ export const AUGMENTS: Augment[] = [
   { id: "big-brain",     name: "Big Brain",        nameFr: "Gros cerveau",      desc: "+8 XP right now.",                 descFr: "+8 XP immédiatement.",                 kind: "instant", tier: "prismatic" },
   { id: "jackpot",       name: "Jackpot",          nameFr: "Jackpot",           desc: "+18 gold right now.",              descFr: "+18 or immédiatement.",                kind: "instant", tier: "prismatic" },
   { id: "prodigy",       name: "Prodigy",          nameFr: "Prodige",           desc: "+12 XP right now.",                descFr: "+12 XP immédiatement.",                kind: "instant", tier: "prismatic" },
+  // ── Combat (prismatic) — powerful team-wide buffs ──────────────────────────
+  { id: "bulk-up",       name: "Bulk Up",          nameFr: "Gonflette",         desc: "Your team gains +22% Attack & +20% Health.", descFr: "Votre équipe : +22% Attaque & +20% PV.", kind: "passive", tier: "prismatic", combat: { adMult: 1.22, hpMult: 1.20 } },
+  { id: "calm-mind",     name: "Calm Mind",        nameFr: "Plénitude",         desc: "Your team gains +28% AP & +18 start mana.",  descFr: "Votre équipe : +28% Att. Spé & +18 mana.", kind: "passive", tier: "prismatic", combat: { apMult: 1.28, manaStart: 18 } },
+  { id: "dragon-dance",  name: "Dragon Dance",     nameFr: "Danse-Draco",       desc: "Your team gains +18% Attack & +18% Attack Speed.", descFr: "Votre équipe : +18% Attaque & +18% Vitesse.", kind: "passive", tier: "prismatic", combat: { adMult: 1.18, asMult: 1.18 } },
+  { id: "sturdy",        name: "Sturdy",           nameFr: "Fermeté",           desc: "Your team gains +25% Health & +25 Armor & MR.", descFr: "Votre équipe : +25% PV & +25 Déf & Déf Spé.", kind: "passive", tier: "prismatic", combat: { hpMult: 1.25, armorAdd: 25, mrAdd: 25 } },
 ];
 
 export const AUGMENT_BY_ID: Record<string, Augment> = Object.fromEntries(AUGMENTS.map((a) => [a.id, a]));
+
+/** Fold a player's owned augments into a single team-wide combat buff. Iterates the
+ *  canonical AUGMENTS order (NOT the player's array order) so the floating-point fold
+ *  is byte-identical on host and every client — the cornerstone of combat determinism. */
+export function teamBuffForAugments(ids: string[] | undefined | null): TeamBuff {
+  const buff: TeamBuff = {};
+  if (!ids || !ids.length) return buff;
+  const owned = new Set(ids);
+  for (const a of AUGMENTS) {
+    if (!a.combat || !owned.has(a.id)) continue;
+    const c = a.combat;
+    if (c.adMult) buff.adMult = (buff.adMult ?? 1) * c.adMult;
+    if (c.apMult) buff.apMult = (buff.apMult ?? 1) * c.apMult;
+    if (c.asMult) buff.asMult = (buff.asMult ?? 1) * c.asMult;
+    if (c.hpMult) buff.hpMult = (buff.hpMult ?? 1) * c.hpMult;
+    if (c.armorAdd) buff.armorAdd = (buff.armorAdd ?? 0) + c.armorAdd;
+    if (c.mrAdd) buff.mrAdd = (buff.mrAdd ?? 0) + c.mrAdd;
+    if (c.critAdd) buff.critAdd = (buff.critAdd ?? 0) + c.critAdd;
+    if (c.manaStart) buff.manaStart = (buff.manaStart ?? 0) + c.manaStart;
+    if (c.lifeSteal) buff.lifeSteal = Math.max(buff.lifeSteal ?? 0, c.lifeSteal);
+  }
+  return buff;
+}
 
 /** Which augment slot (0,1,2) a given round opens, or null. One per early stage,
  *  offered at round 2 — AFTER the stage's first fight (the carousel is the mid-stage
