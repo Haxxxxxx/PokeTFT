@@ -19,6 +19,9 @@ export type GameRules = {
   augmentsEnabled: boolean;
   /** Drive the match from the dedicated server (#110). On by default. */
   serverDriven: boolean;
+  /** Private lobby — not listed in the public game browser (friends can still join
+   *  via the Friends panel). Default false (public). */
+  isPrivate: boolean;
 };
 
 /** Host-side draft of the rules before a room is created. Once a room exists the
@@ -45,6 +48,7 @@ const DEFAULT_RULES: GameRules = {
   // phase transitions, combat resolution and the winner, so outcomes can't diverge
   // between players. The client keeps a 4s fallback if the server is ever late.
   serverDriven: true,
+  isPrivate: false,
 };
 
 export const usePreLobby = create<PreLobbyState>((set) => ({

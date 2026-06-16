@@ -5,7 +5,7 @@ import { useAuth } from "@/game/net/authStore";
 import { AuthShell } from "./AuthShell";
 
 export function SignInScreen() {
-  const { signInGoogle, signInEmail, signUpEmail, error, busy } = useAuth();
+  const { signInGoogle, signInEmail, signUpEmail, resetPassword, error, notice, busy } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -38,12 +38,20 @@ export function SignInScreen() {
           className="w-full py-2.5 rounded-lg font-bold text-[13px] bg-amber-500/90 hover:bg-amber-400 text-black disabled:opacity-40 transition-colors">
           {busy ? "…" : mode === "signin" ? "Sign in" : "Create account"}
         </button>
-        <button onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="text-[11px] text-sky-400 hover:text-sky-300 transition-colors">
-          {mode === "signin" ? "No account? Create one" : "Already have an account? Sign in"}
-        </button>
+        <div className="flex items-center justify-between">
+          <button onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="text-[11px] text-sky-400 hover:text-sky-300 transition-colors">
+            {mode === "signin" ? "No account? Create one" : "Already have an account? Sign in"}
+          </button>
+          {mode === "signin" && (
+            <button onClick={() => resetPassword(email)} disabled={busy} className="text-[11px] text-slate-500 hover:text-amber-300 transition-colors">
+              Forgot password?
+            </button>
+          )}
+        </div>
       </div>
 
       {error && <p className="text-xs text-rose-400 text-center">{error}</p>}
+      {notice && <p className="text-xs text-emerald-400 text-center">{notice}</p>}
     </AuthShell>
   );
 }

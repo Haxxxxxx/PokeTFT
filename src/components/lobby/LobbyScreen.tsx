@@ -35,7 +35,8 @@ export function LobbyScreen() {
   // Host: keep the game-browser listing's player count fresh, and delist when the
   // lobby closes (game starts → unmount, or host leaves).
   const lobbyCount = room ? Object.values(room.players ?? {}).filter((p) => p.connected).length : 0;
-  useEffect(() => { if (isHost) publishLobby(lobbyCount); }, [isHost, lobbyCount, publishLobby]);
+  const isPrivate = room?.rules?.isPrivate === true;
+  useEffect(() => { if (isHost && !isPrivate) publishLobby(lobbyCount); else if (isHost && isPrivate) removeLobby(); }, [isHost, isPrivate, lobbyCount, publishLobby, removeLobby]);
   useEffect(() => () => { if (isHost) removeLobby(); }, [isHost, removeLobby]);
   // Clear my private econ on entering the lobby so a "Play again" rematch in the
   // same room starts fresh instead of restoring the finished game from priv.
@@ -43,8 +44,8 @@ export function LobbyScreen() {
 
   useEffect(() => {
     if (!room || !isHost) return;
-    setRules({ startingHp: preRules.startingHp, generations: preRules.generations, itemsEnabled: preRules.itemsEnabled, draftPoolSize: preRules.draftPoolSize, maxPlayers: preRules.maxPlayers, augmentsEnabled: preRules.augmentsEnabled, serverDriven: preRules.serverDriven });
-  }, [isHost, room, setRules, preRules.startingHp, preRules.generations, preRules.itemsEnabled, preRules.draftPoolSize, preRules.maxPlayers, preRules.augmentsEnabled, preRules.serverDriven]);
+    setRules({ startingHp: preRules.startingHp, generations: preRules.generations, itemsEnabled: preRules.itemsEnabled, draftPoolSize: preRules.draftPoolSize, maxPlayers: preRules.maxPlayers, augmentsEnabled: preRules.augmentsEnabled, serverDriven: preRules.serverDriven, isPrivate: preRules.isPrivate });
+  }, [isHost, room, setRules, preRules.startingHp, preRules.generations, preRules.itemsEnabled, preRules.draftPoolSize, preRules.maxPlayers, preRules.augmentsEnabled, preRules.serverDriven, preRules.isPrivate]);
 
   const roomGenKey = (room?.rules?.generations ?? [1]).join(",");
   const roomItemKey = (room?.rules?.itemsEnabled ?? []).join(",");
@@ -58,8 +59,9 @@ export function LobbyScreen() {
       draftPoolSize: room.rules?.draftPoolSize ?? 60,
       maxPlayers: room.rules?.maxPlayers ?? 8,
       augmentsEnabled: room.rules?.augmentsEnabled !== false,
+      isPrivate: room.rules?.isPrivate === true,
     });
-  }, [isHost, room, setPreRules, roomHp, roomGenKey, roomItemKey, room?.rules?.draftPoolSize, room?.rules?.maxPlayers, room?.rules?.augmentsEnabled]);
+  }, [isHost, room, setPreRules, roomHp, roomGenKey, roomItemKey, room?.rules?.draftPoolSize, room?.rules?.maxPlayers, room?.rules?.augmentsEnabled, room?.rules?.isPrivate]);
 
   if (!room) return null;
 

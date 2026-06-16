@@ -10,9 +10,10 @@ const AVATAR_DEX = [25, 1, 4, 7, 133, 6, 9, 3, 143, 94, 130, 149, 448, 282, 384,
 const AVATARS = AVATAR_DEX.map(spriteUrl);
 
 export function ProfileEditor({ onClose }: { onClose: () => void }) {
-  const { profile, user, saveUsername, setAvatar, error, busy } = useAuth();
+  const { profile, user, saveUsername, setAvatar, deleteAccount, error, busy } = useAuth();
   const isGuest = user?.isAnonymous ?? false;
   const [name, setName] = useState(profile?.username ?? "");
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const nameChanged = name.trim() !== (profile?.username ?? "");
   const valid = usernameValid(name.trim());
 
@@ -81,6 +82,22 @@ export function ProfileEditor({ onClose }: { onClose: () => void }) {
           className="w-full py-2.5 rounded-xl font-extrabold text-sm bg-amber-500 hover:bg-amber-400 text-black disabled:opacity-40">
           {busy ? "…" : "Done"}
         </button>
+
+        {/* Danger zone */}
+        <div className="pt-3 border-t border-slate-800">
+          {!confirmDelete ? (
+            <button onClick={() => setConfirmDelete(true)} className="text-[11px] text-slate-600 hover:text-rose-400 transition-colors">Delete account</button>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <span className="text-[11px] text-rose-300">This permanently deletes your account, rank and history. Are you sure?</span>
+              <div className="flex gap-2">
+                <button onClick={async () => { const r = await deleteAccount(); if (r.ok) onClose(); }} disabled={busy}
+                  className="flex-1 py-2 rounded-lg text-[12px] font-bold bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-40">{busy ? "…" : "Delete forever"}</button>
+                <button onClick={() => setConfirmDelete(false)} className="px-4 py-2 rounded-lg text-[12px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300">Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -166,6 +166,25 @@ export function GameRulesPanel({ isHost }: { isHost: boolean }) {
           </div>
           <p className="text-[11px] text-slate-500 mt-2">{lang === "fr" ? "Le serveur pilote chaque partie — transitions, combats et vainqueur font autorité (anti-désync)." : "The server drives every match — transitions, combat and the winner are authoritative (anti-desync)."}</p>
         </SectionCard>
+
+        <SectionCard title={lang === "fr" ? "Visibilité" : "Visibility"}>
+          <div className="flex gap-1.5">
+            {[false, true].map((priv) => {
+              const active = (rules.isPrivate === true) === priv;
+              return (
+                <button
+                  key={String(priv)}
+                  disabled={!isHost}
+                  onClick={() => setRules({ isPrivate: priv })}
+                  className={`px-4 py-1.5 ${chipBase} ${active ? chipActive : chipIdle} disabled:opacity-50`}
+                >
+                  {priv ? (lang === "fr" ? "Privée" : "Private") : (lang === "fr" ? "Publique" : "Public")}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-slate-500 mt-2">{lang === "fr" ? "Privée : invisible dans le navigateur de parties — vos amis peuvent rejoindre depuis le panneau Amis." : "Private: hidden from the game browser — friends can still join from the Friends panel."}</p>
+        </SectionCard>
       </div>
 
       {/* Right column: the tall items list, on its own. */}

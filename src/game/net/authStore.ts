@@ -4,9 +4,11 @@ import { create } from "zustand";
 import {
   onAuthStateChanged, GoogleAuthProvider, signInWithPopup,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  sendPasswordResetEmail, deleteUser,
   signOut as fbSignOut, type User,
 } from "firebase/auth";
-import { auth } from "./firebase";
+import { ref, remove } from "firebase/database";
+import { auth, db } from "./firebase";
 import {
   ensureProfile, setUsername as setUsernameRT, setPhoto as setPhotoRT, addFriend as addFriendRT,
   removeFriend as removeFriendRT, findUserByUsername, trackPresence, subscribeFriends,
@@ -29,6 +31,8 @@ type AuthState = {
   friends: UserProfile[];
   status: Status;
   error: string | null;
+  /** Transient success message (e.g. "reset email sent"). */
+  notice: string | null;
   busy: boolean;
 
   init: () => void;
@@ -36,6 +40,8 @@ type AuthState = {
   signInEmail: (email: string, pw: string) => Promise<void>;
   signUpEmail: (email: string, pw: string) => Promise<void>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  deleteAccount: () => Promise<{ ok: boolean; error?: string }>;
   saveUsername: (name: string) => Promise<boolean>;
   setAvatar: (photoURL: string) => Promise<void>;
   addFriendByName: (name: string) => Promise<{ ok: boolean; error?: string }>;
@@ -65,6 +71,7 @@ export const useAuth = create<AuthState>((set, get) => ({
   friends: [],
   status: "loading",
   error: null,
+  notice: null,
   busy: false,
 
   init: () => {
@@ -118,6 +125,41 @@ export const useAuth = create<AuthState>((set, get) => ({
   signOut: async () => {
     if (friendsUnsub) { friendsUnsub(); friendsUnsub = null; }
     await fbSignOut(auth());
+  },
+
+  resetPassword: async (email) => {
+    if (!email.trim()) { set({ error: "Enter your email first." }); return; }
+    set({ busy: true, error: null, notice: null });
+    try {
+      await sendPasswordResetEmail(auth(), email.trim());
+      set({ notice: "Reset email sent — check your inbox." });
+    } catch (e) { set({ error: authErr(e) }); }
+    finally { set({ busy: false }); }
+  },
+
+  deleteAccount: async () => {
+    const u = auth().currentUser;
+    if (!u) return { ok: false, error: "Not signed in." };
+    set({ busy: true, error: null });
+    try {
+      // Best-effort cleanup of public records; the account delete is the source of truth.
+      const uid = u.uid;
+      const lower = get().profile?.usernameLower;
+      await Promise.allSettled([
+        remove(ref(db(), `users/${uid}`)),
+        remove(ref(db(), `leaderboard/${uid}`)),
+        ...(lower ? [remove(ref(db(), `usernames/${lower}`))] : []),
+      ]);
+      await deleteUser(u);
+      return { ok: true };
+    } catch (e) {
+      const code = (e as { code?: string })?.code ?? "";
+      const error = code.includes("requires-recent-login")
+        ? "Please sign out and back in, then delete again."
+        : authErr(e);
+      set({ error });
+      return { ok: false, error };
+    } finally { set({ busy: false }); }
   },
 
   saveUsername: async (name) => {
