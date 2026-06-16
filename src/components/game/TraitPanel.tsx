@@ -30,6 +30,18 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
       .filter((d) => (d.types as string[]).includes(key) || ((d.roles as string[] | undefined) ?? []).includes(key))
       .sort((a, b) => a.cost - b.cost);
 
+  // How many carriers of each trait the active region pool even HAS — so a synergy
+  // that can't reach its next tier in this region (e.g. only 1 Dragon in Kanto) is
+  // shown as capped instead of dangling an impossible breakpoint.
+  const poolCountByTrait = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const id of rosterIds) {
+      const d = getDef(id);
+      for (const k of [...(d.types as string[]), ...((d.roles as string[] | undefined) ?? [])]) m.set(k, (m.get(k) ?? 0) + 1);
+    }
+    return m;
+  }, [rosterIds]);
+
   // Hovered row → a portaled tooltip (escapes the scroll container so it's never
   // clipped, even when the synergy list is long enough to scroll).
   const [hover, setHover] = useState<{ key: string; top: number; left: number } | null>(null);
@@ -45,6 +57,8 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
           const color = (TYPE_COLOR as Record<string, string>)[t.key] ?? "#64748b";
           const active = t.tier > 0;
           const nextBp = t.breakpoints.find((b) => b > t.count);
+          const poolMax = poolCountByTrait.get(t.key) ?? 0;
+          const capped = nextBp != null && nextBp > poolMax; // next tier unreachable in this region
           return (
             <div
               key={t.key}
@@ -60,6 +74,7 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
               </span>
               <span className="text-xs font-semibold flex-1">{t.label}</span>
               {active && <span style={{ background: color }} className="text-[9px] font-bold px-1 rounded text-black/80">{t.tier}</span>}
+              {capped && !active && <span className="text-[8px] font-bold uppercase tracking-wide text-slate-600" title={`Only ${poolMax} in this region — can't reach the next tier`}>max {poolMax}</span>}
               <span className="text-[11px] text-slate-400">{t.count}{nextBp ? `/${nextBp}` : " ✓"}</span>
             </div>
           );
