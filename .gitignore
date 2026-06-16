@@ -42,3 +42,6 @@ next-env.d.ts
 
 # firebase deploy cache
 .firebase/
+
+# PokeAPI fetch caches for tools/gen-moves.mjs (regenerable)
+tools/.cache-*.json
