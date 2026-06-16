@@ -484,6 +484,11 @@ export async function addInvitePlaceholder(code: string, uid: string, username: 
   await dbAdapter().update(`games/${code}/invited/${uid}`, { username, photoURL: photoURL ?? null });
 }
 
+/** Remove an invite placeholder (on decline / after joining). */
+export async function clearInvitePlaceholder(code: string, uid: string): Promise<void> {
+  await dbAdapter().update(`games/${code}/invited`, { [uid]: null }).catch(() => {});
+}
+
 /** Forfeit: eliminate the player at `place` (the worst currently-alive spot) so they
  *  leave the standings cleanly instead of vanishing. Writes only their own node. */
 export async function concede(code: string, uid: string, place: number): Promise<void> {

@@ -6,6 +6,7 @@ import { useRoom } from "@/game/net/roomStore";
 import { useAuth } from "@/game/net/authStore";
 import { useAppStore } from "@/game/store/appStore";
 import { subscribeInvites, clearInvite, type Invite } from "@/game/net/users";
+import { clearInvitePlaceholder } from "@/game/net/match";
 import { AppSettingsPanel } from "./AppSettingsPanel";
 import { FriendsPanel } from "@/components/social/FriendsPanel";
 import { ProfileTile } from "./ProfileTile";
@@ -130,11 +131,11 @@ export function WelcomeScreen() {
                 <span className="font-bold text-amber-300">{inv.from}</span> {lang === "fr" ? "vous invite à jouer" : "invited you to a game"}
               </span>
               <button
-                onClick={() => { if (canProceed) join(inv.code, name); if (myUid) clearInvite(myUid, inv.code); }}
+                onClick={() => { if (canProceed) join(inv.code, name); if (myUid) { clearInvite(myUid, inv.code); clearInvitePlaceholder(inv.code, myUid); } }}
                 disabled={!canProceed || busy}
                 className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-[12px] font-bold disabled:opacity-40"
               >{lang === "fr" ? "Rejoindre" : "Join"}</button>
-              <button onClick={() => myUid && clearInvite(myUid, inv.code)} className="text-slate-500 hover:text-slate-300 text-lg leading-none px-1">×</button>
+              <button onClick={() => { if (myUid) { clearInvite(myUid, inv.code); clearInvitePlaceholder(inv.code, myUid); } }} className="text-slate-500 hover:text-slate-300 text-lg leading-none px-1">×</button>
             </div>
           ))}
         </div>

@@ -189,9 +189,9 @@ export function LobbyScreen() {
                     <span className="flex-1 text-[12px] font-semibold text-slate-200 truncate">{f.username}</span>
                     <button
                       onClick={() => { if (myUid) { sendInvite(f.uid, room.code, myProfile?.username ?? "Player", myUid); addInvitePlaceholder(room.code, f.uid, f.username, f.photoURL); setInvited((p) => ({ ...p, [f.uid]: true })); } }}
-                      disabled={invited[f.uid]}
+                      disabled={invited[f.uid] || !!room.invited?.[f.uid]}
                       className="px-2.5 py-1 rounded-md bg-amber-500/90 hover:bg-amber-400 text-black text-[10px] font-bold disabled:opacity-50"
-                    >{invited[f.uid] ? (lang === "fr" ? "Invité ✓" : "Invited ✓") : (lang === "fr" ? "Inviter" : "Invite")}</button>
+                    >{(invited[f.uid] || room.invited?.[f.uid]) ? (lang === "fr" ? "Invité ✓" : "Invited ✓") : (lang === "fr" ? "Inviter" : "Invite")}</button>
                   </div>
                 ))}
               </div>

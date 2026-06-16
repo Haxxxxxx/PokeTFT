@@ -447,7 +447,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
 function roomSig(room: Room): string {
   const m = room.meta as Record<string, unknown>;
   const meta = { ...m, hostBeat: 0, updatedAt: 0 };
-  return JSON.stringify({ meta, players: room.players, combat: room.combat, carousel: room.carousel, rules: room.rules });
+  return JSON.stringify({ meta, players: room.players, combat: room.combat, carousel: room.carousel, rules: room.rules, invited: room.invited });
 }
 let lastSig: string | null = null;
 
@@ -494,6 +494,7 @@ function subscribe(code: string, uid: string, setState: (p: Partial<RoomState>) 
       players: val.players ?? {},
       combat: val.combat ?? {},
       carousel: val.carousel ?? {},
+      invited: val.invited ?? {},
     };
     const sig = roomSig(next);
     if (sig !== lastSig) {
