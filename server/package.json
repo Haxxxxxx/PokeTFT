@@ -1,0 +1,13 @@
+{
+  "name": "poketft-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "PokéTFT authoritative game server (#110). Phase 1 = shadow mode (observe + log, no writes).",
+  "scripts": {
+    "shadow": "node shadow.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}
