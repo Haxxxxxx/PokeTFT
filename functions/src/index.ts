@@ -49,10 +49,19 @@ async function freshRoom(code: string): Promise<Room | null> {
   return s.exists() ? ({ ...(s.val() as Room), code }) : null;
 }
 
-/** Schedule the next transition for `code` at its current deadline (deduped by id). */
+/** Schedule the next transition for `code` at its current deadline (deduped by id).
+ *  The queue name MUST include the region — `taskQueue("runTransition")` alone defaults
+ *  to us-central1 and the europe-west1 queue isn't found → INTERNAL. */
 async function scheduleNext(code: string, deadline: number): Promise<void> {
-  const queue = getFunctions().taskQueue("runTransition");
-  await queue.enqueue({ code }, { scheduleTime: new Date(deadline), id: `${code}-${deadline}` });
+  const queue = getFunctions().taskQueue(`locations/${REGION}/functions/runTransition`);
+  try {
+    await queue.enqueue({ code }, { scheduleTime: new Date(deadline), id: `${code}-${deadline}` });
+  } catch (e: unknown) {
+    // ALREADY_EXISTS = this exact transition is already queued (our dedup id) — fine.
+    const msg = String((e as { message?: string })?.message ?? e);
+    if (msg.includes("ALREADY_EXISTS") || msg.includes("already-exists")) return;
+    throw e;
+  }
 }
 
 /** Fires at a phase deadline: run the transition, then schedule the next. */
