@@ -59,6 +59,9 @@ export type RoomMeta = {
   /** When true, a dedicated server (Cloud Functions + Cloud Tasks, #110 Phase 2) drives
    *  this game's phase transitions; clients stop running their host loop for it. */
   serverDriven?: boolean;
+  /** Authoritative winner (place 1) written once when the game ends, so EVERY client
+   *  shows the identical result instead of each deriving it from its own alive view. */
+  winnerUid?: string;
   updatedAt: number | object;
 };
 

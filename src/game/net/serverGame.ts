@@ -17,3 +17,14 @@ export async function kickoffServerGame(code: string): Promise<void> {
     console.error("[kickoff] server-driven start failed", e);
   }
 }
+
+/** Ask the server to end the current carousel early (everyone already picked). */
+export async function finishCarouselEarly(code: string): Promise<void> {
+  try {
+    db();
+    const fns = getFunctions(undefined, "europe-west1");
+    await httpsCallable(fns, "finishEarly")({ code });
+  } catch (e) {
+    console.error("[finishEarly]", e);
+  }
+}

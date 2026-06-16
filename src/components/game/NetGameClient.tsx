@@ -14,6 +14,7 @@ import { MEGA_STONE, canMega } from "@/game/data/mega";
 import { ITEM_POOL, RARITY_COLOR, COMPONENT_IDS } from "@/game/data/itemPool";
 import { enemyToField } from "@/game/engine/hex";
 import { ItemGlyph, AugmentGlyph } from "./ItemGlyph";
+import { finishCarouselEarly } from "@/game/net/serverGame";
 import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle } from "lucide-react";
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
@@ -203,6 +204,7 @@ export function NetGameClient() {
   // save-sync so a not-yet-hydrated client can't overwrite its real priv save.
   const hydrated = useRef<"none" | "fresh" | "save">("none");
   const droppedFor = useRef<string | null>(null); // PvE round key we've already spawned loot for
+  const earlyFinishLatch = useRef<string | null>(null); // server-driven carousel early-finish, once per round
   // Synchronous latch so a rapid double-click (or two cards clicked before the
   // re-render hides them) can't claim TWO carousel/augment rewards for one slot —
   // setState is async, so the `picked`/`showAugment` gate alone isn't enough.
@@ -289,10 +291,10 @@ export function NetGameClient() {
           // detection still works even though `room` no longer churns on heartbeats.
           const r = useRoom.getState().liveRoom;
           if (!r) return;
-          // A dedicated server drives this game (#110 Phase 2) — but if it's >8s late on
-          // a deadline (down / erroring), the client takes back over so a server hiccup
-          // can never permanently freeze the match.
-          if (r.meta?.serverDriven && serverNow() < (r.meta.deadline ?? 0) + 8000) return;
+          // A dedicated server drives this game (#110 Phase 2) — but if it's >4s late on
+          // a deadline (down / erroring / not yet wired), the client takes back over so a
+          // server hiccup can never permanently freeze the match.
+          if (r.meta?.serverDriven && serverNow() < (r.meta.deadline ?? 0) + 4000) return;
           await maybeClaimHost(r.code, r, myUid);
           if (r.meta?.hostUid !== myUid) return;
           await heartbeat(r.code);
@@ -498,6 +500,20 @@ export function NetGameClient() {
     }
   }, [phase, meta?.stage, meta?.round, myCombat?.oppUid, myCombat?.pve, meta]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Server-driven carousel: once every alive human has picked, ask the server to end
+  // the round early instead of waiting the timer (host-gated so only one client calls).
+  useEffect(() => {
+    const r = room;
+    if (phase !== "carousel" || !meta || !r?.meta?.serverDriven || r.meta.hostUid !== myUid) return;
+    const key = `${meta.stage}-${meta.round}`;
+    if (earlyFinishLatch.current === key) return;
+    const humans = Object.values(r.players ?? {}).filter((p) => !p.isBot && p.alive);
+    if (humans.length > 0 && humans.every((p) => p.carouselPicked === key)) {
+      earlyFinishLatch.current = key;
+      finishCarouselEarly(r.code);
+    }
+  }, [phase, meta?.stage, meta?.round, room, myUid]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // PvE loot: when a wild fight resolves, drop an item component AT a slain creep's
   // position (the enemy half) so loot lands where the mob fell, not bunched together.
   // Deterministic per round (so a reconnect re-spawns the identical drop, deduped).
@@ -539,7 +555,9 @@ export function NetGameClient() {
   const humanPlayers = Object.values(players).filter((p) => !p.isBot);
   const connectedHumans = humanPlayers.filter((p) => p.connected).length;
   const gameOver = phase === "over";
-  const iWon = gameOver && me?.alive && aliveCount === 1;
+  // Read the AUTHORITATIVE result (place 1 / meta.winnerUid) rather than deriving it
+  // from our own alive view — so every client shows the identical ending.
+  const iWon = gameOver && (me?.place === 1 || (!!meta?.winnerUid && meta.winnerUid === myUid));
 
   const phaseLabel = phase === "combat" ? t.net_phase_combat
     : phase === "carousel" ? t.net_phase_carousel
@@ -741,7 +759,7 @@ export function NetGameClient() {
 
           {/* Phase + timer — isolated so it ticks on its own without re-rendering
               the whole game tree every 250ms (the old global tick caused jank). */}
-          <PhaseTimer phase={phase} phaseLabel={phaseLabel} deadline={meta.deadline} totalMs={phase === "combat" ? COMBAT_MS : PLAN_MS} />
+          <PhaseTimer phase={phase} phaseLabel={phaseLabel} deadline={meta.deadline} totalMs={phase === "combat" ? COMBAT_MS : PLAN_MS} resolvingLabel={lang === "fr" ? "Résolution…" : "Resolving…"} />
 
           {isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1 shrink-0">{t.net_host_badge}</span>}
           <div className="flex items-center gap-2 shrink-0">
@@ -1328,14 +1346,26 @@ function SmoothBar({ deadline, totalMs, combat }: { deadline: number; totalMs: n
 
 /** Phase label + countdown + smooth progress bar; ticks the seconds text
  *  internally (the bar is CSS-driven) so the heavy game tree isn't re-rendered. */
-function PhaseTimer({ phase, phaseLabel, deadline, totalMs }: { phase?: string; phaseLabel: string; deadline: number; totalMs: number }) {
+function PhaseTimer({ phase, phaseLabel, deadline, totalMs, resolvingLabel }: { phase?: string; phaseLabel: string; deadline: number; totalMs: number; resolvingLabel: string }) {
+  useClockTick(true); // tick so we notice the deadline passing
+  const active = phase === "planning" || phase === "combat" || phase === "carousel";
+  // "Resolving" = the timer hit 0 (waiting on host/server), OR the transition lock has
+  // parked the deadline far in the future (>40s, since real phases are ≤30s).
+  const left = deadline - serverNow();
+  const resolving = active && (left <= 0 || left > 40_000);
   return (
     <div className="flex-1 min-w-[220px] flex flex-col gap-1 px-2">
       <div className="flex justify-between items-baseline">
-        <span className={`text-xs font-extrabold uppercase tracking-wide ${phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{phaseLabel}</span>
-        <span className="text-sm font-bold tabular-nums text-slate-200"><Countdown deadline={deadline} />s</span>
+        <span className={`text-xs font-extrabold uppercase tracking-wide ${resolving ? "text-amber-300 animate-pulse" : phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{resolving ? resolvingLabel : phaseLabel}</span>
+        <span className="text-sm font-bold tabular-nums text-slate-200">
+          {resolving
+            ? <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-amber-400/25 border-t-amber-400 animate-spin align-middle" />
+            : <><Countdown deadline={deadline} />s</>}
+        </span>
       </div>
-      <SmoothBar deadline={deadline} totalMs={totalMs} combat={phase === "combat"} />
+      {resolving
+        ? <div className="h-1.5 w-full rounded-full bg-slate-800/80 overflow-hidden"><div className="h-full w-1/3 rounded-full bg-amber-400 loading-sweep" /></div>
+        : <SmoothBar deadline={deadline} totalMs={totalMs} combat={phase === "combat"} />}
     </div>
   );
 }

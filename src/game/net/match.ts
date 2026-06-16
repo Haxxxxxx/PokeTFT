@@ -445,7 +445,10 @@ export async function endCombat(code: string, room: Room): Promise<void> {
     });
 
     if (surviving.length <= 1) {
-      if (surviving.length === 1) u[`players/${surviving[0]}/place`] = 1;
+      if (surviving.length === 1) {
+        u[`players/${surviving[0]}/place`] = 1;
+        u["meta/winnerUid"] = surviving[0]; // authoritative — every client reads this
+      }
       u["meta/phase"] = "over";
     } else {
       const next = advanceRound(room.meta.stage, room.meta.round);
@@ -513,6 +516,7 @@ export async function maybeClaimHost(code: string, room: Room, myUid: string): P
         .filter((p) => p.place == null)
         .sort((a, b) => (b.alive ? 1 : 0) - (a.alive ? 1 : 0) || (b.hp ?? 0) - (a.hp ?? 0));
       survivors.forEach((p, i) => { u[`players/${p.uid}/place`] = i + 1; u[`players/${p.uid}/alive`] = false; });
+      if (survivors[0]) u["meta/winnerUid"] = survivors[0].uid; // place-1 = authoritative winner
       await dbAdapter().update(gamePath(code), u).catch(() => {});
     }
     return;

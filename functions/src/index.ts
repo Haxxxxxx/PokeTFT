@@ -49,13 +49,20 @@ async function freshRoom(code: string): Promise<Room | null> {
   return s.exists() ? ({ ...(s.val() as Room), code }) : null;
 }
 
-/** Schedule the next transition for `code` at its current deadline (deduped by id).
- *  The queue name MUST include the region — `taskQueue("runTransition")` alone defaults
- *  to us-central1 and the europe-west1 queue isn't found → INTERNAL. */
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** How early to fire the task before the deadline, so the (possibly cold-starting)
+ *  function is already warm and ready to commit the transition AT the deadline. */
+const WARM_LEAD_MS = 2500;
+
+/** Schedule the next transition, firing ~WARM_LEAD_MS before the deadline (deduped by
+ *  the deadline-keyed id). The queue name MUST include the region — `taskQueue("name")`
+ *  alone defaults to us-central1 and the europe-west1 queue isn't found → INTERNAL. */
 async function scheduleNext(code: string, deadline: number): Promise<void> {
   const queue = getFunctions().taskQueue(`locations/${REGION}/functions/runTransition`);
+  const fireAt = Math.max(Date.now() + 100, deadline - WARM_LEAD_MS);
   try {
-    await queue.enqueue({ code }, { scheduleTime: new Date(deadline), id: `${code}-${deadline}` });
+    await queue.enqueue({ code }, { scheduleTime: new Date(fireAt), id: `${code}-${deadline}` });
   } catch (e: unknown) {
     // ALREADY_EXISTS = this exact transition is already queued (our dedup id) — fine.
     const msg = String((e as { message?: string })?.message ?? e);
@@ -72,6 +79,15 @@ export const runTransition = onTaskDispatched(
     if (!code) return;
     let room = await freshRoom(code);
     if (!room?.meta || !room.meta.serverDriven || room.meta.phase === "over") return; // not ours / finished
+
+    // We fired ~WARM_LEAD_MS early to absorb cold-start. Wait out whatever's left so the
+    // transition commits right at the deadline (the timer reaches 0 cleanly), then re-read.
+    const wait = room.meta.deadline - Date.now();
+    if (wait > 0) {
+      await sleep(Math.min(wait, WARM_LEAD_MS + 1500));
+      room = await freshRoom(code);
+      if (!room?.meta || !room.meta.serverDriven || room.meta.phase === "over") return;
+    }
 
     const phase = room.meta.phase;
     try {
@@ -99,5 +115,19 @@ export const kickoff = onCall({ region: REGION }, async (req) => {
   const room = await freshRoom(code);
   if (!room?.meta?.serverDriven) throw new HttpsError("failed-precondition", "game is not server-driven");
   await scheduleNext(code, room.meta.deadline);
+  return { ok: true };
+});
+
+/** Client calls this when every alive player has already picked their carousel reward,
+ *  to end the round early instead of waiting out the timer. Brings the deadline to now
+ *  and fires the transition immediately. */
+export const finishEarly = onCall({ region: REGION }, async (req) => {
+  const code = String(req.data?.code ?? "");
+  if (!code) throw new HttpsError("invalid-argument", "code required");
+  const room = await freshRoom(code);
+  if (!room?.meta?.serverDriven || room.meta.phase !== "carousel") return { ok: false };
+  const now = Date.now();
+  await adb.ref(`games/${code}/meta`).update({ deadline: now });
+  await scheduleNext(code, now); // fireAt clamps to now+100 → resolves right away
   return { ok: true };
 });
