@@ -30,8 +30,11 @@ export const AUGMENTS: Augment[] = [
   { id: "study-hall",    name: "Study Hall",       nameFr: "Salle d'étude",     desc: "+6 XP right now.",                 descFr: "+6 XP immédiatement.",                 kind: "instant", tier: "silver" },
   { id: "scholar",       name: "Scholar",          nameFr: "Érudit",            desc: "+2 XP every round.",               descFr: "+2 XP à chaque tour.",                 kind: "passive", tier: "silver" },
   { id: "fast-learner",  name: "Fast Learner",     nameFr: "Apprentissage",     desc: "+3 XP every round.",               descFr: "+3 XP à chaque tour.",                 kind: "passive", tier: "silver" },
+  { id: "head-start",    name: "Head Start",       nameFr: "Longueur d'avance", desc: "+3 gold and a free unit now.",     descFr: "+3 or et une unité gratuite.",         kind: "instant", tier: "silver" },
   { id: "lucky",         name: "Lucky Rolls",      nameFr: "Coups de chance",   desc: "Reroll costs 1 gold.",             descFr: "Le reroll coûte 1 or.",                kind: "passive", tier: "gold" },
   // ── Gold ─────────────────────────────────────────────────────────────────
+  { id: "spatula-set",   name: "Spatula Set",      nameFr: "Jeu de Spatules",   desc: "A random trait Emblem now.",       descFr: "Un emblème de trait aléatoire.",       kind: "instant", tier: "gold" },
+  { id: "artisan",       name: "Artisan",          nameFr: "Artisan",           desc: "A random completed item now.",     descFr: "Un objet complet aléatoire.",          kind: "instant", tier: "gold" },
   { id: "recruiter",     name: "Recruiter",        nameFr: "Recruteur",         desc: "2 free units to your bench now.",  descFr: "2 unités gratuites sur le banc.",      kind: "instant", tier: "gold" },
   { id: "merchant",      name: "Merchant",         nameFr: "Marchand",          desc: "+6 gold and a random item now.",   descFr: "+6 or et un objet aléatoire.",         kind: "instant", tier: "gold" },
   { id: "prospector",    name: "Prospector",       nameFr: "Prospecteur",       desc: "A random item every 3rd round.",   descFr: "Un objet aléatoire tous les 3 tours.", kind: "passive", tier: "gold" },
@@ -41,6 +44,8 @@ export const AUGMENTS: Augment[] = [
   { id: "rich",          name: "Rich Get Richer",  nameFr: "Capital croissant", desc: "+1 gold every round.",             descFr: "+1 or à chaque tour.",                 kind: "passive", tier: "gold" },
   { id: "compound-interest", name: "Compound Interest", nameFr: "Intérêts composés", desc: "+2 gold every round.",      descFr: "+2 or à chaque tour.",                 kind: "passive", tier: "prismatic" },
   // ── Prismatic ────────────────────────────────────────────────────────────
+  { id: "trait-trove",   name: "Trait Trove",      nameFr: "Trésor de Traits",  desc: "2 random trait Emblems now.",      descFr: "2 emblèmes de trait aléatoires.",      kind: "instant", tier: "prismatic" },
+  { id: "blacksmith",    name: "Blacksmith",       nameFr: "Forgeron",          desc: "2 random completed items now.",    descFr: "2 objets complets aléatoires.",        kind: "instant", tier: "prismatic" },
   { id: "mega-gift",     name: "Mega Gift",        nameFr: "Cadeau Méga",       desc: "A Mega Stone now.",                descFr: "Une Méga-Gemme immédiatement.",        kind: "instant", tier: "prismatic" },
   { id: "draft-day",     name: "Draft Day",        nameFr: "Jour de draft",     desc: "3 free units to your bench now.",  descFr: "3 unités gratuites sur le banc.",      kind: "instant", tier: "prismatic" },
   { id: "big-brain",     name: "Big Brain",        nameFr: "Gros cerveau",      desc: "+8 XP right now.",                 descFr: "+8 XP immédiatement.",                 kind: "instant", tier: "prismatic" },

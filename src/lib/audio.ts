@@ -108,46 +108,81 @@ export const sfx = {
   },
 };
 
-// ── Generative ambient background music ──────────────────────────────────────
-// A slow, looping chord progression synthesised with Web Audio (no asset files —
-// works with the static export). Low in the mix so it sits under the SFX.
+// ── Generative background music ──────────────────────────────────────────────
+// A small composed loop — sustained pads, a walking bass, a melody motif and a soft
+// kick — synthesised via Web Audio (no asset files; static-export friendly). Sits low
+// under the SFX. A 4-bar Am · F · C · G progression at ~80 BPM.
 let musicGain: GainNode | null = null;
 let musicTimer: ReturnType<typeof setInterval> | null = null;
-let musicStep = 0;
+let bar = 0;
 
-// Gentle minor-ish progression (Am · F · C · G), each as a 3-note chord (Hz).
-const CHORDS = [
-  [220.0, 261.63, 329.63],
-  [174.61, 220.0, 261.63],
-  [261.63, 329.63, 392.0],
-  [196.0, 246.94, 293.66],
+const BPM = 80;
+const BEAT = 60 / BPM;     // 0.75s
+const BAR = BEAT * 4;      // 3.0s, 4/4
+
+const PROG = [
+  { root: 110.0, pad: [220.0, 261.63, 329.63], mel: [440.0, 523.25, 659.25, 783.99] },   // Am
+  { root: 87.31, pad: [174.61, 220.0, 261.63], mel: [349.23, 440.0, 523.25, 698.46] },    // F
+  { root: 130.81, pad: [261.63, 329.63, 392.0], mel: [523.25, 659.25, 783.99, 1046.5] },   // C
+  { root: 98.0, pad: [196.0, 246.94, 293.66], mel: [392.0, 493.88, 587.33, 783.99] },      // G
+];
+// Melody pattern per eighth-note (index into the bar's `mel`, -1 = rest).
+const MEL = [
+  [0, -1, 2, -1, 1, -1, 3, 2],
+  [0, -1, 1, -1, 2, -1, 1, 0],
+  [2, -1, 1, -1, 3, -1, 2, 1],
+  [1, -1, 2, 3, -1, 2, 1, -1],
 ];
 
-function pad(freq: number, when: number, dur: number, vol: number): void {
+function tonePart(type: OscillatorType, freq: number, when: number, dur: number, vol: number, atk = 0.02): void {
+  const c = getCtx();
+  if (!c || !musicGain) return;
+  const osc = c.createOscillator();
+  const g = c.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  osc.connect(g);
+  g.connect(musicGain);
+  g.gain.setValueAtTime(0.0001, when);
+  g.gain.exponentialRampToValueAtTime(vol, when + atk);
+  g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+  osc.start(when);
+  osc.stop(when + dur + 0.03);
+}
+
+function kick(when: number, vol: number): void {
   const c = getCtx();
   if (!c || !musicGain) return;
   const osc = c.createOscillator();
   const g = c.createGain();
   osc.type = "sine";
-  osc.frequency.value = freq;
+  osc.frequency.setValueAtTime(140, when);
+  osc.frequency.exponentialRampToValueAtTime(45, when + 0.12);
   osc.connect(g);
   g.connect(musicGain);
-  g.gain.setValueAtTime(0.0001, when);
-  g.gain.exponentialRampToValueAtTime(vol, when + 0.9);      // slow swell in
-  g.gain.exponentialRampToValueAtTime(0.0001, when + dur);   // slow fade out
+  g.gain.setValueAtTime(vol, when);
+  g.gain.exponentialRampToValueAtTime(0.0001, when + 0.16);
   osc.start(when);
-  osc.stop(when + dur + 0.05);
+  osc.stop(when + 0.18);
 }
 
-function scheduleChord(): void {
+function scheduleBar(): void {
   const c = getCtx();
   if (!c || !soundEnabled()) return;
-  const chord = CHORDS[musicStep % CHORDS.length];
-  const t = c.currentTime + 0.05;
-  chord.forEach((f, i) => pad(f, t, 4.4, 0.05 - i * 0.008));
-  pad(chord[0] / 2, t, 4.6, 0.035);                 // soft sub-bass root
-  if (musicStep % 2 === 0) pad(chord[2] * 2, t + 2.1, 1.6, 0.022); // occasional sparkle
-  musicStep++;
+  const p = PROG[bar % PROG.length];
+  const pat = MEL[bar % MEL.length];
+  const t = c.currentTime + 0.06;
+  const eighth = BEAT / 2;
+  // Pads — sustain the chord across the bar.
+  p.pad.forEach((f, i) => tonePart("sine", f, t, BAR * 1.04, 0.04 - i * 0.006, 0.5));
+  // Bass — root on the beat, octave-up on off-beats (a gentle walk).
+  for (let b = 0; b < 4; b++) tonePart("triangle", b % 2 === 0 ? p.root : p.root * 2, t + b * BEAT, BEAT * 0.9, 0.055, 0.01);
+  // Soft kick on 1 and 3.
+  kick(t, 0.085);
+  kick(t + 2 * BEAT, 0.075);
+  // Melody motif.
+  pat.forEach((idx, s) => { if (idx >= 0) tonePart("triangle", p.mel[idx], t + s * eighth, eighth * 1.4, 0.028, 0.008); });
+  bar++;
 }
 
 export const music = {
@@ -157,16 +192,16 @@ export const music = {
     const c = getCtx();
     if (!c) return;
     if (!musicGain) { musicGain = c.createGain(); musicGain.connect(c.destination); }
-    musicGain.gain.value = 0.5 * masterVol();
-    scheduleChord();
-    musicTimer = setInterval(scheduleChord, 4000);
+    musicGain.gain.value = 0.42 * masterVol();
+    scheduleBar();
+    musicTimer = setInterval(scheduleBar, BAR * 1000);
   },
   stop(): void {
     if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
   },
   /** Live master-volume update for the music bed (slider drag). */
   setVolume(): void {
-    if (musicGain) musicGain.gain.value = 0.5 * masterVol();
+    if (musicGain) musicGain.gain.value = 0.42 * masterVol();
   },
   /** Follow the sound setting: play when on, silence when off. */
   sync(): void {

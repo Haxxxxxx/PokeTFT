@@ -1,7 +1,7 @@
 "use client";
 
 import { createElement } from "react";
-import { Sword, Sparkles, Zap, Heart, Shield, Crosshair, Gem, Coins, GraduationCap, Dices, Users, Package, Star, type LucideIcon } from "lucide-react";
+import { Sword, Sparkles, Zap, Heart, Shield, Crosshair, Gem, Coins, GraduationCap, Dices, Users, Package, Hammer, Star, type LucideIcon } from "lucide-react";
 import { ITEM_EFFECT, EMBLEM_TRAIT, isEmblem } from "@/game/data/items";
 import { MEGA_STONE } from "@/game/data/mega";
 import { TraitGlyph } from "./TraitGlyph";
@@ -28,8 +28,10 @@ function augmentIcon(id: string): LucideIcon {
     case "pumped-up": case "pocket-change": case "windfall": case "jackpot": case "rich": case "compound-interest": return Coins;
     case "training": case "study-hall": case "scholar": case "fast-learner": case "big-brain": case "prodigy": return GraduationCap;
     case "lucky": return Dices;
-    case "recruiter": case "draft-day": return Users;
+    case "recruiter": case "draft-day": case "head-start": return Users;
     case "treasure": case "component-cache": case "merchant": case "prospector": return Package;
+    case "spatula-set": case "trait-trove": return Sparkles;
+    case "artisan": case "blacksmith": return Hammer;
     case "mega-gift": return Gem;
     default: return Star;
   }

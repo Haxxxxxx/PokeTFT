@@ -423,9 +423,19 @@ export const useGame = create<State>((set, get) => ({
       case "component-cache":
         for (let i = 0; i < 3; i++) items = [...items, COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)]];
         break;
+      case "spatula-set": items = [...items, EMBLEM_IDS[randInt(rng, EMBLEM_IDS.length)]]; break;
+      case "trait-trove":
+        for (let i = 0; i < 2; i++) items = [...items, EMBLEM_IDS[randInt(rng, EMBLEM_IDS.length)]];
+        break;
+      case "artisan": items = [...items, COMPLETED_IDS[randInt(rng, COMPLETED_IDS.length)]]; break;
+      case "blacksmith":
+        for (let i = 0; i < 2; i++) items = [...items, COMPLETED_IDS[randInt(rng, COMPLETED_IDS.length)]];
+        break;
+      case "head-start":
       case "recruiter":
       case "draft-day": {
-        const n = id === "draft-day" ? 3 : 2;
+        if (id === "head-start") gold += 3;
+        const n = id === "draft-day" ? 3 : id === "head-start" ? 1 : 2;
         const cheap = [...(state.unitsByCost[1] ?? []), ...(state.unitsByCost[2] ?? [])];
         for (let i = 0; i < n && benchFree() > 0 && cheap.length; i++) {
           const pickId = cheap[randInt(rng, cheap.length)];
