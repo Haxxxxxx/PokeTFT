@@ -445,10 +445,15 @@ function subscribe(code: string, uid: string, setState: (p: Partial<RoomState>) 
   // no economy). If neither callback resolved within 6s, treat it as empty (fresh).
   // Gated on `code` so a stale watchdog from a previous room can't clobber a new
   // game's in-flight restore (the timer is also cleared on re-subscribe + leave).
+  // 15s (not 6s): on a genuinely fresh game the priv path doesn't exist so onValue
+  // fires `null` almost instantly — this watchdog only matters for a real network
+  // stall. Firing it too early on a slow reconnect would declare "no save" while the
+  // real save is still in flight, fresh-starting an in-progress game. The client's
+  // self-heal re-imports a late save, but a longer fuse avoids the churn entirely.
   privWatchdog = setTimeout(() => {
     const s = useRoom.getState();
     if (s.code === code && s.mySave === undefined) setState({ mySave: null });
-  }, 6000);
+  }, 15000);
   const r = roomRef(code);
   unsub = onValue(r, (snap) => {
     if (!snap.exists()) {

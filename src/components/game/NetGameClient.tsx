@@ -193,6 +193,11 @@ export function NetGameClient() {
     useSensor(TouchSensor, { activationConstraint: { delay: 140, tolerance: 8 } }),
   );
   const lastRoundKey = useRef<string | null>(null);
+  // "none" until local econ is first hydrated; "fresh" = we fell back to a new game
+  // (priv save hadn't arrived yet), "save" = restored from the synced save. Lets a
+  // late-arriving save (slow network) heal a premature fresh-start, and gates the
+  // save-sync so a not-yet-hydrated client can't overwrite its real priv save.
+  const hydrated = useRef<"none" | "fresh" | "save">("none");
   // Synchronous latch so a rapid double-click (or two cards clicked before the
   // re-render hides them) can't claim TWO carousel/augment rewards for one slot —
   // setState is async, so the `picked`/`showAugment` gate alone isn't enough.
@@ -316,33 +321,51 @@ export function NetGameClient() {
   // restore a synced save (reconnect) or start fresh — never wipe an in-progress
   // game by re-running newGame.
   useEffect(() => {
-    if (!room || phase !== "planning" || !meta) return;
+    if (!room || !meta) return;
+    // Same roster the host uses (selected gens, drawn to the draft size, seeded by
+    // the room code) — so the shop pool always respects the lobby's region/draft
+    // rules, on a fresh start AND on a reconnect/restore.
+    const roster = () => rosterForGenerations(room.rules?.generations ?? [1], room.rules?.draftPoolSize, codeSeed(room.code));
+    const enabledItems = room.rules?.itemsEnabled;
+
+    // FIRST LOAD — hydrate local econ as soon as the priv snapshot resolves, in ANY
+    // phase. Reconnecting/refreshing mid-combat or mid-carousel must show the real
+    // gold/level immediately, not the store defaults (gold 4 / Lv 1) until the next
+    // planning round.
+    if (hydrated.current === "none") {
+      if (mySave === undefined) return; // priv still loading; re-runs when it resolves
+      const save = mySave ?? me?.save; // private path first, legacy public save as fallback
+      // If we fall back to fresh, it's marked "fresh" (not "save") so a late-arriving
+      // save can still heal it via the self-heal branch below — a slow priv read can
+      // never permanently wipe an in-progress game.
+      if (save) { importSave({ ...save, units: asUnits(save.units) }, roster(), enabledItems); hydrated.current = "save"; }
+      else { newGame(room.rules?.startingHp ?? 100, roster(), enabledItems); hydrated.current = "fresh"; }
+      // Mark the current planning round consumed so netRound doesn't double-grant it.
+      lastRoundKey.current = phase === "planning" ? `${meta.stage}-${meta.round}` : "__hydrated__";
+      return;
+    }
+
+    // SELF-HEAL — if we fell back to a fresh start (watchdog/slow net) and the real
+    // save arrives afterwards, restore it so a slow reconnect isn't permanently wiped.
+    if (hydrated.current === "fresh" && mySave) {
+      importSave({ ...mySave, units: asUnits(mySave.units) }, roster(), enabledItems);
+      hydrated.current = "save";
+      return;
+    }
+
+    // SUBSEQUENT planning rounds — grant the per-round economy once each.
+    if (phase !== "planning") return;
     const key = `${meta.stage}-${meta.round}`;
     if (lastRoundKey.current === key) return;
-    const first = lastRoundKey.current === null;
-    if (first) {
-      // Wait until my PRIVATE econ snapshot has loaded before deciding restore vs
-      // fresh — a slow priv read must never fresh-start an in-progress game.
-      if (mySave === undefined) return; // still loading; re-runs when it resolves
-      lastRoundKey.current = key;
-      const save = mySave ?? me?.save; // private path first, legacy public save as fallback
-      // Same roster the host uses (selected gens, drawn to the draft size, seeded
-      // by the room code) — passed to BOTH paths so the shop pool always respects
-      // the lobby's region/draft rules, even on a reconnect/restore.
-      const roster = rosterForGenerations(room.rules?.generations ?? [1], room.rules?.draftPoolSize, codeSeed(room.code));
-      const enabledItems = room.rules?.itemsEnabled;
-      if (save) importSave({ ...save, units: asUnits(save.units) }, roster, enabledItems);
-      else newGame(room.rules?.startingHp ?? 100, roster, enabledItems);
-    } else {
-      lastRoundKey.current = key;
-      netRound(meta.stage, meta.round, me?.streak ?? 0);
-    }
+    lastRoundKey.current = key;
+    netRound(meta.stage, meta.round, me?.streak ?? 0);
   }, [phase, meta?.stage, meta?.round, mySave]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Push my board + economy snapshot to the room (debounced) — board for combat,
   // save for reconnect.
   useEffect(() => {
     if (!room || !myUid || phase !== "planning") return;
+    if (hydrated.current === "none") return; // never push defaults over the real priv save
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
       const g = useGame.getState();
@@ -363,6 +386,7 @@ export function NetGameClient() {
     const id = setInterval(() => {
       const r = useRoom.getState().liveRoom;
       if (!r?.meta || r.meta.phase !== "planning") return;
+      if (hydrated.current === "none") return; // not hydrated yet — don't sync defaults
       if (r.meta.deadline - serverNow() <= 2500) {
         // Last-second safety net: if the player left bench units while the board
         // has room, auto-deploy them just before the fight (NOT on every level-up).
@@ -546,8 +570,10 @@ export function NetGameClient() {
   }
 
   const streak = me?.streak ?? 0;
-  // Show the augment pick this slot until the player has taken it.
-  const showAugment = augSlotNow != null && augments.length === augSlotNow;
+  // Show the augment pick whenever you still owe one for this slot. Uses `<=` (not
+  // `===`): if you ever let an augment timer expire without picking, `===` would
+  // leave length permanently out of step and lock you out of EVERY future augment.
+  const showAugment = augSlotNow != null && augments.length <= augSlotNow;
   // Spectating a rival from the scoreboard → watch their board, bench and fights
   // (read-only). Works while alive (scouting) and after death (keep watching).
   const spectating = !!spectate && spectate !== myUid && !!players[spectate];
