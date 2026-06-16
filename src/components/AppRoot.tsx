@@ -59,8 +59,10 @@ export function AppRoot() {
   else if (authStatus === "signed-out") view = <SignInScreen />;
   else if (authStatus === "needs-username") view = <UsernamePrompt />;
   else if (reconnecting || (hadSavedRoom && (!code || !room))) view = <LoadingScreen label="Rejoining your game…" />;
-  else if (leaderboardOpen && (!code || !room)) view = <LeaderboardScreen />;
+  // Profile is checked before the leaderboard so opening a trainer's profile FROM the
+  // leaderboard shows it, and "Back" (which clears profileOpen) falls back to the board.
   else if (profileOpen && (!code || !room)) view = <ProfileScreen />;
+  else if (leaderboardOpen && (!code || !room)) view = <LeaderboardScreen />;
   else if (!code || !room) view = <WelcomeScreen />;
   else if (room.meta?.phase === "lobby") view = <LobbyScreen />;
   else view = <NetGameClient />;

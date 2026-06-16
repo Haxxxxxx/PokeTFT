@@ -21,6 +21,10 @@ export type AppStore = {
   /** Home-screen nav: show the ranked leaderboard. */
   leaderboardOpen: boolean;
   setLeaderboardOpen: (v: boolean) => void;
+  /** When set, the profile view shows this user's PUBLIC profile (read-only) instead
+   *  of your own. Cleared on close. Leaderboard rows + friends set this. */
+  viewProfileUid: string | null;
+  openUserProfile: (uid: string) => void;
 };
 
 export const useAppStore = create<AppStore>()(
@@ -33,9 +37,11 @@ export const useAppStore = create<AppStore>()(
       },
       setSettings: (update) => set((s) => ({ settings: { ...s.settings, ...update } })),
       profileOpen: false,
-      setProfileOpen: (v) => set({ profileOpen: v }),
+      setProfileOpen: (v) => set(v ? { profileOpen: true } : { profileOpen: false, viewProfileUid: null }),
       leaderboardOpen: false,
       setLeaderboardOpen: (v) => set({ leaderboardOpen: v }),
+      viewProfileUid: null,
+      openUserProfile: (uid) => set({ viewProfileUid: uid, profileOpen: true }),
     }),
     {
       name: "poketft_settings",

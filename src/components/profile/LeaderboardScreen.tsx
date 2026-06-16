@@ -9,6 +9,7 @@ import { ArrowLeft, Trophy } from "lucide-react";
 export function LeaderboardScreen() {
   const myUid = useAuth((s) => s.user?.uid);
   const setLeaderboardOpen = useAppStore((s) => s.setLeaderboardOpen);
+  const openUserProfile = useAppStore((s) => s.openUserProfile);
   const lang = useAppStore((s) => s.settings.language);
   const [rows, setRows] = useState<LeaderEntry[] | null>(null);
 
@@ -42,7 +43,7 @@ export function LeaderboardScreen() {
                 const rank = rankOf(r.rating);
                 const me = r.uid === myUid;
                 return (
-                  <div key={r.uid} className={`flex items-center gap-3 px-2.5 py-2 rounded-lg border ${me ? "bg-amber-500/10 border-amber-500/30" : "bg-white/[0.02] border-white/[0.05]"}`}>
+                  <button key={r.uid} onClick={() => openUserProfile(r.uid)} className={`w-full text-left flex items-center gap-3 px-2.5 py-2 rounded-lg border transition-colors ${me ? "bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/15" : "bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.05]"}`}>
                     <span className="w-7 text-center font-extrabold text-sm tabular-nums" style={{ color: rankColor(i) }}>{i + 1}</span>
                     <span className="w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.06] flex items-center justify-center overflow-hidden shrink-0">
                       {r.photoURL ? (
@@ -57,7 +58,7 @@ export function LeaderboardScreen() {
                     <span className="text-right shrink-0">
                       <span className="block text-[13px] font-extrabold tabular-nums" style={{ color: rank.color }}>{rank.lp}<span className="text-[9px] text-slate-500 font-semibold"> LP</span></span>
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>

@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/game/net/authStore";
 import { useAppStore } from "@/game/store/appStore";
-import { getHistory, rankOf, START_RATING, type GameResult } from "@/game/net/users";
+import { getHistory, getProfile, rankOf, START_RATING, type GameResult, type UserProfile } from "@/game/net/users";
 import { GEN_LABELS } from "@/game/data/generations";
 import { getDef, spriteUrl } from "@/game/data/mons";
+import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { TraitGlyph } from "@/components/game/TraitGlyph";
 import { TYPE_COLOR } from "@/game/ui";
-import { ArrowLeft, Trophy, Medal, Swords, Crown } from "lucide-react";
+import { ArrowLeft, Trophy, Medal, Swords, Crown, X } from "lucide-react";
 
 /** Placement → accent colour (1st gold, top-half emerald, rest slate). */
 function placeColor(place: number, players: number): string {
@@ -19,15 +20,33 @@ function placeColor(place: number, players: number): string {
 
 export function ProfileScreen() {
   const user = useAuth((s) => s.user);
-  const profile = useAuth((s) => s.profile);
+  const myProfile = useAuth((s) => s.profile);
   const setProfileOpen = useAppStore((s) => s.setProfileOpen);
+  const viewUid = useAppStore((s) => s.viewProfileUid);
   const lang = useAppStore((s) => s.settings.language);
   const [history, setHistory] = useState<GameResult[] | null>(null);
+  const [selected, setSelected] = useState<GameResult | null>(null);
 
-  const uid = user?.uid;
+  // Whose profile are we showing? viewUid (a leaderboard row / friend) overrides self.
+  const isOther = !!viewUid && viewUid !== user?.uid;
+  const uid = viewUid ?? user?.uid;
+  // For another user, pull their public profile node; for self, use the live auth store.
+  const [otherProfile, setOtherProfile] = useState<UserProfile | null>(null);
+  const profile = isOther ? otherProfile : myProfile;
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!isOther || !uid) { setOtherProfile(null); return; }
+    let alive = true;
+    getProfile(uid).then((p) => { if (alive) setOtherProfile(p); }).catch(() => {});
+    return () => { alive = false; };
+  }, [isOther, uid]);
+
   useEffect(() => {
     if (!uid) return;
     let alive = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHistory(null);
     getHistory(uid).then((h) => { if (alive) setHistory(h); }).catch(() => setHistory([]));
     return () => { alive = false; };
   }, [uid]);
@@ -41,9 +60,11 @@ export function ProfileScreen() {
     return { games, wins, top4, avg };
   }, [history]);
 
-  const name = profile?.username || user?.displayName || "Trainer";
-  const photo = profile?.photoURL || user?.photoURL || null;
+  const name = profile?.username || (isOther ? "" : user?.displayName) || "Trainer";
+  const photo = profile?.photoURL ?? (isOther ? null : user?.photoURL) ?? null;
   const tr = (en: string, fr: string) => (lang === "fr" ? fr : en);
+  // Still loading another user's public profile node.
+  const loadingOther = isOther && otherProfile === null;
 
   return (
     <div className="min-h-screen w-full app-bg flex flex-col items-center px-4 py-8">
@@ -56,7 +77,7 @@ export function ProfileScreen() {
           >
             <ArrowLeft size={15} /> {tr("Back", "Retour")}
           </button>
-          <h1 className="text-lg font-extrabold text-amber-200">{tr("Profile", "Profil")}</h1>
+          <h1 className="text-lg font-extrabold text-amber-200">{isOther ? tr("Trainer profile", "Profil du dresseur") : tr("Profile", "Profil")}</h1>
         </div>
 
         {/* Identity card */}
@@ -70,8 +91,8 @@ export function ProfileScreen() {
             )}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-xl font-bold gild-text truncate">{name}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5 truncate">{user?.email}</div>
+            <div className="text-xl font-bold gild-text truncate">{loadingOther ? "…" : name}</div>
+            <div className="text-[11px] text-slate-500 mt-0.5 truncate">{isOther ? (profile?.currentGame ? tr("In a game", "En partie") : tr("Trainer", "Dresseur")) : user?.email}</div>
           </div>
           {(() => {
             const rank = rankOf(profile?.rating ?? START_RATING);
@@ -110,7 +131,7 @@ export function ProfileScreen() {
                 const color = placeColor(g.place, g.players);
                 const regions = g.regions?.map((r) => (GEN_LABELS[r] ?? `Gen ${r}`).split("—")[1]?.trim() ?? `Gen ${r}`).join(", ");
                 return (
-                  <div key={g.code} className="px-2.5 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05]">
+                  <button key={g.code} onClick={() => setSelected(g)} className="w-full text-left px-2.5 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] hover:border-amber-500/30 transition-colors">
                     <div className="flex items-center gap-3">
                       <span className="w-9 h-9 rounded-lg flex items-center justify-center font-extrabold text-sm shrink-0" style={{ background: `${color}22`, color, border: `1px solid ${color}66` }}>
                         #{g.place}
@@ -148,6 +169,84 @@ export function ProfileScreen() {
                         </div>
                       </div>
                     ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Full game recap — opened by clicking a history row. */}
+      {selected && <MatchDetail game={selected} lang={lang} onClose={() => setSelected(null)} />}
+    </div>
+  );
+}
+
+/** A full recap of one finished game: placement, regions, every active trait, and the
+ *  complete final comp with stars — the "whole game" view behind a history row. */
+function MatchDetail({ game, lang, onClose }: { game: GameResult; lang: string; onClose: () => void }) {
+  const tr = (en: string, fr: string) => (lang === "fr" ? fr : en);
+  const color = placeColor(game.place, game.players);
+  const regions = game.regions?.map((r) => (GEN_LABELS[r] ?? `Gen ${r}`).split("—")[1]?.trim() ?? `Gen ${r}`).join(", ");
+  const traits = (game.traits ?? []).filter((t) => t.t > 0).sort((a, b) => b.t - a.t);
+  const team = (game.team ?? []).slice().sort((a, b) => b.s - a.s);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="panel w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-4">
+          <span className="w-11 h-11 rounded-xl flex items-center justify-center font-extrabold text-base shrink-0" style={{ background: `${color}22`, color, border: `1px solid ${color}66` }}>
+            #{game.place}
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="text-base font-extrabold gild-text">
+              {game.place === 1 ? tr("Victory", "Victoire") : tr(`Placed ${game.place} of ${game.players}`, `${game.place}ᵉ sur ${game.players}`)}
+            </div>
+            <div className="text-[11px] text-slate-500 truncate">{regions || "—"}{typeof game.ts === "number" ? ` · ${new Date(game.ts).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}</div>
+          </div>
+          <button onClick={onClose} className="text-slate-500 hover:text-amber-300 shrink-0"><X size={18} /></button>
+        </div>
+
+        {/* Active traits */}
+        {traits.length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-[10px] uppercase tracking-widest text-amber-200/60 font-bold mb-2">{tr("Synergies", "Synergies")}</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {traits.map((t) => {
+                const c = (TYPE_COLOR as Record<string, string>)[t.k] ?? "#94a3b8";
+                const label = TRAITS_BY_KEY[t.k]?.label ?? t.k;
+                return (
+                  <span key={t.k} className="inline-flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-md border" style={{ background: `${c}14`, borderColor: `${c}44` }}>
+                    <span style={{ color: c }}><TraitGlyph traitKey={t.k} size={13} /></span>
+                    <span className="text-[11px] font-semibold text-slate-200">{label}</span>
+                    <span className="text-[9px] font-bold px-1 rounded text-black/80 tabular-nums" style={{ background: c }}>{t.t}</span>
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Final comp */}
+        <div>
+          <h3 className="text-[10px] uppercase tracking-widest text-amber-200/60 font-bold mb-2">{tr("Final board", "Composition finale")} · {team.length}</h3>
+          {team.length === 0 ? (
+            <p className="text-[12px] text-slate-600 py-4 text-center">{tr("No board recorded.", "Aucune composition enregistrée.")}</p>
+          ) : (
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+              {team.map((u, i) => {
+                const def = getDef(u.d);
+                const stage = Math.min(2, Math.max(0, u.s - 1));
+                const dex = def.dex[stage];
+                const name = def.stageNames?.[stage] ?? def.name;
+                return (
+                  <div key={i} className="flex flex-col items-center gap-1 p-2 rounded-lg bg-white/[0.02] border border-white/[0.05]">
+                    <span className="text-[9px] font-bold text-amber-300 leading-none tabular-nums">{"★".repeat(u.s)}</span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={spriteUrl(dex)} alt="" width={44} height={44} style={{ imageRendering: "pixelated" }} />
+                    <span className="text-[10px] font-semibold text-slate-300 text-center leading-tight truncate max-w-full">{name}</span>
                   </div>
                 );
               })}
