@@ -119,6 +119,7 @@ export async function beginMatch(code: string, room: Room): Promise<void> {
     "meta/round": 1,
     "meta/deadline": serverNow() + PLAN_MS,
     "meta/hostBeat": serverNow(),
+    "meta/serverDriven": room.rules?.serverDriven === true, // #110 Phase 2 — server drives if enabled
     combat: null,
   };
   for (const p of Object.values(room.players ?? {})) {

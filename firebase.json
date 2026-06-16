@@ -2,6 +2,11 @@
   "database": {
     "rules": "database.rules.json"
   },
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs22",
+    "predeploy": ["npm --prefix functions install", "npm --prefix functions run build"]
+  },
   "auth": {
     "providers": {
       "anonymous": true

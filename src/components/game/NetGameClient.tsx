@@ -289,6 +289,7 @@ export function NetGameClient() {
           // detection still works even though `room` no longer churns on heartbeats.
           const r = useRoom.getState().liveRoom;
           if (!r) return;
+          if (r.meta?.serverDriven) return; // a dedicated server drives this game (#110 Phase 2)
           await maybeClaimHost(r.code, r, myUid);
           if (r.meta?.hostUid !== myUid) return;
           await heartbeat(r.code);

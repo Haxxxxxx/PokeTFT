@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRoom } from "@/game/net/roomStore";
 import { usePreLobby } from "@/game/store/preLobbyStore";
 import { beginMatch } from "@/game/net/match";
+import { kickoffServerGame } from "@/game/net/serverGame";
 import { PokeballIcon } from "@/components/game/icons";
 import { Settings } from "lucide-react";
 import { enterFullscreen } from "@/lib/fullscreen";
@@ -43,8 +44,8 @@ export function LobbyScreen() {
 
   useEffect(() => {
     if (!room || !isHost) return;
-    setRules({ startingHp: preRules.startingHp, generations: preRules.generations, itemsEnabled: preRules.itemsEnabled, draftPoolSize: preRules.draftPoolSize, maxPlayers: preRules.maxPlayers, augmentsEnabled: preRules.augmentsEnabled });
-  }, [isHost, room, setRules, preRules.startingHp, preRules.generations, preRules.itemsEnabled, preRules.draftPoolSize, preRules.maxPlayers, preRules.augmentsEnabled]);
+    setRules({ startingHp: preRules.startingHp, generations: preRules.generations, itemsEnabled: preRules.itemsEnabled, draftPoolSize: preRules.draftPoolSize, maxPlayers: preRules.maxPlayers, augmentsEnabled: preRules.augmentsEnabled, serverDriven: preRules.serverDriven });
+  }, [isHost, room, setRules, preRules.startingHp, preRules.generations, preRules.itemsEnabled, preRules.draftPoolSize, preRules.maxPlayers, preRules.augmentsEnabled, preRules.serverDriven]);
 
   const roomGenKey = (room?.rules?.generations ?? [1]).join(",");
   const roomItemKey = (room?.rules?.itemsEnabled ?? []).join(",");
@@ -175,7 +176,12 @@ export function LobbyScreen() {
           </button>
         ) : (
           <div className="w-full max-w-md flex flex-col items-center gap-2">
-            <button data-testid="start-game" disabled={!canStart} onClick={() => { enterFullscreen(); beginMatch(room.code, room).catch((e) => console.error("[beginMatch]", e)); }}
+            <button data-testid="start-game" disabled={!canStart} onClick={() => {
+              enterFullscreen();
+              beginMatch(room.code, room)
+                .then(() => { if (room.rules?.serverDriven) return kickoffServerGame(room.code); }) // #110 Phase 2
+                .catch((e) => console.error("[beginMatch]", e));
+            }}
               className="w-full py-4 rounded-2xl font-extrabold text-base tracking-wide transition-all bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black shadow-lg shadow-amber-500/20 disabled:opacity-30 disabled:shadow-none disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500">
               {t.l_net_start}
             </button>

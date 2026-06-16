@@ -56,6 +56,9 @@ export type RoomMeta = {
    *  disconnect, which only flips connected:false and lets the game migrate. Clients
    *  show "host ended the game" on the over screen. */
   endedByHost?: boolean;
+  /** When true, a dedicated server (Cloud Functions + Cloud Tasks, #110 Phase 2) drives
+   *  this game's phase transitions; clients stop running their host loop for it. */
+  serverDriven?: boolean;
   updatedAt: number | object;
 };
 
@@ -98,6 +101,9 @@ export type RoomRules = {
   draftPoolSize?: number;
   /** Whether augment rounds are offered (default true). */
   augmentsEnabled?: boolean;
+  /** Drive phase transitions from the dedicated server (#110) instead of the host
+   *  client. Off by default during rollout. */
+  serverDriven?: boolean;
 };
 
 export type Room = {
@@ -267,7 +273,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       const code = genCode();
       await set(roomRef(code), {
         meta: { hostUid: uid, phase: "lobby", stage: 1, round: 1, deadline: 0, updatedAt: serverTimestamp() },
-        rules: { startingHp, maxPlayers, generations: rules?.generations ?? [1], itemsEnabled: rules?.itemsEnabled ?? [], draftPoolSize: rules?.draftPoolSize ?? 90, augmentsEnabled: rules?.augmentsEnabled !== false },
+        rules: { startingHp, maxPlayers, generations: rules?.generations ?? [1], itemsEnabled: rules?.itemsEnabled ?? [], draftPoolSize: rules?.draftPoolSize ?? 90, augmentsEnabled: rules?.augmentsEnabled !== false, serverDriven: rules?.serverDriven === true },
         players: { [uid]: newPlayer(uid, name || "Host", true, startingHp) },
       });
       subscribe(code, uid, setState);

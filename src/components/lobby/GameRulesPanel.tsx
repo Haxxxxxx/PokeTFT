@@ -156,6 +156,25 @@ export function GameRulesPanel({ isHost }: { isHost: boolean }) {
           </div>
           <p className="text-[11px] text-slate-500 mt-2">{lang === "fr" ? "Boosts choisis aux étapes 2/3/4." : "Power-ups picked at stages 2/3/4."}</p>
         </SectionCard>
+
+        <SectionCard title={lang === "fr" ? "Serveur dédié (bêta)" : "Dedicated server (beta)"} badge="#110">
+          <div className="flex gap-1.5">
+            {[false, true].map((on) => {
+              const active = (rules.serverDriven === true) === on;
+              return (
+                <button
+                  key={String(on)}
+                  disabled={!isHost}
+                  onClick={() => setRules({ serverDriven: on })}
+                  className={`px-4 py-1.5 ${chipBase} ${active ? chipActive : chipIdle} disabled:opacity-50`}
+                >
+                  {on ? (lang === "fr" ? "Serveur" : "Server") : (lang === "fr" ? "Hôte (défaut)" : "Host (default)")}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-slate-500 mt-2">{lang === "fr" ? "Le serveur pilote la partie (nécessite les Functions déployées)." : "The server drives the match (requires deployed Functions)."}</p>
+        </SectionCard>
       </div>
 
       {/* Right column: the tall items list, on its own. */}

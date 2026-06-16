@@ -27,6 +27,8 @@ export type GameRules = {
   maxPlayers: number;
   /** Whether augment rounds (stage 2/3/4) are offered. Default on. */
   augmentsEnabled: boolean;
+  /** Drive the match from the dedicated server (#110). Off by default. */
+  serverDriven: boolean;
 };
 
 export type PreLobbyState = {
@@ -70,6 +72,7 @@ const DEFAULT_RULES: GameRules = {
   itemsEnabled: DEFAULT_ITEMS_ENABLED,
   maxPlayers: 8,
   augmentsEnabled: true,
+  serverDriven: false,
 };
 
 export const usePreLobby = create<PreLobbyState>((set, get) => ({
