@@ -775,7 +775,7 @@ export function NetGameClient() {
         {/* Columns spread to the edges (TFT-style) so wide screens use the side
             space; the centre field column is fixed-width + centred, so it stays
             pinned across phases. */}
-        <div className="grid items-stretch gap-4" style={{ gridTemplateColumns: "260px 824px 340px", justifyContent: "space-between", height: CENTER_H }}>
+        <div className="grid items-stretch gap-4" style={{ gridTemplateColumns: "260px 64px 824px 340px", justifyContent: "space-between", height: CENTER_H }}>
           {/* Left sidebar: scoreboard + synergies, a full-height rail beside the board. */}
           <div className="flex flex-col gap-3 min-h-0">
           <div className="gilded w-full p-2 rounded-xl shrink-0">
@@ -816,11 +816,18 @@ export function NetGameClient() {
               })}
             </div>
           </div>
-          {/* Interest "piggy bank" — a vertical coin column (one slot per 10 gold) that
-              fills bottom-up toward the +5 cap (TFT-style). Sits in the rail beside the
-              board, outside the field. Always reflects YOUR own gold. */}
-          <div className="gilded w-full p-3 rounded-xl shrink-0 flex items-center gap-3">
-            <div className="flex flex-col-reverse gap-1.5">
+            <div className="flex-1 min-h-0 flex flex-col">
+              <TraitPanel units={spectateUnits ?? undefined} />
+            </div>
+          </div>
+
+          {/* Interest "piggy bank" — its own narrow track between the left rail and the
+              field, so it sits right against the board (TFT-style). A vertical coin
+              column (one slot per 10 gold) that fills bottom-up toward the +5 cap.
+              Always reflects YOUR own gold. */}
+          <div className="flex flex-col items-center justify-center gap-2 min-h-0">
+            <span className="text-base font-extrabold text-amber-300 tabular-nums drop-shadow">+{interest(gold)}</span>
+            <div className="flex flex-col-reverse gap-2">
               {Array.from({ length: ECONOMY.interestCap }).map((_, i) => {
                 const threshold = (i + 1) * ECONOMY.interestPer;
                 const filled = gold >= threshold;
@@ -828,26 +835,14 @@ export function NetGameClient() {
                   <span
                     key={i}
                     title={`${threshold} ${lang === "fr" ? "or" : "gold"}`}
-                    className={`w-9 h-9 rounded-lg border-2 flex items-center justify-center transition-all ${filled ? "bg-amber-400/25 border-amber-400/80 text-amber-300 shadow-[0_0_10px_-2px_rgba(251,191,36,0.7)]" : "bg-slate-800/40 border-slate-700/50 text-slate-700"}`}
+                    className={`w-11 h-11 rounded-xl border-2 flex items-center justify-center transition-all ${filled ? "bg-amber-400/25 border-amber-400/80 text-amber-300 shadow-[0_0_12px_-2px_rgba(251,191,36,0.75)]" : "bg-slate-800/40 border-slate-700/50 text-slate-700"}`}
                   >
-                    <CoinIcon size={20} />
+                    <CoinIcon size={24} />
                   </span>
                 );
               })}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[10px] uppercase tracking-wider text-amber-200/55">{lang === "fr" ? "Intérêts" : "Interest"}</div>
-              <div className="text-2xl font-extrabold text-amber-300 tabular-nums leading-none mt-0.5">+{interest(gold)}</div>
-              <div className="text-[10px] text-slate-500 mt-1.5 leading-tight">
-                {interest(gold) >= ECONOMY.interestCap
-                  ? (lang === "fr" ? "Intérêt maximal" : "Max interest")
-                  : (lang === "fr" ? `Prochain à ${(interest(gold) + 1) * ECONOMY.interestPer} or` : `Next at ${(interest(gold) + 1) * ECONOMY.interestPer} gold`)}
-              </div>
-            </div>
-          </div>
-            <div className="flex-1 min-h-0 flex flex-col">
-              <TraitPanel units={spectateUnits ?? undefined} />
-            </div>
+            <span className="text-[8px] font-bold uppercase tracking-wide text-amber-200/45 mt-0.5 text-center leading-tight">{lang === "fr" ? "Intérêt" : "Interest"}</span>
           </div>
 
           {/* Center: the shared field. Locked to CENTER_H in EVERY phase so the
