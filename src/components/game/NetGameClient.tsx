@@ -816,28 +816,34 @@ export function NetGameClient() {
               })}
             </div>
           </div>
-          {/* Interest "piggy bank" — 5 slots, one per 10 gold, fill as you bank toward
-              the +5 interest cap (TFT-style). Always reflects YOUR own gold. */}
-          <div className="gilded w-full p-2 rounded-xl shrink-0">
-            <div className="flex items-center justify-between px-1 mb-1.5">
-              <h2 className="text-[10px] uppercase tracking-wider text-amber-200/55">{lang === "fr" ? "Intérêts" : "Interest"}</h2>
-              <span className="text-[11px] font-bold text-amber-300 tabular-nums">+{interest(gold)}</span>
-            </div>
-            <div className="flex gap-1.5 px-1">
+          {/* Interest "piggy bank" — a vertical coin column (one slot per 10 gold) that
+              fills bottom-up toward the +5 cap (TFT-style). Sits in the rail beside the
+              board, outside the field. Always reflects YOUR own gold. */}
+          <div className="gilded w-full p-3 rounded-xl shrink-0 flex items-center gap-3">
+            <div className="flex flex-col-reverse gap-1.5">
               {Array.from({ length: ECONOMY.interestCap }).map((_, i) => {
-                const filled = gold >= (i + 1) * ECONOMY.interestPer;
+                const threshold = (i + 1) * ECONOMY.interestPer;
+                const filled = gold >= threshold;
                 return (
-                  <span key={i} className={`flex-1 h-6 rounded-md border flex items-center justify-center transition-all ${filled ? "bg-amber-400/20 border-amber-400/70 text-amber-300 shadow-[0_0_8px_-2px_rgba(251,191,36,0.6)]" : "bg-slate-800/40 border-slate-700/50 text-slate-700"}`}>
-                    <CoinIcon size={13} />
+                  <span
+                    key={i}
+                    title={`${threshold} ${lang === "fr" ? "or" : "gold"}`}
+                    className={`w-9 h-9 rounded-lg border-2 flex items-center justify-center transition-all ${filled ? "bg-amber-400/25 border-amber-400/80 text-amber-300 shadow-[0_0_10px_-2px_rgba(251,191,36,0.7)]" : "bg-slate-800/40 border-slate-700/50 text-slate-700"}`}
+                  >
+                    <CoinIcon size={20} />
                   </span>
                 );
               })}
             </div>
-            <p className="text-[9px] text-slate-500 mt-1.5 px-1">
-              {interest(gold) >= ECONOMY.interestCap
-                ? (lang === "fr" ? "Intérêt maximal" : "Max interest")
-                : (lang === "fr" ? `Prochain à ${(interest(gold) + 1) * ECONOMY.interestPer} or` : `Next at ${(interest(gold) + 1) * ECONOMY.interestPer} gold`)}
-            </p>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] uppercase tracking-wider text-amber-200/55">{lang === "fr" ? "Intérêts" : "Interest"}</div>
+              <div className="text-2xl font-extrabold text-amber-300 tabular-nums leading-none mt-0.5">+{interest(gold)}</div>
+              <div className="text-[10px] text-slate-500 mt-1.5 leading-tight">
+                {interest(gold) >= ECONOMY.interestCap
+                  ? (lang === "fr" ? "Intérêt maximal" : "Max interest")
+                  : (lang === "fr" ? `Prochain à ${(interest(gold) + 1) * ECONOMY.interestPer} or` : `Next at ${(interest(gold) + 1) * ECONOMY.interestPer} gold`)}
+              </div>
+            </div>
           </div>
             <div className="flex-1 min-h-0 flex flex-col">
               <TraitPanel units={spectateUnits ?? undefined} />
