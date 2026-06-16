@@ -179,7 +179,7 @@ export function LobbyScreen() {
             <button data-testid="start-game" disabled={!canStart} onClick={() => {
               enterFullscreen();
               beginMatch(room.code, room)
-                .then(() => { if (room.rules?.serverDriven) return kickoffServerGame(room.code); }) // #110 Phase 2
+                .then(() => kickoffServerGame(room.code)) // every game is server-driven (#110)
                 .catch((e) => console.error("[beginMatch]", e));
             }}
               className="w-full py-4 rounded-2xl font-extrabold text-base tracking-wide transition-all bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black shadow-lg shadow-amber-500/20 disabled:opacity-30 disabled:shadow-none disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500">

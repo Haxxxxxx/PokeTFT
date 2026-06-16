@@ -5,6 +5,7 @@ import { ALL_GENS, GEN_LABELS, MAX_REGIONS } from "@/game/data/generations";
 import { unitsForGenerations } from "@/game/data/mons";
 import { COMPLETED } from "@/game/data/itemPool";
 import { ItemGlyph } from "@/components/game/ItemGlyph";
+import { ShieldCheck } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { useAppStore } from "@/game/store/appStore";
 import type { ReactNode } from "react";
@@ -158,23 +159,12 @@ export function GameRulesPanel({ isHost }: { isHost: boolean }) {
           <p className="text-[11px] text-slate-500 mt-2">{lang === "fr" ? "Boosts choisis aux étapes 2/3/4." : "Power-ups picked at stages 2/3/4."}</p>
         </SectionCard>
 
-        <SectionCard title={lang === "fr" ? "Serveur dédié (bêta)" : "Dedicated server (beta)"} badge="#110">
-          <div className="flex gap-1.5">
-            {[false, true].map((on) => {
-              const active = (rules.serverDriven === true) === on;
-              return (
-                <button
-                  key={String(on)}
-                  disabled={!isHost}
-                  onClick={() => setRules({ serverDriven: on })}
-                  className={`px-4 py-1.5 ${chipBase} ${active ? chipActive : chipIdle} disabled:opacity-50`}
-                >
-                  {on ? (lang === "fr" ? "Serveur (défaut)" : "Server (default)") : (lang === "fr" ? "Hôte" : "Host")}
-                </button>
-              );
-            })}
+        <SectionCard title={lang === "fr" ? "Serveur dédié" : "Dedicated server"}>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-950/30 border border-emerald-700/40">
+            <ShieldCheck size={15} className="text-emerald-400 shrink-0" />
+            <span className="text-[12px] font-bold text-emerald-200">{lang === "fr" ? "Toujours activé" : "Always on"}</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-2">{lang === "fr" ? "Le serveur pilote la partie — transitions, combats et vainqueur font autorité (anti-désync)." : "The server drives the match — transitions, combat and the winner are authoritative (anti-desync)."}</p>
+          <p className="text-[11px] text-slate-500 mt-2">{lang === "fr" ? "Le serveur pilote chaque partie — transitions, combats et vainqueur font autorité (anti-désync)." : "The server drives every match — transitions, combat and the winner are authoritative (anti-desync)."}</p>
         </SectionCard>
       </div>
 
