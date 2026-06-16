@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
-import { useGame, BENCH_SIZE, PENSION_COST, PENSION_ROUNDS } from "@/game/store/gameStore";
+import { useGame, BENCH_SIZE, PENSION_COST, PENSION_ROUNDS, resolveBenchSlots } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, markCarouselPicked, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS } from "@/game/net/match";
@@ -563,7 +563,7 @@ export function NetGameClient() {
         const [, c, r] = target.split("-");
         unit = g.units.find((u) => u.pos?.[0] === Number(c) && u.pos?.[1] === Number(r));
       } else if (target.startsWith("bench-")) {
-        unit = g.units.filter((u) => u.pos === null)[Number(target.slice("bench-".length))];
+        unit = resolveBenchSlots(g.units)[Number(target.slice("bench-".length))] ?? undefined;
       }
       if (unit && itemId === MEGA_STONE && !canMega(unit.defId)) {
         useUi.getState().pushToast(lang === "fr" ? "Ce Pokémon ne peut pas Méga-Évoluer" : "This Pokémon can't Mega Evolve");
@@ -577,11 +577,12 @@ export function NetGameClient() {
     if (target === "sell" || target === "sell-shop") sell(iid);
     else if (target === "pension") { if (phase === "planning") depositToPension(iid); }
     else if (target.startsWith("bench-")) {
-      // A specific bench slot: bench a board unit, or rearrange/swap within the bench.
+      // A specific bench slot: place the mon THERE (gaps allowed). A board unit is
+      // benched first, then moved to the exact slot; a bench unit just relocates/swaps.
       const idx = Number(target.slice("bench-".length));
       const u = useGame.getState().units.find((x) => x.iid === iid);
       if (u && u.pos !== null) moveToBench(iid);
-      else reorderBench(iid, idx);
+      reorderBench(iid, idx);
     }
     else if (target === "bench") moveToBench(iid);
     else if (target.startsWith("cell-")) {

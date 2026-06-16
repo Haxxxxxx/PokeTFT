@@ -68,6 +68,9 @@ export type UnitInstance = {
   star: 1 | 2 | 3;
   /** null while on bench; [col,row] while on board. */
   pos: [number, number] | null;
+  /** Explicit bench slot (0..BENCH_SIZE-1) so mons can sit anywhere with gaps, not
+   *  forced to pack from the left. Undefined = auto-placed in the first free slot. */
+  benchSlot?: number;
   items: string[];
   /** Deterministic HP/ATK multiplier (<1 weakens). Used to soften early PvE creeps
    *  so the opening rounds are reliably winnable. Undefined = 1 (no scaling). */

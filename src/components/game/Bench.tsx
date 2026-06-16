@@ -1,7 +1,7 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
-import { useGame, BENCH_SIZE } from "@/game/store/gameStore";
+import { useGame, BENCH_SIZE, resolveBenchSlots } from "@/game/store/gameStore";
 import { UnitChip } from "./UnitChip";
 import type { UnitInstance } from "@/game/types";
 
@@ -26,7 +26,9 @@ function BenchSlot({ index, unit, interactive, canDeploy }: { index: number; uni
  *  rival so neither can mutate your own state. */
 export function Bench({ interactive = true, canDeploy = true }: { interactive?: boolean; canDeploy?: boolean }) {
   const units = useGame((s) => s.units);
-  const bench = units.filter((u) => u.pos === null);
+  // Resolve units to their explicit bench slots (gaps allowed); new/unplaced units
+  // fall into the first free slot.
+  const slots = resolveBenchSlots(units);
   // Outer drop target: dropping a board unit anywhere on the bench benches it.
   const { setNodeRef, isOver } = useDroppable({ id: "bench" });
 
@@ -37,7 +39,7 @@ export function Bench({ interactive = true, canDeploy = true }: { interactive?: 
         ${isOver ? "border-sky-400/60 bg-sky-400/5" : "border-slate-700/60 bg-slate-900/50"}`}
     >
       {Array.from({ length: BENCH_SIZE }).map((_, i) => (
-        <BenchSlot key={i} index={i} unit={bench[i]} interactive={interactive} canDeploy={canDeploy} />
+        <BenchSlot key={i} index={i} unit={slots[i] ?? undefined} interactive={interactive} canDeploy={canDeploy} />
       ))}
     </div>
   );

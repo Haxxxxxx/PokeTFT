@@ -24,6 +24,26 @@ function toast(en: string, fr: string) {
 export const BENCH_SIZE = 9;
 const INITIAL_SEED = 1337;
 
+/** Resolve bench units to their slots (0..BENCH_SIZE-1). Units with an explicit
+ *  `benchSlot` claim it (gaps preserved); the rest fill the first free slots. Returns
+ *  an array indexed by slot, null = empty. Shared by the Bench render + drag logic. */
+export function resolveBenchSlots(units: UnitInstance[]): (UnitInstance | null)[] {
+  const slots: (UnitInstance | null)[] = new Array(BENCH_SIZE).fill(null);
+  const unplaced: UnitInstance[] = [];
+  for (const u of units) {
+    if (u.pos !== null) continue; // on-board units aren't on the bench
+    const s = u.benchSlot;
+    if (s != null && s >= 0 && s < BENCH_SIZE && slots[s] == null) slots[s] = u;
+    else unplaced.push(u);
+  }
+  let si = 0;
+  for (const u of unplaced) {
+    while (si < BENCH_SIZE && slots[si] != null) si++;
+    if (si < BENCH_SIZE) slots[si] = u;
+  }
+  return slots;
+}
+
 // Pension (Day Care): gold to deposit, planning rounds until it matures (1★→2★).
 export const PENSION_COST = 4;
 export const PENSION_ROUNDS = 3;
@@ -332,24 +352,23 @@ export const useGame = create<State>((set, get) => ({
     if (placedAny) set({ units });
   },
 
-  // Rearrange the bench: drop a bench unit onto slot `toIndex` — SWAP with the
-  // unit there, or move it to the end when the slot is empty. Bench order is the
-  // filtered order in `units`, so we rebuild that slice. (Bench order never
-  // affects combat — only on-board units are simulated.)
-  reorderBench: (iid, toIndex) => {
+  // Rearrange the bench: drop a bench unit onto slot `toSlot` — it sits THERE (gaps
+  // allowed); if another unit occupies it, they swap. Bench placement never affects
+  // combat (only on-board units are simulated).
+  reorderBench: (iid, toSlot) => {
     const state = get();
-    const board = state.units.filter((u) => u.pos !== null);
-    const bench = state.units.filter((u) => u.pos === null);
-    const from = bench.findIndex((u) => u.iid === iid);
-    if (from < 0) return;
-    const nb = [...bench];
-    if (toIndex < nb.length) {
-      [nb[from], nb[toIndex]] = [nb[toIndex], nb[from]]; // swap with the occupied slot
-    } else {
-      const [m] = nb.splice(from, 1); // move to the first empty slot (end of the run)
-      nb.push(m);
-    }
-    set({ units: [...board, ...nb] });
+    if (toSlot < 0 || toSlot >= BENCH_SIZE) return;
+    const slots = resolveBenchSlots(state.units);
+    const fromSlot = slots.findIndex((u) => u?.iid === iid);
+    if (fromSlot < 0 || fromSlot === toSlot) return;
+    const occupant = slots[toSlot];
+    set({
+      units: state.units.map((u) => {
+        if (u.iid === iid) return { ...u, benchSlot: toSlot };
+        if (occupant && u.iid === occupant.iid) return { ...u, benchSlot: fromSlot }; // swap
+        return u;
+      }),
+    });
   },
 
   toggleFreeze: () => set({ frozen: !get().frozen }),
