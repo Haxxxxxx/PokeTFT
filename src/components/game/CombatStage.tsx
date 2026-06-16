@@ -475,6 +475,8 @@ function CombatUnit({
       className="absolute"
       style={{ left: x - 28, top: y - 38, width: 56, transform: `translate(${lunge.dx}px, ${lunge.dy}px)`, transition: "transform 90ms ease-out" }}
     >
+      {/* Grounding "feet" glow under the sprite — the TFT team-coloured ring. */}
+      <span className="absolute left-1/2 -translate-x-1/2 rounded-[50%] pointer-events-none" style={{ bottom: -3, width: 38, height: 12, background: `radial-gradient(ellipse at center, ${ring}66, transparent 72%)` }} />
       <div className="h-2 w-14 rounded-full bg-black/70 overflow-hidden mx-auto mb-[3px]" style={{ outline: `1px solid ${ring}66` }}>
         <div className="h-full rounded-full" style={{ width: `${hpFrac * 100}%`, background: hpColor(hpFrac) }} />
       </div>

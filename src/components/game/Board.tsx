@@ -45,7 +45,8 @@ function HexCell({ c, r, unit, interactive }: { c: number; r: number; unit?: Uni
       />
       {unit && (
         <div className="absolute flex items-center justify-center pointer-events-none" style={{ left: x - TILE_W / 2, top: y - TILE_H / 2, width: TILE_W, height: TILE_H }}>
-          <div className="pointer-events-auto">
+          <span className={`unit-glow ${ally ? "" : "enemy"}`} />
+          <div className="pointer-events-auto relative" style={{ zIndex: 1 }}>
             <UnitChip unit={unit} size={TILE_W - 6} interactive={interactive} shape="hex" />
           </div>
         </div>

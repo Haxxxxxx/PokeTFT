@@ -124,11 +124,33 @@ body {
 /* Soft swap when the board view changes (phase flip, or landing on your / a
    rival's board). Keeps the transition subtle so it doesn't feel jumpy. */
 @keyframes board-swap {
-  0% { opacity: 0; transform: scale(0.985); }
-  100% { opacity: 1; transform: scale(1); }
+  0% { opacity: 0; transform: translateX(22px) scale(0.97); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
 }
 .board-swap {
-  animation: board-swap 0.28s ease-out both;
+  animation: board-swap 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* TFT-style glowing "feet" ring under a placed unit. An underlay element (never the
+   draggable chip itself, so dnd-kit hit-testing is unaffected). Gold for your side. */
+@keyframes unit-glow-pulse {
+  0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.85; transform: translate(-50%, -50%) scale(1.08); }
+}
+.unit-glow {
+  position: absolute;
+  left: 50%; top: 64%;
+  width: 74%; height: 34%;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(ellipse at center, rgba(251,191,36,0.6) 0%, rgba(251,191,36,0.2) 46%, transparent 72%);
+  box-shadow: 0 0 20px 5px rgba(251,191,36,0.22);
+  animation: unit-glow-pulse 2.8s ease-in-out infinite;
+}
+.unit-glow.enemy {
+  background: radial-gradient(ellipse at center, rgba(96,165,250,0.55) 0%, rgba(96,165,250,0.18) 46%, transparent 72%);
+  box-shadow: 0 0 20px 5px rgba(96,165,250,0.2);
 }
 
 @keyframes hero-float {

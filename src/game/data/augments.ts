@@ -45,9 +45,11 @@ export const AUGMENTS: Augment[] = [
 
 export const AUGMENT_BY_ID: Record<string, Augment> = Object.fromEntries(AUGMENTS.map((a) => [a.id, a]));
 
-/** Which augment slot (0,1,2) a given round opens, or null. One per early stage. */
+/** Which augment slot (0,1,2) a given round opens, or null. One per early stage,
+ *  offered at round 2 — AFTER the stage's first fight (the carousel is the mid-stage
+ *  event at round 4, so the two rewards never share a round). */
 export function augmentSlot(stage: number, round: number): number | null {
-  if (round !== 1) return null;
+  if (round !== 2) return null;
   if (stage === 2) return 0;
   if (stage === 3) return 1;
   if (stage === 4) return 2;

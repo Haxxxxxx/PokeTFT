@@ -7,6 +7,7 @@ import { useAppStore } from "@/game/store/appStore";
 import { getDef, spriteUrl, archetypeOf, type Archetype } from "@/game/data/mons";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { ITEM_POOL, RARITY_COLOR } from "@/game/data/itemPool";
+import { ITEM_EFFECT } from "@/game/data/items";
 import { megaFormFor, MEGA_STONE } from "@/game/data/mega";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import type { PokeType } from "@/game/types";
@@ -92,13 +93,35 @@ function Card() {
   const lang = useAppStore((s) => s.settings.language);
   const inspect = useUi((s) => s.inspect)!;
   const clear = useUi((s) => s.clearInspect);
+  // The inspected mon's held items (if it's an owned instance) drive the LIVE stats
+  // below, so the panel reflects what the mon actually fights with.
+  const heldUnit = useGame((st) => (inspect.iid ? st.units.find((u) => u.iid === inspect.iid) : undefined));
+  const heldItems = heldUnit?.items ?? [];
   const def = getDef(inspect.defId);
   const arch = ARCH_META[archetypeOf(def)];
   const star = inspect.star;
   const i = star - 1;
   const s = def.stats;
   const color = COST_COLOR[def.cost];
-  const dps = Math.round(s.ad[i] * s.attackSpeed);
+
+  // Apply held-item modifiers exactly like the combat engine (capped at ×2.6 to
+  // match its anti-stacking cap), so the numbers shown == the numbers fought with.
+  const CAP = 2.6;
+  const m = { adMult: 1, apMult: 1, asMult: 1, hpMult: 1, armorAdd: 0, mrAdd: 0, critAdd: 0 };
+  for (const id of heldItems) {
+    const e = ITEM_EFFECT[id];
+    if (!e) continue;
+    m.adMult *= e.adMult ?? 1; m.apMult *= e.apMult ?? 1; m.asMult *= e.asMult ?? 1; m.hpMult *= e.hpMult ?? 1;
+    m.armorAdd += e.armorAdd ?? 0; m.mrAdd += e.mrAdd ?? 0; m.critAdd += e.critAdd ?? 0;
+  }
+  const cap = (x: number) => Math.min(CAP, x);
+  const eHp = Math.round(s.hp[i] * cap(m.hpMult));
+  const eAd = Math.round(s.ad[i] * cap(m.adMult));
+  const eAs = +(s.attackSpeed * cap(m.asMult)).toFixed(2);
+  const eArmor = s.armor + m.armorAdd;
+  const eMr = s.magicResist + m.mrAdd;
+  const eAp = Math.round(def.move.power[i] * cap(m.apMult)); // ability power (magic dmg)
+  const dps = Math.round(eAd * eAs);
   const rangeLabel = s.range <= 1 ? t.ud_melee : t.ud_hexes(s.range);
   const costLabel: Record<number, string> = { 1: t.ud_cost_common, 2: t.ud_cost_uncommon, 3: t.ud_cost_rare, 4: t.ud_cost_epic, 5: t.ud_cost_legendary };
   const shapeDesc: Record<string, string> = { single: t.ud_shape_single, splash: t.ud_shape_splash, line: t.ud_shape_line };
@@ -144,14 +167,15 @@ function Card() {
         </button>
       </div>
 
-      {/* Stats grid */}
+      {/* Stats grid — values reflect held items (buffed stats glow emerald). */}
       <div className="grid grid-cols-3 gap-px bg-white/5">
-        <StatCell icon={<HeartIcon />} label={t.ud_stat_health} value={s.hp[i]} tint="#ff6b6b" />
-        <StatCell icon={<SwordIcon />} label={t.ud_stat_attack} value={s.ad[i]} tint="#ffb454" />
-        <StatCell icon={<DpsIcon />} label={t.ud_stat_dps} value={dps} tint="#ff8e8e" />
-        <StatCell icon={<SpeedIcon />} label={t.ud_stat_aspd} value={s.attackSpeed.toFixed(2)} tint="#f5d76e" />
-        <StatCell icon={<ShieldIcon />} label={t.ud_stat_armor} value={s.armor} tint="#9aa4b2" />
-        <StatCell icon={<MagicIcon />} label={t.ud_stat_mr} value={s.magicResist} tint="#a78bfa" />
+        <StatCell icon={<HeartIcon />} label={t.ud_stat_health} value={eHp} tint="#ff6b6b" buffed={eHp !== s.hp[i]} />
+        <StatCell icon={<SwordIcon />} label={t.ud_stat_attack} value={eAd} tint="#ffb454" buffed={eAd !== s.ad[i]} />
+        <StatCell icon={<DpsIcon />} label={t.ud_stat_dps} value={dps} tint="#ff8e8e" buffed={dps !== Math.round(s.ad[i] * s.attackSpeed)} />
+        <StatCell icon={<SpeedIcon />} label={t.ud_stat_aspd} value={eAs.toFixed(2)} tint="#f5d76e" buffed={eAs !== s.attackSpeed} />
+        <StatCell icon={<MagicIcon />} label={lang === "fr" ? "Magie" : "Magic"} value={eAp} tint="#c084fc" buffed={m.apMult !== 1} />
+        <StatCell icon={<ShieldIcon />} label={t.ud_stat_armor} value={eArmor} tint="#9aa4b2" buffed={eArmor !== s.armor} />
+        <StatCell icon={<MagicIcon />} label={t.ud_stat_mr} value={eMr} tint="#a78bfa" buffed={eMr !== s.magicResist} />
         <StatCell icon={<TargetIcon />} label={t.ud_stat_range} value={rangeLabel} tint="#5eead4" />
         <StatCell icon={<ManaIcon />} label={t.ud_stat_mana} value={`${s.startMana}/${s.maxMana}`} tint="#38bdf8" />
         <StatCell icon={<TierIcon />} label={t.ud_stat_tier} value={`${star}/3`} tint="#fbbf24" />
@@ -262,14 +286,16 @@ function Badge({ color, text, solid }: { color: string; text: string; solid?: bo
   );
 }
 
-function StatCell({ icon, label, value, tint }: { icon: React.ReactNode; label: string; value: string | number; tint: string }) {
+function StatCell({ icon, label, value, tint, buffed }: { icon: React.ReactNode; label: string; value: string | number; tint: string; buffed?: boolean }) {
   return (
     <div className="bg-[#0d1426] px-2.5 py-2">
       <div className="flex items-center gap-1 text-[9px] uppercase tracking-wide" style={{ color: tint }}>
         <span className="opacity-90">{icon}</span>
         <span className="text-slate-400">{label}</span>
       </div>
-      <div className="text-sm font-bold mt-0.5">{value}</div>
+      <div className={`text-sm font-bold mt-0.5 ${buffed ? "text-emerald-300" : ""}`}>
+        {value}{buffed && <span className="ml-1 text-[9px] align-top">▲</span>}
+      </div>
     </div>
   );
 }

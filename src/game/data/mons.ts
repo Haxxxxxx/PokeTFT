@@ -84,9 +84,11 @@ function generatedVariance(dex: number, cost: Cost, types: PokeType[], rawRange?
   let bulk = rng();
   if (types.some((t) => BULKY_TYPES.has(t))) bulk = Math.min(1, bulk + 0.25);
   if (types.some((t) => SQUISHY_TYPES.has(t))) bulk = Math.max(0, bulk - 0.18);
-  const hpMult = 0.82 + 0.46 * bulk;        // [0.82 .. 1.28]
-  const adMult = 1.26 - 0.44 * bulk;        // inverse — tanks hit softer
-  const asMult = 0.9 + 0.24 * rng();        // [0.90 .. 1.14]
+  const hpMult = 0.7 + 0.62 * bulk;                                         // [0.70 .. 1.32]
+  // AD is inverse to bulk BUT with an independent jitter, so two equally-bulky mons
+  // still differ — widens the spread well past the old single-axis variance.
+  const adMult = Math.max(0.68, Math.min(1.5, (1.34 - 0.5 * bulk) * (0.84 + 0.32 * rng())));
+  const asMult = 0.84 + 0.34 * rng();                                       // [0.84 .. 1.18]
   const scale3 = (xs: number[], m: number) => xs.map((x) => Math.round(x * m)) as [number, number, number];
 
   const patch: Partial<StatBlock> = {
