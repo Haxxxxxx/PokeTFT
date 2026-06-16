@@ -322,7 +322,8 @@ export function NetGameClient() {
   const meta = room?.meta;
   const players = room?.players ?? {};
   const me = myUid ? players[myUid] : undefined;
-  bootReadyRef.current = !!room && !!me; // feeds the boot-veil readiness check above
+  // Keep the boot-veil readiness flag in a ref (read by the veil interval above).
+  useEffect(() => { bootReadyRef.current = !!room && !!me; }, [room, me]);
   const phase = meta?.phase;
   const myCombat = myUid ? room?.combat?.[myUid] : undefined;
 
@@ -1283,7 +1284,7 @@ function Toasts() {
     if (!toast) return;
     const id = setTimeout(clear, 2200);
     return () => clearTimeout(id);
-  }, [toast?.seq, clear]);
+  }, [toast, clear]);
   if (!toast) return null;
   return (
     <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-[140] pointer-events-none">

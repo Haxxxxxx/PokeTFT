@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Build artifacts / generated bundles — not hand-written source.
+    "functions/lib/**",     // esbuild output of the Cloud Functions bundle
+    "functions/node_modules/**",
+    "tools/.cache-*.json",  // PokéAPI fetch caches
   ]),
 ]);
 

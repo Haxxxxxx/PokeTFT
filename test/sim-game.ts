@@ -51,7 +51,7 @@ function playGame(seed: number): void {
   const CONST = roster.reduce((s, id) => s + (POOL_SIZE[getDef(id).cost] ?? 0), 0);
 
   const ctx0 = `seed ${seed}`;
-  let s0 = useGame.getState();
+  const s0 = useGame.getState();
   assert(poolSum(s0.pool) + ownedCopies(s0.units, s0.pension) === CONST, `pool+owned != ${CONST} at newGame (got ${poolSum(s0.pool) + ownedCopies(s0.units, s0.pension)})`, ctx0);
 
   let stage = 1, round = 1, health = 100, streak = 0;

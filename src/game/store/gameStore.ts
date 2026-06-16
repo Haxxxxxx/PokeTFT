@@ -7,7 +7,7 @@ import { makePool, makeUnitsByCost, rollShop, takeFromPool, returnToPool, type P
 import { roundIncome, sellValue, interest } from "../engine/economy";
 import { applyCombines, makeInstance } from "../engine/combine";
 import { MEGA_STONE, canMega } from "../data/mega";
-import { ITEM_POOL, ITEM_BY_ID, COMPONENT_IDS, COMPLETED_IDS, EMBLEM_IDS, RECIPES, combineKey, isComponent, isEmblem } from "../data/itemPool";
+import { ITEM_POOL, ITEM_BY_ID, COMPONENT_IDS, COMPLETED_IDS, EMBLEM_IDS, RECIPES, combineKey, isComponent } from "../data/itemPool";
 import { AUGMENT_BY_ID } from "../data/augments";
 import { useUi } from "./uiStore";
 import { useAppStore } from "./appStore";

@@ -173,7 +173,7 @@ export function CombatStage({
   // moment the fight finishes (a ref so a late-arriving authWon isn't read stale
   // and we never play both the local and the authoritative result).
   const wonRef = useRef(won);
-  wonRef.current = won;
+  useEffect(() => { wonRef.current = won; });
   const playedEnd = useRef(false);
   useEffect(() => {
     if (!finished || playedEnd.current) return;

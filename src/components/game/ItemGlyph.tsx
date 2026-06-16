@@ -1,5 +1,6 @@
 "use client";
 
+import { createElement } from "react";
 import { Sword, Sparkles, Zap, Heart, Shield, Crosshair, Gem, Coins, GraduationCap, Dices, Users, Package, Star, type LucideIcon } from "lucide-react";
 import { ITEM_EFFECT, EMBLEM_TRAIT, isEmblem } from "@/game/data/items";
 import { MEGA_STONE } from "@/game/data/mega";
@@ -37,11 +38,10 @@ function augmentIcon(id: string): LucideIcon {
 export function ItemGlyph({ id, size = 16 }: { id: string; size?: number }) {
   // Emblems show the synergy they grant (the trait's own glyph).
   if (isEmblem(id)) return <TraitGlyph traitKey={EMBLEM_TRAIT[id]} size={size} />;
-  const Icon = itemIcon(id);
-  return <Icon size={size} />;
+  // createElement (not <Icon/>) so the icon component isn't re-created each render.
+  return createElement(itemIcon(id), { size });
 }
 
 export function AugmentGlyph({ id, size = 16 }: { id: string; size?: number }) {
-  const Icon = augmentIcon(id);
-  return <Icon size={size} />;
+  return createElement(augmentIcon(id), { size });
 }
