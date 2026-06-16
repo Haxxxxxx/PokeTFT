@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useUi } from "@/game/store/uiStore";
 import { useGame } from "@/game/store/gameStore";
 import { useAppStore } from "@/game/store/appStore";
-import { getDef, spriteUrl, archetypeOf, typesForStar, type Archetype } from "@/game/data/mons";
+import { getDef, spriteUrl, archetypeOf, castEffectOf, typesForStar, type Archetype, type CastEffect } from "@/game/data/mons";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { ITEM_POOL, RARITY_COLOR } from "@/game/data/itemPool";
 import { ITEM_EFFECT } from "@/game/data/items";
@@ -18,6 +18,14 @@ import {
 } from "./icons";
 import { useT } from "@/lib/i18n";
 import { playCry } from "@/lib/audio";
+
+/** Copy + accent for each signature cast flavour, shown on the ability card. */
+const CAST_EFFECT_META: Record<Exclude<CastEffect, "nuke">, { color: string; label: { en: string; fr: string }; desc: { en: string; fr: string } }> = {
+  guard:   { color: "#fbbf24", label: { en: "Guardian", fr: "Gardien" },   desc: { en: "Heals itself when it casts.", fr: "Se soigne en lançant sa capacité." } },
+  heal:    { color: "#34d399", label: { en: "Mender", fr: "Soigneur" },     desc: { en: "Also mends the most-wounded ally.", fr: "Soigne aussi l'allié le plus blessé." } },
+  blast:   { color: "#f472b6", label: { en: "Cataclysm", fr: "Cataclysme" },desc: { en: "Hits every enemy at once.", fr: "Frappe tous les ennemis à la fois." } },
+  execute: { color: "#fb7185", label: { en: "Executioner", fr: "Bourreau" },desc: { en: "Bonus damage to low-HP targets.", fr: "Dégâts bonus sur cibles affaiblies." } },
+};
 
 /** Docked detail panel — sits to the right of the board, not a modal. Shows the
  *  inspected mon OR a held/inventory item's details. */
@@ -200,6 +208,19 @@ function Card() {
           {t.ud_deals(def.move.power[i], def.move.type)}{" "}
           {shapeDesc[def.move.shape]} {t.ud_type_eff}
         </p>
+        {/* Signature cast flavour (heal / guard / blast / execute) — what makes this
+            mon's ability distinct beyond raw typed damage. */}
+        {(() => {
+          const ce = castEffectOf(def);
+          if (ce === "nuke") return null;
+          const meta = CAST_EFFECT_META[ce];
+          return (
+            <p className="mt-1.5 text-[10px] leading-snug" style={{ color: meta.color }}>
+              <span className="font-bold">✦ {meta.label[lang === "fr" ? "fr" : "en"]}</span>
+              <span className="text-slate-400"> — {meta.desc[lang === "fr" ? "fr" : "en"]}</span>
+            </p>
+          );
+        })()}
         <div className="flex items-center gap-2 mt-2.5 text-[10px]">
           <span className="text-slate-500 uppercase tracking-wide">{t.ud_per_star}</span>
           <div className="flex items-center gap-1">

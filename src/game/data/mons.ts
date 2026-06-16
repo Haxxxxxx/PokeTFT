@@ -946,6 +946,23 @@ export function archetypeOf(def: UnitDef): Archetype {
   return "physical";
 }
 
+/** Signature ability flavour, derived deterministically from a unit's archetype +
+ *  primary typing — so each mon's cast does something distinct beyond a typed nuke,
+ *  without hand-authoring 600+ abilities. Pure (host & client agree → sim stays in sync).
+ *   · guard   — tanks heal themselves on cast (sustain frontline)
+ *   · heal    — supportive mages also mend the most-wounded ally
+ *   · blast   — offensive mages hit EVERY enemy (team nuke) for reduced power
+ *   · execute — physical carries deal bonus damage to low-HP targets
+ *   · nuke    — default single/splash/line typed burst */
+export type CastEffect = "nuke" | "guard" | "heal" | "blast" | "execute";
+const HEAL_PRIMARY = new Set<PokeType>(["psychic", "fairy", "water", "grass", "normal"]);
+export function castEffectOf(def: UnitDef): CastEffect {
+  const arch = archetypeOf(def);
+  if (arch === "tank") return "guard";
+  if (arch === "mage") return HEAL_PRIMARY.has(def.types[0]) ? "heal" : "blast";
+  return def.cost >= 3 ? "execute" : "nuke";
+}
+
 /** Returns unit IDs whose base-form dex number falls within the given generations. */
 export function unitsForGenerations(gens: number[]): string[] {
   const ranges = gens.map((g) => GEN_DEX_RANGES[g]).filter(Boolean) as [number, number][];

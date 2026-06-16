@@ -22,6 +22,22 @@ function toast(en: string, fr: string) {
 }
 
 export const BENCH_SIZE = 9;
+
+/** Headliner ("Chosen") roll: from level 3, a shop refresh has a small chance to mark
+ *  ONE occupied slot as a Headliner that grants +1 to one of its (randomly chosen)
+ *  traits. Returns an array aligned to `shop` (trait key or null per slot). */
+function rollHeadliners(shop: (string | null)[], level: number, r: Rng): (string | null)[] {
+  const out: (string | null)[] = shop.map(() => null);
+  if (level < 3) return out;
+  if (r() >= 0.16) return out; // ~16% of refreshes feature a Headliner
+  const occupied = shop.map((id, i) => (id ? i : -1)).filter((i) => i >= 0);
+  if (!occupied.length) return out;
+  const slot = occupied[randInt(r, occupied.length)];
+  const def = getDef(shop[slot]!);
+  const traits = [...def.types, ...def.roles];
+  if (traits.length) out[slot] = traits[randInt(r, traits.length)];
+  return out;
+}
 const INITIAL_SEED = 1337;
 
 /** Resolve bench units to their slots (0..BENCH_SIZE-1). Units with an explicit
@@ -109,6 +125,8 @@ type State = {
   enabledItems: string[] | null;
   units: UnitInstance[];
   shop: (string | null)[];
+  /** Per-shop-slot Headliner trait (null = a normal unit). Aligned to `shop`. */
+  shopChosen: (string | null)[];
   frozen: boolean;
   history: RoundRecord[];
   /** Unequipped items in the player's inventory (e.g. Mega Stones). */
@@ -187,6 +205,7 @@ export const useGame = create<State>((set, get) => ({
   pension: null,
   units: [],
   shop: [],
+  shopChosen: [],
   frozen: false,
   history: [],
   items: [],
@@ -224,7 +243,7 @@ export const useGame = create<State>((set, get) => ({
       pension: null,
       gold: 4, xp: 0, level: 1, health: startingHp,
       streak: 0, stage: 1, round: 1, units, frozen: false, history: [], items: [], drops: [], augments: [],
-      shop: rollShop(1, pool, rng, unitsByCost),
+      shop: rollShop(1, pool, rng, unitsByCost), shopChosen: [],
     });
   },
 
@@ -232,7 +251,8 @@ export const useGame = create<State>((set, get) => ({
     const { gold, level, pool, unitsByCost, augments } = get();
     const cost = augments.includes("lucky") ? 1 : ECONOMY.rerollCost; // Lucky Rolls augment
     if (gold < cost) { toast("Not enough gold", "Pas assez d'or"); return; }
-    set({ gold: gold - cost, frozen: false, shop: rollShop(level, pool, rng, unitsByCost) });
+    const shop = rollShop(level, pool, rng, unitsByCost);
+    set({ gold: gold - cost, frozen: false, shop, shopChosen: rollHeadliners(shop, level, rng) });
   },
 
   buyXp: () => {
@@ -247,21 +267,25 @@ export const useGame = create<State>((set, get) => ({
     const state = get();
     const defId = state.shop[slot];
     if (!defId) return;
+    const chosenTrait = state.shopChosen?.[slot] ?? null;
     const cost = getDef(defId).cost as Cost;
-    if (state.gold < cost) { toast("Not enough gold", "Pas assez d'or"); return; }
+    const price = cost + (chosenTrait ? 2 : 0); // Headliners carry a +2 gold premium
+    if (state.gold < price) { toast("Not enough gold", "Pas assez d'or"); return; }
     // Never buy more copies than the shared pool actually has left.
     if ((state.pool[defId] ?? 0) <= 0) return;
 
     // Combine first, THEN gate on bench size: a 3rd copy that merges into a
     // star-up frees its bench slots, so a full bench can still accept it.
-    const { units, dropped } = applyCombines([...state.units, makeInstance(defId)]);
+    const { units, dropped } = applyCombines([...state.units, makeInstance(defId, 1, chosenTrait ?? undefined)]);
     const benchAfter = units.filter((u) => u.pos === null).length;
     if (benchAfter > BENCH_SIZE) { toast("Bench full", "Banc plein"); return; }
 
     takeFromPool(state.pool, defId);
     const shop = [...state.shop];
     shop[slot] = null;
-    set({ gold: state.gold - cost, units, shop, pool: { ...state.pool }, items: [...state.items, ...dropped] });
+    const shopChosen = [...(state.shopChosen ?? [])];
+    shopChosen[slot] = null;
+    set({ gold: state.gold - price, units, shop, shopChosen, pool: { ...state.pool }, items: [...state.items, ...dropped] });
   },
 
   sell: (iid) => {
@@ -442,7 +466,9 @@ export const useGame = create<State>((set, get) => ({
     const augXp = (state.augments.includes("scholar") ? 2 : 0) + (state.augments.includes("fast-learner") ? 3 : 0);
     const income = ECONOMY.baseIncome + interest(state.gold) + streakGold(streak) + augGold;
     const newXp = state.xp + ECONOMY.passiveXpPerRound + augXp;
-    const shop = state.frozen ? state.shop : rollShop(levelFromXp(newXp), state.pool, rng, state.unitsByCost);
+    const lvl = levelFromXp(newXp);
+    const shop = state.frozen ? state.shop : rollShop(lvl, state.pool, rng, state.unitsByCost);
+    const shopChosen = state.frozen ? state.shopChosen : rollHeadliners(shop, lvl, rng);
 
     // PvE loot: extra gold + an occasional free low-cost unit. (Item components now
     // drop at the slain creep's position — spawned at combat-end via spawnDrops — so
@@ -471,7 +497,7 @@ export const useGame = create<State>((set, get) => ({
     // Pension trains one planning round closer to maturity (down to 0 = ready).
     const pension = state.pension ? { ...state.pension, roundsLeft: Math.max(0, state.pension.roundsLeft - 1) } : null;
 
-    set({ gold: state.gold + income + bonusGold, xp: newXp, level: levelFromXp(newXp), stage, round, shop, frozen: false, items, units, drops: [], pension, pool: { ...state.pool } });
+    set({ gold: state.gold + income + bonusGold, xp: newXp, level: lvl, stage, round, shop, shopChosen, frozen: false, items, units, drops: [], pension, pool: { ...state.pool } });
   },
 
   netCarouselPick: (pick) => {

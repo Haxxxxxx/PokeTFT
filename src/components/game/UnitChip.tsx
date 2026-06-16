@@ -109,6 +109,7 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
         <div className="absolute -top-1 inset-x-0 flex justify-center pointer-events-none">
           <Stars star={unit.star} />
         </div>
+        {unit.chosen && <span className="absolute -top-1 -left-1 text-fuchsia-300 drop-shadow pointer-events-none" title="Headliner"><StarIcon size={11} /></span>}
         <ItemPips items={heldItems} megaReady={megaReady} />
       </div>
     );
@@ -137,6 +138,7 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
       <div className="absolute top-0 left-0 right-0">
         <Stars star={unit.star} />
       </div>
+      {unit.chosen && <span className="absolute -top-1 -left-1 text-fuchsia-300 drop-shadow pointer-events-none" title="Headliner"><StarIcon size={11} /></span>}
       <ItemPips items={heldItems} megaReady={megaReady} />
     </div>
   );

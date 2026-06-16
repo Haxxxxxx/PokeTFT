@@ -8,8 +8,10 @@ export function newIid(): string {
   return `u${counter++}`;
 }
 
-export function makeInstance(defId: string, star: 1 | 2 | 3 = 1): UnitInstance {
-  return { iid: newIid(), defId, star, pos: null, items: [] };
+export function makeInstance(defId: string, star: 1 | 2 | 3 = 1, chosen?: string): UnitInstance {
+  const u: UnitInstance = { iid: newIid(), defId, star, pos: null, items: [] };
+  if (chosen) u.chosen = chosen;
+  return u;
 }
 
 /**
@@ -43,12 +45,14 @@ export function applyCombines(units: UnitInstance[]): { units: UnitInstance[]; d
       // Prefer to keep a board slot if one of the three was placed.
       const placed = components.find((u) => u.pos !== null);
       const pooled = components.flatMap((u) => u.items ?? []).filter(Boolean);
+      const chosen = components.find((u) => u.chosen)?.chosen; // a Headliner upgrades into a Headliner
       const upgraded: UnitInstance = {
         iid: a.iid,
         defId: a.defId,
         star: (a.star + 1) as 1 | 2 | 3,
         pos: placed ? placed.pos : null,
         items: pooled.slice(0, 3),
+        ...(chosen ? { chosen } : {}),
       };
       dropped.push(...pooled.slice(3)); // overflow → refunded to inventory by the caller
       const removeIids = new Set(components.map((u) => u.iid));

@@ -7,7 +7,7 @@
  */
 
 import type { UnitInstance, PokeType, Move } from "../types";
-import { getDef, typesForStar } from "../data/mons";
+import { getDef, typesForStar, castEffectOf, type CastEffect } from "../data/mons";
 import { effectiveness } from "../data/typeChart";
 import { isMegaActive, megaFormFor } from "../data/mega";
 import { ITEM_EFFECT } from "../data/items";
@@ -89,6 +89,8 @@ type Combatant = {
   burnTicks: number;      // remaining burn ticks
   burnPerSec: number;     // incoming burn dmg/sec (frac of maxHp)
   disabledTicks: number;  // stunned/frozen ticks remaining (can't act)
+  // Signature ability flavour (derived from archetype + typing).
+  castEffect: CastEffect;
   // Cumulative contribution (for the live damage/tank/heal recap).
   dmgDealt: number;
   dmgTaken: number;
@@ -207,6 +209,8 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
   hpMult = Math.min(ITEM_MULT_CAP, hpMult);
   ad = Math.round(ad * adMult);
   hp = Math.round(hp * hpMult);
+  // Headliner ("Chosen") combat perk: +15% HP and a head start on its first cast.
+  if (u.chosen) { hp = Math.round(hp * 1.15); manaAdd += 15; }
 
   return {
     id: `${team}-${u.iid}`,
@@ -250,6 +254,7 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
     burnTicks: 0,
     burnPerSec: 0,
     disabledTicks: 0,
+    castEffect: castEffectOf(def),
     dmgDealt: 0,
     dmgTaken: 0,
     healed: 0,
@@ -494,9 +499,11 @@ function castAbility(caster: Combatant, target: Combatant, units: Combatant[], e
   const eff = effectiveness(caster.move.type, target.types);
   events.push({ kind: "cast", from: caster.id, to: target.id, moveType: caster.move.type, eff, shape: caster.move.shape, move: caster.move.name });
 
-  const hitOne = (victim: Combatant) => {
+  const hitOne = (victim: Combatant, mult = 1) => {
     const e = effectiveness(caster.move.type, victim.types);
-    const dmg = Math.round(base * e * (100 / (100 + victim.mr)) * caster.dmgMult);
+    // Execute carries: low-HP targets take extra ability damage.
+    const exec = caster.castEffect === "execute" && victim.hp < victim.maxHp * 0.35 ? 1.6 : 1;
+    const dmg = Math.round(base * mult * exec * e * (100 / (100 + victim.mr)) * caster.dmgMult);
     const hpBefore = victim.hp;
     applyHit(caster, victim, dmg);
     lifesteal(caster, hpBefore - victim.hp);
@@ -509,17 +516,42 @@ function castAbility(caster: Combatant, target: Combatant, units: Combatant[], e
     }
   };
 
-  hitOne(target);
-  if (caster.move.shape === "splash") {
-    const around = new Set(neighbors(target.pos).map(hexKey));
+  // Restore HP to a unit, crediting the caster's HEAL recap tally.
+  const heal = (u: Combatant, amount: number) => {
+    if (!u.alive || amount <= 0) return;
+    const before = u.hp;
+    u.hp = Math.min(u.maxHp, u.hp + amount);
+    caster.healed += u.hp - before;
+  };
+
+  if (caster.castEffect === "blast") {
+    // Team nuke — every living enemy takes a reduced-power hit (deterministic order).
     for (const v of units) {
-      if (v.alive && v.team !== caster.team && v.id !== target.id && around.has(hexKey(v.pos))) hitOne(v);
+      if (v.alive && v.team !== caster.team) hitOne(v, 0.55);
     }
-  } else if (caster.move.shape === "line") {
-    // Hit enemies sharing the target's column behind it.
-    for (const v of units) {
-      if (v.alive && v.team !== caster.team && v.id !== target.id && v.pos.c === target.pos.c) hitOne(v);
+  } else {
+    hitOne(target);
+    if (caster.move.shape === "splash") {
+      const around = new Set(neighbors(target.pos).map(hexKey));
+      for (const v of units) {
+        if (v.alive && v.team !== caster.team && v.id !== target.id && around.has(hexKey(v.pos))) hitOne(v);
+      }
+    } else if (caster.move.shape === "line") {
+      // Hit enemies sharing the target's column behind it.
+      for (const v of units) {
+        if (v.alive && v.team !== caster.team && v.id !== target.id && v.pos.c === target.pos.c) hitOne(v);
+      }
     }
+  }
+
+  // Support flavours mend after striking: guards patch themselves, healers mend the
+  // most-wounded ally (self included). Deterministic pick (stable reduce order).
+  if (caster.castEffect === "guard") {
+    heal(caster, base * 0.9);
+  } else if (caster.castEffect === "heal") {
+    const allies = units.filter((a) => a.alive && a.team === caster.team);
+    const wounded = allies.reduce((lo, a) => (a.hp / a.maxHp < lo.hp / lo.maxHp ? a : lo), caster);
+    heal(wounded, base * 0.7);
   }
 }
 
