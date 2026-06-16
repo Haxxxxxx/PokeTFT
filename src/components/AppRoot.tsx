@@ -4,9 +4,11 @@ import { useEffect } from "react";
 import { useRoom } from "@/game/net/roomStore";
 import { useAuth } from "@/game/net/authStore";
 import { startServerTime } from "@/game/net/serverTime";
+import { useAppStore } from "@/game/store/appStore";
 import { WelcomeScreen } from "@/components/welcome/WelcomeScreen";
 import { LobbyScreen } from "@/components/lobby/LobbyScreen";
 import { NetGameClient } from "@/components/game/NetGameClient";
+import { ProfileScreen } from "@/components/profile/ProfileScreen";
 import { SignInScreen } from "@/components/auth/SignInScreen";
 import { UsernamePrompt } from "@/components/auth/UsernamePrompt";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -27,6 +29,7 @@ export function AppRoot() {
   const room = useRoom((s) => s.room);
   const reconnecting = useRoom((s) => s.reconnecting);
   const reconnect = useRoom((s) => s.reconnect);
+  const profileOpen = useAppStore((s) => s.profileOpen);
 
   useEffect(() => { initAuth(); startServerTime(); }, [initAuth]);
   // Only try to reconnect to a saved room once we're authenticated.
@@ -41,6 +44,7 @@ export function AppRoot() {
   else if (authStatus === "signed-out") view = <SignInScreen />;
   else if (authStatus === "needs-username") view = <UsernamePrompt />;
   else if (reconnecting || (hadSavedRoom && (!code || !room))) view = <LoadingScreen label="Rejoining your game…" />;
+  else if (profileOpen && (!code || !room)) view = <ProfileScreen />;
   else if (!code || !room) view = <WelcomeScreen />;
   else if (room.meta?.phase === "lobby") view = <LobbyScreen />;
   else view = <NetGameClient />;

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePreLobby } from "@/game/store/preLobbyStore";
 import { useRoom } from "@/game/net/roomStore";
 import { useAuth } from "@/game/net/authStore";
+import { useAppStore } from "@/game/store/appStore";
 import { AppSettingsPanel } from "./AppSettingsPanel";
 import { FriendsPanel } from "@/components/social/FriendsPanel";
 import { ProfileEditor } from "@/components/social/ProfileEditor";
@@ -42,6 +43,7 @@ export function WelcomeScreen() {
   const netError = useRoom((s) => s.error);
   const profile = useAuth((s) => s.profile);
   const signOut = useAuth((s) => s.signOut);
+  const setProfileOpen = useAppStore((s) => s.setProfileOpen);
   const isGuest = useAuth((s) => s.user?.isAnonymous ?? false);
   const [username, setUsername] = useState(profile?.username ?? "");
   const [mode, setMode] = useState<Mode>("idle");
@@ -114,6 +116,7 @@ export function WelcomeScreen() {
                 <span className="text-sm font-bold text-amber-300">{profile?.username}</span>
               )}
               <span className="flex gap-2 text-[10px]">
+                <button onClick={() => setProfileOpen(true)} className="text-amber-400 hover:text-amber-300 font-semibold">{t.w_profile}</button>
                 {!isGuest && <button onClick={() => setEditProfile(true)} className="text-sky-400 hover:text-sky-300">Edit</button>}
                 <button onClick={signOut} className="text-slate-500 hover:text-rose-400">{isGuest ? "Sign in" : "Sign out"}</button>
               </span>

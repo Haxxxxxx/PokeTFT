@@ -96,6 +96,31 @@ export function setPhoto(uid: string, photoURL: string | null) {
   return update(usersRef(uid), { photoURL });
 }
 
+/** A finished-game record kept under users/{uid}/history/{code} (keyed by room code,
+ *  so re-observing "over" is idempotent — no duplicate rows). */
+export type GameResult = {
+  code: string;
+  place: number;        // final placement (1 = win)
+  players: number;      // total players in the match
+  regions: number[];    // generations played
+  won: boolean;
+  ts: number | object;  // serverTimestamp
+};
+
+/** Record (or idempotently overwrite) a finished game's result for this player. */
+export async function recordGameResult(uid: string, code: string, r: Omit<GameResult, "code" | "ts">): Promise<void> {
+  await set(ref(db(), `users/${uid}/history/${code}`), { ...r, code, ts: serverTimestamp() }).catch(() => {});
+}
+
+/** Read a player's recent finished games, newest first. */
+export async function getHistory(uid: string, limit = 50): Promise<GameResult[]> {
+  const snap = await get(ref(db(), `users/${uid}/history`));
+  if (!snap.exists()) return [];
+  return Object.values(snap.val() as Record<string, GameResult>)
+    .sort((a, b) => (Number(b.ts) || 0) - (Number(a.ts) || 0))
+    .slice(0, limit);
+}
+
 /** Subscribe to the user's friends and resolve each friend's live profile. */
 export function subscribeFriends(uid: string, cb: (friends: UserProfile[]) => void): () => void {
   const friendsRef = ref(db(), `users/${uid}/friends`);

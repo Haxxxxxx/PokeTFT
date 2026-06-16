@@ -15,6 +15,7 @@ import { ITEM_POOL, RARITY_COLOR, COMPONENT_IDS } from "@/game/data/itemPool";
 import { enemyToField } from "@/game/engine/hex";
 import { ItemGlyph, AugmentGlyph } from "./ItemGlyph";
 import { finishCarouselEarly } from "@/game/net/serverGame";
+import { recordGameResult } from "@/game/net/users";
 import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle } from "lucide-react";
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
@@ -545,6 +546,17 @@ export function NetGameClient() {
       const ps = room?.players ?? {};
       const lastOneStanding = !!(myUid && ps[myUid]?.alive) && Object.values(ps).filter((p) => p.alive).length === 1;
       if (lastOneStanding) sfx.victory(); else sfx.defeat();
+      // Record this finished game in the player's history (idempotent by room code).
+      if (myUid && room?.code) {
+        const meP = ps[myUid];
+        const place = meP?.place ?? (lastOneStanding ? 1 : Object.values(ps).filter((p) => !p.isBot).length);
+        recordGameResult(myUid, room.code, {
+          place,
+          players: Object.values(ps).length,
+          regions: room.rules?.generations ?? [1],
+          won: place === 1 || meta?.winnerUid === myUid,
+        }).catch(() => {});
+      }
     }
     prevPhase.current = phase ?? null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
