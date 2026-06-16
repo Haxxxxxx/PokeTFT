@@ -237,13 +237,25 @@ export function NetGameClient() {
   // resizes or jumps between phases (the old measured-height refit did).
   const [scale, setScale] = useState(1);
   useEffect(() => {
+    const vv = window.visualViewport;
     const fit = () => {
-      const s = Math.min(MAX_SCALE, (window.innerWidth - 8) / DESIGN_W, (window.innerHeight - 8) / DESIGN_H);
+      // Prefer the visual viewport on mobile — it excludes the browser toolbars, so
+      // the canvas fills the *actually visible* area instead of leaving a strip
+      // hidden behind the URL bar. Falls back to the layout viewport on desktop.
+      const w = vv?.width ?? window.innerWidth;
+      const h = vv?.height ?? window.innerHeight;
+      const s = Math.min(MAX_SCALE, (w - 8) / DESIGN_W, (h - 8) / DESIGN_H);
       setScale(s > 0 ? s : 1);
     };
     fit();
     window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
+    window.addEventListener("orientationchange", fit);
+    vv?.addEventListener("resize", fit);
+    return () => {
+      window.removeEventListener("resize", fit);
+      window.removeEventListener("orientationchange", fit);
+      vv?.removeEventListener("resize", fit);
+    };
   }, []);
 
   // Boot-veil readiness ref filled in below (after `me` is known).
