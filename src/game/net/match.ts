@@ -480,10 +480,16 @@ export async function endCombat(code: string, room: Room): Promise<void> {
  *  together the moment the shared phase flips. */
 export async function returnToLobby(code: string, room: Room): Promise<void> {
   const hp = room.rules?.startingHp ?? 100;
+  // Fully rewind the room to a fresh lobby with the SAME players (TFT-style requeue):
+  // clear every "over"/in-game meta marker so the next match starts clean.
   const u: Updates = {
     "meta/phase": "lobby",
     "meta/updatedAt": serverNow(),
     "meta/hostBeat": serverNow(),
+    "meta/winnerUid": null,
+    "meta/stage": 1,
+    "meta/round": 1,
+    "meta/deadline": null,
     combat: null,
     carousel: null,
   };
@@ -497,6 +503,8 @@ export async function returnToLobby(code: string, room: Room): Promise<void> {
     u[`players/${p.uid}/save`] = null;
     u[`players/${p.uid}/lastOpp`] = null;
     u[`players/${p.uid}/carouselPicked`] = null;
+    // Re-ready everyone so the host can immediately start again (bots stay ready).
+    u[`players/${p.uid}/ready`] = true;
   }
   await dbAdapter().update(gamePath(code), u);
 }

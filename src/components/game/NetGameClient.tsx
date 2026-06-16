@@ -16,6 +16,7 @@ import { enemyToField } from "@/game/engine/hex";
 import { ItemGlyph, AugmentGlyph } from "./ItemGlyph";
 import { finishCarouselEarly } from "@/game/net/serverGame";
 import { recordGameResult, applyRankedResult } from "@/game/net/users";
+import { computeTraits } from "@/game/engine/synergies";
 import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle } from "lucide-react";
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
@@ -552,11 +553,17 @@ export function NetGameClient() {
         const meP = ps[myUid];
         const place = meP?.place ?? (lastOneStanding ? 1 : Object.values(ps).filter((p) => !p.isBot).length);
         const total = Object.values(ps).length;
+        // Snapshot the final board + active traits for the history recap.
+        const finalBoard = useGame.getState().units.filter((u) => u.pos !== null);
+        const team = finalBoard.map((u) => ({ d: u.defId, s: u.star }));
+        const traits = computeTraits(finalBoard).filter((tr) => tr.tier > 0).map((tr) => ({ k: tr.key, t: tr.tier }));
         recordGameResult(myUid, room.code, {
           place,
           players: total,
           regions: room.rules?.generations ?? [1],
           won: place === 1 || meta?.winnerUid === myUid,
+          team,
+          traits,
         }).catch(() => {});
         // Ranked: nudge the player's rating by placement + mirror to the leaderboard.
         applyRankedResult(myUid, place, total, meP?.name ?? "Player", meP?.photoURL).catch(() => {});
@@ -1211,7 +1218,11 @@ export function NetGameClient() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button onClick={() => returnToLobby(room.code, room)} className="px-6 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold shadow-lg">{t.net_play_again}</button>
+            {isHost ? (
+              <button onClick={() => returnToLobby(room.code, room)} className="px-6 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold shadow-lg">{t.net_play_again}</button>
+            ) : (
+              <span className="px-6 py-2.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-400 text-sm font-semibold">{lang === "fr" ? "En attente de l'hôte…" : "Waiting for host…"}</span>
+            )}
             <button onClick={leave} className="px-6 py-2.5 rounded-lg bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-slate-200 text-sm font-bold">{t.net_quit}</button>
           </div>
         </div>

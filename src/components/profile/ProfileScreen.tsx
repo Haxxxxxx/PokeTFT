@@ -5,6 +5,9 @@ import { useAuth } from "@/game/net/authStore";
 import { useAppStore } from "@/game/store/appStore";
 import { getHistory, ratingTier, START_RATING, type GameResult } from "@/game/net/users";
 import { GEN_LABELS } from "@/game/data/generations";
+import { getDef, spriteUrl } from "@/game/data/mons";
+import { TraitGlyph } from "@/components/game/TraitGlyph";
+import { TYPE_COLOR } from "@/game/ui";
 import { ArrowLeft, Trophy, Medal, Swords, Crown } from "lucide-react";
 
 /** Placement → accent colour (1st gold, top-half emerald, rest slate). */
@@ -103,19 +106,44 @@ export function ProfileScreen() {
                 const color = placeColor(g.place, g.players);
                 const regions = g.regions?.map((r) => (GEN_LABELS[r] ?? `Gen ${r}`).split("—")[1]?.trim() ?? `Gen ${r}`).join(", ");
                 return (
-                  <div key={g.code} className="flex items-center gap-3 px-2.5 py-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                    <span className="w-9 h-9 rounded-lg flex items-center justify-center font-extrabold text-sm shrink-0" style={{ background: `${color}22`, color, border: `1px solid ${color}66` }}>
-                      #{g.place}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[12px] font-bold text-slate-200 truncate">
-                        {g.place === 1 ? tr("Victory", "Victoire") : tr(`Placed ${g.place} of ${g.players}`, `${g.place}ᵉ sur ${g.players}`)}
+                  <div key={g.code} className="px-2.5 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05]">
+                    <div className="flex items-center gap-3">
+                      <span className="w-9 h-9 rounded-lg flex items-center justify-center font-extrabold text-sm shrink-0" style={{ background: `${color}22`, color, border: `1px solid ${color}66` }}>
+                        #{g.place}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[12px] font-bold text-slate-200 truncate">
+                          {g.place === 1 ? tr("Victory", "Victoire") : tr(`Placed ${g.place} of ${g.players}`, `${g.place}ᵉ sur ${g.players}`)}
+                        </div>
+                        <div className="text-[10px] text-slate-500 truncate">{regions}</div>
                       </div>
-                      <div className="text-[10px] text-slate-500 truncate">{regions}</div>
+                      {typeof g.ts === "number" && (
+                        <span className="text-[10px] text-slate-600 shrink-0">{new Date(g.ts).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" })}</span>
+                      )}
                     </div>
-                    {typeof g.ts === "number" && (
-                      <span className="text-[10px] text-slate-600 shrink-0">{new Date(g.ts).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" })}</span>
-                    )}
+                    {/* Final team + active traits recap */}
+                    {(g.team?.length || g.traits?.length) ? (
+                      <div className="flex items-center gap-2 mt-2 pl-12 flex-wrap">
+                        {g.traits && g.traits.length > 0 && (
+                          <div className="flex items-center gap-1 pr-2 mr-1 border-r border-white/[0.06]">
+                            {g.traits.slice(0, 8).map((tt) => (
+                              <span key={tt.k} title={tt.k} className="inline-flex items-center justify-center w-4 h-4" style={{ color: (TYPE_COLOR as Record<string, string>)[tt.k] ?? "#94a3b8" }}>
+                                <TraitGlyph traitKey={tt.k} size={12} />
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-0.5 flex-wrap">
+                          {g.team?.map((u, i) => {
+                            const dex = getDef(u.d).dex[Math.min(2, Math.max(0, u.s - 1))];
+                            return (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img key={i} src={spriteUrl(dex)} alt="" width={22} height={22} title={getDef(u.d).name} style={{ imageRendering: "pixelated" }} className="opacity-90" />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}

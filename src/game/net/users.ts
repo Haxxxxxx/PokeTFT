@@ -147,6 +147,10 @@ export type GameResult = {
   regions: number[];    // generations played
   won: boolean;
   ts: number | object;  // serverTimestamp
+  /** Final board snapshot — d=defId, s=star (compact to keep the row small). */
+  team?: { d: string; s: number }[];
+  /** Active traits at the end — k=key, t=tier. */
+  traits?: { k: string; t: number }[];
 };
 
 /** Record (or idempotently overwrite) a finished game's result for this player. */
