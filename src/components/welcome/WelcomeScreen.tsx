@@ -14,7 +14,7 @@ import { ProfileEditor } from "@/components/social/ProfileEditor";
 import { HowToPlay } from "@/components/HowToPlay";
 import { NewsModal, hasUnseenNews, markNewsSeen } from "@/components/NewsModal";
 import { PokeballIcon } from "@/components/game/icons";
-import { Swords, Trophy, Megaphone } from "lucide-react";
+import { Swords, Trophy, Megaphone, AlertTriangle } from "lucide-react";
 import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 
@@ -204,7 +204,11 @@ export function WelcomeScreen() {
                   </div>
                 </div>
 
-                {netError && <p className="text-xs text-rose-400">{netError}</p>}
+                {netError && (
+                  <div className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold">
+                    <AlertTriangle size={14} className="shrink-0" /> {netError}
+                  </div>
+                )}
               </div>
           </div>
         </main>
