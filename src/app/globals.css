@@ -32,6 +32,29 @@
   border: 1px solid rgba(212, 175, 55, 0.4);
   box-shadow: inset 0 1px 0 rgba(231, 198, 107, 0.12), 0 0 36px -16px rgba(212, 175, 55, 0.4), 0 22px 60px -34px rgba(0, 0, 0, 0.85);
 }
+/* ── Pre-game "thin premium" language — minimal, narrow, clean. Kept separate from
+   the heavier in-game .gilded panels. ── */
+.app-bg {
+  background:
+    radial-gradient(90% 55% at 50% -8%, rgba(45, 62, 104, 0.28), transparent 62%),
+    radial-gradient(70% 45% at 50% 108%, rgba(120, 53, 15, 0.08), transparent 60%),
+    #090c16;
+}
+/* Thin glassy panel — a single hairline border, barely-there fill, soft depth. */
+.panel {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.018);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 24px 64px -44px rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(12px);
+}
+/* A faint hairline-gold accented variant for the one hero element per screen. */
+.panel-hero {
+  border: 1px solid rgba(212, 175, 55, 0.18);
+  background: rgba(255, 255, 255, 0.02);
+  box-shadow: inset 0 1px 0 rgba(231, 198, 107, 0.06), 0 30px 80px -50px rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(12px);
+}
+.hairline { border-color: rgba(255, 255, 255, 0.07); }
 .text-gold { color: var(--gold-bright); }
 /* Gold metallic text for wordmarks / headings. */
 .gild-text {

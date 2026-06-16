@@ -24,11 +24,8 @@ export type Dict = {
   s_sound: string;
   s_sound_on: string;
   s_sound_off: string;
-  s_anim: string;
   s_lang_fr: string;
   s_lang_en: string;
-  s_anim_normal: string;
-  s_anim_fast: string;
   // Lobby (legacy offline)
   l_rules: string;
   l_code: string;
@@ -161,11 +158,8 @@ export const FR: Dict = {
   s_sound: "Son",
   s_sound_on: "Activé",
   s_sound_off: "Désactivé",
-  s_anim: "Animations",
   s_lang_fr: "Français",
   s_lang_en: "English",
-  s_anim_normal: "Normal",
-  s_anim_fast: "Rapide",
   l_rules: "Règles de partie",
   l_code: "Code lobby",
   l_copy: "Copier",
@@ -289,11 +283,8 @@ export const EN: Dict = {
   s_sound: "Sound",
   s_sound_on: "Enabled",
   s_sound_off: "Disabled",
-  s_anim: "Animations",
   s_lang_fr: "Français",
   s_lang_en: "English",
-  s_anim_normal: "Normal",
-  s_anim_fast: "Fast",
   l_rules: "Game rules",
   l_code: "Lobby code",
   l_copy: "Copy",

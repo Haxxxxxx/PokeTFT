@@ -4,12 +4,10 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
 export type Language = "fr" | "en";
-export type AnimationSpeed = "normal" | "fast";
 
 export type AppSettings = {
   language: Language;
   soundEnabled: boolean;
-  animationSpeed: AnimationSpeed;
 };
 
 export type AppStore = {
@@ -26,7 +24,6 @@ export const useAppStore = create<AppStore>()(
       settings: {
         language: "fr",
         soundEnabled: true,
-        animationSpeed: "normal",
       },
       setSettings: (update) => set((s) => ({ settings: { ...s.settings, ...update } })),
       profileOpen: false,

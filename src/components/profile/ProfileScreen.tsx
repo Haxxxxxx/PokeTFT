@@ -43,8 +43,8 @@ export function ProfileScreen() {
   const tr = (en: string, fr: string) => (lang === "fr" ? fr : en);
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center px-4 py-6">
-      <div className="w-full max-w-3xl flex flex-col gap-4">
+    <div className="min-h-screen w-full app-bg flex flex-col items-center px-4 py-8">
+      <div className="w-full max-w-xl flex flex-col gap-3.5">
         {/* Header */}
         <div className="flex items-center gap-3">
           <button
@@ -57,18 +57,18 @@ export function ProfileScreen() {
         </div>
 
         {/* Identity card */}
-        <div className="gilded rounded-2xl p-4 flex items-center gap-4">
-          <span className="w-16 h-16 rounded-xl bg-black/40 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0">
+        <div className="panel rounded-2xl p-4 flex items-center gap-3.5">
+          <span className="w-16 h-16 rounded-xl bg-white/[0.03] border border-amber-500/25 flex items-center justify-center overflow-hidden shrink-0">
             {photo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={photo} alt="" width={64} height={64} style={{ imageRendering: "pixelated" }} />
             ) : (
-              <span className="text-2xl font-extrabold text-slate-500">{name.slice(0, 1).toUpperCase()}</span>
+              <span className="text-2xl font-bold text-amber-200/70">{name.slice(0, 1).toUpperCase()}</span>
             )}
           </span>
           <div className="min-w-0">
-            <div className="text-xl font-extrabold text-slate-100 truncate">{name}</div>
-            <div className="text-[11px] text-slate-500">{user?.isAnonymous ? tr("Guest account", "Compte invité") : user?.email}</div>
+            <div className="text-xl font-bold gild-text truncate">{name}</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">{user?.isAnonymous ? tr("Guest account", "Compte invité") : user?.email}</div>
           </div>
         </div>
 
@@ -81,7 +81,7 @@ export function ProfileScreen() {
         </div>
 
         {/* History list */}
-        <div className="gilded rounded-2xl p-3">
+        <div className="panel rounded-2xl p-3">
           <h2 className="text-[10px] uppercase tracking-widest text-amber-200/60 font-bold mb-2 px-1">{tr("Match history", "Historique")}</h2>
           {history === null ? (
             <p className="text-[12px] text-slate-500 py-6 text-center">{tr("Loading…", "Chargement…")}</p>
@@ -119,7 +119,7 @@ export function ProfileScreen() {
 
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number | string; color: string }) {
   return (
-    <div className="gilded rounded-xl p-2.5 flex flex-col items-center gap-0.5">
+    <div className="panel rounded-xl p-2.5 flex flex-col items-center gap-0.5">
       <span style={{ color }}>{icon}</span>
       <span className="text-lg font-extrabold tabular-nums" style={{ color }}>{value}</span>
       <span className="text-[9px] uppercase tracking-wide text-slate-500 text-center leading-tight">{label}</span>

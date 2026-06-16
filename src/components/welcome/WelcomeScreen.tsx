@@ -92,9 +92,9 @@ export function WelcomeScreen() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col tft-shell">
+    <div className="min-h-screen flex flex-col app-bg">
       {/* Top nav bar */}
-      <header className="flex items-center justify-between gap-3 px-4 sm:px-6 h-16 border-b border-[color:var(--panel-edge)] bg-slate-950/50 backdrop-blur shrink-0">
+      <header className="flex items-center justify-between gap-3 px-4 sm:px-6 h-14 border-b border-white/[0.06] bg-slate-950/40 backdrop-blur shrink-0">
         <div className="flex items-center gap-2.5">
           <span className="text-gold drop-shadow-[0_0_8px_rgba(212,175,55,0.5)]"><PokeballIcon size={26} /></span>
           <span className="font-extrabold tracking-tight text-xl">Poké<span className="gild-text">TFT</span></span>
@@ -127,30 +127,32 @@ export function WelcomeScreen() {
       </header>
 
       {/* Main */}
-      <div className="flex-1 w-full max-w-[1320px] mx-auto flex flex-col lg:flex-row gap-6 p-4 sm:p-6 items-stretch">
+      <div className="flex-1 w-full max-w-[940px] mx-auto flex flex-col lg:flex-row gap-5 p-4 sm:p-6 items-stretch">
         {/* Hero / play */}
         <main className="flex-1 flex flex-col min-h-[420px]">
-          <div className="gilded-strong gilded flex-1 flex flex-col justify-center items-center gap-8 rounded-3xl p-10 relative overflow-hidden"
-            style={{ backgroundImage: "radial-gradient(70% 80% at 50% 28%, rgba(212,175,55,0.1), transparent 60%)" }}>
+          <div className="panel-hero flex-1 flex flex-col justify-center items-center gap-7 rounded-2xl p-8 relative overflow-hidden">
             {/* Decorative floating mons */}
             <div className="absolute inset-0 pointer-events-none select-none">
               {heroMons.map((m, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img key={i} src={spriteUrl(m.dex)} alt="" width={m.size} height={m.size}
-                  className="absolute hero-float" style={{ left: m.x, top: m.y, width: m.size, ["--r" as string]: `${m.rot}deg`, imageRendering: "pixelated", opacity: 0.13, filter: "saturate(1.1)", animationDelay: `${i * 0.6}s` }} />
+                  className="absolute hero-float" style={{ left: m.x, top: m.y, width: m.size, ["--r" as string]: `${m.rot}deg`, imageRendering: "pixelated", opacity: 0.06, filter: "saturate(1.05)", animationDelay: `${i * 0.6}s` }} />
               ))}
             </div>
 
             <div className="text-center relative z-10">
-              <h1 className="font-extrabold tracking-tight text-3xl sm:text-5xl text-slate-100 drop-shadow-[0_2px_20px_rgba(0,0,0,0.5)]">{t.w_hero_title}</h1>
-              <p className="text-slate-400 text-sm mt-2">{t.w_subtitle}</p>
+              <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full border border-amber-500/30 bg-amber-500/5 text-[10px] font-extrabold uppercase tracking-[0.25em] text-amber-300/80">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> {lobbies.length} {lobbies.length === 1 ? "lobby" : "lobbies"} live
+              </div>
+              <h1 className="font-bold tracking-tight text-3xl sm:text-5xl text-slate-100">{t.w_hero_title}</h1>
+              <p className="text-slate-500 text-[13px] mt-2.5">{t.w_subtitle}</p>
             </div>
 
             {mode === "idle" ? (
               <div className="flex flex-col items-center gap-3 w-full max-w-sm">
                 <button data-testid="create-game" onClick={handleCreate} disabled={!canProceed || busy}
-                  className="w-full py-4 rounded-2xl font-extrabold text-base tracking-wide bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black shadow-lg shadow-amber-500/20 disabled:opacity-30 disabled:shadow-none transition-all">
-                  {busy ? "…" : <span className="inline-flex items-center justify-center gap-2"><Swords size={18} /> {t.w_create_btn}</span>}
+                  className="w-full py-3 rounded-xl font-bold text-[15px] tracking-wide bg-amber-500/95 hover:bg-amber-400 text-black disabled:opacity-30 transition-colors">
+                  {busy ? "…" : <span className="inline-flex items-center justify-center gap-2"><Swords size={17} /> {t.w_create_btn}</span>}
                 </button>
 
                 {/* Live game browser — find + join an open game without a code. */}
@@ -207,10 +209,10 @@ export function WelcomeScreen() {
         </main>
 
         {/* Right rail: friends + settings */}
-        <aside className="w-full lg:w-80 shrink-0 flex flex-col gap-4">
+        <aside className="w-full lg:w-72 shrink-0 flex flex-col gap-4">
           <FriendsPanel />
-          <div className="gilded rounded-2xl p-5">
-            <h2 className="text-xs font-extrabold uppercase tracking-widest text-gold mb-3 border-b border-[color:var(--panel-edge)] pb-2">{t.s_title}</h2>
+          <div className="panel rounded-2xl p-4">
+            <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-3 border-b border-white/[0.06] pb-2.5">{t.s_title}</h2>
             <AppSettingsPanel />
           </div>
         </aside>

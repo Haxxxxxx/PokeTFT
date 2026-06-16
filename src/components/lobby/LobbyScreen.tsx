@@ -91,9 +91,9 @@ export function LobbyScreen() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "radial-gradient(120% 80% at 50% -10%, #1a2540 0%, #0a1020 60%)" }}>
+    <div className="min-h-screen flex flex-col app-bg">
       {/* Top bar */}
-      <header className="flex items-center justify-between gap-3 px-4 sm:px-6 h-16 border-b border-slate-800/80 bg-slate-950/40 backdrop-blur shrink-0">
+      <header className="relative z-10 flex items-center justify-between gap-3 px-4 sm:px-6 h-14 border-b border-white/[0.06] bg-slate-950/40 backdrop-blur shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-amber-400 shrink-0"><PokeballIcon size={26} /></span>
           <div className="min-w-0">
@@ -114,9 +114,8 @@ export function LobbyScreen() {
       </header>
 
       {/* Party stage */}
-      <main className="flex-1 flex flex-col items-center justify-center gap-7 p-4 sm:p-8 overflow-y-auto">
-        <div className="w-full max-w-[860px] rounded-3xl border border-slate-800 bg-slate-900/40 backdrop-blur p-5 sm:p-7"
-          style={{ background: "radial-gradient(70% 100% at 50% 0%, rgba(251,191,36,0.05), transparent 60%), rgba(15,23,42,0.4)" }}>
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center gap-7 p-4 sm:p-8 overflow-y-auto">
+        <div className="panel w-full max-w-[600px] rounded-2xl p-5 sm:p-6">
           <h2 className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-4 text-center">{t.l_net_players(players.length, maxPlayers)}</h2>
           {/* Party portrait row (wraps responsively) */}
           <div className="flex flex-wrap items-start justify-center gap-3 sm:gap-4">
@@ -154,7 +153,7 @@ export function LobbyScreen() {
         </div>
 
         {/* Settings summary */}
-        <div className="w-full max-w-[860px] flex flex-wrap items-center justify-center gap-2">
+        <div className="w-full max-w-[600px] flex flex-wrap items-center justify-center gap-2">
           {[
             `${gens.map((g) => GEN_NAMES[g] ?? `Gen ${g}`).join(", ")}`,
             `${poolCount} Pokémon`,
