@@ -77,7 +77,9 @@ export function WelcomeScreen() {
 
   async function handleCreate() {
     if (!canProceed || busy) return;
-    await host(name, { startingHp: rules.startingHp, maxPlayers: rules.maxPlayers, generations: rules.generations, itemsEnabled: rules.itemsEnabled });
+    // Forward the FULL rules object — previously draftPoolSize + augmentsEnabled were
+    // dropped here and only patched back by a racy lobby heal effect.
+    await host(name, rules);
   }
   async function handleJoin() {
     if (!canProceed || joinCode.trim().length < 6) { setJoinError(true); return; }

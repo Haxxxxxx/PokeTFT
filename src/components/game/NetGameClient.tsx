@@ -526,6 +526,9 @@ export function NetGameClient() {
   const isHost = meta.hostUid === myUid;
   const ladder = Object.values(players).sort((a, b) => Number(b.alive) - Number(a.alive) || b.hp - a.hp);
   const aliveCount = Object.values(players).filter((p) => p.alive).length;
+  // Human trainers connected — drives the boot-veil progress while everyone joins.
+  const humanPlayers = Object.values(players).filter((p) => !p.isBot);
+  const connectedHumans = humanPlayers.filter((p) => p.connected).length;
   const gameOver = phase === "over";
   const iWon = gameOver && me?.alive && aliveCount === 1;
 
@@ -1106,23 +1109,35 @@ export function NetGameClient() {
         );
       })()}
 
-      {booting && <BootVeil label={lang === "fr" ? "Synchronisation avec les dresseurs…" : "Syncing with trainers…"} />}
+      {booting && <BootVeil
+        label={lang === "fr" ? "Connexion au serveur…" : "Connecting to the arena…"}
+        sub={`${connectedHumans}/${humanPlayers.length} ${lang === "fr" ? "dresseurs prêts" : "trainers ready"}`}
+        progress={humanPlayers.length ? connectedHumans / humanPlayers.length : 1}
+      />}
     </DndContext>
   );
 }
 
 /** Pokéball boot veil shown briefly at match start while sprites load + the room
  *  syncs, so the first frame everyone sees is fully loaded and in lockstep. */
-function BootVeil({ label }: { label: string }) {
+function BootVeil({ label, sub, progress }: { label: string; sub?: string; progress: number }) {
+  const pct = Math.round(Math.max(0, Math.min(1, progress)) * 100);
   return (
     <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-5 bg-[#070b16]" style={{ animation: "bootfade 0.4s ease-out 1.5s forwards" }}>
       <div className="relative w-16 h-16 animate-spin" style={{ animationDuration: "1s" }}>
         <div className="absolute inset-0 rounded-full" style={{ background: "linear-gradient(#ef4444 0 calc(50% - 3px), #0f172a calc(50% - 3px) calc(50% + 3px), #f1f5f9 calc(50% + 3px) 100%)", boxShadow: "0 0 0 3px #0f172a, 0 0 22px 3px #ef444455" }} />
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-100 border-[4px] border-slate-900" />
       </div>
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-1.5">
         <div className="text-lg font-extrabold tracking-wide text-slate-100">Poké<span className="text-amber-400">TFT</span></div>
         <div className="text-xs text-slate-400">{label}</div>
+        {sub && <div className="text-[11px] font-semibold text-amber-300/80 tabular-nums">{sub}</div>}
+        {/* Progress bar — fills as trainers connect, then a sweep while the board syncs. */}
+        <div className="mt-1 w-52 h-1.5 rounded-full bg-slate-800/80 overflow-hidden">
+          {pct >= 100
+            ? <div className="h-full w-1/3 rounded-full bg-amber-400 loading-sweep" />
+            : <div className="h-full rounded-full bg-amber-400 transition-[width] duration-500 ease-out" style={{ width: `${pct}%` }} />}
+        </div>
       </div>
       <style>{`@keyframes bootfade { to { opacity: 0; visibility: hidden; } }`}</style>
     </div>
