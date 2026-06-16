@@ -1,5 +1,4 @@
-import { ref, get, update, runTransaction } from "firebase/database";
-import { db } from "./firebase";
+import { dbAdapter } from "./db-adapter";
 import { serverNow } from "./serverTime";
 import { simulate } from "../engine/combat";
 import { makeRng } from "../engine/rng";
@@ -19,8 +18,8 @@ export const HOST_TIMEOUT = 3_500;
 
 type Updates = Record<string, unknown>;
 
-function gamePath(code: string) {
-  return ref(db(), `games/${code}`);
+function gamePath(code: string): string {
+  return `games/${code}`;
 }
 
 /** FNV-1a string hash → 32-bit uint. Used to fold stable identifiers (game code,
@@ -133,7 +132,7 @@ export async function beginMatch(code: string, room: Room): Promise<void> {
     u[`players/${p.uid}/save`] = null;
     u[`players/${p.uid}/carouselPicked`] = null;
   }
-  await update(gamePath(code), u);
+  await dbAdapter().update(gamePath(code), u);
 }
 
 /** RTDB rejects any `undefined` in a write (it accepts `null`). A holey shop
@@ -151,13 +150,13 @@ function rtdbSafe<T>(v: T): T {
  *  shop. A refresh rehydrates my own state from there. */
 export async function syncBoard(code: string, uid: string, units: UnitInstance[], save?: unknown): Promise<void> {
   const onBoard = rtdbSafe(units.filter((un) => un.pos !== null));
-  await update(ref(db(), `games/${code}/players/${uid}`), { board: onBoard });
-  if (save) await update(ref(db(), `priv/${code}/${uid}`), { save: rtdbSafe(save) });
+  await dbAdapter().update(`games/${code}/players/${uid}`, { board: onBoard });
+  if (save) await dbAdapter().update(`priv/${code}/${uid}`, { save: rtdbSafe(save) });
 }
 
 /** Host: write a liveness heartbeat so migration only triggers on a real stall. */
 export async function heartbeat(code: string): Promise<void> {
-  await update(ref(db(), `games/${code}/meta`), { hostBeat: serverNow() });
+  await dbAdapter().update(`games/${code}/meta`, { hostBeat: serverNow() });
 }
 
 function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, bUid: string, stage: number, ghost: boolean) {
@@ -208,11 +207,11 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
  *  compute from a fresh read, not the passed-in `room`. */
 async function freshRoom(code: string): Promise<Room | null> {
   try {
-    const snap = await get(gamePath(code));
-    // RTDB stores the game UNDER its code key, so the snapshot value has no `code`
-    // field — inject it, or anything reading room.code (e.g. the seeded roster
-    // draw) hits undefined and the whole transition throws.
-    return snap.exists() ? ({ ...(snap.val() as Room), code }) : null;
+    const val = await dbAdapter().get<Room>(gamePath(code));
+    // RTDB stores the game UNDER its code key, so the value has no `code` field —
+    // inject it, or anything reading room.code (e.g. the seeded roster draw) hits
+    // undefined and the whole transition throws.
+    return val ? ({ ...val, code }) : null;
   } catch {
     return null;
   }
@@ -221,14 +220,14 @@ async function freshRoom(code: string): Promise<Room | null> {
 /** Atomically claim a phase transition so exactly ONE client resolves a round,
  *  even if two clients briefly believe they are the host. Returns true if we won. */
 async function claimTransition(code: string, fromPhase: string, expectedDeadline: number): Promise<boolean> {
-  const res = await runTransaction(ref(db(), `games/${code}/meta`), (m) => {
+  const res = await dbAdapter().transaction<{ phase?: string; deadline?: number }>(`games/${code}/meta`, (m) => {
     if (m && m.phase === fromPhase && (m.deadline ?? 0) === expectedDeadline && serverNow() >= expectedDeadline) {
       m.deadline = serverNow() + 60_000; // lock: park the deadline so no one else claims
       return m;
     }
     return; // abort — already claimed/changed
   });
-  return res.committed && (res.snapshot.child("deadline").val() as number) > expectedDeadline + 30_000;
+  return res.committed && (res.value?.deadline ?? 0) > expectedDeadline + 30_000;
 }
 
 /** Run a claimed transition's body so that ANY throw / rejected write RELEASES the
@@ -249,7 +248,7 @@ async function withClaimGuard(code: string, body: () => Promise<void>): Promise<
     const n = (claimFailures.get(code) ?? 0) + 1;
     claimFailures.set(code, n);
     const backoff = Math.min(2500 * 2 ** (n - 1), 30_000);
-    await update(ref(db(), `games/${code}/meta`), { deadline: serverNow() + backoff, hostBeat: serverNow() }).catch(() => {});
+    await dbAdapter().update(`games/${code}/meta`, { deadline: serverNow() + backoff, hostBeat: serverNow() }).catch(() => {});
     throw err;
   }
 }
@@ -323,7 +322,7 @@ export async function startCombat(code: string, room: Room): Promise<void> {
       if (!combat[uid].pve && !combat[uid].ghost) u[`players/${uid}/lastOpp`] = combat[uid].oppUid;
     }
     for (const uid of Object.keys(botBoards)) u[`players/${uid}/board`] = botBoards[uid]; // persist for replay
-    await update(gamePath(code), u);
+    await dbAdapter().update(gamePath(code), u);
   });
 }
 
@@ -349,7 +348,7 @@ export async function startCarousel(code: string, room: Room): Promise<void> {
       const item = itemPool[(salt >>> 3) % itemPool.length];
       carousel[p.uid] = [item, ...pickCarouselOptions(room.meta.stage, salt, 4, rosterFor(room))];
     }
-    await update(gamePath(code), {
+    await dbAdapter().update(gamePath(code), {
       "meta/phase": "carousel", "meta/deadline": serverNow() + CAROUSEL_MS,
       "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow(),
       combat: null, carousel,
@@ -360,7 +359,7 @@ export async function startCarousel(code: string, room: Room): Promise<void> {
 /** Client: mark that I've taken my carousel pick this round (so the host can end
  *  the carousel as soon as everyone has chosen). */
 export async function markCarouselPicked(code: string, uid: string, key: string): Promise<void> {
-  await update(ref(db(), `games/${code}/players/${uid}`), { carouselPicked: key });
+  await dbAdapter().update(`games/${code}/players/${uid}`, { carouselPicked: key });
 }
 
 /** Host: if every alive human has already picked this carousel, end it early
@@ -376,7 +375,7 @@ export async function finishCarouselEarlyIfReady(code: string, room: Room): Prom
   // reward. The deadline still bounds the wait if they never come back.
   const humans = alivePlayers(room).filter((p) => !p.isBot);
   if (humans.length === 0 || !humans.every((p) => p.carouselPicked === key)) return;
-  await update(ref(db(), `games/${code}/meta`), { deadline: serverNow(), updatedAt: serverNow() });
+  await dbAdapter().update(`games/${code}/meta`, { deadline: serverNow(), updatedAt: serverNow() });
 }
 
 /** Host: carousel → next planning round. */
@@ -385,7 +384,7 @@ export async function endCarousel(code: string, room: Room): Promise<void> {
   return withClaimGuard(code, async () => {
     room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
     const next = advanceRound(room.meta.stage, room.meta.round);
-    await update(gamePath(code), {
+    await dbAdapter().update(gamePath(code), {
       "meta/phase": "planning", "meta/stage": next.stage, "meta/round": next.round,
       "meta/deadline": serverNow() + PLAN_MS, "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow(),
       carousel: null,
@@ -457,7 +456,7 @@ export async function endCombat(code: string, room: Room): Promise<void> {
     }
     u["meta/hostBeat"] = serverNow();
     u["meta/updatedAt"] = serverNow();
-    await update(gamePath(code), u);
+    await dbAdapter().update(gamePath(code), u);
   });
 }
 
@@ -485,7 +484,7 @@ export async function returnToLobby(code: string, room: Room): Promise<void> {
     u[`players/${p.uid}/lastOpp`] = null;
     u[`players/${p.uid}/carouselPicked`] = null;
   }
-  await update(gamePath(code), u);
+  await dbAdapter().update(gamePath(code), u);
 }
 
 /** Any client: claim the host role if the current host's heartbeat has gone
@@ -513,13 +512,13 @@ export async function maybeClaimHost(code: string, room: Room, myUid: string): P
         .filter((p) => p.place == null)
         .sort((a, b) => (b.alive ? 1 : 0) - (a.alive ? 1 : 0) || (b.hp ?? 0) - (a.hp ?? 0));
       survivors.forEach((p, i) => { u[`players/${p.uid}/place`] = i + 1; u[`players/${p.uid}/alive`] = false; });
-      await update(gamePath(code), u).catch(() => {});
+      await dbAdapter().update(gamePath(code), u).catch(() => {});
     }
     return;
   }
   if (humans[0] !== myUid) return;
 
-  await runTransaction(ref(db(), `games/${code}/meta`), (m) => {
+  await dbAdapter().transaction<{ hostUid?: string; hostBeat?: number }>(`games/${code}/meta`, (m) => {
     if (!m) return m;
     if (serverNow() - (m.hostBeat ?? 0) >= HOST_TIMEOUT || !m.hostUid) {
       m.hostUid = myUid;
