@@ -51,7 +51,7 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
   const heldItems = unit.items ?? [];
   const megaReady = isMegaActive(unit.defId, heldItems);
   // Any held item can be equipped (max 3); the Mega Stone also needs a Mega-capable mon.
-  const canEquipArmed = interactive && !!armedItem && heldItems.length < 3 && (armedItem === MEGA_STONE ? canMega(unit.defId) : true);
+  const canEquipArmed = interactive && !!armedItem && heldItems.length < 3 && (armedItem === MEGA_STONE ? (canMega(unit.defId) && unit.star >= 3) : true);
 
   function onClick() {
     if (interactive && armedItem) {
