@@ -7,6 +7,7 @@ import { useAuth } from "@/game/net/authStore";
 import { useAppStore } from "@/game/store/appStore";
 import { AppSettingsPanel } from "./AppSettingsPanel";
 import { FriendsPanel } from "@/components/social/FriendsPanel";
+import { ProfileTile } from "./ProfileTile";
 import { ProfileEditor } from "@/components/social/ProfileEditor";
 import { HowToPlay } from "@/components/HowToPlay";
 import { PokeballIcon } from "@/components/game/icons";
@@ -171,8 +172,9 @@ export function WelcomeScreen() {
           </div>
         </main>
 
-        {/* Right rail: friends + settings */}
+        {/* Right rail: profile + friends + settings */}
         <aside className="w-full lg:w-72 shrink-0 flex flex-col gap-4">
+          <ProfileTile />
           <FriendsPanel />
           <div className="panel rounded-2xl p-4">
             <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-3 border-b border-white/[0.06] pb-2.5">{t.s_title}</h2>
