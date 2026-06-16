@@ -10,6 +10,7 @@ import { WelcomeScreen } from "@/components/welcome/WelcomeScreen";
 import { LobbyScreen } from "@/components/lobby/LobbyScreen";
 import { NetGameClient } from "@/components/game/NetGameClient";
 import { OrientationGate } from "@/components/game/OrientationGate";
+import { FirstMatchCoach } from "@/components/game/FirstMatchCoach";
 import { ProfileScreen } from "@/components/profile/ProfileScreen";
 import { LeaderboardScreen } from "@/components/profile/LeaderboardScreen";
 import { SignInScreen } from "@/components/auth/SignInScreen";
@@ -74,6 +75,8 @@ export function AppRoot() {
       {view}
       {/* The fixed-canvas match is the only view that needs landscape — gate it. */}
       {inMatch && <OrientationGate />}
+      {/* Learn-by-doing coach for a brand-new trainer's first match (self-dismissing). */}
+      {inMatch && <FirstMatchCoach />}
     </ErrorBoundary>
   );
 }

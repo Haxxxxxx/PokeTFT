@@ -157,6 +157,13 @@ body {
 }
 .toast-pop { animation: toast-pop 2.2s ease-out both; }
 
+/* One-shot entrance for persistent corner panels (e.g. the first-match coach). */
+@keyframes coach-in {
+  0% { transform: translateY(10px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.coach-in { animation: coach-in 0.35s ease-out both; }
+
 /* Soft swap when the board view changes (phase flip, or landing on your / a
    rival's board). Keeps the transition subtle so it doesn't feel jumpy. */
 @keyframes board-swap {
