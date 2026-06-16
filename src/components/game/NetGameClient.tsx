@@ -310,8 +310,11 @@ export function NetGameClient() {
           // a deadline (down / erroring / not yet wired), the client takes back over so a
           // server hiccup can never permanently freeze the match.
           if (r.meta?.serverDriven && serverNow() < (r.meta.deadline ?? 0) + 4000) return;
-          await maybeClaimHost(r.code, r, myUid);
-          if (r.meta?.hostUid !== myUid) return;
+          // Use the claim's authoritative result (not the stale snapshot's hostUid), so
+          // a fresh promotion drives this very tick instead of idling one cycle (~700ms),
+          // which under a slow link could let a deadline slip after host migration.
+          const amHost = await maybeClaimHost(r.code, r, myUid);
+          if (!amHost) return;
           await heartbeat(r.code);
           // End the carousel the moment everyone has picked (don't wait the timer).
           if (r.meta.phase === "carousel") await finishCarouselEarlyIfReady(r.code, r);

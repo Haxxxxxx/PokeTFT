@@ -553,12 +553,16 @@ export async function returnToLobby(code: string, room: Room): Promise<void> {
 
 /** Any client: claim the host role if the current host's heartbeat has gone
  *  stale (dropped OR backgrounded tab). Race-free via a transaction on meta. */
-export async function maybeClaimHost(code: string, room: Room, myUid: string): Promise<void> {
+/** Ensure the round loop has a live host, promoting THIS client if the current host has
+ *  gone silent. Returns whether *I* am the host afterwards — read from the transaction's
+ *  committed snapshot, NOT the (now-stale) input room, so the caller can act on a fresh
+ *  promotion in the SAME tick instead of waiting for the listener to catch up. */
+export async function maybeClaimHost(code: string, room: Room, myUid: string): Promise<boolean> {
   const meta = room.meta;
   const beat = meta?.hostBeat ?? 0;
   const host = room.players?.[meta?.hostUid];
   const hostHealthy = host?.connected && serverNow() - beat < HOST_TIMEOUT;
-  if (hostHealthy) return;
+  if (hostHealthy) return meta?.hostUid === myUid;
 
   // Only a connected HUMAN can be host — a bot can't drive the round loop, so a
   // bot holding the role would wedge the game forever. Lowest-uid attempts.
@@ -579,11 +583,11 @@ export async function maybeClaimHost(code: string, room: Room, myUid: string): P
       if (survivors[0]) u["meta/winnerUid"] = survivors[0].uid; // place-1 = authoritative winner
       await dbAdapter().update(gamePath(code), u).catch(() => {});
     }
-    return;
+    return false;
   }
-  if (humans[0] !== myUid) return;
+  if (humans[0] !== myUid) return false;
 
-  await dbAdapter().transaction<{ hostUid?: string; hostBeat?: number }>(`games/${code}/meta`, (m) => {
+  const res = await dbAdapter().transaction<{ hostUid?: string; hostBeat?: number }>(`games/${code}/meta`, (m) => {
     if (!m) return m;
     if (serverNow() - (m.hostBeat ?? 0) >= HOST_TIMEOUT || !m.hostUid) {
       m.hostUid = myUid;
@@ -591,4 +595,7 @@ export async function maybeClaimHost(code: string, room: Room, myUid: string): P
     }
     return m;
   });
+  // Whether I hold the role now — from the committed value, so a same-tick promotion is
+  // visible immediately (the stale input room still names the old host).
+  return res.value?.hostUid === myUid;
 }
