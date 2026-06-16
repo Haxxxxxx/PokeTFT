@@ -184,6 +184,15 @@ body {
   animation: loading-sweep 1.1s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 
+/* Stage-up announce: sweep in, hold, fade — a TFT-style "Stage N" beat. */
+@keyframes stage-banner {
+  0% { opacity: 0; transform: translateY(10px) scale(0.96); letter-spacing: 0.5em; }
+  18% { opacity: 1; transform: translateY(0) scale(1); letter-spacing: 0.25em; }
+  78% { opacity: 1; transform: translateY(0) scale(1); letter-spacing: 0.25em; }
+  100% { opacity: 0; transform: translateY(-8px) scale(1.02); letter-spacing: 0.3em; }
+}
+.stage-banner { animation: stage-banner 2.2s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
 @keyframes hero-float {
   0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
   50% { transform: translateY(-14px) rotate(var(--r, 0deg)); }

@@ -56,6 +56,8 @@ export function ShopBar() {
   const xpBase = XP_TO_REACH[level];
   const xpNeed = atMax ? 1 : XP_TO_REACH[level + 1] - xpBase;
   const xpCur = xp - xpBase;
+  // Decision cue: one Buy-XP would level you up (and you can afford it) → highlight it.
+  const canLevelNow = !atMax && gold >= ECONOMY.buyXpCost && xpCur + ECONOMY.buyXpAmount >= xpNeed;
 
   return (
     <div className="flex items-stretch gap-2">
@@ -84,8 +86,11 @@ export function ShopBar() {
         <button
           onClick={buyXp}
           disabled={gold < ECONOMY.buyXpCost || atMax}
-          className="flex flex-col gap-1 px-2.5 py-1.5 rounded-lg bg-sky-800/80 hover:bg-sky-700 disabled:opacity-40 border border-sky-600/40 transition-colors"
+          className={`relative flex flex-col gap-1 px-2.5 py-1.5 rounded-lg bg-sky-800/80 hover:bg-sky-700 disabled:opacity-40 border transition-colors ${canLevelNow ? "border-amber-400/80 ring-1 ring-amber-300/60 shadow-[0_0_12px_-3px_rgba(251,191,36,0.7)]" : "border-sky-600/40"}`}
         >
+          {canLevelNow && (
+            <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 px-1.5 py-px rounded-full bg-amber-400 text-black text-[8px] font-extrabold uppercase tracking-wide whitespace-nowrap">↑ {t.sh_level_up}</span>
+          )}
           <div className="flex items-center justify-between w-full text-[10px] leading-none">
             <span className="font-extrabold text-slate-100">{t.net_level} {level}</span>
             <span className="text-sky-200 tabular-nums">{atMax ? "MAX" : `${xpCur}/${xpNeed} XP`}</span>

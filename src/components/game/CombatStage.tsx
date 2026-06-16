@@ -54,12 +54,15 @@ export function CombatStage({
   inline = false,
   pve = false,
   authWon,
+  hpLost,
   syncStart,
   syncWindowMs,
 }: {
   result: CombatResult;
   /** Mirror the view (this player is the canonical sim's "enemy" side). */
   flip?: boolean;
+  /** HP the player lost this round (0 on a win / PvE breather) — shown in the banner. */
+  hpLost?: number;
   /** Host-authoritative win flag for THIS player. When set, the result banner
    *  uses it (instead of the local re-sim) so the outcome shown can never
    *  disagree with the HP the host actually applied. */
@@ -404,6 +407,14 @@ export function CombatStage({
                 {won ? t.cs_victory : result.winner === "draw" ? t.cs_draw : t.cs_defeat}
               </span>
               {!won && result.winner === "enemy" && <span className="text-sm text-slate-400 font-medium">· {result.survivors} survived</span>}
+              {/* HP-loss readout (TFT-style): how much the round cost you. */}
+              {pve ? (
+                <span className="text-xs text-emerald-300/70 font-semibold">· {t.cs_breather}</span>
+              ) : hpLost && hpLost > 0 ? (
+                <span className="text-sm font-extrabold text-rose-400">−{hpLost} {t.net_hp}</span>
+              ) : !won ? null : (
+                <span className="text-xs text-emerald-300/70 font-semibold">· {t.cs_no_dmg}</span>
+              )}
             </div>
             {autoResolve ? (
               <span className="text-xs text-slate-500">…</span>

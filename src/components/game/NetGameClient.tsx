@@ -566,6 +566,21 @@ export function NetGameClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
+  // Stage-up announce — flash a "Stage N" banner whenever the stage increments.
+  const [stageBanner, setStageBanner] = useState<number | null>(null);
+  const prevStage = useRef<number | null>(null);
+  useEffect(() => {
+    const s = meta?.stage;
+    if (s == null) return;
+    if (prevStage.current !== null && s > prevStage.current) setStageBanner(s);
+    prevStage.current = s;
+  }, [meta?.stage]);
+  useEffect(() => {
+    if (stageBanner == null) return;
+    const id = setTimeout(() => setStageBanner(null), 2200);
+    return () => clearTimeout(id);
+  }, [stageBanner]);
+
   if (!room || !meta || !myUid) return null;
 
   const isHost = meta.hostUid === myUid;
@@ -674,6 +689,21 @@ export function NetGameClient() {
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
       <Toasts />
+      {/* Stage-up announce overlay */}
+      {stageBanner != null && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
+          <div className="stage-banner text-center">
+            <div className="text-[11px] font-extrabold uppercase tracking-[0.4em] text-amber-300/80 mb-1">{lang === "fr" ? "Manche" : "Stage"}</div>
+            <div className="text-6xl font-black gild-text drop-shadow-[0_4px_30px_rgba(212,175,55,0.4)]">{stageBanner}</div>
+            <div className="text-xs text-slate-400 mt-2 tracking-wide">
+              {stageBanner <= 2 ? (lang === "fr" ? "Le début de partie" : "The early game")
+                : stageBanner === 3 ? (lang === "fr" ? "Le milieu de partie commence" : "The midgame begins")
+                : stageBanner === 4 ? (lang === "fr" ? "Pic de puissance" : "Powerspike")
+                : (lang === "fr" ? "Fin de partie" : "Endgame")}
+            </div>
+          </div>
+        </div>
+      )}
       <div className="tft-shell fixed inset-0 flex justify-center items-center overflow-hidden">
       <div
         style={{ width: DESIGN_W, height: DESIGN_H, transform: `scale(${scale})`, transformOrigin: "center" }}
@@ -898,6 +928,7 @@ export function NetGameClient() {
                     result={combatResult}
                     flip={!!myCombat?.flip}
                     authWon={myCombat?.won}
+                    hpLost={myCombat?.dmg}
                     opponentName={myCombat?.oppName ?? "Rival"}
                     pve={!!myCombat?.pve}
                     autoResolve

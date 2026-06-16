@@ -83,6 +83,7 @@ export type Dict = {
   sh_drag_sell: string;
   sh_view_details: string;
   sh_max: string;
+  sh_level_up: string;
   sh_odds: string;
   sh_items_title: string;
   it_empty: string;
@@ -95,6 +96,8 @@ export type Dict = {
   cs_vs: string;
   cs_overtime: string;
   cs_get_ready: string;
+  cs_breather: string;
+  cs_no_dmg: string;
   cs_continue: string;
   cs_victory: string;
   cs_defeat: string;
@@ -202,6 +205,7 @@ export const FR: Dict = {
   sh_drag_sell: "Glisser pour vendre",
   sh_view_details: "Voir les détails",
   sh_max: "MAX",
+  sh_level_up: "Niveau",
   sh_odds: "Chances",
   sh_items_title: "Objets",
   it_empty: "Aucun objet — gagne-les en carrousel ou PvE.",
@@ -213,6 +217,8 @@ export const FR: Dict = {
   cs_vs: "VS",
   cs_overtime: "PROLONGATION",
   cs_get_ready: "Préparez-vous !",
+  cs_breather: "Répit — aucun PV perdu",
+  cs_no_dmg: "Aucun PV perdu",
   cs_recap: "Bilan",
   cs_show_recap: "Afficher le bilan",
   cs_hide_recap: "Masquer le bilan",
@@ -319,6 +325,7 @@ export const EN: Dict = {
   sh_drag_sell: "Drag here to sell",
   sh_view_details: "View details",
   sh_max: "MAX",
+  sh_level_up: "Level",
   sh_odds: "Odds",
   sh_items_title: "Items",
   it_empty: "No items yet — win them in carousel or PvE.",
@@ -330,6 +337,8 @@ export const EN: Dict = {
   cs_vs: "VS",
   cs_overtime: "OVERTIME",
   cs_get_ready: "Get ready!",
+  cs_breather: "Breather — no HP lost",
+  cs_no_dmg: "No HP lost",
   cs_recap: "Recap",
   cs_show_recap: "Show recap",
   cs_hide_recap: "Hide recap",

@@ -283,6 +283,12 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
 
   const combat: Record<string, CombatAssign> = {};
   if (kind === "pve") {
+    const pveName = stage <= 1 ? "Wild Pokémon"
+      : stage <= 2 ? "Wild Pack"
+      : stage <= 3 ? "Feral Horde"
+      : stage <= 4 ? "Savage Swarm"
+      : stage <= 5 ? "Apex Pack"
+      : "Legendary Encounter";
     // Everyone fights wild creeps — no HP loss, a breather to build. Resolve from
     // the SAME round-tripped boards the client replays (see assign()) so the PvE
     // outcome the player sees always matches what the host recorded.
@@ -290,7 +296,7 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
       const self = rtdbSafe(board(room.players[p.uid]));
       const creeps = rtdbSafe(generateCreepBoard(stage, room.meta.round, stage * 97 + room.meta.round * 13 + p.uid.length, allowed));
       const r = simulate(self, creeps);
-      combat[p.uid] = { oppUid: p.uid, oppName: "Wild Pokémon", ghost: true, pve: true, won: r.winner === "ally", survivors: 0, dmg: 0, selfBoard: self, oppBoard: creeps };
+      combat[p.uid] = { oppUid: p.uid, oppName: pveName, ghost: true, pve: true, won: r.winner === "ally", survivors: 0, dmg: 0, selfBoard: self, oppBoard: creeps };
     }
   } else {
     const order = shuffled(alive.map((p) => p.uid).sort(), stage * 131 + room.meta.round);
