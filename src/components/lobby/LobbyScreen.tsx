@@ -6,7 +6,7 @@ import { usePreLobby } from "@/game/store/preLobbyStore";
 import { beginMatch } from "@/game/net/match";
 import { kickoffServerGame } from "@/game/net/serverGame";
 import { PokeballIcon } from "@/components/game/icons";
-import { Settings } from "lucide-react";
+import { Settings, Swords } from "lucide-react";
 import { enterFullscreen } from "@/lib/fullscreen";
 import { GameRulesPanel } from "./GameRulesPanel";
 import { unitsForGenerations } from "@/game/data/mons";
@@ -183,7 +183,7 @@ export function LobbyScreen() {
                 .catch((e) => console.error("[beginMatch]", e));
             }}
               className="w-full py-4 rounded-2xl font-extrabold text-base tracking-wide transition-all bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black shadow-lg shadow-amber-500/20 disabled:opacity-30 disabled:shadow-none disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500">
-              {t.l_net_start}
+              <span className="inline-flex items-center justify-center gap-2"><Swords size={18} /> {t.l_net_start}</span>
             </button>
             {!canStart && <p className="text-xs text-slate-600">{t.l_net_wait_ready}</p>}
           </div>

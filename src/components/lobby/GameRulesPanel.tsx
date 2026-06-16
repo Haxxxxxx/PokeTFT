@@ -4,6 +4,7 @@ import { usePreLobby } from "@/game/store/preLobbyStore";
 import { ALL_GENS, GEN_LABELS, MAX_REGIONS } from "@/game/data/generations";
 import { unitsForGenerations } from "@/game/data/mons";
 import { COMPLETED } from "@/game/data/itemPool";
+import { ItemGlyph } from "@/components/game/ItemGlyph";
 import { useT } from "@/lib/i18n";
 import { useAppStore } from "@/game/store/appStore";
 import type { ReactNode } from "react";
@@ -194,7 +195,7 @@ export function GameRulesPanel({ isHost }: { isHost: boolean }) {
                     : "bg-slate-900/30 border-slate-800 opacity-55 hover:opacity-90 hover:border-slate-700"
                 }`}
               >
-                <span className="text-sm shrink-0 mt-0.5">{item.icon}</span>
+                <span className="shrink-0 mt-0.5 text-slate-300"><ItemGlyph id={item.id} size={15} /></span>
                 <div className="flex flex-col min-w-0 flex-1">
                   <span className={`text-[11px] font-bold truncate ${active ? "text-amber-200" : "text-slate-400"}`}>
                     {lang === "en" ? item.name : item.nameFr}
