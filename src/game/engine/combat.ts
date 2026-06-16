@@ -62,6 +62,8 @@ type Combatant = {
   range: number;
   mana: number;
   maxMana: number;
+  /** Bonus mana gained per auto-attack from items (Shojin/Tear-style accelerators). */
+  manaPerAttack: number;
   /** Ability-power multiplier (Mega boosts this). */
   apMult: number;
   mega: boolean;
@@ -188,7 +190,7 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
   let mr = mega ? s.magicResist + mega.mrBonus : s.magicResist;
   let attackSpeed = s.attackSpeed;
   let adMult = 1, hpMult = 1, critAdd = 0, lifeSteal = 0, armorPen = 0;
-  let regen = 0, thorns = 0, burnDps = 0, stunChance = 0, manaAdd = 0;
+  let regen = 0, thorns = 0, burnDps = 0, stunChance = 0, manaAdd = 0, manaPerAtk = 0;
   let sash = false, statusImmune = false;
   for (const id of items) {
     const e = ITEM_EFFECT[id];
@@ -207,6 +209,7 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
     if (e.burnDps) burnDps = Math.max(burnDps, e.burnDps);
     if (e.stunChance) stunChance = Math.max(stunChance, e.stunChance);
     if (e.manaStart) manaAdd += e.manaStart;
+    if (e.manaPerAttack) manaPerAtk += e.manaPerAttack;
     if (e.sash) sash = true;
     if (e.statusImmune) statusImmune = true;
   }
@@ -238,6 +241,7 @@ function toCombatant(u: UnitInstance, team: Team): Combatant {
     range: Math.max(1, s.range), // floor at melee — range 0 could never reach a target and would idle until overtime
     mana: Math.min(s.maxMana, s.startMana + manaAdd),
     maxMana: s.maxMana,
+    manaPerAttack: manaPerAtk,
     apMult,
     mega: !!mega,
     pos,
@@ -408,7 +412,7 @@ export function simulate(allies: UnitInstance[], enemies: UnitInstance[]): Comba
           u.atkCd = 1 / Math.max(0.1, Math.min(MAX_ATTACK_SPEED, u.attackSpeed || 0));
           // Armor penetration ignores a fraction of the target's armor.
           dealDamage(u, target, u.ad * armorMult(target.armor * (1 - u.armorPenPct)), "physical", events, rng);
-          u.mana = Math.min(u.maxMana, u.mana + MANA_PER_ATTACK);
+          u.mana = Math.min(u.maxMana, u.mana + MANA_PER_ATTACK + u.manaPerAttack);
 
           // Cast on full mana — but only if the auto-attack didn't already kill
           // the target (otherwise the ability hits a corpse).

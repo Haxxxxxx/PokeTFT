@@ -1,4 +1,4 @@
-/** Item system with TFT-style combining: 6 components combine (2 → 1) into 21
+/** Item system with TFT-style combining: 7 components combine (2 → 1) into 28
  *  completed items. Effects are a structured object the combat engine applies
  *  generically (deterministic — no per-id branching in the sim). Spatula-style
  *  EMBLEMS additionally grant their holder a synergy trait. */
@@ -23,6 +23,7 @@ export type ItemEffect = {
   burnDps?: number;       // abilities burn for a fraction of victim max HP / sec
   stunChance?: number;    // abilities can stun
   manaStart?: number;     // + starting mana
+  manaPerAttack?: number; // + bonus mana gained per auto-attack (caster accelerators)
   sash?: boolean;         // survive one lethal blow at full HP
   statusImmune?: boolean; // immune to burn/stun/freeze
 };
@@ -47,7 +48,7 @@ export const RARITY_COLOR: Record<ItemRarity, string> = {
   legendary: "#fbbf24",
 };
 
-/** The 6 building-block components — these are what drops; players combine them. */
+/** The 7 building-block components — these are what drops; players combine them. */
 export const COMPONENTS: ItemDef[] = [
   { id: "c-ad",   name: "Power Bracer", nameFr: "Bracelet Force", rarity: "common", kind: "component", effect: { adMult: 1.2 },    text: "+20% Attack",        textFr: "+20% Attaque" },
   { id: "c-ap",   name: "Psy Crystal",  nameFr: "Cristal Psy",    rarity: "common", kind: "component", effect: { apMult: 1.2 },    text: "+20% Ability Power",  textFr: "+20% Att. Spé" },
@@ -55,6 +56,7 @@ export const COMPONENTS: ItemDef[] = [
   { id: "c-hp",   name: "Vital Band",   nameFr: "Ruban Vital",    rarity: "common", kind: "component", effect: { hpMult: 1.15 },   text: "+15% Health",         textFr: "+15% PV" },
   { id: "c-res",  name: "Stone Plate",  nameFr: "Plaque Pierre",  rarity: "common", kind: "component", effect: { armorAdd: 18, mrAdd: 18 }, text: "+18 Armor & MR", textFr: "+18 Déf & Déf Spé" },
   { id: "c-crit", name: "Keen Edge",    nameFr: "Lame Affûtée",   rarity: "common", kind: "component", effect: { critAdd: 0.12 },  text: "+12% Crit",           textFr: "+12% Critique" },
+  { id: "c-mana", name: "Leppa Berry",  nameFr: "Baie Mepo",      rarity: "common", kind: "component", effect: { manaStart: 15 },  text: "+15 Starting Mana",   textFr: "+15 Mana de départ" },
 ];
 
 /** Completed items — one per unordered component pair (recipe key in RECIPES). */
@@ -80,6 +82,14 @@ export const COMPLETED: ItemDef[] = [
   { id: "bulwark",      name: "Bulwark",       nameFr: "Rempart",        rarity: "rare",      kind: "completed", effect: { hpMult: 1.35, armorAdd: 35, mrAdd: 35, thornsPct: 0.12 }, text: "+35% HP, +35 def, thorns", textFr: "+35% PV, +35 déf, épines" },
   { id: "vampire-fang", name: "Vampire Fang",  nameFr: "Croc Vampire",   rarity: "legendary", kind: "completed", effect: { hpMult: 1.3, critAdd: 0.25, lifeSteal: 0.25 }, text: "+30% HP, +25% crit, 25% lifesteal", textFr: "+30% PV, +25% crit, 25% vol de vie" },
   { id: "edge-night",   name: "Edge of Night",  nameFr: "Lame de Nuit",  rarity: "rare",     kind: "completed", effect: { armorAdd: 35, mrAdd: 35, critAdd: 0.25, sash: true }, text: "+35 def, +25% crit, survives one blow", textFr: "+35 déf, +25% crit, survit à un coup" },
+  // Mana line (c-mana pairs) — caster accelerators that were impossible before.
+  { id: "spirit-orb",   name: "Spirit Orb",    nameFr: "Orbe Spirituel", rarity: "legendary", kind: "completed", effect: { manaStart: 30, manaPerAttack: 8 },     text: "+30 start mana, +8 mana/attack",   textFr: "+30 mana initial, +8 mana/attaque" },
+  { id: "archmage",     name: "Archmage Tome", nameFr: "Tome Archimage", rarity: "legendary", kind: "completed", effect: { apMult: 1.4, manaPerAttack: 6 },        text: "+40% AP, +6 mana/attack",          textFr: "+40% Att.Spé, +6 mana/attaque" },
+  { id: "spellblade",   name: "Spellblade",    nameFr: "Lame Magique",   rarity: "rare",      kind: "completed", effect: { adMult: 1.4, manaPerAttack: 6 },        text: "+40% Attack, +6 mana/attack",      textFr: "+40% Attaque, +6 mana/attaque" },
+  { id: "flux-rotor",   name: "Flux Rotor",    nameFr: "Rotor Flux",     rarity: "rare",      kind: "completed", effect: { asMult: 1.35, manaPerAttack: 5 },       text: "+35% Speed, +5 mana/attack",       textFr: "+35% Vitesse, +5 mana/attaque" },
+  { id: "soul-vessel",  name: "Soul Vessel",   nameFr: "Calice d'Âme",   rarity: "rare",      kind: "completed", effect: { hpMult: 1.3, manaStart: 20 },           text: "+30% HP, +20 start mana",          textFr: "+30% PV, +20 mana initial" },
+  { id: "mana-veil",    name: "Mana Veil",     nameFr: "Voile Mana",     rarity: "rare",      kind: "completed", effect: { armorAdd: 30, mrAdd: 30, manaStart: 15 }, text: "+30 Armor & MR, +15 start mana",  textFr: "+30 Déf, +15 mana initial" },
+  { id: "resonance",    name: "Resonance Lens", nameFr: "Lentille Résonance", rarity: "rare", kind: "completed", effect: { critAdd: 0.3, manaPerAttack: 5 },        text: "+30% crit, +5 mana/attack",        textFr: "+30% crit, +5 mana/attaque" },
 ];
 
 /** Spatula-style EMBLEMS — grant the holder a synergy trait (TFT emblems). One per
@@ -145,6 +155,14 @@ export const RECIPES: Record<string, string> = {
   [combineKey("c-hp", "c-res")]: "bulwark",
   [combineKey("c-hp", "c-crit")]: "vampire-fang",
   [combineKey("c-res", "c-crit")]: "edge-night",
+  // Mana component pairs.
+  [combineKey("c-mana", "c-mana")]: "spirit-orb",
+  [combineKey("c-mana", "c-ap")]: "archmage",
+  [combineKey("c-mana", "c-ad")]: "spellblade",
+  [combineKey("c-mana", "c-as")]: "flux-rotor",
+  [combineKey("c-mana", "c-hp")]: "soul-vessel",
+  [combineKey("c-mana", "c-res")]: "mana-veil",
+  [combineKey("c-mana", "c-crit")]: "resonance",
 };
 
 export function isComponent(id: string): boolean {
