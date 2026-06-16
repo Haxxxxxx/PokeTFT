@@ -353,12 +353,21 @@ export async function startCarousel(code: string, room: Room): Promise<void> {
     // stage/round/uid.length, which is identical across every game). The host
     // writes this once, so it just needs to vary — not be client-reproducible.
     const gameSeed = hashStr(code);
+    // Comeback mechanic: TFT lets the lowest-HP players pick the carousel first. With
+    // private per-player menus there's no shared ring to pick from, so instead we scale
+    // REWARD QUALITY by how far behind you are — players below the field's median HP get
+    // a richer carousel (emblems earlier + more often), helping them claw back.
+    const aliveHumans = alivePlayers(room).filter((p) => !p.isBot);
+    const hps = aliveHumans.map((p) => p.hp).sort((a, b) => a - b);
+    const medianHp = hps.length ? hps[Math.floor((hps.length - 1) / 2)] : 100;
     for (const p of alivePlayers(room)) {
       if (p.isBot) continue;
       const salt = (gameSeed ^ hashStr(p.uid) ^ Math.imul(room.meta.stage * 31 + room.meta.round * 7 + 1, 2654435761)) >>> 0;
-      // Rotate which item is offered per player/round so it varies but stays sync-free (host-written).
-      // From stage 3 on, ~1 in 4 carousels upgrades the reward to a Spatula emblem.
-      const wantEmblem = room.meta.stage >= 3 && (salt >>> 11) % 4 === 0;
+      // Behind = strictly below the median HP (and not alone). Such players get the
+      // premium emblem from stage 2 at ~50%, vs stage 3 at ~25% for everyone else.
+      const behind = aliveHumans.length > 1 && p.hp < medianHp;
+      const emblemGate = behind ? 2 : 4;            // % gate: 1-in-2 vs 1-in-4
+      const wantEmblem = room.meta.stage >= (behind ? 2 : 3) && (salt >>> 11) % emblemGate === 0;
       const item = wantEmblem
         ? EMBLEM_IDS[(salt >>> 5) % EMBLEM_IDS.length]
         : itemPool[(salt >>> 3) % itemPool.length];

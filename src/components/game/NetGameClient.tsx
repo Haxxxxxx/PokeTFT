@@ -1115,6 +1115,17 @@ export function NetGameClient() {
                 <span><Sparkles size={24} /></span>
                 <h2 className="text-2xl font-extrabold text-amber-300 tracking-tight">{lang === "fr" ? "Carrousel" : "Carousel"}</h2>
               </div>
+              {(() => {
+                // Comeback cue: mirrors the server's below-median-HP reward boost so the
+                // player understands why their carousel looks richer when behind.
+                const hps = Object.values(room.players ?? {}).filter((p) => !p.isBot && p.alive).map((p) => p.hp).sort((a, b) => a - b);
+                const median = hps.length ? hps[Math.floor((hps.length - 1) / 2)] : 100;
+                return hps.length > 1 && (me?.hp ?? 100) < median ? (
+                  <span className="mb-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/40 text-[10px] font-bold text-emerald-300">
+                    <Sparkles size={10} /> {lang === "fr" ? "Bonus de remontée" : "Comeback bonus"}
+                  </span>
+                ) : null;
+              })()}
               <p className="text-xs text-slate-300/80">{picked ? (() => {
                 // How many connected trainers still owe a pick (the round ends as
                 // soon as everyone has chosen).
