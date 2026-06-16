@@ -23,14 +23,24 @@ function HexCell({ c, r, unit, interactive }: { c: number; r: number; unit?: Uni
   const droppable = interactive && ally;
   const { setNodeRef, isOver } = useDroppable({ id: `cell-${c}-${localR}`, disabled: !droppable });
   const { x, y } = hexToPixel({ c, r }, TILE_W, TILE_H);
+  // TFT-style lit hexes: your half glows gold, the enemy half a cool indigo. Hovering
+  // a drop target flares bright amber.
   const tint = ally
-    ? { bg: isOver ? "rgba(52,211,153,0.24)" : "rgba(52,211,153,0.06)", ring: isOver ? "rgba(52,211,153,0.7)" : "rgba(52,211,153,0.16)" }
-    : { bg: "rgba(251,113,133,0.04)", ring: "rgba(251,113,133,0.1)" };
+    ? {
+        bg: isOver ? "rgba(251,191,36,0.30)" : "rgba(251,191,36,0.07)",
+        ring: isOver ? "rgba(253,224,71,0.95)" : "rgba(251,191,36,0.42)",
+        glow: isOver ? "0 0 18px 2px rgba(251,191,36,0.55), inset 0 0 14px rgba(251,191,36,0.3)" : "inset 0 0 12px rgba(251,191,36,0.12)",
+      }
+    : {
+        bg: "rgba(99,102,241,0.05)",
+        ring: "rgba(129,140,248,0.30)",
+        glow: "inset 0 0 10px rgba(99,102,241,0.10)",
+      };
   return (
     <>
       <div
         ref={droppable ? setNodeRef : undefined}
-        className="absolute transition-colors"
+        className="absolute transition-all"
         style={{
           left: x - TILE_W / 2,
           top: y - TILE_H / 2,
@@ -38,7 +48,7 @@ function HexCell({ c, r, unit, interactive }: { c: number; r: number; unit?: Uni
           height: TILE_H - 3,
           clipPath: HEX_CLIP,
           background: tint.bg,
-          boxShadow: `inset 0 0 0 1px ${tint.ring}`,
+          boxShadow: `inset 0 0 0 1.5px ${tint.ring}, ${tint.glow}`,
         }}
       />
       {unit && (
@@ -74,8 +84,8 @@ export function Board({ units, interactive = true }: { units?: UnitInstance[]; i
         width: w + 28,
         height: h + 28,
         padding: 14,
-        background: "radial-gradient(115% 78% at 50% 88%, #1b2748 0%, #0d1729 52%, #070c18 100%)",
-        boxShadow: "inset 0 1px 0 rgba(148,163,184,0.08), inset 0 -28px 60px -30px rgba(56,189,248,0.18), 0 18px 50px -24px rgba(0,0,0,0.8)",
+        background: "radial-gradient(125% 85% at 50% 96%, #3a2f1a 0%, #1a1d33 42%, #0a0d1a 78%, #06080f 100%)",
+        boxShadow: "inset 0 1px 0 rgba(251,191,36,0.12), inset 0 -40px 90px -40px rgba(251,191,36,0.22), 0 18px 50px -24px rgba(0,0,0,0.85)",
       }}
     >
       <div className="absolute" style={{ left: 14, top: 14, width: w, height: h }}>
