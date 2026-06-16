@@ -213,6 +213,9 @@ export function NetGameClient() {
   // Past timeline chip the player tapped to see a fight recap (null = closed).
   const [recapKey, setRecapKey] = useState<string | null>(null);
   const [pickedKey, setPickedKey] = useState<string | null>(null);
+  // The augment slot index we just picked — hides the augment panel immediately on
+  // pick (the `<=` count gate alone can leave it open when you're behind a slot).
+  const [pickedSlot, setPickedSlot] = useState<number | null>(null);
   const [spectate, setSpectate] = useState<string | null>(null);
   // Carousel/augment: hide the choice cards (revealing the live board behind the
   // overlay) and toggle them back. Resets whenever a new pick screen opens.
@@ -600,7 +603,7 @@ export function NetGameClient() {
   // Show the augment pick whenever you still owe one for this slot. Uses `<=` (not
   // `===`): if you ever let an augment timer expire without picking, `===` would
   // leave length permanently out of step and lock you out of EVERY future augment.
-  const showAugment = augSlotNow != null && augments.length <= augSlotNow;
+  const showAugment = augSlotNow != null && augments.length <= augSlotNow && pickedSlot !== augSlotNow;
   // Spectating a rival from the scoreboard → watch their board, bench and fights
   // (read-only). Works while alive (scouting) and after death (keep watching).
   const spectating = !!spectate && spectate !== myUid && !!players[spectate];
@@ -1022,7 +1025,7 @@ export function NetGameClient() {
             {augOptions.map((a) => (
               <OrnateAugmentCard
                 key={a.id}
-                onClick={() => { const lk = `a-${augSlotNow}`; if (pickLatch.current === lk) return; pickLatch.current = lk; pickAugment(a.id); flushSync(); }}
+                onClick={() => { const lk = `a-${augSlotNow}`; if (pickLatch.current === lk) return; pickLatch.current = lk; pickAugment(a.id); setPickedSlot(augSlotNow); flushSync(); }}
                 icon={<AugmentGlyph id={a.id} size={34} />}
                 name={lang === "fr" ? a.nameFr : a.name}
                 desc={lang === "fr" ? a.descFr : a.desc}
