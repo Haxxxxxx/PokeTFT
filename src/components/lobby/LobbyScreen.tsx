@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRoom } from "@/game/net/roomStore";
 import { usePreLobby } from "@/game/store/preLobbyStore";
-import { beginMatch } from "@/game/net/match";
+import { beginMatch, addInvitePlaceholder } from "@/game/net/match";
 import { kickoffServerGame } from "@/game/net/serverGame";
+import { useAuth } from "@/game/net/authStore";
+import { useAppStore } from "@/game/store/appStore";
+import { sendInvite } from "@/game/net/users";
 import { PokeballIcon } from "@/components/game/icons";
-import { Settings, Swords } from "lucide-react";
+import { Settings, Swords, UserPlus } from "lucide-react";
 import { enterFullscreen } from "@/lib/fullscreen";
 import { GameRulesPanel } from "./GameRulesPanel";
 import { unitsForGenerations } from "@/game/data/mons";
@@ -28,7 +31,12 @@ export function LobbyScreen() {
   const clearMySave = useRoom((s) => s.clearMySave);
   const preRules = usePreLobby((s) => s.rules);
   const setPreRules = usePreLobby((s) => s.setRules);
+  const friends = useAuth((s) => s.friends);
+  const myProfile = useAuth((s) => s.profile);
+  const lang = useAppStore((s) => s.settings.language);
   const [showRules, setShowRules] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
+  const [invited, setInvited] = useState<Record<string, boolean>>({});
 
   const isHost = room?.meta?.hostUid === myUid;
 
@@ -70,7 +78,11 @@ export function LobbyScreen() {
     .sort((a, b) => Number(b.isHost) - Number(a.isHost) || a.name.localeCompare(b.name));
   const me = myUid ? room.players?.[myUid] : undefined;
   const maxPlayers = room.rules?.maxPlayers ?? 8;
-  const openSlots = Math.max(0, maxPlayers - players.length);
+  // Invited-but-not-yet-joined friends → shown as pending placeholder slots.
+  const pendingInvites = Object.entries(room.invited ?? {})
+    .filter(([uid]) => !room.players?.[uid])
+    .map(([uid, v]) => ({ uid, ...v }));
+  const openSlots = Math.max(0, maxPlayers - players.length - pendingInvites.length);
   const allReady = players.every((p) => p.ready);
   // Need at least 2 players (humans and/or bots) — a 1-player game has no
   // opponent, so it can never deal damage or end. Add a bot to play solo.
@@ -107,8 +119,14 @@ export function LobbyScreen() {
 
       {/* Party stage */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center gap-7 p-4 sm:p-8 overflow-y-auto">
-        <div className="panel w-full max-w-[600px] rounded-2xl p-5 sm:p-6">
-          <h2 className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-4 text-center">{t.l_net_players(players.length, maxPlayers)}</h2>
+        <div className="panel w-full max-w-[680px] rounded-2xl p-5 sm:p-7">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-base font-extrabold gild-text leading-none">{lang === "fr" ? "Salon" : "Lobby"}</h2>
+              <p className="text-[11px] text-slate-500 mt-1">{lang === "fr" ? "Invitez vos amis ou ajoutez des IA" : "Invite friends or add AIs"}</p>
+            </div>
+            <span className="text-[12px] font-extrabold px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.07] text-slate-200 tabular-nums">{players.length + pendingInvites.length}/{maxPlayers}</span>
+          </div>
           {/* Party portrait row (wraps responsively) */}
           <div className="flex flex-wrap items-start justify-center gap-3 sm:gap-4">
             {players.map((p) => (
@@ -121,6 +139,19 @@ export function LobbyScreen() {
                   {p.uid === myUid && <span className="text-[8px] font-bold uppercase bg-sky-600 text-white rounded px-1 leading-tight">{t.l_net_you}</span>}
                 </div>
                 <span className={`text-[10px] font-semibold ${p.ready ? "text-emerald-400" : "text-slate-500"}`}>{p.isBot ? p.botDifficulty : p.ready ? t.l_net_ready_up : t.l_net_not_ready}</span>
+              </div>
+            ))}
+            {/* Pending invites — placeholder slots until the friend accepts. */}
+            {pendingInvites.map((p) => (
+              <div key={`inv-${p.uid}`} className="flex flex-col items-center gap-1.5 w-20">
+                <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-amber-500/40 bg-amber-500/[0.04] flex items-center justify-center overflow-hidden shrink-0 animate-pulse">
+                  {p.photoURL
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={p.photoURL} alt="" width={44} height={44} style={{ imageRendering: "pixelated", opacity: 0.5 }} />
+                    : <span className="text-lg font-extrabold text-amber-300/50">{(p.username || "?").slice(0, 1).toUpperCase()}</span>}
+                </div>
+                <span className="text-xs font-bold text-slate-400 truncate max-w-full text-center">{p.username}</span>
+                <span className="text-[10px] font-semibold text-amber-400/80">{lang === "fr" ? "Invité…" : "Invited…"}</span>
               </div>
             ))}
             {Array.from({ length: openSlots }).map((_, i) => (
@@ -142,10 +173,34 @@ export function LobbyScreen() {
               ))}
             </div>
           )}
+
+          {/* Invite friends */}
+          <div className="mt-3 pt-4 border-t border-white/[0.06] flex flex-col items-center gap-2">
+            <button onClick={() => setShowInvite((s) => !s)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[11px] font-bold text-amber-300">
+              <UserPlus size={13} /> {lang === "fr" ? "Inviter des amis" : "Invite friends"}
+            </button>
+            {showInvite && (
+              <div className="w-full max-w-[380px] flex flex-col gap-1 mt-1">
+                {friends.filter((f) => !room.players?.[f.uid]).length === 0 ? (
+                  <p className="text-[11px] text-slate-600 text-center py-1.5">{lang === "fr" ? "Aucun ami à inviter." : "No friends to invite."}</p>
+                ) : friends.filter((f) => !room.players?.[f.uid]).map((f) => (
+                  <div key={f.uid} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.05]">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${f.online ? "bg-emerald-400" : "bg-slate-600"}`} />
+                    <span className="flex-1 text-[12px] font-semibold text-slate-200 truncate">{f.username}</span>
+                    <button
+                      onClick={() => { if (myUid) { sendInvite(f.uid, room.code, myProfile?.username ?? "Player", myUid); addInvitePlaceholder(room.code, f.uid, f.username, f.photoURL); setInvited((p) => ({ ...p, [f.uid]: true })); } }}
+                      disabled={invited[f.uid]}
+                      className="px-2.5 py-1 rounded-md bg-amber-500/90 hover:bg-amber-400 text-black text-[10px] font-bold disabled:opacity-50"
+                    >{invited[f.uid] ? (lang === "fr" ? "Invité ✓" : "Invited ✓") : (lang === "fr" ? "Inviter" : "Invite")}</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Settings summary */}
-        <div className="w-full max-w-[600px] flex flex-wrap items-center justify-center gap-2">
+        <div className="w-full max-w-[680px] flex flex-wrap items-center justify-center gap-2">
           {[
             `${gens.map((g) => GEN_NAMES[g] ?? `Gen ${g}`).join(", ")}`,
             `${poolCount} Pokémon`,

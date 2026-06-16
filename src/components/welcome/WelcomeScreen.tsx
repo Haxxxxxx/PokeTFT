@@ -5,6 +5,7 @@ import { usePreLobby } from "@/game/store/preLobbyStore";
 import { useRoom } from "@/game/net/roomStore";
 import { useAuth } from "@/game/net/authStore";
 import { useAppStore } from "@/game/store/appStore";
+import { subscribeInvites, clearInvite, type Invite } from "@/game/net/users";
 import { AppSettingsPanel } from "./AppSettingsPanel";
 import { FriendsPanel } from "@/components/social/FriendsPanel";
 import { ProfileTile } from "./ProfileTile";
@@ -47,6 +48,8 @@ export function WelcomeScreen() {
   const setProfileOpen = useAppStore((s) => s.setProfileOpen);
   const setLeaderboardOpen = useAppStore((s) => s.setLeaderboardOpen);
   const lang = useAppStore((s) => s.settings.language);
+  const myUid = useAuth((s) => s.user?.uid);
+  const [invites, setInvites] = useState<Invite[]>([]);
   const [editProfile, setEditProfile] = useState(false);
   const [howTo, setHowTo] = useState(false);
   // Random showcase mons each visit (client-only to avoid hydration mismatch).
@@ -60,6 +63,9 @@ export function WelcomeScreen() {
 
   // Live game browser — subscribe to open lobbies while on this screen.
   useEffect(() => { watchLobbies(); return () => unwatchLobbies(); }, [watchLobbies, unwatchLobbies]);
+
+  // Pending game invites from friends.
+  useEffect(() => { if (!myUid) return; return subscribeInvites(myUid, setInvites); }, [myUid]);
 
   // Show the tutorial automatically the first time someone lands here.
   useEffect(() => {
@@ -113,6 +119,26 @@ export function WelcomeScreen() {
           </div>
         </div>
       </header>
+
+      {/* Friend invites */}
+      {invites.length > 0 && (
+        <div className="w-full max-w-[940px] mx-auto px-4 sm:px-6 pt-3 flex flex-col gap-2">
+          {invites.map((inv) => (
+            <div key={inv.code} className="panel rounded-xl px-4 py-2.5 flex items-center gap-3 border-amber-500/25">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+              <span className="flex-1 min-w-0 text-[13px] text-slate-200 truncate">
+                <span className="font-bold text-amber-300">{inv.from}</span> {lang === "fr" ? "vous invite à jouer" : "invited you to a game"}
+              </span>
+              <button
+                onClick={() => { if (canProceed) join(inv.code, name); if (myUid) clearInvite(myUid, inv.code); }}
+                disabled={!canProceed || busy}
+                className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-[12px] font-bold disabled:opacity-40"
+              >{lang === "fr" ? "Rejoindre" : "Join"}</button>
+              <button onClick={() => myUid && clearInvite(myUid, inv.code)} className="text-slate-500 hover:text-slate-300 text-lg leading-none px-1">×</button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Main */}
       <div className="flex-1 w-full max-w-[940px] mx-auto flex flex-col lg:flex-row gap-5 p-4 sm:p-6 items-stretch">

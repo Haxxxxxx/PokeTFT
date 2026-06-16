@@ -121,6 +121,7 @@ export async function beginMatch(code: string, room: Room): Promise<void> {
     "meta/hostBeat": serverNow(),
     "meta/serverDriven": true, // #110 — every game is server-driven (no host-loop mode)
     combat: null,
+    invited: null,
   };
   for (const p of Object.values(room.players ?? {})) {
     if (!p.connected) continue;
@@ -478,6 +479,11 @@ export async function endCombat(code: string, room: Room): Promise<void> {
  *  every player's match state (the next start re-rolls fresh) and clears the
  *  finished game. Any player may trigger it — everyone returns to the lobby
  *  together the moment the shared phase flips. */
+/** Show an invited friend as a pending placeholder slot in the lobby until they join. */
+export async function addInvitePlaceholder(code: string, uid: string, username: string, photoURL?: string | null): Promise<void> {
+  await dbAdapter().update(`games/${code}/invited/${uid}`, { username, photoURL: photoURL ?? null });
+}
+
 /** Forfeit: eliminate the player at `place` (the worst currently-alive spot) so they
  *  leave the standings cleanly instead of vanishing. Writes only their own node. */
 export async function concede(code: string, uid: string, place: number): Promise<void> {
@@ -498,6 +504,7 @@ export async function returnToLobby(code: string, room: Room): Promise<void> {
     "meta/deadline": null,
     combat: null,
     carousel: null,
+    invited: null,
   };
   for (const p of Object.values(room.players ?? {})) {
     u[`players/${p.uid}/hp`] = hp;

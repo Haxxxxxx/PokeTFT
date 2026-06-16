@@ -184,6 +184,27 @@ export async function getHistory(uid: string, limit = 50): Promise<GameResult[]>
     .slice(0, limit);
 }
 
+// ── Game invites ────────────────────────────────────────────────────────────
+export type Invite = { code: string; from: string; fromUid: string; ts: number | object };
+
+/** Send a friend a direct invite to join the lobby `code`. (Rules: only a friend can.) */
+export async function sendInvite(toUid: string, code: string, from: string, fromUid: string): Promise<void> {
+  await set(ref(db(), `users/${toUid}/invites/${code}`), { code, from, fromUid, ts: serverTimestamp() }).catch(() => {});
+}
+
+/** Live subscription to MY pending invites. */
+export function subscribeInvites(uid: string, cb: (invites: Invite[]) => void): () => void {
+  return onValue(ref(db(), `users/${uid}/invites`), (snap) => {
+    const out: Invite[] = [];
+    if (snap.exists()) snap.forEach((c) => { out.push(c.val() as Invite); });
+    cb(out.sort((a, b) => (Number(b.ts) || 0) - (Number(a.ts) || 0)));
+  });
+}
+
+export async function clearInvite(uid: string, code: string): Promise<void> {
+  await remove(ref(db(), `users/${uid}/invites/${code}`)).catch(() => {});
+}
+
 /** Subscribe to the user's friends and resolve each friend's live profile. */
 export function subscribeFriends(uid: string, cb: (friends: UserProfile[]) => void): () => void {
   const friendsRef = ref(db(), `users/${uid}/friends`);

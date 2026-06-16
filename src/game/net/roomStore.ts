@@ -119,6 +119,8 @@ export type Room = {
   combat?: Record<string, CombatAssign>;
   /** Carousel round: per-player free-pick options (unit ids / mega-stone). */
   carousel?: Record<string, string[]>;
+  /** Pending invites — friends invited but not yet joined (shown as placeholder slots). */
+  invited?: Record<string, { username: string; photoURL?: string | null }>;
 };
 
 /** Lightweight discovery entry for the game browser (lobbies/{code}). */

@@ -8,6 +8,11 @@
         "usernameLower": { ".validate": "newData.isString() && newData.val().length <= 16" },
         "friends": {
           "$fid": { ".write": "auth != null && ($uid === auth.uid || $fid === auth.uid)" }
+        },
+        "invites": {
+          "$code": {
+            ".write": "auth != null && (root.child('users').child($uid).child('friends').child(auth.uid).exists() || (!newData.exists() && $uid === auth.uid))"
+          }
         }
       }
     },
@@ -57,6 +62,7 @@
           "round": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 12" }
         },
 
+        "invited":  { ".write": "auth != null" },
         "combat":   { ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
         "carousel": { ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
         "rules":    { ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
