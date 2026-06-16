@@ -5,7 +5,7 @@ import { DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSen
 import { useGame, BENCH_SIZE, PENSION_COST, PENSION_ROUNDS, resolveBenchSlots } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
-import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, markCarouselPicked, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS } from "@/game/net/match";
+import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, concede, markCarouselPicked, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate } from "@/game/engine/combat";
 import { getDef, spriteUrl, rosterForGenerations, hasDef } from "@/game/data/mons";
 import { streakGold, roundKind, advanceRound, boardSizeForLevel, ECONOMY } from "@/game/config";
@@ -574,6 +574,7 @@ export function NetGameClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
+  const [confirmLeave, setConfirmLeave] = useState(false);
   // Stage-up announce — flash a "Stage N" banner whenever the stage increments.
   const [stageBanner, setStageBanner] = useState<number | null>(null);
   const prevStage = useRef<number | null>(null);
@@ -601,6 +602,25 @@ export function NetGameClient() {
   // Read the AUTHORITATIVE result (place 1 / meta.winnerUid) rather than deriving it
   // from our own alive view — so every client shows the identical ending.
   const iWon = gameOver && (me?.place === 1 || (!!meta?.winnerUid && meta.winnerUid === myUid));
+
+  const inMatch = phase === "planning" || phase === "combat" || phase === "carousel";
+  // Forfeit: take the worst currently-alive placement, record the result, then leave.
+  const doConcede = async () => {
+    const ps = room.players ?? {};
+    const place = Object.values(ps).filter((p) => p.alive).length;
+    try {
+      await concede(room.code, myUid, place);
+      const finalBoard = useGame.getState().units.filter((u) => u.pos !== null);
+      recordGameResult(myUid, room.code, {
+        place, players: Object.values(ps).length, regions: room.rules?.generations ?? [1], won: false,
+        team: finalBoard.map((u) => ({ d: u.defId, s: u.star })),
+        traits: computeTraits(finalBoard).filter((tr) => tr.tier > 0).map((tr) => ({ k: tr.key, t: tr.tier })),
+      });
+      applyRankedResult(myUid, place, Object.values(ps).length, me?.name ?? "Player", me?.photoURL).catch(() => {});
+    } catch { /* best-effort */ }
+    leave();
+  };
+  const onLeaveClick = () => { if (me?.alive && inMatch) setConfirmLeave(true); else leave(); };
 
   const phaseLabel = phase === "combat" ? t.net_phase_combat
     : phase === "carousel" ? t.net_phase_carousel
@@ -697,6 +717,19 @@ export function NetGameClient() {
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
       <Toasts />
+      {/* Concede / forfeit confirm */}
+      {confirmLeave && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setConfirmLeave(false)}>
+          <div className="gilded gilded-strong w-full max-w-sm rounded-2xl p-5 flex flex-col gap-3" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-extrabold text-rose-300">{lang === "fr" ? "Abandonner la partie ?" : "Forfeit the match?"}</h3>
+            <p className="text-[12px] text-slate-400">{lang === "fr" ? "Vous serez éliminé à la dernière place restante et la partie sera enregistrée comme une défaite." : "You'll be eliminated at the worst remaining place and the game is recorded as a loss."}</p>
+            <div className="flex gap-2 mt-1">
+              <button onClick={() => { setConfirmLeave(false); doConcede(); }} className="flex-1 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-sm font-bold">{lang === "fr" ? "Abandonner" : "Forfeit"}</button>
+              <button onClick={() => setConfirmLeave(false)} className="px-5 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-sm font-bold">{lang === "fr" ? "Annuler" : "Cancel"}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Stage-up announce overlay */}
       {stageBanner != null && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
@@ -823,7 +856,7 @@ export function NetGameClient() {
           <div className="flex items-center gap-2 shrink-0">
             <OptionsMenu />
             <FullscreenButton />
-            <button onClick={leave} className="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.net_leave}</button>
+            <button onClick={onLeaveClick} className="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.net_leave}</button>
           </div>
         </div>
 

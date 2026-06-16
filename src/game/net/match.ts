@@ -478,6 +478,12 @@ export async function endCombat(code: string, room: Room): Promise<void> {
  *  every player's match state (the next start re-rolls fresh) and clears the
  *  finished game. Any player may trigger it — everyone returns to the lobby
  *  together the moment the shared phase flips. */
+/** Forfeit: eliminate the player at `place` (the worst currently-alive spot) so they
+ *  leave the standings cleanly instead of vanishing. Writes only their own node. */
+export async function concede(code: string, uid: string, place: number): Promise<void> {
+  await dbAdapter().update(`games/${code}/players/${uid}`, { hp: 0, alive: false, place });
+}
+
 export async function returnToLobby(code: string, room: Room): Promise<void> {
   const hp = room.rules?.startingHp ?? 100;
   // Fully rewind the room to a fresh lobby with the SAME players (TFT-style requeue):
