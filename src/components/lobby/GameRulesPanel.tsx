@@ -1,7 +1,7 @@
 "use client";
 
 import { usePreLobby } from "@/game/store/preLobbyStore";
-import { ALL_GENS, GEN_LABELS } from "@/game/data/generations";
+import { ALL_GENS, GEN_LABELS, MAX_REGIONS } from "@/game/data/generations";
 import { unitsForGenerations } from "@/game/data/mons";
 import { COMPLETED } from "@/game/data/itemPool";
 import { useT } from "@/lib/i18n";
@@ -58,15 +58,17 @@ export function GameRulesPanel({ isHost }: { isHost: boolean }) {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
       {/* Left column: generations + the two small numeric rules. */}
       <div className="flex flex-col gap-4">
-        <SectionCard title={t.r_gens} badge={t.r_pool(poolCount)}>
+        <SectionCard title={t.r_gens} badge={`${rules.generations.length}/${MAX_REGIONS} · ${t.r_pool(poolCount)}`}>
           <div className="grid grid-cols-2 gap-1.5">
             {ALL_GENS.map((gen) => {
               const active = rules.generations.includes(gen);
+              const atCap = !active && rules.generations.length >= MAX_REGIONS;
               return (
                 <button
                   key={gen}
-                  disabled={!isHost || genCounts[gen] === 0}
+                  disabled={!isHost || genCounts[gen] === 0 || atCap}
                   onClick={() => toggleGeneration(gen)}
+                  title={atCap ? `Up to ${MAX_REGIONS} regions per match` : undefined}
                   className={`flex items-center justify-between gap-1.5 px-3 py-2.5 ${chipBase} ${active ? chipActive : chipIdle} disabled:opacity-40`}
                 >
                   <span className="truncate font-semibold">{GEN_LABELS[gen]}</span>

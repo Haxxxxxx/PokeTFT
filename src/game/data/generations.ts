@@ -26,6 +26,10 @@ export const GEN_LABELS: Record<number, string> = {
 /** All gen numbers in order. */
 export const ALL_GENS = Object.keys(GEN_DEX_RANGES).map(Number);
 
+/** Hybrid region model: play one region by default, or combine up to this many for a
+ *  bigger pool. Capping mixing keeps each match's roster balanced (vs an all-9 soup). */
+export const MAX_REGIONS = 3;
+
 /** Total Pokémon count for a list of generations. */
 export function totalPokemonCount(gens: number[]): number {
   return gens.reduce((sum, g) => {

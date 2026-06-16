@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { DEFAULT_ITEMS_ENABLED } from "../data/itemPool";
+import { MAX_REGIONS } from "../data/generations";
 
 export type BotDifficulty = "easy" | "medium" | "hard";
 
@@ -119,7 +120,10 @@ export const usePreLobby = create<PreLobbyState>((set, get) => ({
 
   toggleGeneration: (gen) =>
     set((s) => {
-      const gens = s.rules.generations.includes(gen)
+      const has = s.rules.generations.includes(gen);
+      // Hybrid model: cap the mix at MAX_REGIONS — ignore a request to add beyond it.
+      if (!has && s.rules.generations.length >= MAX_REGIONS) return s;
+      const gens = has
         ? s.rules.generations.filter((g) => g !== gen)
         : [...s.rules.generations, gen].sort((a, b) => a - b);
       // Always keep at least 1 generation.
