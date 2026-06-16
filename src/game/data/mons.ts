@@ -22,6 +22,45 @@ function move(name: string, type: PokeType, basePower: number, shape: Move["shap
   return { name, type, power: [basePower, Math.round(basePower * 1.7), Math.round(basePower * 2.9)], shape };
 }
 
+// Types that read as durable frontliners vs glass-cannon special attackers — used to
+// bias each generated species' build so a Steel mon ≠ a Psychic mon at the same cost.
+const BULKY_TYPES = new Set<PokeType>(["rock", "steel", "ground", "ice"]);
+const SQUISHY_TYPES = new Set<PokeType>(["psychic", "ghost", "fairy", "poison", "fire", "electric"]);
+
+/** Deterministic per-species stat variance for the auto-generated units (whose raw
+ *  data only carries types/range, so every same-cost generated mon was otherwise
+ *  IDENTICAL). Seeded by the dex number so it's stable across clients, and biased by
+ *  type: bulkier species trade ATK for HP/armor, squishier ones the reverse. Also
+ *  rebalances the melee/ranged curve — flips a deterministic slice of melee special
+ *  attackers to range 2 so low cost isn't ~73% melee. Returns a patch layered UNDER
+ *  the raw patch (so an explicit generator range still wins where it set one). */
+function generatedVariance(dex: number, cost: Cost, types: PokeType[], rawRange?: number): Partial<StatBlock> {
+  const base = STAT_BY_COST[cost];
+  const rng = seededRng((dex * 2654435761) >>> 0);
+  // "bulk" axis in [0,1]: 0 = glass cannon, 1 = tank. Nudged by type identity.
+  let bulk = rng();
+  if (types.some((t) => BULKY_TYPES.has(t))) bulk = Math.min(1, bulk + 0.25);
+  if (types.some((t) => SQUISHY_TYPES.has(t))) bulk = Math.max(0, bulk - 0.18);
+  const hpMult = 0.82 + 0.46 * bulk;        // [0.82 .. 1.28]
+  const adMult = 1.26 - 0.44 * bulk;        // inverse — tanks hit softer
+  const asMult = 0.9 + 0.24 * rng();        // [0.90 .. 1.14]
+  const scale3 = (xs: number[], m: number) => xs.map((x) => Math.round(x * m)) as [number, number, number];
+
+  const patch: Partial<StatBlock> = {
+    hp: scale3(base.hp, hpMult),
+    ad: scale3(base.ad, adMult),
+    attackSpeed: Math.round(base.attackSpeed * asMult * 100) / 100,
+    armor: Math.round(base.armor * (0.82 + 0.42 * bulk)),
+    magicResist: Math.round(base.magicResist * (0.82 + 0.42 * bulk)),
+  };
+  // Melee/ranged rebalance: a glassy special-attacker that the generator left melee
+  // becomes ranged ~45% of the time, lifting the lopsided low-cost melee share.
+  if ((rawRange ?? 1) <= 1 && types.some((t) => SQUISHY_TYPES.has(t)) && bulk < 0.5 && rng() < 0.45) {
+    patch.range = 2;
+  }
+  return patch;
+}
+
 type DefInput = {
   id: string;
   name: string;
@@ -763,7 +802,11 @@ export const UNITS: UnitDef[] = [
       id: g.id, name: g.name, cost: g.cost, types: g.types, roles: [],
       dex: g.dex, stageNames: g.stageNames,
       move: move(g.move.name, g.move.type, g.move.power, g.move.shape),
-      patch: g.patch,
+      // Variance layered OVER the raw patch: it always differentiates hp/ad/as/armor,
+      // and only sets `range` when it flips a melee special-attacker to ranged (it's
+      // told the generator's rawRange, so it never flips an already-ranged unit — that
+      // range is preserved because variance leaves range unset there).
+      patch: { ...g.patch, ...generatedVariance(g.dex[0], g.cost, g.types, g.patch?.range) },
     }));
   }
 }
