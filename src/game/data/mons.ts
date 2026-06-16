@@ -2,6 +2,7 @@ import type { UnitDef, StatBlock, Move, PokeType, RoleTrait } from "../types";
 import type { Cost } from "../config";
 import { GEN_DEX_RANGES } from "./generations";
 import { GENERATED } from "./mons.generated";
+import { TRAITS_BY_KEY } from "./traits";
 
 /** Sprite URL from national dex id (PokéAPI's public sprite repo). */
 export function spriteUrl(dex: number): string {
@@ -798,6 +799,53 @@ export function getDef(id: string): UnitDef {
   return UNITS_BY_ID[id] ?? placeholderDef(id);
 }
 
+/** Combat-role archetype, derived from a mon's 1★ stats. Physical = auto-attack
+ *  carry, Mage = ability carry, Tank = durable frontliner. */
+export type Archetype = "physical" | "tank" | "mage";
+
+/** The three role metrics from a unit's base (1★) statline. */
+function roleMetrics(def: UnitDef): { auto: number; ability: number; ehp: number } {
+  const s = def.stats;
+  const auto = s.ad[0] * s.attackSpeed;                                   // auto-attack DPS
+  const castsPerSec = s.maxMana > 0 ? (s.attackSpeed * 10) / s.maxMana : 0; // ~10 mana/attack
+  const ability = (def.move?.power?.[0] ?? 0) * castsPerSec;             // ability DPS
+  const ehp = s.hp[0] * (1 + (s.armor + s.magicResist) / 100);          // effective HP
+  return { auto, ability, ehp };
+}
+
+// Per-cost averages of the three metrics, computed once, so classification is
+// RELATIVE to a tier (a 1-cost tank ≠ a 5-cost tank in raw numbers).
+let _costMeans: Record<number, { auto: number; ability: number; ehp: number }> | null = null;
+function costMeans(): Record<number, { auto: number; ability: number; ehp: number }> {
+  if (_costMeans) return _costMeans;
+  const acc: Record<number, { auto: number; ability: number; ehp: number; n: number }> = {};
+  for (const d of UNITS) {
+    const m = roleMetrics(d);
+    const a = (acc[d.cost] ??= { auto: 0, ability: 0, ehp: 0, n: 0 });
+    a.auto += m.auto; a.ability += m.ability; a.ehp += m.ehp; a.n += 1;
+  }
+  _costMeans = {};
+  for (const c of Object.keys(acc)) {
+    const a = acc[+c];
+    _costMeans[+c] = { auto: a.auto / a.n || 1, ability: a.ability / a.n || 1, ehp: a.ehp / a.n || 1 };
+  }
+  return _costMeans;
+}
+
+/** Classify a unit as physical / tank / mage by whichever metric most exceeds the
+ *  average for its cost tier. Self-calibrating, so it stays meaningful as stats are
+ *  rebalanced. Ties (e.g. an undifferentiated statline) fall back to physical. */
+export function archetypeOf(def: UnitDef): Archetype {
+  const m = roleMetrics(def);
+  const mean = costMeans()[def.cost] ?? { auto: 1, ability: 1, ehp: 1 };
+  const phys = m.auto / (mean.auto || 1);
+  const mage = m.ability / (mean.ability || 1);
+  const tank = m.ehp / (mean.ehp || 1);
+  if (tank >= phys && tank >= mage && tank > 1.05) return "tank";
+  if (mage > phys) return "mage";
+  return "physical";
+}
+
 /** Returns unit IDs whose base-form dex number falls within the given generations. */
 export function unitsForGenerations(gens: number[]): string[] {
   const ranges = gens.map((g) => GEN_DEX_RANGES[g]).filter(Boolean) as [number, number][];
@@ -851,5 +899,70 @@ export function rosterForGenerations(gens: number[], size: number = ROSTER_CAP, 
     const take = Math.max(1, Math.round((size * tier.length) / ids.length));
     out.push(...tier.slice(0, Math.min(take, tier.length)));
   }
-  return out;
+  return repairTraits(out, ids, seed);
+}
+
+/** Every trait (type + role) a unit carries. */
+function traitsOf(id: string): string[] {
+  const d = getDef(id);
+  return [...d.types, ...d.roles];
+}
+
+/** Deterministic repair pass: guarantee that every trait whose lowest breakpoint is
+ *  actually reachable from the full pool has at least that many carriers in the drawn
+ *  roster — so a random draft never strands a synergy as unbuildable. Swaps carriers
+ *  in from the un-drawn remainder, evicting units that are "safe" (none of whose own
+ *  traits would drop below their lowest breakpoint), preferring same-cost evictions to
+ *  keep the tier spread. Fully deterministic (sorted order, no RNG) so the host and
+ *  every client land on the identical roster. */
+function repairTraits(draw: string[], allIds: string[], seed: number): string[] {
+  const lowestBp = (key: string): number => TRAITS_BY_KEY[key]?.tiers?.[0]?.count ?? Infinity;
+  const inDraw = new Set(draw);
+  const count = (set: Set<string>, key: string): number => {
+    let n = 0;
+    for (const id of set) if (traitsOf(id).includes(key)) n++;
+    return n;
+  };
+  // Which traits CAN be guaranteed (full pool has enough carriers)?
+  const allTraits = new Set<string>();
+  for (const id of allIds) for (const k of traitsOf(id)) allTraits.add(k);
+  const guaranteeable = [...allTraits]
+    .filter((k) => Number.isFinite(lowestBp(k)) && count(new Set(allIds), k) >= lowestBp(k))
+    .sort();
+
+  const remainder = allIds.filter((id) => !inDraw.has(id)).sort();
+  // Cap iterations as a runaway guard (each swap fixes at most one carrier).
+  for (let guard = 0; guard < draw.length * 2; guard++) {
+    // Most-deficient guaranteeable trait (deterministic: largest deficit, then key).
+    let target: string | null = null, worst = 0;
+    for (const k of guaranteeable) {
+      const deficit = lowestBp(k) - count(inDraw, k);
+      if (deficit > worst) { worst = deficit; target = k; }
+    }
+    if (!target) break; // all satisfied
+
+    // A carrier of `target` to add, preferring one that also helps other deficits.
+    const candidate = remainder.find((id) => traitsOf(id).includes(target!));
+    if (!candidate) break;
+    const candCost = getDef(candidate).cost;
+
+    // Evict a "safe" unit: removing it drops no trait below its lowest breakpoint, and
+    // it does NOT carry `target`. Prefer same cost as the candidate (keep tier spread).
+    const safeToEvict = (id: string): boolean => {
+      if (traitsOf(id).includes(target!)) return false;
+      return traitsOf(id).every((k) => !guaranteeable.includes(k) || count(inDraw, k) - 1 >= lowestBp(k));
+    };
+    const evict = draw.filter(safeToEvict).sort((a, b) => {
+      const ca = getDef(a).cost === candCost ? 0 : 1, cb = getDef(b).cost === candCost ? 0 : 1;
+      return ca !== cb ? ca - cb : a < b ? -1 : 1;
+    })[0];
+    if (!evict) break; // can't satisfy without breaking another guarantee
+
+    inDraw.delete(evict); inDraw.add(candidate);
+    draw[draw.indexOf(evict)] = candidate;
+    remainder.splice(remainder.indexOf(candidate), 1);
+    remainder.push(evict); remainder.sort();
+  }
+  void seed; // (kept for signature symmetry; the repair is RNG-free/deterministic)
+  return draw;
 }

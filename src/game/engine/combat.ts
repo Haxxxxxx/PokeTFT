@@ -528,19 +528,53 @@ function cleanupDeaths(units: Combatant[], occupied: Map<string, string>, events
   }
 }
 
-/** Greedy one-hex step: the free neighbor that minimises distance to the goal. */
+/** One-hex step toward the goal. Fast path: the free neighbour that strictly
+ *  reduces distance (open field — identical to the old greedy behaviour). If every
+ *  distance-reducing neighbour is blocked (a wall of allies in front), fall back to
+ *  a deterministic BFS that routes AROUND the obstruction toward the reachable free
+ *  hex closest to the goal — so rear units flow around their own line instead of
+ *  standing idle until the front dies. Fully deterministic (fixed neighbour order +
+ *  hexKey tie-breaks), so host and client step identically. */
 function bestStep(from: Hex, goal: Hex, occupied: Map<string, string>): Hex | null {
-  let best: Hex | null = null;
-  let bestD = hexDistance(from, goal);
+  const curD = hexDistance(from, goal);
+  // Fast path: a strictly-closer free neighbour (the common, open-field case).
+  let greedy: Hex | null = null;
+  let greedyD = curD;
   for (const n of neighbors(from)) {
     if (occupied.has(hexKey(n))) continue;
     const d = hexDistance(n, goal);
-    if (d < bestD || (d === bestD && best && hexKey(n) < hexKey(best))) {
-      bestD = d;
-      best = n;
+    if (d < greedyD || (d === greedyD && greedy && hexKey(n) < hexKey(greedy))) { greedyD = d; greedy = n; }
+  }
+  if (greedy) return greedy;
+
+  // Blocked: BFS over free hexes to find the first step of the shortest detour to
+  // whichever reachable free hex sits closest to the goal.
+  const goalKey = hexKey(goal);
+  const visited = new Set<string>([hexKey(from)]);
+  const queue: { hex: Hex; first: Hex }[] = [];
+  for (const n of neighbors(from)) {           // seed with free first-steps
+    const k = hexKey(n);
+    if (occupied.has(k) || visited.has(k)) continue;
+    visited.add(k);
+    queue.push({ hex: n, first: n });
+  }
+  let bestFirst: Hex | null = null;
+  let bestD = Infinity;
+  let bestKey = "";
+  for (let head = 0; head < queue.length; head++) {
+    const { hex, first } = queue[head];
+    const d = hexDistance(hex, goal);
+    const key = hexKey(hex);
+    if (d < bestD || (d === bestD && key < bestKey)) { bestFirst = first; bestD = d; bestKey = key; }
+    for (const n of neighbors(hex)) {
+      const k = hexKey(n);
+      if (visited.has(k) || k === goalKey || occupied.has(k)) continue;
+      visited.add(k);
+      queue.push({ hex: n, first });
     }
   }
-  return best;
+  // Only commit to the detour if it actually gets us closer than standing still.
+  return bestFirst && bestD < curD ? bestFirst : null;
 }
 
 function finalize(units: Combatant[], frames: Frame[], duration: number): CombatResult {

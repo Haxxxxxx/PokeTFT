@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useUi } from "@/game/store/uiStore";
 import { useGame } from "@/game/store/gameStore";
 import { useAppStore } from "@/game/store/appStore";
-import { getDef, spriteUrl } from "@/game/data/mons";
+import { getDef, spriteUrl, archetypeOf, type Archetype } from "@/game/data/mons";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { ITEM_POOL, RARITY_COLOR } from "@/game/data/itemPool";
 import { megaFormFor, MEGA_STONE } from "@/game/data/mega";
@@ -81,11 +81,19 @@ function EmptyState() {
   );
 }
 
+const ARCH_META: Record<Archetype, { en: string; fr: string; color: string }> = {
+  physical: { en: "Physical", fr: "Physique", color: "#fb923c" },
+  tank: { en: "Tank", fr: "Tank", color: "#94a3b8" },
+  mage: { en: "Mage", fr: "Mage", color: "#c084fc" },
+};
+
 function Card() {
   const t = useT();
+  const lang = useAppStore((s) => s.settings.language);
   const inspect = useUi((s) => s.inspect)!;
   const clear = useUi((s) => s.clearInspect);
   const def = getDef(inspect.defId);
+  const arch = ARCH_META[archetypeOf(def)];
   const star = inspect.star;
   const i = star - 1;
   const s = def.stats;
@@ -117,6 +125,10 @@ function Card() {
             {costLabel[def.cost]}
             <span className="text-slate-600">·</span>
             <span className="inline-flex items-center gap-1 text-amber-300/90"><CoinIcon size={11} />{def.cost}</span>
+            <span className="text-slate-600">·</span>
+            <span style={{ background: arch.color }} className="text-[9px] px-1.5 py-0.5 rounded font-extrabold text-black/85 uppercase tracking-wide">
+              {lang === "fr" ? arch.fr : arch.en}
+            </span>
           </div>
           <div className="flex flex-wrap gap-1 mt-1.5">
             {def.types.map((t) => (

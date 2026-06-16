@@ -52,6 +52,10 @@ export type RoomMeta = {
   deadline: number;
   /** Host liveness heartbeat (server-time ms) — drives migration if it goes stale. */
   hostBeat?: number;
+  /** Set when the host INTENTIONALLY quit mid-match (clicked Leave) — distinct from a
+   *  disconnect, which only flips connected:false and lets the game migrate. Clients
+   *  show "host ended the game" on the over screen. */
+  endedByHost?: boolean;
   updatedAt: number | object;
 };
 
@@ -395,20 +399,27 @@ export const useRoom = create<RoomState>((setState, getState) => ({
     if (privWatchdog) { clearTimeout(privWatchdog); privWatchdog = null; }
     if (myUid) setCurrentGame(myUid, null);
     if (code && myUid) {
-      // Only delete the WHOLE room when it's safe: no other human player nodes at
-      // all (regardless of momentary connection) AND we're not mid-match. A human
-      // whose tab is briefly backgrounded shows connected:false — deleting on that
-      // would nuke a live game out from under them, so during play we just drop our
-      // own node and let host migration carry on.
       const otherHumans = Object.values(room?.players ?? {}).filter((p) => !p.isBot && p.uid !== myUid);
       const phase = room?.meta?.phase;
-      const safeToDelete = otherHumans.length === 0 && (phase === "lobby" || phase === "over" || !phase);
-      if (safeToDelete) remove(roomRef(code)).catch(onWriteErr);
-      else remove(ref(db(), `games/${code}/players/${myUid}`)).catch(onWriteErr);
+      const iAmHost = room?.meta?.hostUid === myUid;
+      const inMatch = phase === "planning" || phase === "combat" || phase === "carousel";
+      if (iAmHost && inMatch) {
+        // Host quit mid-match → force-end for EVERYONE. Write an authoritative over
+        // state every client observes (endedByHost flags the banner), rather than
+        // dropping our node and letting the game limp on under a migrated host.
+        update(ref(db(), `games/${code}/meta`), { phase: "over", endedByHost: true, updatedAt: serverTimestamp() }).catch(onWriteErr);
+        remove(ref(db(), `lobbies/${code}`)).catch(() => {});
+      } else {
+        // Only delete the WHOLE room when it's safe: no other human player nodes at
+        // all AND we're not mid-match. Otherwise just drop our own node (a backgrounded
+        // human shows connected:false — deleting on that would nuke a live game).
+        const safeToDelete = otherHumans.length === 0 && (phase === "lobby" || phase === "over" || !phase);
+        if (safeToDelete) remove(roomRef(code)).catch(onWriteErr);
+        else remove(ref(db(), `games/${code}/players/${myUid}`)).catch(onWriteErr);
+        if (iAmHost || otherHumans.length === 0) remove(ref(db(), `lobbies/${code}`)).catch(() => {});
+      }
       // Always clear my own private econ node (rules only let me write my own).
       remove(ref(db(), `priv/${code}/${myUid}`)).catch(() => {});
-      // I'm the host (or the room is gone) → drop the browser listing.
-      if (room?.meta?.hostUid === myUid || otherHumans.length === 0) remove(ref(db(), `lobbies/${code}`)).catch(() => {});
     }
     forgetRoom();
     setState({ code: null, myUid: null, room: null, mySave: undefined, status: "idle", error: null });

@@ -142,7 +142,7 @@ export function LobbyScreen() {
             <div className="flex items-center justify-center gap-2 mt-5 pt-4 border-t border-slate-800">
               <span className="text-[10px] uppercase tracking-wide text-slate-500">{t.l_net_add_ai}</span>
               {(["easy", "medium", "hard"] as const).map((d) => (
-                <button key={d} onClick={() => addBot(d)} className="px-3 py-1.5 rounded-md bg-violet-900/50 hover:bg-violet-700 border border-violet-700 text-[11px] font-bold text-violet-200 capitalize transition-colors">
+                <button key={d} data-testid={`add-bot-${d}`} onClick={() => addBot(d)} className="px-3 py-1.5 rounded-md bg-violet-900/50 hover:bg-violet-700 border border-violet-700 text-[11px] font-bold text-violet-200 capitalize transition-colors">
                   {d === "easy" ? t.p_diff_easy : d === "medium" ? t.p_diff_medium : t.p_diff_hard}
                 </button>
               ))}
@@ -173,7 +173,7 @@ export function LobbyScreen() {
           </button>
         ) : (
           <div className="w-full max-w-md flex flex-col items-center gap-2">
-            <button disabled={!canStart} onClick={() => { enterFullscreen(); beginMatch(room.code, room).catch((e) => console.error("[beginMatch]", e)); }}
+            <button data-testid="start-game" disabled={!canStart} onClick={() => { enterFullscreen(); beginMatch(room.code, room).catch((e) => console.error("[beginMatch]", e)); }}
               className="w-full py-4 rounded-2xl font-extrabold text-base tracking-wide transition-all bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black shadow-lg shadow-amber-500/20 disabled:opacity-30 disabled:shadow-none disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500">
               {t.l_net_start}
             </button>

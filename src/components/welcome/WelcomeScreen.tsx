@@ -141,7 +141,7 @@ export function WelcomeScreen() {
 
             {mode === "idle" ? (
               <div className="flex flex-col items-center gap-3 w-full max-w-sm">
-                <button onClick={handleCreate} disabled={!canProceed || busy}
+                <button data-testid="create-game" onClick={handleCreate} disabled={!canProceed || busy}
                   className="w-full py-4 rounded-2xl font-extrabold text-base tracking-wide bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black shadow-lg shadow-amber-500/20 disabled:opacity-30 disabled:shadow-none transition-all">
                   {busy ? "…" : t.w_create_btn}
                 </button>

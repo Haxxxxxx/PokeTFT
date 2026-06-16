@@ -1028,7 +1028,9 @@ export function NetGameClient() {
           <div className={`celebrate-pop flex flex-col items-center gap-2 ${iWon ? "text-amber-300" : "text-slate-200"}`}>
             {iWon && <TrophyIcon size={52} />}
             <div className="text-4xl font-extrabold">{iWon ? t.net_victory : t.net_gameover}</div>
-            <div className="text-sm text-slate-400">{t.net_placed(me?.place ?? 1)}</div>
+            {meta?.endedByHost
+              ? <div className="text-sm font-semibold text-rose-300">{lang === "fr" ? "L'hôte a quitté — partie terminée." : "The host left — game ended."}</div>
+              : <div className="text-sm text-slate-400">{t.net_placed(me?.place ?? 1)}</div>}
           </div>
 
           <div className="w-full max-w-[560px] flex flex-col gap-2">
