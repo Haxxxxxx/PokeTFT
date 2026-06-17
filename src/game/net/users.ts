@@ -22,7 +22,7 @@ export type UserProfile = {
 /** Everyone starts here; placement nudges it up/down each game. (Silver II) */
 export const START_RATING = 1000;
 
-const RANK_TIERS = [
+export const RANK_TIERS = [
   { name: "Iron", color: "#9ca3af" },
   { name: "Bronze", color: "#b45309" },
   { name: "Silver", color: "#cbd5e1" },
@@ -31,8 +31,10 @@ const RANK_TIERS = [
   { name: "Diamond", color: "#60a5fa" },
 ];
 const ROMAN = ["", "I", "II", "III", "IV"];
-const RATING_PER_DIV = 100;          // 100 "LP" per division
-const APEX_RATING = RANK_TIERS.length * 4 * RATING_PER_DIV; // 2400 → Master
+export const RATING_PER_DIV = 100;          // 100 "LP" per division
+export const APEX_RATING = RANK_TIERS.length * 4 * RATING_PER_DIV; // 2400 → Master
+/** Master accent (the apex tier above Diamond I). */
+export const MASTER_COLOR = "#c084fc";
 
 export type Rank = { tier: string; division: number; lp: number; lpMax: number; color: string; label: string; apex: boolean };
 

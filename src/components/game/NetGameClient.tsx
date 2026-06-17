@@ -598,9 +598,13 @@ export function NetGameClient() {
           team,
           traits,
         }).catch(() => {});
-        // Ranked: nudge the player's rating by placement + mirror to the leaderboard,
-        // and surface the LP delta on the end screen.
-        applyRankedResult(myUid, place, total, meP?.name ?? "Player", meP?.photoURL).then(setRankResult).catch(() => {});
+        // Ranked: BOTS DON'T COUNT — LP is computed against humans only. Your rank among
+        // humans = how many humans finished ahead of you (+1), out of the human headcount.
+        // (A solo-vs-bots game → 1 human → ±0 LP, so practice never moves your rating.)
+        const humans = Object.values(ps).filter((p) => !p.isBot);
+        const humanTotal = humans.length;
+        const humanPlace = humans.filter((p) => (p.place ?? 99) < place).length + 1;
+        applyRankedResult(myUid, humanPlace, humanTotal, meP?.name ?? "Player", meP?.photoURL).then(setRankResult).catch(() => {});
       }
     }
     prevPhase.current = phase ?? null;
@@ -662,7 +666,9 @@ export function NetGameClient() {
         team: finalBoard.map((u) => ({ d: u.defId, s: u.star })),
         traits: computeTraits(finalBoard).filter((tr) => tr.tier > 0).map((tr) => ({ k: tr.key, t: tr.tier })),
       });
-      applyRankedResult(myUid, place, Object.values(ps).length, me?.name ?? "Player", me?.photoURL).catch(() => {});
+      // Bots don't count toward LP — rank among humans only (alive humans incl. me).
+      const humans = Object.values(ps).filter((p) => !p.isBot);
+      applyRankedResult(myUid, humans.filter((p) => p.alive).length, humans.length, me?.name ?? "Player", me?.photoURL).catch(() => {});
     } catch { /* best-effort */ }
     leave();
   };

@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/game/net/authStore";
 import { useAppStore } from "@/game/store/appStore";
 import { getLeaderboard, rankOf, type LeaderEntry } from "@/game/net/users";
-import { ArrowLeft, Trophy } from "lucide-react";
+import { RankInfoModal } from "./RankInfoModal";
+import { ArrowLeft, Trophy, HelpCircle } from "lucide-react";
 
 export function LeaderboardScreen() {
   const myUid = useAuth((s) => s.user?.uid);
@@ -14,6 +15,7 @@ export function LeaderboardScreen() {
   const [rows, setRows] = useState<LeaderEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [showInfo, setShowInfo] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -34,6 +36,9 @@ export function LeaderboardScreen() {
             <ArrowLeft size={15} /> {tr("Back", "Retour")}
           </button>
           <h1 className="text-lg font-bold text-amber-200 inline-flex items-center gap-2"><Trophy size={18} className="text-amber-400" /> {tr("Leaderboard", "Classement")}</h1>
+          <button onClick={() => setShowInfo(true)} aria-label={tr("How ranks work", "Fonctionnement des rangs")} className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.07] border border-white/[0.06] text-xs font-bold text-slate-300">
+            <HelpCircle size={14} /> {tr("Ranks", "Rangs")}
+          </button>
         </div>
 
         <div className="panel rounded-2xl p-3">
@@ -74,6 +79,7 @@ export function LeaderboardScreen() {
           )}
         </div>
       </div>
+      {showInfo && <RankInfoModal onClose={() => setShowInfo(false)} />}
     </div>
   );
 }
