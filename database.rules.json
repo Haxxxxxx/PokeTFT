@@ -74,7 +74,7 @@
             "hp":    { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500" },
             "level": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10" },
             "augments": {
-              ".validate": "!newData.exists() || newData.numChildren() <= 3",
+              ".validate": "!newData.exists() || !newData.hasChild('3')",
               "$i": { ".validate": "newData.isString() && newData.val().length <= 24" }
             }
           }
