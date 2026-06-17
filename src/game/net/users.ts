@@ -58,13 +58,19 @@ export function ratingDelta(place: number, players: number): number {
 
 export type LeaderEntry = { uid: string; username: string; rating: number; photoURL?: string | null };
 
+/** The LP outcome of a finished ranked game — what the end screen shows the player. */
+export type RankedResult = { delta: number; rating: number; prevRating: number };
+
 /** Apply a finished game's placement to the player's rating (transaction) and mirror it
- *  to the public, queryable leaderboard node. */
-export async function applyRankedResult(uid: string, place: number, players: number, username: string, photoURL?: string | null): Promise<void> {
+ *  to the public, queryable leaderboard node. Returns the LP delta + new/old rating so the
+ *  end-of-game screen can show exactly what was won or lost. */
+export async function applyRankedResult(uid: string, place: number, players: number, username: string, photoURL?: string | null): Promise<RankedResult> {
   const delta = ratingDelta(place, players);
   const res = await runTransaction(ref(db(), `users/${uid}/rating`), (cur) => Math.max(0, (cur ?? START_RATING) + delta));
   const rating = (res.snapshot.val() as number) ?? START_RATING;
   await set(ref(db(), `leaderboard/${uid}`), { username, rating, photoURL: photoURL ?? null }).catch(() => {});
+  // prevRating from the authoritative post-value minus the applied delta (clamped at 0).
+  return { delta, rating, prevRating: Math.max(0, rating - delta) };
 }
 
 /** Top-rated players, highest first. */

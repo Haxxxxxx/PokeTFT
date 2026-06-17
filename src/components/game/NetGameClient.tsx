@@ -15,7 +15,7 @@ import { ITEM_POOL, RARITY_COLOR, COMPONENT_IDS } from "@/game/data/itemPool";
 import { enemyToField } from "@/game/engine/hex";
 import { ItemGlyph, AugmentGlyph } from "./ItemGlyph";
 import { finishCarouselEarly } from "@/game/net/serverGame";
-import { recordGameResult, applyRankedResult } from "@/game/net/users";
+import { recordGameResult, applyRankedResult, rankOf, type RankedResult } from "@/game/net/users";
 import { computeTraits } from "@/game/engine/synergies";
 import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords } from "lucide-react";
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR, teamBuffForAugments } from "@/game/data/augments";
@@ -222,6 +222,8 @@ export function NetGameClient() {
   // pick (the `<=` count gate alone can leave it open when you're behind a slot).
   const [pickedSlot, setPickedSlot] = useState<number | null>(null);
   const [spectate, setSpectate] = useState<string | null>(null);
+  // LP outcome of this ranked game — shown on the end screen once applyRankedResult resolves.
+  const [rankResult, setRankResult] = useState<RankedResult | null>(null);
   // Carousel/augment: hide the choice cards (revealing the live board behind the
   // overlay) and toggle them back. Resets whenever a new pick screen opens.
   const [revealBoard, setRevealBoard] = useState(false);
@@ -578,6 +580,7 @@ export function NetGameClient() {
       const ps = room?.players ?? {};
       const lastOneStanding = !!(myUid && ps[myUid]?.alive) && Object.values(ps).filter((p) => p.alive).length === 1;
       if (lastOneStanding) sfx.victory(); else sfx.defeat();
+      setRankResult(null); // clear any prior game's LP until this one's applyRankedResult resolves
       // Record this finished game in the player's history (idempotent by room code).
       if (myUid && room?.code) {
         const meP = ps[myUid];
@@ -595,8 +598,9 @@ export function NetGameClient() {
           team,
           traits,
         }).catch(() => {});
-        // Ranked: nudge the player's rating by placement + mirror to the leaderboard.
-        applyRankedResult(myUid, place, total, meP?.name ?? "Player", meP?.photoURL).catch(() => {});
+        // Ranked: nudge the player's rating by placement + mirror to the leaderboard,
+        // and surface the LP delta on the end screen.
+        applyRankedResult(myUid, place, total, meP?.name ?? "Player", meP?.photoURL).then(setRankResult).catch(() => {});
       }
     }
     prevPhase.current = phase ?? null;
@@ -1275,6 +1279,30 @@ export function NetGameClient() {
               ? <div className="text-sm font-semibold text-rose-300">{lang === "fr" ? "L'hôte a quitté — partie terminée." : "The host left — game ended."}</div>
               : <div className="text-sm text-slate-400">{t.net_placed(me?.place ?? 1)}</div>}
           </div>
+
+          {/* Ranked LP outcome — what this game won/lost on the ladder. */}
+          {rankResult && (() => {
+            const before = rankOf(rankResult.prevRating);
+            const after = rankOf(rankResult.rating);
+            const moved = before.label !== after.label;
+            const up = rankResult.rating > rankResult.prevRating;
+            return (
+              <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08]">
+                <span className={`text-lg font-extrabold tabular-nums ${rankResult.delta >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                  {rankResult.delta >= 0 ? "+" : ""}{rankResult.delta} LP
+                </span>
+                <span className="flex items-center gap-1.5 text-xs">
+                  <span className="font-bold" style={{ color: after.color }}>{after.label}</span>
+                  <span className="text-slate-500 tabular-nums">{after.apex ? `${after.lp} LP` : `${after.lp}/${after.lpMax}`}</span>
+                  {moved && (
+                    <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${up ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"}`}>
+                      {up ? (lang === "fr" ? "Promu" : "Promoted") : (lang === "fr" ? "Rétrogradé" : "Demoted")}
+                    </span>
+                  )}
+                </span>
+              </div>
+            );
+          })()}
 
           <div className="w-full max-w-[560px] flex flex-col gap-2">
             <h3 className="text-[11px] uppercase tracking-[0.2em] text-slate-500 text-center mb-1">{t.net_final_standings}</h3>
