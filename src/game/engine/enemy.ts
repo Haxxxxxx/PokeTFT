@@ -1,7 +1,7 @@
 /** Generates an AI board scaled to a level + unit count. Deterministic per seed. */
 
 import type { UnitInstance, PokeType } from "../types";
-import { SHOP_ODDS, boardSizeForLevel, cumulativeRound, type Cost } from "../config";
+import { SHOP_ODDS, boardSizeForLevel, roundsInStage, type Cost } from "../config";
 import { UNITS, getDef } from "../data/mons";
 import { canMega, MEGA_STONE } from "../data/mega";
 import { makeRng, weightedPick, randInt, type Rng } from "./rng";
@@ -35,6 +35,30 @@ const ROW_ORDER = [1, 0, 2, 3];
 
 const MAX_BOARD = COL_ORDER.length * ROW_ORDER.length;
 
+/** The level (== board size) a GOOD player can legitimately reach at a given point — the
+ *  ceiling no bot may exceed. Bots are never allowed to field more units, higher-cost
+ *  units, or higher stars than this curve permits: difficulty comes from PLAYING WELL
+ *  (synergies, economy, items, positioning), never from cheat stats or impossible boards.
+ *  Start/end level per stage, interpolated by round. */
+const START_LVL = [0, 1, 3, 4, 6, 7, 8, 8, 9];
+const END_LVL   = [0, 2, 4, 6, 7, 8, 8, 9, 9];
+export function realisticLevel(stage: number, round: number): number {
+  const s = Math.min(Math.max(stage, 1), 8);
+  const start = START_LVL[s] ?? 9, end = END_LVL[s] ?? 9;
+  const frac = Math.min(1, Math.max(0, (round - 1) / roundsInStage(stage)));
+  return Math.max(1, Math.min(10, Math.round(start + (end - start) * frac)));
+}
+
+/** Per-tier PLAY QUALITY (never stat cheats). lvlOff shifts where the bot sits relative to
+ *  the good-player curve (≤ 0 so it's never ahead of what a player could field); the rest
+ *  govern how WELL it plays — synergy count, star-up/item discipline, when it slams a Mega.
+ *  hard/expert/ultimate map from the synergy generator's "base"/"strong"/"elite". */
+const TIER_PLAY = {
+  base:   { lvlOff: -1, themes: 1, starMult: 0.85, itemRate: 0.45, megaStage: 5 }, // hard
+  strong: { lvlOff: 0,  themes: 2, starMult: 1.0,  itemRate: 0.8,  megaStage: 4 }, // expert
+  elite:  { lvlOff: 0,  themes: 3, starMult: 1.1,  itemRate: 1.0,  megaStage: 3 }, // ultimate
+} as const;
+
 /** Build a board of `count` mons at shop-`level` quality. Exported for the test
  *  harnesses; in-app it's wrapped by generateCreepBoard / generatePlayerLikeBoard. */
 export function generateBoard(level: number, count: number, seed: number, allowedIds?: string[]): UnitInstance[] {
@@ -66,39 +90,28 @@ export function generateBoard(level: number, count: number, seed: number, allowe
  *  point in the game. Board size, unit cost, and star level all track a believable
  *  gold/level curve (no 4-cost 2-stars in the first PvP). Deterministic per seed. */
 export function generatePlayerLikeBoard(stage: number, round: number, difficulty: BotLevel | undefined, seed: number, allowedIds?: string[], enabledItems?: string[]): UnitInstance[] {
-  // Difficulty ladder (shifted up a notch — the old tiers all play harder now):
-  //   hard     → synergy+item bot  (old "expert")
-  //   expert   → cheat boss         (old "ultimate")
-  //   ultimate → ELITE: stat-buffed boss above the old ultimate
-  // easy/medium fall through to the economy-realistic board below (medium = old "hard").
+  // The three skilled tiers draft synergies + items (their edge is PLAY, not stats):
+  //   hard → "base", expert → "strong", ultimate → "elite". None exceeds the good-player curve.
   if (difficulty === "ultimate") return generateExpertBoard(stage, round, seed, allowedIds, enabledItems, "elite");
   if (difficulty === "expert") return generateExpertBoard(stage, round, seed, allowedIds, enabledItems, "strong");
   if (difficulty === "hard") return generateExpertBoard(stage, round, seed, allowedIds, enabledItems, "base");
   const rng: Rng = makeRng(seed >>> 0);
-  const cr = cumulativeRound(stage, round);
   const byCost = byCostFrom(allowedIds);
 
-  // Board size ≈ a real player's level (which lags the cap a little).
-  let size = Math.round(2 + cr * 0.25); // 2-1≈3, 3-1≈5, 4-1≈7, 5-1≈8
-  let costCap = Math.min(stage, 5);      // stage 2 → cost ≤2, ramps to 5
-  // Star-ups only appear once a player could realistically have them.
-  let twoStarChance = stage >= 3 ? Math.min(0.5, (stage - 2) * 0.18) : 0;
-  let threeStarChance = stage >= 5 ? (stage - 4) * 0.06 : 0;
-
-  if (difficulty === "easy") { size -= 1; twoStarChance *= 0.4; threeStarChance = 0; costCap = Math.max(1, costCap - 1); }
-  // "medium" now plays like the old "hard" (the whole ladder moved up).
-  else { size += 1; twoStarChance = Math.min(0.6, twoStarChance + 0.12); threeStarChance += 0.04; costCap = Math.min(5, costCap + 1); }
-  size = Math.max(1, Math.min(size, Math.min(boardSizeForLevel(9), MAX_BOARD)));
-
-  // Cost weights favour cheap units, hard-capped at costCap (cheaper than the cap
-  // is far more common — mirrors a real shop where 1-cost units dominate).
-  const weights: number[] = [];
-  for (let c = 1; c <= 5; c++) weights.push(c <= costCap ? Math.pow(0.55, c - 1) : 0);
+  // easy/medium sit BELOW the good-player curve and roll a REAL shop (SHOP_ODDS by level),
+  // so they can never field more, higher-cost, or higher-star units than that level allows.
+  const lvlOff = difficulty === "easy" ? -2 : -1; // medium is the default branch
+  const starMult = difficulty === "easy" ? 0.4 : 0.7;
+  const level = Math.max(1, Math.min(10, realisticLevel(stage, round) + lvlOff));
+  const size = Math.max(1, Math.min(boardSizeForLevel(level), MAX_BOARD));
+  const odds = SHOP_ODDS[level];
+  const twoStarChance = Math.min(0.55, Math.max(0, (stage - 2) * 0.12)) * starMult;
+  const threeStarChance = stage >= 5 ? Math.min(0.18, (stage - 4) * 0.05) * starMult : 0;
 
   const board: UnitInstance[] = [];
   for (let i = 0; i < size; i++) {
-    let cost = (weightedPick(rng, weights) + 1) as Cost;
-    while (byCost[cost].length === 0) cost = (((cost % 5)) + 1) as Cost;
+    let cost = (weightedPick(rng, odds) + 1) as Cost;
+    let t = 0; while (byCost[cost].length === 0 && t++ < 5) cost = ((cost % 5) + 1) as Cost;
     const defId = byCost[cost][randInt(rng, byCost[cost].length)];
     let star: 1 | 2 | 3 = 1;
     // Cheaper units star up first, exactly like a real player's roster.
@@ -151,111 +164,86 @@ function pickItems(pref: string[], enabled: Set<string> | null, n: number, used:
  *  shift: hard→"base", expert→"strong", ultimate→"elite". */
 export type ExpertIntensity = "base" | "strong" | "elite";
 
-/** A synergy+item bot board: commits to type synergies (drafted to real breakpoints),
- *  fronts its tanks, back-lines its carries, and equips item builds + Mega Stones.
- *  Intensity ramps the threat: "base" tracks a believable curve; "strong" is a cheat boss
- *  (bigger board, more star-ups, a second synergy, ahead-of-curve cost, fat items); "elite"
- *  goes a step further still (third synergy, even more 3★, the richest items, the earliest
- *  Megas) AND a flat stat buff so it's genuinely hard to out-scale. Deterministic per seed. */
+/** A synergy+item bot board. Its threat is PLAY QUALITY, never cheat stats: the board is
+ *  hard-capped at a good player's level/size/shop for this round (realisticLevel + TIER_PLAY),
+ *  rolls the SAME SHOP_ODDS a player of that level rolls, and never exceeds the achievable
+ *  star/item economy. Intensity only changes how WELL it plays — synergy count, star/item
+ *  discipline, Mega timing: "base"=hard, "strong"=expert, "elite"=ultimate (a flawless
+ *  player, not a buffed one). Deterministic per seed. */
 export function generateExpertBoard(stage: number, round: number, seed: number, allowedIds?: string[], enabledItems?: string[], intensity: ExpertIntensity = "base"): UnitInstance[] {
   const rng: Rng = makeRng(seed >>> 0);
-  const strong = intensity !== "base";   // strong OR elite → the cheat-boss behaviours
-  const elite = intensity === "elite";   // elite → the extra step above
-  const cr = cumulativeRound(stage, round);
+  const cfg = TIER_PLAY[intensity];
   const byCost = byCostFrom(allowedIds);
   const allow = allowedIds && allowedIds.length ? new Set(allowedIds) : null;
 
-  // Board size / cost-cap / star-up odds ramp with intensity.
-  let size = Math.round((elite ? 5 : strong ? 4 : 3) + cr * (elite ? 0.32 : strong ? 0.3 : 0.26));
-  const costCap = Math.min(stage + (elite ? 2 : strong ? 1 : 0), 5);
-  const twoStarChance = stage >= 2 ? Math.min(elite ? 0.95 : strong ? 0.85 : 0.65, (stage - (strong ? 1 : 2)) * (elite ? 0.28 : strong ? 0.24 : 0.2)) : 0;
-  const threeStarChance = stage >= (elite ? 3 : strong ? 4 : 5) ? (stage - (elite ? 2 : strong ? 3 : 4)) * (elite ? 0.14 : strong ? 0.1 : 0.07) : 0;
-  size = Math.max(1, Math.min(size, Math.min(boardSizeForLevel(strong ? 10 : 9), MAX_BOARD)));
-  // Elite fields a flat stat advantage on every unit (like a mild boss) so it can't simply
-  // be out-economied — this is the lever that makes the top tier actually punishing. Tuned
-  // down from 1.23→1.38: now ~1.15 (stage 2) → ~1.27 (stage 8).
-  const statScale = elite ? 1.12 + Math.min(stage, 8) * 0.018 : undefined;
+  // Capped at a good player's reality: level → board size, and SHOP_ODDS[level] is the exact
+  // shop that level rolls (so 5-costs only appear at high level, etc.). NO stat buff.
+  const level = Math.max(1, Math.min(10, realisticLevel(stage, round) + cfg.lvlOff));
+  const size = Math.max(1, Math.min(boardSizeForLevel(level), MAX_BOARD));
+  const odds = SHOP_ODDS[level];
+  const twoStarChance = Math.min(0.55, Math.max(0, (stage - 2) * 0.12)) * cfg.starMult;
+  const threeStarChance = stage >= 5 ? Math.min(0.18, (stage - 4) * 0.05) * cfg.starMult : 0;
 
-  // Tally every type in the legal roster, then pick a theme that actually has the
-  // depth to reach a breakpoint (≥4 units), weighted toward the more populous types.
+  // Pick up to `cfg.themes` distinct viable synergy types (≥4 carriers) to cluster around —
+  // this is the legit skill: hitting real breakpoints.
   const typeUnits = new Map<PokeType, string[]>();
   for (const u of UNITS) {
     if (allow && !allow.has(u.id)) continue;
-    if (u.cost > costCap) continue;
-    for (const t of u.types) {
-      if (!typeUnits.has(t)) typeUnits.set(t, []);
-      typeUnits.get(t)!.push(u.id);
-    }
+    for (const t of u.types) { const arr = typeUnits.get(t) ?? (typeUnits.set(t, []).get(t)!); arr.push(u.id); }
   }
-  const viable = [...typeUnits.entries()].filter(([, ids]) => ids.length >= 4);
-  const theme: PokeType | null = viable.length ? viable[randInt(rng, viable.length)][0] : null;
-  const themeTarget = theme ? Math.min(size >= 8 ? 6 : 4, size, typeUnits.get(theme)!.length) : 0;
-  // Strong/elite run a SECOND synergy alongside the first; elite adds a THIRD (all distinct).
-  const others = theme ? viable.filter(([k]) => k !== theme) : [];
-  const theme2: PokeType | null = strong && theme && others.length ? (others[randInt(rng, others.length)]?.[0] ?? null) : null;
-  const theme2Target = theme2 ? Math.min(4, typeUnits.get(theme2)!.length) : 0;
-  const others3 = theme2 ? others.filter(([k]) => k !== theme2) : [];
-  const theme3: PokeType | null = elite && theme2 && others3.length ? (others3[randInt(rng, others3.length)]?.[0] ?? null) : null;
-  const theme3Target = theme3 ? Math.min(3, typeUnits.get(theme3)!.length) : 0;
+  const viable = [...typeUnits.entries()].filter(([, ids]) => ids.length >= 4).map(([k]) => k);
+  const themes = new Set<PokeType>();
+  for (let i = 0; i < cfg.themes; i++) {
+    const pool = viable.filter((t) => !themes.has(t));
+    if (!pool.length) break;
+    themes.add(pool[randInt(rng, pool.length)]);
+  }
 
-  // Draft distinct defIds: theme units first (toward the breakpoint), then best-cost
-  // fillers. Cheaper units dominate, exactly like a real shop climb.
+  // Draft a real shop: roll a COST the level can afford (SHOP_ODDS), then PREFER a theme unit
+  // of that cost (synergy) over a random one. Distinct defIds, like a player's roster.
   const chosen: string[] = [];
   const taken = new Set<string>();
-  const draftFrom = (ids: string[]) => {
-    // Weight by cost (capped), favouring cheaper but allowing the odd premium unit.
-    const pool = ids.filter((id) => !taken.has(id) && getDef(id).cost <= costCap);
-    if (!pool.length) return false;
-    const weights = pool.map((id) => Math.pow(0.6, getDef(id).cost - 1));
-    const idx = weightedPick(rng, weights);
-    chosen.push(pool[idx]); taken.add(pool[idx]);
-    return true;
-  };
-  if (theme) for (let i = 0; i < themeTarget && chosen.length < size; i++) draftFrom(typeUnits.get(theme)!);
-  if (theme2) for (let i = 0; i < theme2Target && chosen.length < size; i++) draftFrom(typeUnits.get(theme2)!);
-  if (theme3) for (let i = 0; i < theme3Target && chosen.length < size; i++) draftFrom(typeUnits.get(theme3)!);
-  let guard = 0;
-  while (chosen.length < size && guard++ < 100) {
-    let cost = (weightedPick(rng, [1, 1, 1, 1, 1].map((_, c) => (c + 1 <= costCap ? Math.pow(0.55, c) : 0))) + 1) as Cost;
-    while (byCost[cost].length === 0) cost = (((cost % 5)) + 1) as Cost;
-    if (!draftFrom(byCost[cost])) break;
+  for (let i = 0; i < size; i++) {
+    let cost = (weightedPick(rng, odds) + 1) as Cost;
+    let t = 0;
+    while (byCost[cost].filter((id) => !taken.has(id)).length === 0 && t++ < 6) cost = ((cost % 5) + 1) as Cost;
+    const pool = byCost[cost].filter((id) => !taken.has(id));
+    if (!pool.length) break;
+    const themed = themes.size ? pool.filter((id) => getDef(id).types.some((ty) => themes.has(ty))) : [];
+    const pick = (themed.length && rng() < 0.85) ? themed[randInt(rng, themed.length)] : pool[randInt(rng, pool.length)];
+    chosen.push(pick); taken.add(pick);
   }
 
   // Order: tanks to the front, carries to the back (so item-laden carries sit safe).
   chosen.sort((a, b) => Number(isTank(b)) - Number(isTank(a)));
 
   const board: UnitInstance[] = chosen.map((defId, i) => {
-    let star: 1 | 2 | 3 = 1;
     const def = getDef(defId);
+    let star: 1 | 2 | 3 = 1;
     if (def.cost <= 2 && rng() < threeStarChance) star = 3;
     else if (def.cost <= 3 && rng() < twoStarChance) star = 2;
     const col = COL_ORDER[i % COL_ORDER.length];
     const row = ROW_ORDER[Math.floor(i / COL_ORDER.length) % ROW_ORDER.length];
-    const u: UnitInstance = { iid: `x${seed}_${i}`, defId, star, pos: [col, row], items: [] as string[] };
-    if (statScale) u.statScale = statScale; // elite stat advantage
-    return u;
+    return { iid: `x${seed}_${i}`, defId, star, pos: [col, row], items: [] as string[] };
   });
 
-  // Item builds: scale a budget by stage onto the strongest units (highest cost, then
-  // star). Carries get up to 2–3 offensive items matched to their damage type; the
-  // sturdiest frontliner gets defensive items. A Mega Stone lands on a mega-capable
-  // unit from stage 4 on.
+  // Items: a REALISTIC count — a player nets ~1 completed item per stage from carousels +
+  // PvE drops (capped at 6), so only that many here, scaled by the tier's discipline. No
+  // stat buffs. Carry gets the offensive build, a frontliner gets defense, the rest spare.
   const enabled = enabledItems && enabledItems.length ? new Set(enabledItems) : null;
   const usedItems = new Set<string>();
-  let budget = elite ? Math.max(3, Math.min(stage + 3, 9)) : strong ? Math.max(2, Math.min(stage + 1, 9)) : Math.max(0, Math.min(stage - 1, 6));
+  let budget = Math.round(Math.max(0, Math.min(stage - 1, 6)) * cfg.itemRate);
   if (budget > 0 && board.length) {
     const ranked = [...board].sort((a, b) => (getDef(b.defId).cost - getDef(a.defId).cost) || (b.star - a.star));
-    // Primary carry (back-line damage dealer) gets the richest build.
     const carry = ranked.find((u) => !isTank(u.defId)) ?? ranked[0];
     const carryItems = pickItems(isSpecial(carry.defId) ? AP_ITEMS : AD_ITEMS, enabled, Math.min(3, budget), usedItems);
     carry.items = [...carryItems];
     budget -= carryItems.length;
-    // Mega Stone on a mega-capable unit (prefer the carry). Higher tiers Mega earlier.
-    if (stage >= (elite ? 2 : strong ? 3 : 4)) {
-      const megaTarget = (canMega(carry.defId) ? carry : board.find((u) => canMega(u.defId)));
+    // A Mega Stone (a player would have one from a carousel by now) on a mega-capable unit.
+    if (stage >= cfg.megaStage) {
+      const megaTarget = canMega(carry.defId) ? carry : board.find((u) => canMega(u.defId));
       if (megaTarget && megaTarget.items.length < 3) megaTarget.items = [...megaTarget.items, MEGA_STONE];
     }
-    // Spend the rest on a tank, then any remaining strong unit.
     for (const u of ranked) {
       if (budget <= 0) break;
       if (u === carry) continue;
