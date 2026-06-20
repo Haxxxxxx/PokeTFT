@@ -2,9 +2,10 @@
 
 import type { UnitInstance, PokeType } from "../types";
 import { SHOP_ODDS, boardSizeForLevel, roundsInStage, type Cost } from "../config";
-import { UNITS, getDef, typesForStar } from "../data/mons";
+import { UNITS, getDef, typesForStar, archetypeOf } from "../data/mons";
 import { TRAITS_BY_KEY } from "../data/traits";
 import { effectiveness } from "../data/typeChart";
+import { EMBLEM_TRAIT } from "../data/items";
 import { canMega, MEGA_STONE } from "../data/mega";
 import { makeRng, weightedPick, randInt, type Rng } from "./rng";
 
@@ -37,6 +38,29 @@ const ROW_ORDER = [1, 0, 2, 3];
 
 const MAX_BOARD = COL_ORDER.length * ROW_ORDER.length;
 
+// Smart positioning: tanks centered on the FRONT line to soak; carries on the BACK line
+// pushed to the CORNERS so the opponent's splash/line abilities can't catch two at once.
+const FRONT_COLS = [3, 2, 4, 1, 5, 0, 6]; // center-out for the wall
+const CARRY_COLS = [0, 6, 1, 5, 2, 4, 3]; // corners-in for the damage dealers
+const FRONT_ROWS = [0, 1];
+const BACK_ROWS = [3, 2];
+
+/** Place units like a thoughtful player: tanks front-centre, carries spread to the back
+ *  corners. Mutates each unit's `pos`. */
+function placeSmart(units: UnitInstance[]): void {
+  const used = new Set<string>();
+  const claim = (cols: number[], rows: number[]): [number, number] | null => {
+    for (const r of rows) for (const c of cols) { const k = `${c},${r}`; if (!used.has(k)) { used.add(k); return [c, r]; } }
+    return null;
+  };
+  for (const u of units) {
+    const isT = isTank(u.defId);
+    const pos = claim(isT ? FRONT_COLS : CARRY_COLS, isT ? FRONT_ROWS : BACK_ROWS)
+      ?? claim(FRONT_COLS, [1, 0, 2, 3]); // overflow → any free cell
+    if (pos) u.pos = pos;
+  }
+}
+
 /** The level (== board size) a GOOD player can legitimately reach at a given point — the
  *  ceiling no bot may exceed. Bots are never allowed to field more units, higher-cost
  *  units, or higher stars than this curve permits: difficulty comes from PLAYING WELL
@@ -59,13 +83,24 @@ type TierName = "easy" | "medium" | "hard" | "expert" | "ultimate";
  *  concentrates star-ups + items, when it Mega-evolves, and how hard it COUNTERS the
  *  opponent's types (`counter`, 0 = doesn't read the foe → 1 = drafts a full type counter).
  *  This is the whole difficulty ladder, smoothly graded from beginner to flawless. */
-const TIER_PLAY: Record<TierName, { lvlOff: number; themes: number; starMult: number; itemRate: number; megaStage: number; counter: number; smart: boolean }> = {
-  easy:     { lvlOff: -2, themes: 0, starMult: 0.4,  itemRate: 0,    megaStage: 99, counter: 0,   smart: false }, // a beginner: small board, no synergy/items
-  medium:   { lvlOff: -1, themes: 1, starMult: 0.7,  itemRate: 0.2,  megaStage: 6,  counter: 0,   smart: false }, // casual: one loose synergy
-  hard:     { lvlOff: -1, themes: 1, starMult: 0.85, itemRate: 0.5,  megaStage: 5,  counter: 0.4, smart: true  }, // solid: a real synergy + items, light counter
-  expert:   { lvlOff: 0,  themes: 2, starMult: 1.0,  itemRate: 0.8,  megaStage: 4,  counter: 0.8, smart: true  }, // strong: two synergies, counters you
-  ultimate: { lvlOff: 0,  themes: 3, starMult: 1.1,  itemRate: 1.0,  megaStage: 3,  counter: 1.0, smart: true  }, // flawless: triple synergy, full counter
+const TIER_PLAY: Record<TierName, { lvlOff: number; themes: number; starMult: number; itemRate: number; megaStage: number; counter: number; smart: boolean; emblem: boolean }> = {
+  easy:     { lvlOff: -2, themes: 0, starMult: 0.4,  itemRate: 0,    megaStage: 99, counter: 0,   smart: false, emblem: false }, // a beginner: small board, no synergy/items
+  medium:   { lvlOff: -1, themes: 1, starMult: 0.7,  itemRate: 0.2,  megaStage: 6,  counter: 0,   smart: false, emblem: false }, // casual: one loose synergy
+  hard:     { lvlOff: -1, themes: 1, starMult: 0.85, itemRate: 0.5,  megaStage: 5,  counter: 0.4, smart: true,  emblem: false }, // solid: a real synergy + items, light counter
+  expert:   { lvlOff: 0,  themes: 2, starMult: 1.0,  itemRate: 0.8,  megaStage: 4,  counter: 0.8, smart: true,  emblem: false }, // strong: two synergies, counters you
+  ultimate: { lvlOff: 0,  themes: 3, starMult: 1.1,  itemRate: 1.0,  megaStage: 3,  counter: 1.0, smart: true,  emblem: true  }, // flawless: triple synergy, full counter + an emblem splash
 };
+
+/** A board's physical-vs-special damage lean (for tailoring augments + items to it). */
+export function boardProfileOf(units: UnitInstance[]): { ad: number; ap: number } {
+  let ad = 0, ap = 0;
+  for (const u of units) {
+    if (!u?.defId) continue;
+    const a = archetypeOf(getDef(u.defId));
+    if (a === "physical") ad += 1; else if (a === "mage") ap += 1;
+  }
+  return { ad, ap };
+}
 
 /** Tally the opponent board's defensive typing (per-star, so an evolved Charizard counts as
  *  Fire/Flying). Drives counter-drafting. */
@@ -135,8 +170,13 @@ const TANK_TYPES = new Set<PokeType>(["rock", "steel", "ground"]);
 // Item preferences by carry archetype (best first). Intersected with the room's
 // enabled items so the bot never fields an item the player couldn't also build.
 const AP_ITEMS = ["jeweled-lens", "archmage", "choice-specs", "mystic-surge", "burn-charm", "sage-ward"];
+// Casters value MANA (more casts) — lead an AP carry's build with a mana item.
+const AP_CARRY_ITEMS = ["archmage", "spirit-orb", "jeweled-lens", "mystic-surge", "choice-specs"];
 const AD_ITEMS = ["sniper-scope", "choice-band", "adamant-edge", "berserker", "titan-fist", "spellblade"];
 const TANK_ITEMS = ["aegis", "bulwark", "titan-heart", "vampire-fang", "edge-night"];
+// Defensive builds matched to the THREAT: armour vs a physical foe, magic resist vs casters.
+const ARMOR_ITEMS = ["aegis", "bulwark", "steadfast", "edge-night", "titan-heart"];
+const MR_ITEMS = ["sage-ward", "mana-veil", "aegis", "bulwark", "titan-heart"];
 
 function isSpecial(defId: string): boolean {
   const def = getDef(defId);
@@ -251,7 +291,7 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
     chosen.push(pick); taken.add(pick);
   }
 
-  // Order: tanks to the front, carries to the back (so item-laden carries sit safe).
+  // Order: tanks first (front), carries last (back).
   chosen.sort((a, b) => Number(isTank(b)) - Number(isTank(a)));
 
   const board: UnitInstance[] = chosen.map((defId, i) => {
@@ -261,8 +301,11 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
     else if (def.cost <= 3 && rng() < twoStarChance) star = 2;
     const col = COL_ORDER[i % COL_ORDER.length];
     const row = ROW_ORDER[Math.floor(i / COL_ORDER.length) % ROW_ORDER.length];
-    return { iid: `x${seed}_${i}`, defId, star, pos: [col, row], items: [] as string[] };
+    return { iid: `x${seed}_${i}`, defId, star, pos: [col, row] as [number, number], items: [] as string[] };
   });
+  // Skilled tiers position like a thoughtful player: tanks front-centre, carries to the back
+  // corners (anti-splash). Lower tiers keep the naive center-out layout above.
+  if (cfg.smart) placeSmart(board);
 
   // Concentrate the rolled star-ups onto the best CARRIES (a good player upgrades their
   // damage dealers first). This re-allocates the SAME number of 2★/3★ (no extra — stays
@@ -283,11 +326,15 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
   // stat buffs. Carry gets the offensive build, a frontliner gets defense, the rest spare.
   const enabled = enabledItems && enabledItems.length ? new Set(enabledItems) : null;
   const usedItems = new Set<string>();
+  // Itemize to COUNTER the foe: stack the defense their damage type actually cares about.
+  const oppLean = (() => { const p = boardProfileOf(opponentBoard ?? []); return p.ap > p.ad ? "ap" : p.ad > p.ap ? "ad" : "none"; })();
+  const tankPref = oppLean === "ap" ? MR_ITEMS : oppLean === "ad" ? ARMOR_ITEMS : TANK_ITEMS;
   let budget = Math.round(Math.max(0, Math.min(stage - 1, 6)) * cfg.itemRate);
   if (budget > 0 && board.length) {
     const ranked = [...board].sort((a, b) => (getDef(b.defId).cost - getDef(a.defId).cost) || (b.star - a.star));
     const carry = ranked.find((u) => !isTank(u.defId)) ?? ranked[0];
-    const carryItems = pickItems(isSpecial(carry.defId) ? AP_ITEMS : AD_ITEMS, enabled, Math.min(3, budget), usedItems);
+    // Casters lead with a mana item (faster ults); attackers with raw damage items.
+    const carryItems = pickItems(isSpecial(carry.defId) ? AP_CARRY_ITEMS : AD_ITEMS, enabled, Math.min(3, budget), usedItems);
     carry.items = [...carryItems];
     budget -= carryItems.length;
     // A Mega Stone (a player would have one from a carousel by now) on a mega-capable unit.
@@ -298,10 +345,24 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
     for (const u of ranked) {
       if (budget <= 0) break;
       if (u === carry) continue;
-      const pref = isTank(u.defId) ? TANK_ITEMS : isSpecial(u.defId) ? AP_ITEMS : AD_ITEMS;
+      const pref = isTank(u.defId) ? tankPref : isSpecial(u.defId) ? AP_ITEMS : AD_ITEMS;
       const give = pickItems(pref, enabled, Math.min(2, budget), usedItems);
       u.items = [...u.items, ...give];
       budget -= give.length;
+    }
+  }
+
+  // Trait emblem splash (ultimate, like a player with a Spatula): an emblem of the PRIMARY
+  // synergy on a frontline unit that doesn't already carry that type — pushing the trait up
+  // a breakpoint for a bigger active bonus.
+  if (cfg.emblem && themeList.length) {
+    const emblemId = `emblem-${themeList[0]}`;
+    if (EMBLEM_TRAIT[emblemId]) {
+      // Only worth it on a unit that does NOT already carry the type (so it adds +1 to the
+      // count toward the next breakpoint) — prefer a sturdy frontliner.
+      const noType = board.filter((u) => (u.items?.length ?? 0) < 3 && !typesForStar(getDef(u.defId), u.star).includes(themeList[0]));
+      const target = noType.find((u) => isTank(u.defId)) ?? noType[0];
+      if (target) target.items = [...(target.items ?? []), emblemId];
     }
   }
 

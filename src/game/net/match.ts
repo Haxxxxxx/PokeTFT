@@ -2,14 +2,14 @@ import { dbAdapter } from "./db-adapter";
 import { serverNow } from "./serverTime";
 import { simulate } from "../engine/combat";
 import { makeRng } from "../engine/rng";
-import { generatePlayerLikeBoard, generateCreepBoard, generateBossBoard, pickCarouselOptions } from "../engine/enemy";
+import { generatePlayerLikeBoard, generateCreepBoard, generateBossBoard, pickCarouselOptions, boardProfileOf } from "../engine/enemy";
 import { hasDef } from "../data/mons";
 import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem, isDoubleUp, assignTeams } from "../data/gameModes";
 import { loadGhost, ghostBoardForRound } from "./ghost";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
 import { COMPONENT_IDS, EMBLEM_IDS } from "../data/items";
-import { teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID } from "../data/augments";
+import { teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID, pickBotAugments } from "../data/augments";
 import type { UnitInstance } from "../types";
 import type { Room, RoomPlayer, CombatAssign, BotDifficulty } from "./roomStore";
 
@@ -362,17 +362,27 @@ export async function resolveRoundStart(code: string, room: Room): Promise<void>
   return startCombat(code, room);
 }
 
+/** How many augments a bot fields — matching a player's augment slots (1 at stage 2, 2 at
+ *  stage 3, 3 from stage 4) so bots aren't fighting buff-less. Easy gets none, medium half. */
+function botAugmentCount(stage: number, difficulty: BotDifficulty | undefined): number {
+  const slots = stage >= 4 ? 3 : stage >= 3 ? 2 : stage >= 2 ? 1 : 0;
+  if (difficulty === "easy") return 0;
+  if (difficulty === "medium") return Math.ceil(slots / 2);
+  return slots; // hard/expert/ultimate/clone: full
+}
+
 /** Build the (deterministic) combat assignments + bot-board persistence for the
  *  current round. Factored out of startCombat so endCombat can re-resolve a round
  *  if it ever finds an empty/missing combat map (e.g. after a host migration),
  *  rather than silently applying zero damage. Same room + stage/round always
  *  yields the same pairings and outcomes. */
-function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoards: Record<string, UnitInstance[]> } {
+function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoards: Record<string, UnitInstance[]>; botAugments: Record<string, string[]> } {
   const stage = room.meta.stage;
   const kind = roundKind(stage, room.meta.round);
   const alive = alivePlayers(room);
   const allowed = rosterFor(room);
   const botBoards: Record<string, UnitInstance[]> = {};
+  const botAugments: Record<string, string[]> = {};
 
   // Standard PvP: resolve the pairing FIRST so a bot can read (and counter-draft against) the
   // board of the HUMAN it's about to fight. Same deterministic shuffle the assign loop reuses.
@@ -402,8 +412,14 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
     const opp = oppUid ? room.players[oppUid] : undefined;
     const oppBoard = opp && !opp.isBot ? board(opp) : undefined;
     const b = botBoard(stage, room.meta.round, p.botDifficulty, p.uid, allowed, room.rules?.itemsEnabled, room.ghost, oppBoard);
-    room.players[p.uid] = { ...p, board: b };
+    // Augments — bots get the same buff a player picks (tailored to their board), so they're
+    // not fighting under-powered. Folded into teamBuffFor via the player's `augments` field.
+    const aCount = botAugmentCount(stage, p.botDifficulty);
+    let aSeed = 0; for (let i = 0; i < p.uid.length; i++) aSeed = (aSeed * 31 + p.uid.charCodeAt(i)) >>> 0;
+    const augs = aCount > 0 ? pickBotAugments(boardProfileOf(b), aCount, makeRng(aSeed >>> 0)) : [];
+    room.players[p.uid] = { ...p, board: b, augments: augs };
     botBoards[p.uid] = b;
+    if (augs.length) botAugments[p.uid] = augs;
   }
 
   const combat: Record<string, CombatAssign> = {};
@@ -450,7 +466,7 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
       else combat[a] = { oppUid: a, oppName: "—", ghost: true, won: true, survivors: 0, dmg: 0, selfBoard: rtdbSafe(board(room.players[a])), oppBoard: [] };
     }
   }
-  return { combat, botBoards };
+  return { combat, botBoards, botAugments };
 }
 
 /** Host: planning → combat (PvP pairing or PvE creeps). Freezes boards. */
@@ -458,7 +474,7 @@ export async function startCombat(code: string, room: Room): Promise<void> {
   if (!(await claimTransition(code, "planning", room.meta.deadline))) return;
   return withClaimGuard(code, async () => {
     room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
-    const { combat, botBoards } = buildCombat(room);
+    const { combat, botBoards, botAugments } = buildCombat(room);
 
     const u: Updates = { "meta/phase": "combat", "meta/deadline": serverNow() + COMBAT_MS, "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow() };
     for (const uid of Object.keys(combat)) {
@@ -466,6 +482,8 @@ export async function startCombat(code: string, room: Room): Promise<void> {
       if (!combat[uid].pve && !combat[uid].ghost) u[`players/${uid}/lastOpp`] = combat[uid].oppUid;
     }
     for (const uid of Object.keys(botBoards)) u[`players/${uid}/board`] = botBoards[uid]; // persist for replay
+    // Persist bot augments too, so clients fold the IDENTICAL team buff when they replay.
+    for (const uid of Object.keys(botAugments)) u[`players/${uid}/augments`] = botAugments[uid];
     await dbAdapter().update(gamePath(code), u);
   });
 }

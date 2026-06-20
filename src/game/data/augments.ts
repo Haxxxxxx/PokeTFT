@@ -226,6 +226,24 @@ export function tailoredAugmentPicks(pool: Augment[], profile: BoardProfile, cou
   return out;
 }
 
+/** Augments for an AI team (so bots aren't fighting without the 3 buffs a player picks).
+ *  Only COMBAT augments (econ ones are useless to a bot), tailored to the bot's board lean,
+ *  and ESCALATING in tier with the slot (silver→gold→prismatic) exactly like a player's run.
+ *  `count` = how many augment slots the bot has reached (0..3). Returns distinct ids. */
+export function pickBotAugments(profile: BoardProfile, count: number, rng: () => number): string[] {
+  if (count <= 0) return [];
+  const tiers: AugmentTier[] = ["silver", "gold", "prismatic"];
+  const out: string[] = [];
+  for (let slot = 0; slot < Math.min(count, 3); slot++) {
+    const tier = tiers[slot];
+    const pool = AUGMENTS.filter((a) => a.combat && !a.id.startsWith("sig-") && a.tier === tier && !out.includes(a.id));
+    const fallback = AUGMENTS.filter((a) => a.combat && !a.id.startsWith("sig-") && !out.includes(a.id));
+    const pick = tailoredAugmentPicks(pool.length ? pool : fallback, profile, 1, rng)[0];
+    if (pick) out.push(pick.id);
+  }
+  return out;
+}
+
 /** Which augment slot (0,1,2) a given round opens, or null. One per early stage,
  *  offered at round 2 — AFTER the stage's first fight (the carousel is the mid-stage
  *  event at round 4, so the two rewards never share a round). */
