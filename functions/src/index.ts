@@ -64,9 +64,16 @@ async function scheduleNext(code: string, deadline: number): Promise<void> {
   try {
     await queue.enqueue({ code }, { scheduleTime: new Date(fireAt), id: `${code}-${deadline}` });
   } catch (e: unknown) {
-    // ALREADY_EXISTS = this exact transition is already queued (our dedup id) — fine.
-    const msg = String((e as { message?: string })?.message ?? e);
-    if (msg.includes("ALREADY_EXISTS") || msg.includes("already-exists")) return;
+    // The deterministic task id (`code-deadline`) is intentional dedup: if a task with that id
+    // already exists, this exact transition is ALREADY queued — so swallow it and return.
+    // The Admin SDK surfaces this as code `functions/task-already-exists` with the message
+    // "A task with ID ... already exists" (note: a SPACE, not a hyphen). The old check only
+    // matched "ALREADY_EXISTS"/"already-exists", so it never caught the real error → every
+    // collision re-threw → Cloud Tasks RETRIED the whole transition, churning the round loop
+    // and freezing/booting games right at the first timer. Match all spellings, case-insensitive.
+    const err = e as { message?: string; code?: string; errorInfo?: { code?: string } };
+    const blob = `${err?.errorInfo?.code ?? ""} ${err?.code ?? ""} ${err?.message ?? e}`.toLowerCase();
+    if (blob.includes("already exists") || blob.includes("already-exists") || blob.includes("already_exists")) return;
     throw e;
   }
 }
