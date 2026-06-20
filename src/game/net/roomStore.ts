@@ -112,6 +112,8 @@ export type RoomRules = {
   serverDriven?: boolean;
   /** Private lobby — kept out of the public game browser (friends can still join). */
   isPrivate?: boolean;
+  /** Game mode id (see data/gameModes.ts). Absent/"standard" = classic TFT. */
+  mode?: string;
 };
 
 export type Room = {
@@ -283,7 +285,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       const code = genCode();
       await set(roomRef(code), {
         meta: { hostUid: uid, phase: "lobby", stage: 1, round: 1, deadline: 0, updatedAt: serverTimestamp() },
-        rules: { startingHp, maxPlayers, generations: rules?.generations ?? [1], itemsEnabled: rules?.itemsEnabled ?? [], draftPoolSize: rules?.draftPoolSize ?? 60, augmentsEnabled: rules?.augmentsEnabled !== false, serverDriven: true, isPrivate: rules?.isPrivate === true },
+        rules: { startingHp, maxPlayers, generations: rules?.generations ?? [1], itemsEnabled: rules?.itemsEnabled ?? [], draftPoolSize: rules?.draftPoolSize ?? 60, augmentsEnabled: rules?.augmentsEnabled !== false, serverDriven: true, isPrivate: rules?.isPrivate === true, mode: rules?.mode ?? "standard" },
         players: { [uid]: newPlayer(uid, name || "Host", true, startingHp) },
       });
       subscribe(code, uid, setState);

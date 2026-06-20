@@ -3,7 +3,8 @@ import { serverNow } from "./serverTime";
 import { simulate } from "../engine/combat";
 import { makeRng } from "../engine/rng";
 import { generatePlayerLikeBoard, generateCreepBoard, pickCarouselOptions } from "../engine/enemy";
-import { rosterForGenerations, hasDef } from "../data/mons";
+import { hasDef } from "../data/mons";
+import { rosterForRoom } from "../data/gameModes";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
 import { COMPONENT_IDS, EMBLEM_IDS } from "../data/items";
@@ -36,7 +37,7 @@ function hashStr(s: string | undefined): number {
  *  drawn down to the room's draft size, seeded by the room code so AI/creeps/
  *  carousel and every client share the identical pool. */
 function rosterFor(room: Room): string[] {
-  return rosterForGenerations(room.rules?.generations ?? [1], room.rules?.draftPoolSize, hashStr(room.code));
+  return rosterForRoom(room.rules, hashStr(room.code));
 }
 
 /** A bot's board for a round, scaled by stage progress and difficulty. The "expert"

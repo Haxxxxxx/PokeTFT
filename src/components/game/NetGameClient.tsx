@@ -7,7 +7,8 @@ import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, concede, markCarouselPicked, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate } from "@/game/engine/combat";
-import { getDef, spriteUrl, rosterForGenerations, hasDef } from "@/game/data/mons";
+import { getDef, spriteUrl, hasDef } from "@/game/data/mons";
+import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, getMode, pickMonoType } from "@/game/data/gameModes";
 import { streakGold, roundKind, advanceRound, boardSizeForLevel, ECONOMY } from "@/game/config";
 import { interest } from "@/game/engine/economy";
 import { MEGA_STONE, canMega } from "@/game/data/mega";
@@ -361,7 +362,7 @@ export function NetGameClient() {
     // Same roster the host uses (selected gens, drawn to the draft size, seeded by
     // the room code) — so the shop pool always respects the lobby's region/draft
     // rules, on a fresh start AND on a reconnect/restore.
-    const roster = () => rosterForGenerations(room.rules?.generations ?? [1], room.rules?.draftPoolSize, codeSeed(room.code));
+    const roster = () => rosterForRoom(room.rules, codeSeed(room.code));
     const enabledItems = room.rules?.itemsEnabled;
 
     // FIRST LOAD — hydrate local econ as soon as the priv snapshot resolves, in ANY
@@ -375,7 +376,7 @@ export function NetGameClient() {
       // save can still heal it via the self-heal branch below — a slow priv read can
       // never permanently wipe an in-progress game.
       if (save) { importSave({ ...save, units: asUnits(save.units) }, roster(), enabledItems); hydrated.current = "save"; }
-      else { newGame(roster(), enabledItems); hydrated.current = "fresh"; }
+      else { newGame(roster(), enabledItems, modeStartItems(room.rules)); hydrated.current = "fresh"; }
       // Mark the current planning round consumed so netRound doesn't double-grant it.
       lastRoundKey.current = phase === "planning" ? `${meta.stage}-${meta.round}` : "__hydrated__";
       return;
@@ -395,7 +396,9 @@ export function NetGameClient() {
     if (lastRoundKey.current === key) return;
     lastRoundKey.current = key;
     // A positive streak means the previous combat was a win → pay TFT win-gold (+1).
-    netRound(meta.stage, meta.round, me?.streak ?? 0, (me?.streak ?? 0) > 0);
+    // Game-mode round grants (Mega Madness stone, Treasure Hunt loot) ride along too.
+    netRound(meta.stage, meta.round, me?.streak ?? 0, (me?.streak ?? 0) > 0,
+      { roundItem: modeRoundItem(room.rules), lootScale: modeLootScale(room.rules) });
   }, [phase, meta?.stage, meta?.round, mySave]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Push my board + economy snapshot to the room (debounced) — board for combat,
@@ -898,6 +901,18 @@ export function NetGameClient() {
               title={opp.ghost ? (lang === "fr" ? "Combat fantôme (copie d'un adversaire)" : "Ghost fight (a copy of a rival)") : undefined} />;
           })()}
 
+          {(() => {
+            const gm = getMode(room.rules?.mode);
+            if (gm.id === "standard") return null;
+            const mono = gm.flags?.monoType ? pickMonoType(room.rules?.generations ?? [1], codeSeed(room.code)) : null;
+            return (
+              <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-extrabold"
+                style={{ borderColor: `${gm.color}66`, color: gm.color, background: `${gm.color}14` }}
+                title={lang === "fr" ? gm.descFr : gm.desc}>
+                {lang === "fr" ? gm.nameFr : gm.name}{mono ? ` · ${mono}` : ""}
+              </span>
+            );
+          })()}
           <AugmentsBar augments={augments} lang={lang} />
 
           {/* Phase + timer — isolated so it ticks on its own without re-rendering
