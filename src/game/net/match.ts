@@ -4,7 +4,7 @@ import { simulate } from "../engine/combat";
 import { makeRng } from "../engine/rng";
 import { generatePlayerLikeBoard, generateCreepBoard, generateBossBoard, pickCarouselOptions } from "../engine/enemy";
 import { hasDef } from "../data/mons";
-import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem } from "../data/gameModes";
+import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem, isDoubleUp, assignTeams } from "../data/gameModes";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
 import { COMPONENT_IDS, EMBLEM_IDS } from "../data/items";
@@ -131,7 +131,13 @@ export async function beginMatch(code: string, room: Room): Promise<void> {
     "meta/serverDriven": true, // #110 — every game is server-driven (no host-loop mode)
     combat: null,
     invited: null,
+    teams: null, // cleared, then (re)built below for Double Up
   };
+  // Double Up: pair every participant (humans + bots) into deterministic teams of 2,
+  // each sharing ONE HP pool. Same uid→team mapping on host + clients (sorted uids).
+  const doubleUp = isDoubleUp(room.rules);
+  const teamOf = doubleUp ? assignTeams(Object.values(room.players ?? {}).filter((p) => p.connected).map((p) => p.uid)) : {};
+  const teamMembers: Record<number, string[]> = {};
   for (const p of Object.values(room.players ?? {})) {
     if (!p.connected) continue;
     u[`players/${p.uid}/hp`] = hp;
@@ -143,6 +149,20 @@ export async function beginMatch(code: string, room: Room): Promise<void> {
     u[`players/${p.uid}/save`] = null;
     u[`players/${p.uid}/carouselPicked`] = null;
     u[`players/${p.uid}/augments`] = null; // clear public combat augments from a prior game
+    if (doubleUp) {
+      const t = teamOf[p.uid] ?? 0;
+      u[`players/${p.uid}/teamId`] = t;
+      (teamMembers[t] ??= []).push(p.uid);
+    } else {
+      u[`players/${p.uid}/teamId`] = null;
+    }
+  }
+  // One shared HP pool per team (the team's "Little Legend"). A 2-player team feeds
+  // damage from both boards into this single bar; the team is out when it hits 0.
+  if (doubleUp) {
+    for (const [t, members] of Object.entries(teamMembers)) {
+      u[`teams/${t}`] = { hp, alive: true, place: null, members };
+    }
   }
   await dbAdapter().update(gamePath(code), u);
 }
@@ -337,9 +357,13 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
     }
   } else {
     const order = shuffled(alive.map((p) => p.uid).sort(), stage * 131 + room.meta.round);
-    // Avoid an immediate rematch when there's someone else to swap with.
+    const doubleUp = isDoubleUp(room.rules);
+    const sameTeam = (a: string, b: string) => doubleUp && room.players[a]?.teamId != null && room.players[a]?.teamId === room.players[b]?.teamId;
+    // Avoid an immediate rematch (and, in Double Up, never pair teammates) when there's
+    // someone else to swap with.
     for (let i = 0; i + 1 < order.length; i += 2) {
-      if (room.players[order[i]]?.lastOpp === order[i + 1] && i + 2 < order.length) {
+      const clash = room.players[order[i]]?.lastOpp === order[i + 1] || sameTeam(order[i], order[i + 1]);
+      if (clash && i + 2 < order.length) {
         [order[i + 1], order[i + 2]] = [order[i + 2], order[i + 1]];
       }
     }
@@ -467,6 +491,14 @@ export async function endCombat(code: string, room: Room): Promise<void> {
     if (aliveUids.length > 0 && !aliveUids.every((uid) => combat[uid])) {
       combat = buildCombat(room).combat;
     }
+
+    // Double Up: damage pools into shared TEAM HP and teams (not individuals) are
+    // eliminated. Resolved separately so the classic FFA path stays untouched.
+    if (isDoubleUp(room.rules)) {
+      await resolveDoubleUpCombat(code, room, combat, aliveUids, u);
+      return;
+    }
+
     const hpAfter: Record<string, number> = {};
 
     for (const uid of aliveUids) {
@@ -522,6 +554,85 @@ export async function endCombat(code: string, room: Room): Promise<void> {
   });
 }
 
+/** Double Up combat resolution: each alive player's combat damage pools into their TEAM's
+ *  shared HP bar; a team is eliminated when its bar hits 0 (both partners out together).
+ *  Placements + the winner are per TEAM. Each member's player.hp mirrors the team HP so the
+ *  existing HP displays just work. Writes everything into `u` and commits. */
+async function resolveDoubleUpCombat(code: string, room: Room, combat: Record<string, CombatAssign>, aliveUids: string[], u: Updates): Promise<void> {
+  const teams = room.teams ?? {};
+  // Sum this round's damage per team, and carry each player's streak (econ is per-player).
+  const teamDmg: Record<number, number> = {};
+  for (const uid of aliveUids) {
+    const p = room.players[uid];
+    if (!p || p.teamId == null) continue;
+    const c = combat[uid];
+    teamDmg[p.teamId] = (teamDmg[p.teamId] ?? 0) + (c?.dmg ?? 0);
+    if (c) {
+      const s = p.streak ?? 0;
+      u[`players/${uid}/streak`] = c.won ? (s >= 0 ? s + 1 : 1) : (s <= 0 ? s - 1 : -1);
+    }
+  }
+
+  const aliveTeamIds = Object.keys(teams).map(Number).filter((t) => teams[t]?.alive);
+  const hpBefore: Record<number, number> = {};
+  const hpAfter: Record<number, number> = {};
+  for (const t of aliveTeamIds) {
+    hpBefore[t] = teams[t].hp;
+    hpAfter[t] = Math.max(0, teams[t].hp - (teamDmg[t] ?? 0));
+  }
+
+  let survivingTeams = aliveTeamIds.filter((t) => hpAfter[t] > 0);
+  let deadTeams = aliveTeamIds.filter((t) => hpAfter[t] <= 0);
+  // Mutual KO: if every remaining team would fall this round, the team with the most
+  // pre-damage HP survives at 1 (mirrors the FFA tiebreak).
+  if (survivingTeams.length === 0 && deadTeams.length > 0) {
+    const winner = [...deadTeams].sort((a, b) => hpBefore[b] - hpBefore[a])[0];
+    survivingTeams = [winner];
+    deadTeams = deadTeams.filter((t) => t !== winner);
+    hpAfter[winner] = 1;
+  }
+
+  // Commit the new shared HP, mirroring it onto each member's player.hp for display.
+  for (const t of aliveTeamIds) {
+    u[`teams/${t}/hp`] = hpAfter[t];
+    for (const uid of teams[t].members ?? []) u[`players/${uid}/hp`] = hpAfter[t];
+  }
+
+  // Distinct team placements, worst HP → worst remaining place.
+  const deadByHp = [...deadTeams].sort((a, b) => hpBefore[a] - hpBefore[b]);
+  deadByHp.forEach((t, i) => {
+    const place = survivingTeams.length + deadTeams.length - i;
+    u[`teams/${t}/alive`] = false;
+    u[`teams/${t}/place`] = place;
+    for (const uid of teams[t].members ?? []) {
+      u[`players/${uid}/alive`] = false;
+      u[`players/${uid}/place`] = place;
+    }
+  });
+
+  if (survivingTeams.length <= 1) {
+    if (survivingTeams.length === 1) {
+      const wt = survivingTeams[0];
+      u[`teams/${wt}/place`] = 1;
+      u["meta/winnerTeam"] = wt;
+      // winnerUid stays single for compatibility (the end screen reads place===1 too).
+      u["meta/winnerUid"] = (teams[wt].members ?? [])[0] ?? null;
+      for (const uid of teams[wt].members ?? []) u[`players/${uid}/place`] = 1;
+    }
+    u["meta/phase"] = "over";
+  } else {
+    const next = advanceRound(room.meta.stage, room.meta.round);
+    u["meta/phase"] = "planning";
+    u["meta/stage"] = next.stage;
+    u["meta/round"] = next.round;
+    u["meta/deadline"] = serverNow() + PLAN_MS;
+    u["combat"] = null;
+  }
+  u["meta/hostBeat"] = serverNow();
+  u["meta/updatedAt"] = serverNow();
+  await dbAdapter().update(gamePath(code), u);
+}
+
 /** End screen → rematch: send the whole room back to the pre-game lobby. Resets
  *  every player's match state (the next start re-rolls fresh) and clears the
  *  finished game. Any player may trigger it — everyone returns to the lobby
@@ -551,12 +662,14 @@ export async function returnToLobby(code: string, room: Room): Promise<void> {
     "meta/updatedAt": serverNow(),
     "meta/hostBeat": serverNow(),
     "meta/winnerUid": null,
+    "meta/winnerTeam": null,
     "meta/stage": 1,
     "meta/round": 1,
     "meta/deadline": null,
     combat: null,
     carousel: null,
     invited: null,
+    teams: null, // Double Up team pools cleared; rebuilt at next beginMatch
   };
   for (const p of Object.values(room.players ?? {})) {
     u[`players/${p.uid}/hp`] = hp;
@@ -569,6 +682,7 @@ export async function returnToLobby(code: string, room: Room): Promise<void> {
     u[`players/${p.uid}/lastOpp`] = null;
     u[`players/${p.uid}/carouselPicked`] = null;
     u[`players/${p.uid}/augments`] = null; // clear public combat augments from the finished game
+    u[`players/${p.uid}/teamId`] = null;   // Double Up teams re-paired at next beginMatch
     // Re-ready everyone so the host can immediately start again (bots stay ready).
     u[`players/${p.uid}/ready`] = true;
   }

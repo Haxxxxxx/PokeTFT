@@ -8,7 +8,7 @@ import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, concede, markCarouselPicked, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate } from "@/game/engine/combat";
 import { getDef, spriteUrl, hasDef } from "@/game/data/mons";
-import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, modeTeamBuff, modeSignatureAugment, getMode, pickMonoType } from "@/game/data/gameModes";
+import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, modeTeamBuff, modeSignatureAugment, getMode, pickMonoType, isDoubleUp } from "@/game/data/gameModes";
 import { streakGold, roundKind, advanceRound, boardSizeForLevel, ECONOMY } from "@/game/config";
 import { interest } from "@/game/engine/economy";
 import { MEGA_STONE, canMega } from "@/game/data/mega";
@@ -19,7 +19,7 @@ import { AugmentsBar } from "./AugmentsBar";
 import { finishCarouselEarly } from "@/game/net/serverGame";
 import { recordGameResult, applyRankedResult, rankOf, type RankedResult } from "@/game/net/users";
 import { computeTraits } from "@/game/engine/synergies";
-import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords } from "lucide-react";
+import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords, Users, Heart } from "lucide-react";
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR, teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
 import { useUi } from "@/game/store/uiStore";
@@ -596,7 +596,11 @@ export function NetGameClient() {
   useEffect(() => {
     if (phase === "over" && prevPhase.current !== "over") {
       const ps = room?.players ?? {};
-      const lastOneStanding = !!(myUid && ps[myUid]?.alive) && Object.values(ps).filter((p) => p.alive).length === 1;
+      // Win detection works for FFA and Double Up alike: place 1 (both partners get it),
+      // the authoritative winnerUid, or — in Double Up — my team being the winning team.
+      const meP0 = myUid ? ps[myUid] : undefined;
+      const wonByTeam = meta?.winnerTeam != null && meP0?.teamId === meta.winnerTeam;
+      const lastOneStanding = meP0?.place === 1 || meta?.winnerUid === myUid || wonByTeam;
       if (lastOneStanding) sfx.victory(); else sfx.defeat();
       setRankResult(null); // clear any prior game's LP until this one's applyRankedResult resolves
       // Record this finished game in the player's history (idempotent by room code).
@@ -667,9 +671,12 @@ export function NetGameClient() {
   const humanPlayers = Object.values(players).filter((p) => !p.isBot);
   const connectedHumans = humanPlayers.filter((p) => p.connected).length;
   const gameOver = phase === "over";
-  // Read the AUTHORITATIVE result (place 1 / meta.winnerUid) rather than deriving it
-  // from our own alive view — so every client shows the identical ending.
-  const iWon = gameOver && (me?.place === 1 || (!!meta?.winnerUid && meta.winnerUid === myUid));
+  // Double Up: my team, my partner, and the shared HP (mirrored onto player.hp by the host).
+  const doubleUp = isDoubleUp(room.rules);
+  const partner = doubleUp && me?.teamId != null ? Object.values(players).find((p) => p.uid !== myUid && p.teamId === me.teamId) : undefined;
+  // Read the AUTHORITATIVE result (place 1 / meta.winnerUid / winning team) rather than
+  // deriving it from our own alive view — so every client shows the identical ending.
+  const iWon = gameOver && (me?.place === 1 || (!!meta?.winnerUid && meta.winnerUid === myUid) || (meta?.winnerTeam != null && me?.teamId === meta.winnerTeam));
 
   const inMatch = phase === "planning" || phase === "combat" || phase === "carousel";
   // Forfeit: take the worst currently-alive placement, record the result, then leave.
@@ -926,6 +933,18 @@ export function NetGameClient() {
               </span>
             );
           })()}
+          {doubleUp && partner && (
+            <button
+              onClick={() => setSpectate(partner.uid)}
+              title={lang === "fr" ? "Voir le plateau de ton partenaire" : "View your partner's board"}
+              className="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-emerald-500/50 bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-200"
+            >
+              <Users size={13} />
+              <span className="text-[11px] font-bold truncate max-w-[90px]">{partner.name}</span>
+              <span className="text-[11px] font-extrabold tabular-nums text-emerald-300">{Math.max(0, partner.hp)}</span>
+              <Heart size={11} />
+            </button>
+          )}
           <AugmentsBar augments={augments} lang={lang} />
 
           {/* Phase + timer — isolated so it ticks on its own without re-rendering

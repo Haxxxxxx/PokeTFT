@@ -66,6 +66,8 @@
         "combat":   { ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
         "carousel": { ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
         "rules":    { ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
+        "teams":    { ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)",
+          "$tid": { "hp": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500" } } },
 
         "players": {
           "$uid": {
@@ -73,6 +75,7 @@
             "name":  { ".validate": "newData.isString() && newData.val().length <= 24" },
             "hp":    { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500" },
             "level": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10" },
+            "teamId": { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 4)" },
             "augments": {
               ".validate": "!newData.exists() || !newData.hasChild('3')",
               "$i": { ".validate": "newData.isString() && newData.val().length <= 24" }
