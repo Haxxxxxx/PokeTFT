@@ -6,7 +6,7 @@ import { UNITS, getDef } from "../data/mons";
 import { canMega, MEGA_STONE } from "../data/mega";
 import { makeRng, weightedPick, randInt, type Rng } from "./rng";
 
-export type BotLevel = "easy" | "medium" | "hard" | "expert" | "ultimate";
+export type BotLevel = "easy" | "medium" | "hard" | "expert" | "ultimate" | "clone";
 
 const BY_COST: Record<Cost, string[]> = (() => {
   const m = { 1: [], 2: [], 3: [], 4: [], 5: [] } as Record<Cost, string[]>;
@@ -66,10 +66,14 @@ export function generateBoard(level: number, count: number, seed: number, allowe
  *  point in the game. Board size, unit cost, and star level all track a believable
  *  gold/level curve (no 4-cost 2-stars in the first PvP). Deterministic per seed. */
 export function generatePlayerLikeBoard(stage: number, round: number, difficulty: BotLevel | undefined, seed: number, allowedIds?: string[], enabledItems?: string[]): UnitInstance[] {
-  // The "expert" / "ultimate" bots draft around synergies and equip items — real,
-  // threatening opponents rather than a random pile of units. "ultimate" is the cheat
-  // boss: bigger board, more star-ups, double synergy and a fat item budget.
-  if (difficulty === "expert" || difficulty === "ultimate") return generateExpertBoard(stage, round, seed, allowedIds, enabledItems, difficulty);
+  // Difficulty ladder (shifted up a notch — the old tiers all play harder now):
+  //   hard     → synergy+item bot  (old "expert")
+  //   expert   → cheat boss         (old "ultimate")
+  //   ultimate → ELITE: stat-buffed boss above the old ultimate
+  // easy/medium fall through to the economy-realistic board below (medium = old "hard").
+  if (difficulty === "ultimate") return generateExpertBoard(stage, round, seed, allowedIds, enabledItems, "elite");
+  if (difficulty === "expert") return generateExpertBoard(stage, round, seed, allowedIds, enabledItems, "strong");
+  if (difficulty === "hard") return generateExpertBoard(stage, round, seed, allowedIds, enabledItems, "base");
   const rng: Rng = makeRng(seed >>> 0);
   const cr = cumulativeRound(stage, round);
   const byCost = byCostFrom(allowedIds);
@@ -82,7 +86,8 @@ export function generatePlayerLikeBoard(stage: number, round: number, difficulty
   let threeStarChance = stage >= 5 ? (stage - 4) * 0.06 : 0;
 
   if (difficulty === "easy") { size -= 1; twoStarChance *= 0.4; threeStarChance = 0; costCap = Math.max(1, costCap - 1); }
-  else if (difficulty === "hard") { size += 1; twoStarChance = Math.min(0.6, twoStarChance + 0.12); threeStarChance += 0.04; costCap = Math.min(5, costCap + 1); }
+  // "medium" now plays like the old "hard" (the whole ladder moved up).
+  else { size += 1; twoStarChance = Math.min(0.6, twoStarChance + 0.12); threeStarChance += 0.04; costCap = Math.min(5, costCap + 1); }
   size = Math.max(1, Math.min(size, Math.min(boardSizeForLevel(9), MAX_BOARD)));
 
   // Cost weights favour cheap units, hard-capped at costCap (cheaper than the cap
@@ -142,26 +147,33 @@ function pickItems(pref: string[], enabled: Set<string> | null, n: number, used:
   return out;
 }
 
-/** An "expert" / "ultimate" bot board: commits to type synergies (drafted to real
- *  breakpoints), fronts its tanks, back-lines its carries, and equips item builds +
- *  Mega Stones. "ultimate" is the cheat boss — bigger board, more star-ups, a second
- *  synergy, an ahead-of-curve cost cap and a fat item budget. Deterministic per seed
- *  (host-generated, replay-safe). */
-export function generateExpertBoard(stage: number, round: number, seed: number, allowedIds?: string[], enabledItems?: string[], tier: "expert" | "ultimate" = "expert"): UnitInstance[] {
+/** Drafting intensity for the synergy/item bot. Mapped from difficulty after the ladder
+ *  shift: hard→"base", expert→"strong", ultimate→"elite". */
+export type ExpertIntensity = "base" | "strong" | "elite";
+
+/** A synergy+item bot board: commits to type synergies (drafted to real breakpoints),
+ *  fronts its tanks, back-lines its carries, and equips item builds + Mega Stones.
+ *  Intensity ramps the threat: "base" tracks a believable curve; "strong" is a cheat boss
+ *  (bigger board, more star-ups, a second synergy, ahead-of-curve cost, fat items); "elite"
+ *  goes a step further still (third synergy, even more 3★, the richest items, the earliest
+ *  Megas) AND a flat stat buff so it's genuinely hard to out-scale. Deterministic per seed. */
+export function generateExpertBoard(stage: number, round: number, seed: number, allowedIds?: string[], enabledItems?: string[], intensity: ExpertIntensity = "base"): UnitInstance[] {
   const rng: Rng = makeRng(seed >>> 0);
-  const ult = tier === "ultimate";
+  const strong = intensity !== "base";   // strong OR elite → the cheat-boss behaviours
+  const elite = intensity === "elite";   // elite → the extra step above
   const cr = cumulativeRound(stage, round);
   const byCost = byCostFrom(allowedIds);
   const allow = allowedIds && allowedIds.length ? new Set(allowedIds) : null;
 
-  // The toughest opponents. Expert's edge is synergy + items + star-ups while tracking a
-  // believable cost curve; ultimate is the cheat boss — a fuller board, more upgrades and
-  // an ahead-of-curve cost cap on top.
-  let size = Math.round((ult ? 4 : 3) + cr * (ult ? 0.3 : 0.26));
-  const costCap = Math.min(stage + (ult ? 1 : 0), 5);
-  const twoStarChance = stage >= 2 ? Math.min(ult ? 0.85 : 0.65, (stage - (ult ? 1 : 2)) * (ult ? 0.24 : 0.2)) : 0;
-  const threeStarChance = stage >= (ult ? 4 : 5) ? (stage - (ult ? 3 : 4)) * (ult ? 0.1 : 0.07) : 0;
-  size = Math.max(1, Math.min(size, Math.min(boardSizeForLevel(ult ? 10 : 9), MAX_BOARD)));
+  // Board size / cost-cap / star-up odds ramp with intensity.
+  let size = Math.round((elite ? 5 : strong ? 4 : 3) + cr * (elite ? 0.32 : strong ? 0.3 : 0.26));
+  const costCap = Math.min(stage + (elite ? 2 : strong ? 1 : 0), 5);
+  const twoStarChance = stage >= 2 ? Math.min(elite ? 0.95 : strong ? 0.85 : 0.65, (stage - (strong ? 1 : 2)) * (elite ? 0.28 : strong ? 0.24 : 0.2)) : 0;
+  const threeStarChance = stage >= (elite ? 3 : strong ? 4 : 5) ? (stage - (elite ? 2 : strong ? 3 : 4)) * (elite ? 0.14 : strong ? 0.1 : 0.07) : 0;
+  size = Math.max(1, Math.min(size, Math.min(boardSizeForLevel(strong ? 10 : 9), MAX_BOARD)));
+  // Elite fields a flat stat advantage on every unit (like a mild boss) so it can't simply
+  // be out-economied — this is the lever that makes the top tier actually punishing.
+  const statScale = elite ? 1.18 + Math.min(stage, 8) * 0.025 : undefined;
 
   // Tally every type in the legal roster, then pick a theme that actually has the
   // depth to reach a breakpoint (≥4 units), weighted toward the more populous types.
@@ -177,11 +189,13 @@ export function generateExpertBoard(stage: number, round: number, seed: number, 
   const viable = [...typeUnits.entries()].filter(([, ids]) => ids.length >= 4);
   const theme: PokeType | null = viable.length ? viable[randInt(rng, viable.length)][0] : null;
   const themeTarget = theme ? Math.min(size >= 8 ? 6 : 4, size, typeUnits.get(theme)!.length) : 0;
-  // Ultimate runs a SECOND synergy alongside the first (a distinct viable type).
-  const theme2: PokeType | null = ult && theme && viable.length > 1
-    ? (viable.filter(([k]) => k !== theme)[randInt(rng, viable.length - 1)]?.[0] ?? null)
-    : null;
+  // Strong/elite run a SECOND synergy alongside the first; elite adds a THIRD (all distinct).
+  const others = theme ? viable.filter(([k]) => k !== theme) : [];
+  const theme2: PokeType | null = strong && theme && others.length ? (others[randInt(rng, others.length)]?.[0] ?? null) : null;
   const theme2Target = theme2 ? Math.min(4, typeUnits.get(theme2)!.length) : 0;
+  const others3 = theme2 ? others.filter(([k]) => k !== theme2) : [];
+  const theme3: PokeType | null = elite && theme2 && others3.length ? (others3[randInt(rng, others3.length)]?.[0] ?? null) : null;
+  const theme3Target = theme3 ? Math.min(3, typeUnits.get(theme3)!.length) : 0;
 
   // Draft distinct defIds: theme units first (toward the breakpoint), then best-cost
   // fillers. Cheaper units dominate, exactly like a real shop climb.
@@ -198,6 +212,7 @@ export function generateExpertBoard(stage: number, round: number, seed: number, 
   };
   if (theme) for (let i = 0; i < themeTarget && chosen.length < size; i++) draftFrom(typeUnits.get(theme)!);
   if (theme2) for (let i = 0; i < theme2Target && chosen.length < size; i++) draftFrom(typeUnits.get(theme2)!);
+  if (theme3) for (let i = 0; i < theme3Target && chosen.length < size; i++) draftFrom(typeUnits.get(theme3)!);
   let guard = 0;
   while (chosen.length < size && guard++ < 100) {
     let cost = (weightedPick(rng, [1, 1, 1, 1, 1].map((_, c) => (c + 1 <= costCap ? Math.pow(0.55, c) : 0))) + 1) as Cost;
@@ -215,7 +230,9 @@ export function generateExpertBoard(stage: number, round: number, seed: number, 
     else if (def.cost <= 3 && rng() < twoStarChance) star = 2;
     const col = COL_ORDER[i % COL_ORDER.length];
     const row = ROW_ORDER[Math.floor(i / COL_ORDER.length) % ROW_ORDER.length];
-    return { iid: `x${seed}_${i}`, defId, star, pos: [col, row], items: [] as string[] };
+    const u: UnitInstance = { iid: `x${seed}_${i}`, defId, star, pos: [col, row], items: [] as string[] };
+    if (statScale) u.statScale = statScale; // elite stat advantage
+    return u;
   });
 
   // Item builds: scale a budget by stage onto the strongest units (highest cost, then
@@ -224,7 +241,7 @@ export function generateExpertBoard(stage: number, round: number, seed: number, 
   // unit from stage 4 on.
   const enabled = enabledItems && enabledItems.length ? new Set(enabledItems) : null;
   const usedItems = new Set<string>();
-  let budget = ult ? Math.max(2, Math.min(stage + 1, 9)) : Math.max(0, Math.min(stage - 1, 6));
+  let budget = elite ? Math.max(3, Math.min(stage + 3, 9)) : strong ? Math.max(2, Math.min(stage + 1, 9)) : Math.max(0, Math.min(stage - 1, 6));
   if (budget > 0 && board.length) {
     const ranked = [...board].sort((a, b) => (getDef(b.defId).cost - getDef(a.defId).cost) || (b.star - a.star));
     // Primary carry (back-line damage dealer) gets the richest build.
@@ -232,8 +249,8 @@ export function generateExpertBoard(stage: number, round: number, seed: number, 
     const carryItems = pickItems(isSpecial(carry.defId) ? AP_ITEMS : AD_ITEMS, enabled, Math.min(3, budget), usedItems);
     carry.items = [...carryItems];
     budget -= carryItems.length;
-    // Mega Stone on a mega-capable unit (prefer the carry). Ultimate megas a stage earlier.
-    if (stage >= (ult ? 3 : 4)) {
+    // Mega Stone on a mega-capable unit (prefer the carry). Higher tiers Mega earlier.
+    if (stage >= (elite ? 2 : strong ? 3 : 4)) {
       const megaTarget = (canMega(carry.defId) ? carry : board.find((u) => canMega(u.defId)));
       if (megaTarget && megaTarget.items.length < 3) megaTarget.items = [...megaTarget.items, MEGA_STONE];
     }

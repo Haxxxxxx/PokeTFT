@@ -5,6 +5,7 @@ import { makeRng } from "../engine/rng";
 import { generatePlayerLikeBoard, generateCreepBoard, generateBossBoard, pickCarouselOptions } from "../engine/enemy";
 import { hasDef } from "../data/mons";
 import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem, isDoubleUp, assignTeams } from "../data/gameModes";
+import { loadGhost, ghostBoardForRound } from "./ghost";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
 import { COMPONENT_IDS, EMBLEM_IDS } from "../data/items";
@@ -40,10 +41,17 @@ function rosterFor(room: Room): string[] {
   return rosterForRoom(room.rules, hashStr(room.code));
 }
 
-/** A bot's board for a round, scaled by stage progress and difficulty. The "expert"
- *  tier also drafts around a synergy and equips items (from the room's enabled pool). */
-function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string, allowed: string[], enabledItems?: string[]): UnitInstance[] {
+/** A bot's board for a round, scaled by stage progress and difficulty. The "expert"/
+ *  "ultimate" tiers draft synergies + items; a "clone" replays the host's last game (ghost). */
+function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string, allowed: string[], enabledItems?: string[], ghost?: Room["ghost"]): UnitInstance[] {
   const cr = cumulativeRound(stage, round);
+  // Clone bot: field the host's last-game board for this cumulative round. Falls back to a
+  // tough synergy board on the host's first-ever game (no ghost yet).
+  if (difficulty === "clone") {
+    const g = ghostBoardForRound(ghost, cr);
+    if (g && g.length) return g.map((u, i) => ({ ...u, iid: `clone${salt}_${cr}_${i}` }));
+    return generatePlayerLikeBoard(stage, round, "expert", (() => { let s = 0; for (let i = 0; i < salt.length; i++) s = (s * 31 + salt.charCodeAt(i)) >>> 0; return s + cr; })(), allowed, enabledItems);
+  }
   let seed = 0;
   for (let i = 0; i < salt.length; i++) seed = (seed * 31 + salt.charCodeAt(i)) >>> 0;
   // Economy-realistic: a board a real player could actually build at this round.
@@ -173,6 +181,11 @@ export async function beginMatch(code: string, room: Room): Promise<void> {
   } else {
     u["teams"] = null; // FFA: ensure no stale team pools linger
   }
+  // Clone bot: if any bot is a Clone, copy the HOST's saved last-game ghost into the room so
+  // the authoritative loop (host + Functions) can field it. The host is whoever started the
+  // match (= meta.hostUid); the clone mirrors their previous game. Whole-node write.
+  const hasClone = Object.values(room.players ?? {}).some((p) => p.isBot && p.botDifficulty === "clone");
+  u["ghost"] = hasClone ? ((await loadGhost(room.meta.hostUid).catch(() => null)) ?? null) : null;
   await dbAdapter().update(gamePath(code), u);
 }
 
@@ -363,7 +376,7 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
   // Bots get a deterministic host-generated board each round (humans synced theirs).
   for (const p of alive) {
     if (p.isBot) {
-      const b = botBoard(stage, room.meta.round, p.botDifficulty, p.uid, allowed, room.rules?.itemsEnabled);
+      const b = botBoard(stage, room.meta.round, p.botDifficulty, p.uid, allowed, room.rules?.itemsEnabled, room.ghost);
       room.players[p.uid] = { ...p, board: b };
       botBoards[p.uid] = b;
     }

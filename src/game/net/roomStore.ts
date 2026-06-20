@@ -11,7 +11,7 @@ import type { UnitInstance } from "../types";
 
 export type RoomPhase = "lobby" | "planning" | "combat" | "carousel" | "over";
 
-export type BotDifficulty = "easy" | "medium" | "hard" | "expert" | "ultimate";
+export type BotDifficulty = "easy" | "medium" | "hard" | "expert" | "ultimate" | "clone";
 
 export type RoomPlayer = {
   uid: string;
@@ -141,6 +141,9 @@ export type Room = {
   invited?: Record<string, { username: string; photoURL?: string | null }>;
   /** Double Up: shared team HP pools, keyed by teamId. */
   teams?: Record<number, TeamState>;
+  /** Clone bot: the host's last-game board snapshots (copied in at beginMatch), keyed by
+   *  cumulative round, so a Clone bot can replay them. See net/ghost.ts. */
+  ghost?: { ts: number; gens?: number[]; snaps: Record<number, { d: string; s: number; c: number; r: number; i?: string[] }[]> };
 };
 
 /** Lightweight discovery entry for the game browser (lobbies/{code}). */
@@ -367,7 +370,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
     if (count >= (room.rules?.maxPlayers ?? 8)) return;
     const id = "bot-" + Math.random().toString(36).slice(2, 8);
     update(ref(db(), `games/${code}/players/${id}`), {
-      uid: id, name: `AI ${difficulty}`, isHost: false, connected: true, ready: true,
+      uid: id, name: difficulty === "clone" ? "Clone" : `AI ${difficulty}`, isHost: false, connected: true, ready: true,
       isBot: true, botDifficulty: difficulty,
       hp: room.rules?.startingHp ?? 100, level: 1, alive: true, place: null, streak: 0,
     }).catch(onWriteErr);
