@@ -16,9 +16,11 @@
  */
 import { onTaskDispatched } from "firebase-functions/v2/tasks";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { initializeApp } from "firebase-admin/app";
 import { getDatabase } from "firebase-admin/database";
 import { getFunctions } from "firebase-admin/functions";
+import { getAuth } from "firebase-admin/auth";
 import { logger } from "firebase-functions/v2";
 
 import { setDbAdapter } from "../../src/game/net/db-adapter";
@@ -137,4 +139,73 @@ export const finishEarly = onCall({ region: REGION }, async (req) => {
   await adb.ref(`games/${code}/meta`).update({ deadline: now });
   await scheduleNext(code, now); // fireAt clamps to now+100 → resolves right away
   return { ok: true };
+});
+
+/**
+ * Scheduled cleanup — prunes RTDB cruft so it doesn't accumulate forever. Runs every 30
+ * minutes. Deliberately CONSERVATIVE: it only removes things that are clearly done or
+ * long-abandoned, never anything that could be an in-progress game or an active player.
+ *
+ *  - Games: finished ("over") for >30 min, OR not updated in >3h (stuck/abandoned), OR a
+ *    fragment node with no meta. Their /lobbies + /priv siblings go too.
+ *  - Lobbies: any /lobbies entry whose game no longer exists.
+ *  - Guests: anonymous "Guest-*" profiles older than 3 days that are offline and have NO
+ *    history and NO friends (one-session throwaways). Removes the /users node, the
+ *    /usernames claim, and best-effort the orphaned anonymous Auth record.
+ */
+const OVER_AGE_MS = 30 * 60_000;
+const IDLE_AGE_MS = 3 * 60 * 60_000;
+const GUEST_AGE_MS = 3 * 24 * 60 * 60_000;
+
+export const pruneStale = onSchedule({ region: REGION, schedule: "every 30 minutes" }, async () => {
+  const now = Date.now();
+  const updates: Record<string, null> = {};
+
+  // ── Stale games (+ their lobby/priv siblings) ──
+  const games = (await adb.ref("games").get()).val() as Record<string, { meta?: { phase?: string; updatedAt?: number } }> | null;
+  let prunedGames = 0;
+  for (const [code, g] of Object.entries(games ?? {})) {
+    const meta = g?.meta;
+    const updatedAt = typeof meta?.updatedAt === "number" ? meta.updatedAt : 0;
+    const stale = !meta
+      || (meta.phase === "over" && now - updatedAt > OVER_AGE_MS)
+      || (now - updatedAt > IDLE_AGE_MS);
+    if (stale) {
+      updates[`games/${code}`] = null;
+      updates[`lobbies/${code}`] = null;
+      updates[`priv/${code}`] = null;
+      prunedGames++;
+    }
+  }
+
+  // ── Orphaned lobby entries (game already gone) ──
+  const lobbies = (await adb.ref("lobbies").get()).val() as Record<string, unknown> | null;
+  for (const code of Object.keys(lobbies ?? {})) {
+    if (!games?.[code]) updates[`lobbies/${code}`] = null;
+  }
+
+  // ── Abandoned guest profiles ──
+  const users = (await adb.ref("users").get()).val() as Record<string, { usernameLower?: string; createdAt?: number; online?: boolean; history?: unknown; friends?: unknown }> | null;
+  const guestUids: string[] = [];
+  for (const [uid, u] of Object.entries(users ?? {})) {
+    const isGuest = typeof u?.usernameLower === "string" && u.usernameLower.startsWith("guest-");
+    const old = typeof u?.createdAt === "number" && now - u.createdAt > GUEST_AGE_MS;
+    const empty = !u?.history && !u?.friends && u?.online !== true;
+    if (isGuest && old && empty) {
+      updates[`users/${uid}`] = null;
+      if (u.usernameLower) updates[`usernames/${u.usernameLower}`] = null;
+      guestUids.push(uid);
+    }
+  }
+
+  if (Object.keys(updates).length) await adb.ref().update(updates);
+
+  // Best-effort: delete the orphaned anonymous Auth records for swept guests (rate-limited,
+  // so cap per run; the rest get caught on the next tick).
+  let prunedAuth = 0;
+  for (const uid of guestUids.slice(0, 50)) {
+    try { await getAuth().deleteUser(uid); prunedAuth++; } catch { /* already gone / not anon */ }
+  }
+
+  logger.info(`pruneStale: removed ${prunedGames} games, ${guestUids.length} guest profiles (${prunedAuth} auth)`);
 });
