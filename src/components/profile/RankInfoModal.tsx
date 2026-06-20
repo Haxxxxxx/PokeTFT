@@ -58,8 +58,8 @@ export function RankInfoModal({ onClose }: { onClose: () => void }) {
             "LP comes from your finish: the top half of the lobby gains, the bottom half loses — bigger swings in bigger lobbies.",
             "Les LP dépendent de ton classement : la moitié haute gagne, la moitié basse perd — plus l'écart est grand, plus le gain/la perte est forte.")}</li>
           <li className="flex gap-2"><span className="text-violet-400">•</span>{tr(
-            "Bots don't count — only human placements move your LP. Everyone starts at",
-            "Les IA ne comptent pas — seuls les classements humains bougent tes LP. Tout le monde commence à")} <b style={{ color: start.color }}>{start.label}</b>.</li>
+            "Bots count too, but for less — a practice game vs AI moves your LP slowly, a full human lobby moves it fully. Everyone starts at",
+            "Les IA comptent aussi, mais moins — une partie d'entraînement contre l'IA bouge tes LP lentement, un lobby plein de joueurs les bouge pleinement. Tout le monde commence à")} <b style={{ color: start.color }}>{start.label}</b>.</li>
         </ul>
 
         {/* Placement → LP example */}

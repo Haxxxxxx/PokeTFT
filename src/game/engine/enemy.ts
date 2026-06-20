@@ -1,9 +1,12 @@
 /** Generates an AI board scaled to a level + unit count. Deterministic per seed. */
 
-import type { UnitInstance } from "../types";
+import type { UnitInstance, PokeType } from "../types";
 import { SHOP_ODDS, boardSizeForLevel, cumulativeRound, type Cost } from "../config";
-import { UNITS } from "../data/mons";
+import { UNITS, getDef } from "../data/mons";
+import { canMega, MEGA_STONE } from "../data/mega";
 import { makeRng, weightedPick, randInt, type Rng } from "./rng";
+
+export type BotLevel = "easy" | "medium" | "hard" | "expert";
 
 const BY_COST: Record<Cost, string[]> = (() => {
   const m = { 1: [], 2: [], 3: [], 4: [], 5: [] } as Record<Cost, string[]>;
@@ -62,7 +65,10 @@ export function generateBoard(level: number, count: number, seed: number, allowe
 /** An economy-realistic AI board: what a real player could actually field at this
  *  point in the game. Board size, unit cost, and star level all track a believable
  *  gold/level curve (no 4-cost 2-stars in the first PvP). Deterministic per seed. */
-export function generatePlayerLikeBoard(stage: number, round: number, difficulty: "easy" | "medium" | "hard" | undefined, seed: number, allowedIds?: string[]): UnitInstance[] {
+export function generatePlayerLikeBoard(stage: number, round: number, difficulty: BotLevel | undefined, seed: number, allowedIds?: string[], enabledItems?: string[]): UnitInstance[] {
+  // The "expert" bot drafts around a synergy and equips items — a real, threatening
+  // opponent rather than a random pile of units.
+  if (difficulty === "expert") return generateExpertBoard(stage, round, seed, allowedIds, enabledItems);
   const rng: Rng = makeRng(seed >>> 0);
   const cr = cumulativeRound(stage, round);
   const byCost = byCostFrom(allowedIds);
@@ -96,6 +102,142 @@ export function generatePlayerLikeBoard(stage: number, round: number, difficulty
     const row = ROW_ORDER[Math.floor(i / COL_ORDER.length) % ROW_ORDER.length];
     board.push({ iid: `g${seed}_${i}`, defId, star, pos: [col, row], items: [] });
   }
+  return board;
+}
+
+// ── Expert AI: synergy-aware drafting + item builds ──────────────────────────
+
+/** Special-attacking types lean on Ability Power; everything else is a physical
+ *  auto-attacker. Used to hand the right carry item to each bot unit. */
+const SPECIAL_TYPES = new Set<PokeType>(["fire", "water", "grass", "electric", "psychic", "ice", "dragon", "dark", "fairy", "ghost", "poison"]);
+/** Naturally bulky types — the bot frontlines these and feeds them defensive items. */
+const TANK_TYPES = new Set<PokeType>(["rock", "steel", "ground"]);
+
+// Item preferences by carry archetype (best first). Intersected with the room's
+// enabled items so the bot never fields an item the player couldn't also build.
+const AP_ITEMS = ["jeweled-lens", "archmage", "choice-specs", "mystic-surge", "burn-charm", "sage-ward"];
+const AD_ITEMS = ["sniper-scope", "choice-band", "adamant-edge", "berserker", "titan-fist", "spellblade"];
+const TANK_ITEMS = ["aegis", "bulwark", "titan-heart", "vampire-fang", "edge-night"];
+
+function isSpecial(defId: string): boolean {
+  const def = getDef(defId);
+  return SPECIAL_TYPES.has(def.move.type) || def.types.some((t) => SPECIAL_TYPES.has(t) && t === def.move.type);
+}
+function isTank(defId: string): boolean {
+  const def = getDef(defId);
+  return def.types.some((t) => TANK_TYPES.has(t)) || def.stats.armor >= 40;
+}
+
+/** Pick `n` distinct items for an archetype, restricted to the enabled pool. */
+function pickItems(pref: string[], enabled: Set<string> | null, n: number, used: Set<string>): string[] {
+  const out: string[] = [];
+  for (const id of pref) {
+    if (out.length >= n) break;
+    if (enabled && !enabled.has(id)) continue;
+    if (used.has(id)) continue;
+    out.push(id);
+    used.add(id);
+  }
+  return out;
+}
+
+/** An "expert" bot board: commits to one type synergy (drafted to a real breakpoint),
+ *  fronts its tanks, back-lines its carries, and equips item builds + the odd Mega Stone.
+ *  Deterministic per seed (host-generated, replay-safe). */
+export function generateExpertBoard(stage: number, round: number, seed: number, allowedIds?: string[], enabledItems?: string[]): UnitInstance[] {
+  const rng: Rng = makeRng(seed >>> 0);
+  const cr = cumulativeRound(stage, round);
+  const byCost = byCostFrom(allowedIds);
+  const allow = allowedIds && allowedIds.length ? new Set(allowedIds) : null;
+
+  // A touch larger / higher-quality than "hard" — this is the toughest opponent. Its
+  // edge is synergy drafting + item builds + star-ups, NOT impossibly early high-cost
+  // units, so the cost curve still tracks the stage a real player could reach.
+  let size = Math.round(3 + cr * 0.26);
+  const costCap = Math.min(stage, 5);
+  const twoStarChance = stage >= 3 ? Math.min(0.65, (stage - 2) * 0.2) : 0;
+  const threeStarChance = stage >= 5 ? (stage - 4) * 0.07 : 0;
+  size = Math.max(1, Math.min(size, Math.min(boardSizeForLevel(9), MAX_BOARD)));
+
+  // Tally every type in the legal roster, then pick a theme that actually has the
+  // depth to reach a breakpoint (≥4 units), weighted toward the more populous types.
+  const typeUnits = new Map<PokeType, string[]>();
+  for (const u of UNITS) {
+    if (allow && !allow.has(u.id)) continue;
+    if (u.cost > costCap) continue;
+    for (const t of u.types) {
+      if (!typeUnits.has(t)) typeUnits.set(t, []);
+      typeUnits.get(t)!.push(u.id);
+    }
+  }
+  const viable = [...typeUnits.entries()].filter(([, ids]) => ids.length >= 4);
+  const theme: PokeType | null = viable.length ? viable[randInt(rng, viable.length)][0] : null;
+  const themeTarget = theme ? Math.min(theme && size >= 8 ? 6 : 4, size, typeUnits.get(theme)!.length) : 0;
+
+  // Draft distinct defIds: theme units first (toward the breakpoint), then best-cost
+  // fillers. Cheaper units dominate, exactly like a real shop climb.
+  const chosen: string[] = [];
+  const taken = new Set<string>();
+  const draftFrom = (ids: string[]) => {
+    // Weight by cost (capped), favouring cheaper but allowing the odd premium unit.
+    const pool = ids.filter((id) => !taken.has(id) && getDef(id).cost <= costCap);
+    if (!pool.length) return false;
+    const weights = pool.map((id) => Math.pow(0.6, getDef(id).cost - 1));
+    const idx = weightedPick(rng, weights);
+    chosen.push(pool[idx]); taken.add(pool[idx]);
+    return true;
+  };
+  if (theme) for (let i = 0; i < themeTarget && chosen.length < size; i++) draftFrom(typeUnits.get(theme)!);
+  let guard = 0;
+  while (chosen.length < size && guard++ < 100) {
+    let cost = (weightedPick(rng, [1, 1, 1, 1, 1].map((_, c) => (c + 1 <= costCap ? Math.pow(0.55, c) : 0))) + 1) as Cost;
+    while (byCost[cost].length === 0) cost = (((cost % 5)) + 1) as Cost;
+    if (!draftFrom(byCost[cost])) break;
+  }
+
+  // Order: tanks to the front, carries to the back (so item-laden carries sit safe).
+  chosen.sort((a, b) => Number(isTank(b)) - Number(isTank(a)));
+
+  const board: UnitInstance[] = chosen.map((defId, i) => {
+    let star: 1 | 2 | 3 = 1;
+    const def = getDef(defId);
+    if (def.cost <= 2 && rng() < threeStarChance) star = 3;
+    else if (def.cost <= 3 && rng() < twoStarChance) star = 2;
+    const col = COL_ORDER[i % COL_ORDER.length];
+    const row = ROW_ORDER[Math.floor(i / COL_ORDER.length) % ROW_ORDER.length];
+    return { iid: `x${seed}_${i}`, defId, star, pos: [col, row], items: [] as string[] };
+  });
+
+  // Item builds: scale a budget by stage onto the strongest units (highest cost, then
+  // star). Carries get up to 2–3 offensive items matched to their damage type; the
+  // sturdiest frontliner gets defensive items. A Mega Stone lands on a mega-capable
+  // unit from stage 4 on.
+  const enabled = enabledItems && enabledItems.length ? new Set(enabledItems) : null;
+  const usedItems = new Set<string>();
+  let budget = Math.max(0, Math.min(stage - 1, 6));
+  if (budget > 0 && board.length) {
+    const ranked = [...board].sort((a, b) => (getDef(b.defId).cost - getDef(a.defId).cost) || (b.star - a.star));
+    // Primary carry (back-line damage dealer) gets the richest build.
+    const carry = ranked.find((u) => !isTank(u.defId)) ?? ranked[0];
+    const carryItems = pickItems(isSpecial(carry.defId) ? AP_ITEMS : AD_ITEMS, enabled, Math.min(3, budget), usedItems);
+    carry.items = [...carryItems];
+    budget -= carryItems.length;
+    // Mega Stone on a mega-capable unit (prefer the carry) once the game has ramped.
+    if (stage >= 4) {
+      const megaTarget = (canMega(carry.defId) ? carry : board.find((u) => canMega(u.defId)));
+      if (megaTarget && megaTarget.items.length < 3) megaTarget.items = [...megaTarget.items, MEGA_STONE];
+    }
+    // Spend the rest on a tank, then any remaining strong unit.
+    for (const u of ranked) {
+      if (budget <= 0) break;
+      if (u === carry) continue;
+      const pref = isTank(u.defId) ? TANK_ITEMS : isSpecial(u.defId) ? AP_ITEMS : AD_ITEMS;
+      const give = pickItems(pref, enabled, Math.min(2, budget), usedItems);
+      u.items = [...u.items, ...give];
+      budget -= give.length;
+    }
+  }
+
   return board;
 }
 

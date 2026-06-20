@@ -9,6 +9,8 @@ export const ECONOMY = {
   /** +1 gold per 10 banked, capped. */
   interestPer: 10,
   interestCap: 5,
+  /** TFT win-gold: flat bonus for winning a combat (paid the next planning round). */
+  winGold: 1,
   /** XP gained passively at the start of each round (from Stage 2). */
   passiveXpPerRound: 2,
   /** Buy 4 XP for 4 gold. */

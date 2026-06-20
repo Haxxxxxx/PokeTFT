@@ -11,7 +11,7 @@ import type { UnitInstance } from "../types";
 
 export type RoomPhase = "lobby" | "planning" | "combat" | "carousel" | "over";
 
-export type BotDifficulty = "easy" | "medium" | "hard";
+export type BotDifficulty = "easy" | "medium" | "hard" | "expert";
 
 export type RoomPlayer = {
   uid: string;

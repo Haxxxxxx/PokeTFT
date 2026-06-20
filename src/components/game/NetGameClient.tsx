@@ -14,6 +14,7 @@ import { MEGA_STONE, canMega } from "@/game/data/mega";
 import { ITEM_POOL, RARITY_COLOR, COMPONENT_IDS } from "@/game/data/itemPool";
 import { enemyToField } from "@/game/engine/hex";
 import { ItemGlyph, AugmentGlyph } from "./ItemGlyph";
+import { AugmentsBar } from "./AugmentsBar";
 import { finishCarouselEarly } from "@/game/net/serverGame";
 import { recordGameResult, applyRankedResult, rankOf, type RankedResult } from "@/game/net/users";
 import { computeTraits } from "@/game/engine/synergies";
@@ -393,7 +394,8 @@ export function NetGameClient() {
     const key = `${meta.stage}-${meta.round}`;
     if (lastRoundKey.current === key) return;
     lastRoundKey.current = key;
-    netRound(meta.stage, meta.round, me?.streak ?? 0);
+    // A positive streak means the previous combat was a win → pay TFT win-gold (+1).
+    netRound(meta.stage, meta.round, me?.streak ?? 0, (me?.streak ?? 0) > 0);
   }, [phase, meta?.stage, meta?.round, mySave]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Push my board + economy snapshot to the room (debounced) — board for combat,
@@ -598,13 +600,13 @@ export function NetGameClient() {
           team,
           traits,
         }).catch(() => {});
-        // Ranked: BOTS DON'T COUNT — LP is computed against humans only. Your rank among
-        // humans = how many humans finished ahead of you (+1), out of the human headcount.
-        // (A solo-vs-bots game → 1 human → ±0 LP, so practice never moves your rating.)
-        const humans = Object.values(ps).filter((p) => !p.isBot);
-        const humanTotal = humans.length;
-        const humanPlace = humans.filter((p) => (p.place ?? 99) < place).length + 1;
-        applyRankedResult(myUid, humanPlace, humanTotal, meP?.name ?? "Player", meP?.photoURL).then(setRankResult).catch(() => {});
+        // Ranked: placement is over the WHOLE lobby (bots are real opponents on the board),
+        // but the LP swing is weighted by how human the lobby was — bots count for less, so
+        // practice still nudges your rating without being worth a full game (see weightedRatingDelta).
+        const all = Object.values(ps);
+        const humanOpp = all.filter((p) => !p.isBot && p.uid !== myUid).length;
+        const botOpp = all.filter((p) => p.isBot).length;
+        applyRankedResult(myUid, place, all.length, meP?.name ?? "Player", meP?.photoURL, { humans: humanOpp, bots: botOpp }).then(setRankResult).catch(() => {});
       }
     }
     prevPhase.current = phase ?? null;
@@ -666,9 +668,12 @@ export function NetGameClient() {
         team: finalBoard.map((u) => ({ d: u.defId, s: u.star })),
         traits: computeTraits(finalBoard).filter((tr) => tr.tier > 0).map((tr) => ({ k: tr.key, t: tr.tier })),
       });
-      // Bots don't count toward LP — rank among humans only (alive humans incl. me).
-      const humans = Object.values(ps).filter((p) => !p.isBot);
-      applyRankedResult(myUid, humans.filter((p) => p.alive).length, humans.length, me?.name ?? "Player", me?.photoURL).catch(() => {});
+      // Forfeit at the worst currently-alive placement (over the whole lobby); LP swing is
+      // weighted so a bot-heavy practice game moves the rating less than a real lobby.
+      const all = Object.values(ps);
+      const humanOpp = all.filter((p) => !p.isBot && p.uid !== myUid).length;
+      const botOpp = all.filter((p) => p.isBot).length;
+      applyRankedResult(myUid, place, all.length, me?.name ?? "Player", me?.photoURL, { humans: humanOpp, bots: botOpp }).catch(() => {});
     } catch { /* best-effort */ }
     leave();
   };
@@ -893,14 +898,7 @@ export function NetGameClient() {
               title={opp.ghost ? (lang === "fr" ? "Combat fantôme (copie d'un adversaire)" : "Ghost fight (a copy of a rival)") : undefined} />;
           })()}
 
-          {augments.length > 0 && (
-            <div className="flex items-center gap-1 shrink-0" title="Augments">
-              {augments.map((id, i) => {
-                const a = AUGMENTS.find((x) => x.id === id);
-                return <span key={i} className="w-7 h-7 rounded-md bg-violet-900/40 border border-violet-500/50 flex items-center justify-center text-violet-200" title={a ? (lang === "fr" ? `${a.nameFr} — ${a.descFr}` : `${a.name} — ${a.desc}`) : id}><AugmentGlyph id={id} size={15} /></span>;
-              })}
-            </div>
-          )}
+          <AugmentsBar augments={augments} lang={lang} />
 
           {/* Phase + timer — isolated so it ticks on its own without re-rendering
               the whole game tree every 250ms (the old global tick caused jank). */}

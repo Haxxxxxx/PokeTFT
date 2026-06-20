@@ -58,6 +58,23 @@ export function ratingDelta(place: number, players: number): number {
   return Math.round((mid - place) * 8);
 }
 
+/** How much LP a bot opponent is worth relative to a human. Beating (or losing to) bots
+ *  still moves your rating so practice isn't pointless — but at a fraction of a real game,
+ *  so the ladder stays meaningful. 1 human + 7 bots → ~35% of a full lobby's swing. */
+export const BOT_LP_WEIGHT = 0.35;
+
+/** Weighted rating delta for a mixed human/bot lobby. Placement is computed over ALL
+ *  players (bots included — they're real opponents on the board), but the resulting swing
+ *  is scaled by how human the lobby was: human opponents pull full weight, bots pull
+ *  BOT_LP_WEIGHT. A pure-human lobby is unchanged; a pure-bot lobby gives partial LP. */
+export function weightedRatingDelta(place: number, players: number, humanOpponents: number, botOpponents: number): number {
+  const raw = ratingDelta(place, players);
+  const opponents = humanOpponents + botOpponents;
+  if (opponents <= 0) return 0; // nobody to play against → no rating change
+  const weight = (humanOpponents + botOpponents * BOT_LP_WEIGHT) / opponents;
+  return Math.round(raw * weight);
+}
+
 export type LeaderEntry = { uid: string; username: string; rating: number; photoURL?: string | null };
 
 /** The LP outcome of a finished ranked game — what the end screen shows the player. */
@@ -66,8 +83,12 @@ export type RankedResult = { delta: number; rating: number; prevRating: number }
 /** Apply a finished game's placement to the player's rating (transaction) and mirror it
  *  to the public, queryable leaderboard node. Returns the LP delta + new/old rating so the
  *  end-of-game screen can show exactly what was won or lost. */
-export async function applyRankedResult(uid: string, place: number, players: number, username: string, photoURL?: string | null): Promise<RankedResult> {
-  const delta = ratingDelta(place, players);
+export async function applyRankedResult(uid: string, place: number, players: number, username: string, photoURL?: string | null, opponents?: { humans: number; bots: number }): Promise<RankedResult> {
+  // Full placement over all players; the swing is then weighted by how human the lobby was
+  // (bots count for less). When no opponent breakdown is given, treat it as a full lobby.
+  const delta = opponents
+    ? weightedRatingDelta(place, players, opponents.humans, opponents.bots)
+    : ratingDelta(place, players);
   const res = await runTransaction(ref(db(), `users/${uid}/rating`), (cur) => Math.max(0, (cur ?? START_RATING) + delta));
   const rating = (res.snapshot.val() as number) ?? START_RATING;
   await set(ref(db(), `leaderboard/${uid}`), { username, rating, photoURL: photoURL ?? null }).catch(() => {});

@@ -47,6 +47,7 @@ export type Dict = {
   p_diff_easy: string;
   p_diff_medium: string;
   p_diff_hard: string;
+  p_diff_expert: string;
   // Top bar (offline GameClient)
   // NetGameClient HUD
   net_stage: string;
@@ -171,6 +172,7 @@ export const FR: Dict = {
   p_diff_easy: "Facile",
   p_diff_medium: "Moyen",
   p_diff_hard: "Difficile",
+  p_diff_expert: "Expert",
   net_stage: "Stage",
   net_hp: "PV",
   net_gold: "Or",
@@ -290,6 +292,7 @@ export const EN: Dict = {
   p_diff_easy: "Easy",
   p_diff_medium: "Medium",
   p_diff_hard: "Hard",
+  p_diff_expert: "Expert",
   net_stage: "Stage",
   net_hp: "HP",
   net_gold: "Gold",

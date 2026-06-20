@@ -236,24 +236,40 @@ function Card() {
       {/* Held items — effects + unequip (back to inventory). */}
       <HeldItems iid={inspect.iid} />
 
-      {/* Mega Evolution callout */}
-      {megaFormFor(def.id) && (
-        <div className="mx-3 mb-3 p-2.5 rounded-lg border border-fuchsia-500/40 bg-fuchsia-500/10 flex items-center gap-3">
-          <div className="rounded-lg bg-black/30 p-1 border border-fuchsia-500/40">
+      {/* Mega Evolution callout — shows the form's combat identity so the player knows
+          what the stone will do (a physical bruiser vs a special wall etc.). */}
+      {megaFormFor(def.id) && (() => {
+        const mf = megaFormFor(def.id)!;
+        const pct = (x: number) => Math.round((x - 1) * 100);
+        return (
+        <div className="mx-3 mb-3 p-2.5 rounded-lg border border-fuchsia-500/40 bg-fuchsia-500/10 flex items-start gap-3">
+          <div className="rounded-lg bg-black/30 p-1 border border-fuchsia-500/40 shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={spriteUrl(megaFormFor(def.id)!.megaDex)} alt="" width={44} height={44} style={{ imageRendering: "pixelated" }} />
+            <img src={spriteUrl(mf.megaDex)} alt="" width={44} height={44} style={{ imageRendering: "pixelated" }} />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-fuchsia-200 text-xs font-bold">
-              <MegaIcon size={13} /> {megaFormFor(def.id)!.name}
+            <div className="flex items-center gap-1.5 text-fuchsia-200 text-xs font-bold flex-wrap">
+              <MegaIcon size={13} /> {mf.name}
+              <span className="text-[8px] px-1.5 py-0.5 rounded bg-fuchsia-500/25 text-fuchsia-100 uppercase tracking-wide font-extrabold">
+                {lang === "fr" ? mf.roleLabelFr : mf.roleLabel}
+              </span>
+              {mf.addType && <Badge color={TYPE_COLOR[mf.addType]} text={`+${traitLabel(mf.addType)}`} solid />}
             </div>
-            <p className="text-[10px] text-slate-300 leading-snug mt-0.5">
-              Holds a <span className="text-fuchsia-300 font-semibold">Mega Stone</span> → Mega Evolves at combat start
-              (+{Math.round((megaFormFor(def.id)!.hpMult - 1) * 100)}% HP, +{Math.round((megaFormFor(def.id)!.adMult - 1) * 100)}% ATK, +{Math.round((megaFormFor(def.id)!.apMult - 1) * 100)}% ability).
+            <p className="text-[10px] text-slate-300 leading-snug mt-1">
+              {lang === "fr" ? "Tient une " : "Holds a "}<span className="text-fuchsia-300 font-semibold">Mega Stone</span>
+              {lang === "fr" ? " → Méga-Évolue au combat" : " → Mega Evolves at combat start"}.
             </p>
+            <div className="flex flex-wrap gap-1 mt-1.5 text-[9px] font-bold">
+              <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300">+{pct(mf.hpMult)}% HP</span>
+              <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">+{pct(mf.adMult)}% ATK</span>
+              <span className="px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-300">+{pct(mf.apMult)}% {lang === "fr" ? "Spé" : "AP"}</span>
+              <span className="px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-300">+{mf.armorBonus} {lang === "fr" ? "Déf" : "Armor"}</span>
+              <span className="px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300">+{mf.mrBonus} {lang === "fr" ? "Déf.Spé" : "MR"}</span>
+            </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
