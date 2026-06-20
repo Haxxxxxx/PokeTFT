@@ -31,9 +31,24 @@ function setPath(root: Obj, path: string, val: unknown): void {
   else cur[last] = val;
 }
 
+/** Reproduce the Firebase SDK's client-side guard: an update() whose keys include an
+ *  ancestor AND a descendant path (e.g. `teams` and `teams/0`) is rejected outright. The
+ *  real SDK throws here; our in-memory store must too, or it silently masks the bug that
+ *  broke Double Up's start on prod. */
+function assertNoPathConflict(keys: string[]) {
+  const norm = keys.map((k) => k.replace(/\/+$/g, ""));
+  for (let i = 0; i < norm.length; i++) for (let j = 0; j < norm.length; j++) {
+    if (i === j) continue;
+    if (norm[i] === "" || norm[j].startsWith(norm[i] + "/")) {
+      throw new Error(`update path conflict: '${norm[i]}' is an ancestor of '${norm[j]}' (Firebase rejects this)`);
+    }
+  }
+}
+
 setDbAdapter({
   async get(path) { return (getPath(store, path) ?? null) as never; },
   async update(path, value) {
+    assertNoPathConflict(Object.keys(value));
     for (const [k, v] of Object.entries(value)) setPath(store, `${path}/${k}`, v === undefined ? null : v);
   },
   async transaction(path, fn) {
@@ -113,7 +128,7 @@ async function run() {
   assert(teamOf.p0 === 0 && teamOf.p1 === 0, "p0+p1 on team 0");
   assert(teamOf.p2 === 1 && teamOf.p3 === 1, "p2+p3 on team 1");
   assert(!!room.teams && room.teams[0]?.hp === 100 && room.teams[1]?.hp === 100, "two shared HP pools at 100");
-  assert(room.teams[0]?.members?.length === 2 && room.teams[1]?.members?.length === 2, "each team has 2 members");
+  assert(room.teams?.[0]?.members?.length === 2 && room.teams?.[1]?.members?.length === 2, "each team has 2 members");
 
   // 2) Run PvP combat rounds until a team is eliminated (game over), capped to avoid loops.
   console.log("\nRunning PvP rounds:");
