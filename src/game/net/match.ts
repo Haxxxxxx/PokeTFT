@@ -2,13 +2,13 @@ import { dbAdapter } from "./db-adapter";
 import { serverNow } from "./serverTime";
 import { simulate } from "../engine/combat";
 import { makeRng } from "../engine/rng";
-import { generatePlayerLikeBoard, generateCreepBoard, pickCarouselOptions } from "../engine/enemy";
+import { generatePlayerLikeBoard, generateCreepBoard, generateBossBoard, pickCarouselOptions } from "../engine/enemy";
 import { hasDef } from "../data/mons";
-import { rosterForRoom } from "../data/gameModes";
+import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem } from "../data/gameModes";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
 import { COMPONENT_IDS, EMBLEM_IDS } from "../data/items";
-import { teamBuffForAugments, AUGMENT_BY_ID } from "../data/augments";
+import { teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID } from "../data/augments";
 import type { UnitInstance } from "../types";
 import type { Room, RoomPlayer, CombatAssign, BotDifficulty } from "./roomStore";
 
@@ -107,10 +107,10 @@ function board(p: RoomPlayer | undefined): UnitInstance[] {
     .map((u) => ({ ...u, items: (Array.isArray(u.items) ? u.items : Object.values((u.items ?? {}) as Record<string, string>)).filter(Boolean) }));
 }
 
-/** A player's team-wide combat buff from their (public) combat augments. Computed the
- *  same way on host and client → deterministic. */
-function teamBuffFor(p: RoomPlayer | undefined) {
-  return teamBuffForAugments(p?.augments);
+/** A player's team-wide combat buff: their (public) combat augments folded with the
+ *  game-mode's region modifier. Computed the same way on host and client → deterministic. */
+function teamBuffFor(p: RoomPlayer | undefined, room: Room) {
+  return combineTeamBuffs(teamBuffForAugments(p?.augments), modeTeamBuff(room.rules));
 }
 
 /** Players still in the game (alive). Disconnected-but-alive players still fight
@@ -191,7 +191,7 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
   const sa = rtdbSafe(board(room.players[aUid]));
   const sb = rtdbSafe(board(room.players[bUid]));
   // Combat augments buff each side's team (ghost fights use the ghost's source player).
-  const r = simulate(sa, sb, teamBuffFor(room.players[aUid]), teamBuffFor(room.players[bUid]));
+  const r = simulate(sa, sb, teamBuffFor(room.players[aUid], room), teamBuffFor(room.players[bUid], room));
   const draw = r.winner === "draw";
   const aWon = r.winner === "ally";
   const bWon = r.winner === "enemy";
@@ -307,21 +307,33 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
 
   const combat: Record<string, CombatAssign> = {};
   if (kind === "pve") {
-    const pveName = stage <= 1 ? "Wild Pokémon"
+    // Region Clash: the region's legendary appears as a BOSS on recurring PvE rounds
+    // (the X-7 encounters), not the soft stage-1 opener — so the opener stays a build
+    // breather while the legendary is a real mid/late-game wall.
+    const bossId = modeBossId(room.rules);
+    const isBossRound = !!bossId && hasDef(bossId) && stage >= 2;
+    const bossName = modeBossName(room.rules);
+    const pveName = isBossRound ? `${bossName} (Boss)`
+      : stage <= 1 ? "Wild Pokémon"
       : stage <= 2 ? "Wild Pack"
       : stage <= 3 ? "Feral Horde"
       : stage <= 4 ? "Savage Swarm"
       : stage <= 5 ? "Apex Pack"
       : "Legendary Encounter";
-    // Everyone fights wild creeps — no HP loss, a breather to build. Resolve from
-    // the SAME round-tripped boards the client replays (see assign()) so the PvE
-    // outcome the player sees always matches what the host recorded.
+    // Everyone fights wild creeps (or the boss) — resolve from the SAME round-tripped
+    // boards the client replays (see assign()) so the PvE outcome the player sees always
+    // matches what the host recorded.
     for (const p of alive) {
       const self = rtdbSafe(board(room.players[p.uid]));
-      const creeps = rtdbSafe(generateCreepBoard(stage, room.meta.round, stage * 97 + room.meta.round * 13 + hashStr(p.uid), allowed));
-      // Player's augments buff their team; the wild creeps get no buff.
-      const r = simulate(self, creeps, teamBuffFor(room.players[p.uid]), undefined);
-      combat[p.uid] = { oppUid: p.uid, oppName: pveName, ghost: true, pve: true, won: r.winner === "ally", survivors: 0, dmg: 0, selfBoard: self, oppBoard: creeps };
+      const seed = stage * 97 + room.meta.round * 13 + hashStr(p.uid);
+      const creeps = rtdbSafe(isBossRound
+        ? generateBossBoard(bossId!, stage, room.meta.round, seed, allowed)
+        : generateCreepBoard(stage, room.meta.round, seed, allowed));
+      // Player's augments + region modifier buff their team; wild creeps/boss get no buff.
+      const r = simulate(self, creeps, teamBuffFor(room.players[p.uid], room), undefined);
+      // A boss round CAN deal HP damage on a loss (it's a real threat); ordinary PvE doesn't.
+      const dmg = isBossRound && r.winner !== "ally" ? Math.min(8, stageBaseDamage(stage)) : 0;
+      combat[p.uid] = { oppUid: p.uid, oppName: pveName, ghost: true, pve: true, won: r.winner === "ally", survivors: 0, dmg, selfBoard: self, oppBoard: creeps };
     }
   } else {
     const order = shuffled(alive.map((p) => p.uid).sort(), stage * 131 + room.meta.round);
@@ -366,7 +378,9 @@ export async function startCarousel(code: string, room: Room): Promise<void> {
     // Item rewards: a Mega Stone plus item components players combine into the
     // completed items the lobby enabled. Offering components (not finished items)
     // is what makes the carousel a build-toward-a-recipe decision.
-    const itemPool = [MEGA_STONE, ...COMPONENT_IDS];
+    // Themed carousel: Region Clash adds the region's signature completed item to the pool.
+    const sigItem = modeCarouselItem(room.rules);
+    const itemPool = [MEGA_STONE, ...COMPONENT_IDS, ...(sigItem ? [sigItem] : [])];
     const carousel: Record<string, string[]> = {};
     // Per-GAME entropy: the room code is unique to each match, so folding it in
     // makes carousels differ from game to game (they used to seed only on

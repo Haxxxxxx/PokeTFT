@@ -87,6 +87,18 @@ export const AUGMENTS: Augment[] = [
   { id: "apex-predator", name: "Apex Predator",    nameFr: "Prédateur Alpha",   desc: "+24% Attack, +22% Crit & 18% lifesteal.", descFr: "+24% Attaque, +22% Crit & 18% vol de vie.", kind: "passive", tier: "prismatic", combat: { adMult: 1.24, critAdd: 0.22, lifeSteal: 0.18 } },
   { id: "archmagus",     name: "Archmagus",        nameFr: "Archimage",         desc: "+30% Ability Power, +20 mana & +12% Attack Speed.", descFr: "+30% Att. Spé, +20 mana & +12% Vitesse.", kind: "passive", tier: "prismatic", combat: { apMult: 1.30, manaStart: 20, asMult: 1.12 } },
   { id: "titanforged",   name: "Titanforged",      nameFr: "Forge Titan",       desc: "+22% Health, +30 Armor & MR, +12% Attack.", descFr: "+22% PV, +30 Déf & Déf Spé, +12% Attaque.", kind: "passive", tier: "prismatic", combat: { hpMult: 1.22, armorAdd: 30, mrAdd: 30, adMult: 1.12 } },
+
+  // ── Region signature augments — offered as a guaranteed pick in Region Clash modes,
+  //    each themed to that region's signature type (see data/gameModes.ts). ──
+  { id: "sig-kanto",  name: "Kanto Inferno",     nameFr: "Brasier Kanto",     desc: "+18% Attack & +10% Crit.",            descFr: "+18% Attaque & +10% Critique.",         kind: "passive", tier: "gold", combat: { adMult: 1.18, critAdd: 0.10 } },
+  { id: "sig-johto",  name: "Johto Voltage",     nameFr: "Voltage Johto",     desc: "+20% Attack Speed.",                  descFr: "+20% Vitesse d'attaque.",               kind: "passive", tier: "gold", combat: { asMult: 1.20 } },
+  { id: "sig-hoenn",  name: "Hoenn Tide",        nameFr: "Marée Hoenn",       desc: "+18% Ability Power & +12 start mana.", descFr: "+18% Att. Spé & +12 mana de départ.",  kind: "passive", tier: "gold", combat: { apMult: 1.18, manaStart: 12 } },
+  { id: "sig-sinnoh", name: "Sinnoh Bulwark",    nameFr: "Rempart Sinnoh",    desc: "+28 Armor & MR, +8% Health.",         descFr: "+28 Déf & Déf Spé, +8% PV.",            kind: "passive", tier: "gold", combat: { armorAdd: 28, mrAdd: 28, hpMult: 1.08 } },
+  { id: "sig-unova",  name: "Unova Surge",       nameFr: "Déferlante Unova",  desc: "+14% Attack & Ability Power.",        descFr: "+14% Attaque & Att. Spé.",              kind: "passive", tier: "gold", combat: { adMult: 1.14, apMult: 1.14 } },
+  { id: "sig-kalos",  name: "Kalos Grace",       nameFr: "Grâce Kalos",       desc: "+16% Health, +14 Armor & MR.",        descFr: "+16% PV, +14 Déf & Déf Spé.",           kind: "passive", tier: "gold", combat: { hpMult: 1.16, armorAdd: 14, mrAdd: 14 } },
+  { id: "sig-alola",  name: "Alola Mind",        nameFr: "Esprit Alola",      desc: "+22% Ability Power & +10 start mana.", descFr: "+22% Att. Spé & +10 mana de départ.",  kind: "passive", tier: "gold", combat: { apMult: 1.22, manaStart: 10 } },
+  { id: "sig-galar",  name: "Galar Resolve",     nameFr: "Détermination Galar", desc: "+16% Attack & +18% Crit.",          descFr: "+16% Attaque & +18% Critique.",         kind: "passive", tier: "gold", combat: { adMult: 1.16, critAdd: 0.18 } },
+  { id: "sig-paldea", name: "Paldea Paradox",    nameFr: "Paradoxe Paldea",   desc: "+12% Attack & AP, 12% lifesteal.",    descFr: "+12% Attaque & Att. Spé, 12% vol de vie.", kind: "passive", tier: "gold", combat: { adMult: 1.12, apMult: 1.12, lifeSteal: 0.12 } },
 ];
 
 export const AUGMENT_BY_ID: Record<string, Augment> = Object.fromEntries(AUGMENTS.map((a) => [a.id, a]));
@@ -128,6 +140,41 @@ export function teamBuffForAugments(ids: string[] | undefined | null): TeamBuff 
   if (buff.manaStart) buff.manaStart = Math.min(40, buff.manaStart);
   if (buff.lifeSteal) buff.lifeSteal = Math.min(0.4, buff.lifeSteal);
   return buff;
+}
+
+/** Apply the shared ceilings to a folded TeamBuff (mults capped, adds capped). Pulled out
+ *  of teamBuffForAugments so other buff sources (region modifiers) clamp identically. */
+function capBuff(buff: TeamBuff): TeamBuff {
+  if (buff.adMult) buff.adMult = Math.min(1.8, buff.adMult);
+  if (buff.apMult) buff.apMult = Math.min(1.8, buff.apMult);
+  if (buff.asMult) buff.asMult = Math.min(1.8, buff.asMult);
+  if (buff.hpMult) buff.hpMult = Math.min(1.8, buff.hpMult);
+  if (buff.armorAdd) buff.armorAdd = Math.min(60, buff.armorAdd);
+  if (buff.mrAdd) buff.mrAdd = Math.min(60, buff.mrAdd);
+  if (buff.critAdd) buff.critAdd = Math.min(0.5, buff.critAdd);
+  if (buff.manaStart) buff.manaStart = Math.min(40, buff.manaStart);
+  if (buff.lifeSteal) buff.lifeSteal = Math.min(0.4, buff.lifeSteal);
+  return buff;
+}
+
+/** Combine multiple TeamBuffs into one (mults multiply, adds add, lifesteal takes the max),
+ *  then clamp. Order-independent for the supported ops so host + client agree (determinism).
+ *  Used to fold a region modifier on top of the player's augment buff. */
+export function combineTeamBuffs(...buffs: (TeamBuff | undefined | null)[]): TeamBuff {
+  const out: TeamBuff = {};
+  for (const b of buffs) {
+    if (!b) continue;
+    if (b.adMult) out.adMult = (out.adMult ?? 1) * b.adMult;
+    if (b.apMult) out.apMult = (out.apMult ?? 1) * b.apMult;
+    if (b.asMult) out.asMult = (out.asMult ?? 1) * b.asMult;
+    if (b.hpMult) out.hpMult = (out.hpMult ?? 1) * b.hpMult;
+    if (b.armorAdd) out.armorAdd = (out.armorAdd ?? 0) + b.armorAdd;
+    if (b.mrAdd) out.mrAdd = (out.mrAdd ?? 0) + b.mrAdd;
+    if (b.critAdd) out.critAdd = (out.critAdd ?? 0) + b.critAdd;
+    if (b.manaStart) out.manaStart = (out.manaStart ?? 0) + b.manaStart;
+    if (b.lifeSteal) out.lifeSteal = Math.max(out.lifeSteal ?? 0, b.lifeSteal);
+  }
+  return capBuff(out);
 }
 
 /** Which augment slot (0,1,2) a given round opens, or null. One per early stage,

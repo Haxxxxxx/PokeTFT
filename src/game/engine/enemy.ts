@@ -275,6 +275,24 @@ function weaken(board: UnitInstance[], scale: number): UnitInstance[] {
   return scale >= 1 ? board : board.map((u) => ({ ...u, statScale: scale }));
 }
 
+/** A region BOSS encounter for PvE rounds in Region Clash modes: the region's signature
+ *  legendary at ★★★, hugely buffed (statScale ramps with stage), flanked by a few escort
+ *  creeps so it's a real fight. Deterministic per seed. Beatable with a developed board,
+ *  threatening to a weak one — and it drops the usual PvE loot on a win. */
+export function generateBossBoard(bossId: string, stage: number, round: number, seed: number, allowedIds?: string[]): UnitInstance[] {
+  // Boss power ramps with stage: ~2.2x at stage 2 up to ~4x late, so it stays a wall you
+  // must out-scale rather than a free win.
+  const bossScale = 2.0 + Math.min(stage, 8) * 0.28;
+  const boss: UnitInstance = { iid: `boss${seed}`, defId: bossId, star: 3, pos: [3, 1], items: [], statScale: bossScale };
+  // Escorts: a couple of region creeps, mildly buffed, so the boss isn't alone (and the
+  // player's AoE has targets). Count + strength ramp with stage.
+  const escorts = Math.min(1 + Math.floor(stage / 2), 5);
+  const guard = generateBoard(Math.min(2 + Math.floor(stage / 2), 6), escorts, seed * 17 + 53, allowedIds)
+    .map((u, i) => ({ ...u, iid: `bguard${seed}_${i}`, statScale: 1.2 }));
+  // Keep the boss off the escorts' hexes.
+  return [boss, ...guard.filter((u) => !(u.pos?.[0] === 3 && u.pos?.[1] === 1))];
+}
+
 /** Free unit choices offered on a carousel round. */
 export function pickCarouselOptions(stage: number, seed: number, n = 5, allowedIds?: string[]): string[] {
   const rng: Rng = makeRng((seed * 277 + stage * 51) >>> 0);

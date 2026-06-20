@@ -12,6 +12,7 @@
  *  Double Up (2v2) is a separate, larger effort and is intentionally NOT here yet. */
 
 import type { PokeType } from "../types";
+import type { TeamBuff } from "../engine/combat";
 import { GEN_DEX_RANGES, GEN_LABELS } from "./generations";
 import { unitsForGenerations, getDef, rosterForGenerations } from "./mons";
 import { MEGA_STONE } from "./mega";
@@ -43,36 +44,56 @@ export type GameMode = {
   region?: number;
   signatureType?: PokeType;
   signatureItem?: string;
+  /** Region modifier — a passive team-wide combat buff folded in every fight (identity). */
+  modifier?: TeamBuff;
+  /** Short label for the modifier shown in the lobby/HUD. */
+  modifierLabel?: string;
+  modifierLabelFr?: string;
+  /** Region augment id guaranteed in the augment offering (see data/augments.ts). */
+  signatureAugment?: string;
+  /** The region's signature legendary — appears as a scaling boss on recurring PvE rounds. */
+  bossId?: string;
+  bossName?: string;
 };
 
-/** Per-region identity: signature synergy type (→ Emblem) + a thematic starting item. */
-const REGION_SIGNATURE: Record<number, { type: PokeType; item: string; tag: string }> = {
-  1: { type: "fire",     item: "choice-band",  tag: "Kanto" },
-  2: { type: "electric", item: "choice-scarf", tag: "Johto" },
-  3: { type: "water",    item: "archmage",     tag: "Hoenn" },
-  4: { type: "steel",    item: "aegis",        tag: "Sinnoh" },
-  5: { type: "dragon",   item: "light-ball",   tag: "Unova" },
-  6: { type: "fairy",    item: "sage-ward",    tag: "Kalos" },
-  7: { type: "psychic",  item: "jeweled-lens", tag: "Alola" },
-  8: { type: "fighting", item: "titan-fist",   tag: "Galar" },
-  9: { type: "dragon",   item: "adamant-edge", tag: "Paldea" },
+/** Per-region identity: signature synergy type (→ Emblem), thematic starting item, a passive
+ *  team modifier (combat buff), a signature augment, and a legendary PvE boss. */
+const REGION_SIGNATURE: Record<number, {
+  type: PokeType; item: string; tag: string;
+  modifier: TeamBuff; modLabel: string; modLabelFr: string;
+  augment: string; boss: string; bossName: string;
+}> = {
+  1: { type: "fire",     item: "choice-band",  tag: "Kanto",  modifier: { adMult: 1.08 },              modLabel: "Aggression: +8% Attack",      modLabelFr: "Agression : +8% Attaque",       augment: "sig-kanto",  boss: "mewtwo",   bossName: "Mewtwo" },
+  2: { type: "electric", item: "choice-scarf", tag: "Johto",  modifier: { asMult: 1.10 },              modLabel: "Tempo: +10% Attack Speed",    modLabelFr: "Tempo : +10% Vitesse",          augment: "sig-johto",  boss: "lugia",    bossName: "Lugia" },
+  3: { type: "water",    item: "archmage",     tag: "Hoenn",  modifier: { manaStart: 12 },             modLabel: "Downpour: +12 start mana",    modLabelFr: "Averse : +12 mana de départ",   augment: "sig-hoenn",  boss: "rayquaza", bossName: "Rayquaza" },
+  4: { type: "steel",    item: "aegis",        tag: "Sinnoh", modifier: { armorAdd: 12, mrAdd: 12 },   modLabel: "Fortify: +12 Armor & MR",     modLabelFr: "Fortifié : +12 Déf & Déf Spé",  augment: "sig-sinnoh", boss: "dialga",   bossName: "Dialga" },
+  5: { type: "dragon",   item: "light-ball",   tag: "Unova",  modifier: { adMult: 1.06, apMult: 1.06 },modLabel: "Ideals: +6% Attack & AP",     modLabelFr: "Idéaux : +6% Attaque & Att.Spé",augment: "sig-unova",  boss: "reshiram", bossName: "Reshiram" },
+  6: { type: "fairy",    item: "sage-ward",    tag: "Kalos",  modifier: { hpMult: 1.10 },              modLabel: "Bond: +10% Health",           modLabelFr: "Lien : +10% PV",                augment: "sig-kalos",  boss: "xerneas",  bossName: "Xerneas" },
+  7: { type: "psychic",  item: "jeweled-lens", tag: "Alola",  modifier: { apMult: 1.10 },              modLabel: "Aura: +10% Ability Power",    modLabelFr: "Aura : +10% Att. Spé",          augment: "sig-alola",  boss: "solgaleo", bossName: "Solgaleo" },
+  8: { type: "fighting", item: "titan-fist",   tag: "Galar",  modifier: { adMult: 1.06, critAdd: 0.12 },modLabel: "Dynamax: +6% Attack, +12% Crit", modLabelFr: "Dynamax : +6% Attaque, +12% Crit", augment: "sig-galar", boss: "zacian",  bossName: "Zacian" },
+  9: { type: "dragon",   item: "adamant-edge", tag: "Paldea", modifier: { lifeSteal: 0.10 },           modLabel: "Paradox: 10% lifesteal",      modLabelFr: "Paradoxe : 10% vol de vie",     augment: "sig-paldea", boss: "koraidon", bossName: "Koraidon" },
 };
 
 function regionMode(gen: number): GameMode {
   const sig = REGION_SIGNATURE[gen];
-  const label = GEN_LABELS[gen];
   return {
     id: `region-${gen}`,
     name: `${sig.tag} Clash`,
     nameFr: `Duel ${sig.tag}`,
-    desc: `Only ${sig.tag} mons. Everyone starts with a ${sig.type} Emblem + a signature item.`,
-    descFr: `Uniquement des ${sig.tag}. Chacun démarre avec un Emblème ${sig.type} + un objet signature.`,
+    desc: `Only ${sig.tag} mons. Start with a ${sig.type} Emblem + signature item, a region modifier (${sig.modLabel}), and face ${sig.bossName} as a boss.`,
+    descFr: `Uniquement des ${sig.tag}. Emblème ${sig.type} + objet signature, un modificateur de région (${sig.modLabelFr}), et ${sig.bossName} en boss.`,
     group: "region",
     color: "#22d3ee",
     rulesPatch: { generations: [gen], draftPoolSize: 9999 }, // full region (capped to its pool)
     region: gen,
     signatureType: sig.type,
     signatureItem: sig.item,
+    modifier: sig.modifier,
+    modifierLabel: sig.modLabel,
+    modifierLabelFr: sig.modLabelFr,
+    signatureAugment: sig.augment,
+    bossId: sig.boss,
+    bossName: sig.bossName,
   };
 }
 
@@ -164,4 +185,33 @@ export function modeRoundItem(rules: RoomRulesLike | undefined): string | null {
 /** PvE loot multiplier for the mode (Treasure Hunt pours out more). */
 export function modeLootScale(rules: RoomRulesLike | undefined): number {
   return getMode(rules?.mode).flags?.treasure ? 2.5 : 1;
+}
+
+/** The region modifier's team-wide combat buff (folded into every fight in a Region
+ *  Clash mode), or undefined. Caps mirror the augment fold so it can't be over-tuned. */
+export function modeTeamBuff(rules: RoomRulesLike | undefined): TeamBuff | undefined {
+  const m = getMode(rules?.mode).modifier;
+  if (!m) return undefined;
+  return { ...m };
+}
+
+/** The region's signature augment id (guaranteed in the offering), or null. */
+export function modeSignatureAugment(rules: RoomRulesLike | undefined): string | null {
+  return getMode(rules?.mode).signatureAugment ?? null;
+}
+
+/** The region's signature completed item, added to the carousel item pool (themed
+ *  carousel), or null. */
+export function modeCarouselItem(rules: RoomRulesLike | undefined): string | null {
+  return getMode(rules?.mode).signatureItem ?? null;
+}
+
+/** The region's PvE boss legendary id (recurring PvE rounds), or null. */
+export function modeBossId(rules: RoomRulesLike | undefined): string | null {
+  return getMode(rules?.mode).bossId ?? null;
+}
+
+/** The region's PvE boss display name, or "Boss". */
+export function modeBossName(rules: RoomRulesLike | undefined): string {
+  return getMode(rules?.mode).bossName ?? "Boss";
 }
