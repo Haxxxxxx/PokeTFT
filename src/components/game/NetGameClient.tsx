@@ -16,10 +16,12 @@ import { ITEM_POOL, RARITY_COLOR, COMPONENT_IDS } from "@/game/data/itemPool";
 import { enemyToField } from "@/game/engine/hex";
 import { ItemGlyph, AugmentGlyph } from "./ItemGlyph";
 import { AugmentsBar } from "./AugmentsBar";
+import { CoopPanel } from "./CoopPanel";
 import { finishCarouselEarly } from "@/game/net/serverGame";
+import { subscribeTransfers } from "@/game/net/coop";
 import { recordGameResult, applyRankedResult, rankOf, type RankedResult } from "@/game/net/users";
 import { computeTraits } from "@/game/engine/synergies";
-import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords, Users, Heart } from "lucide-react";
+import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords } from "lucide-react";
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR, teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
 import { useUi } from "@/game/store/uiStore";
@@ -177,6 +179,8 @@ export function NetGameClient() {
 
   const newGame = useGame((s) => s.newGame);
   const netRound = useGame((s) => s.netRound);
+  const coopReceiveGold = useGame((s) => s.coopReceiveGold);
+  const coopReceiveUnit = useGame((s) => s.coopReceiveUnit);
   const importSave = useGame((s) => s.importSave);
   const netCarouselPick = useGame((s) => s.netCarouselPick);
   const pickAugment = useGame((s) => s.pickAugment);
@@ -400,6 +404,18 @@ export function NetGameClient() {
     netRound(meta.stage, meta.round, me?.streak ?? 0, (me?.streak ?? 0) > 0,
       { roundItem: modeRoundItem(room.rules), lootScale: modeLootScale(room.rules) });
   }, [phase, meta?.stage, meta?.round, mySave]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Double Up co-op: receive gold/units my partner sends, apply to my own econ, then the
+  // mailbox entry is deleted (in coop.ts). Only mounts in a Double Up game.
+  useEffect(() => {
+    const code = room?.code;
+    if (!code || !myUid || !isDoubleUp(room?.rules)) return;
+    const unsub = subscribeTransfers(code, myUid, (t) => {
+      if (t.kind === "gold") coopReceiveGold(t.gold);
+      else if (t.kind === "unit") coopReceiveUnit(t.unit);
+    });
+    return unsub;
+  }, [room?.code, myUid, room?.rules?.mode, coopReceiveGold, coopReceiveUnit]);
 
   // Push my board + economy snapshot to the room (debounced) — board for combat,
   // save for reconnect.
@@ -934,16 +950,7 @@ export function NetGameClient() {
             );
           })()}
           {doubleUp && partner && (
-            <button
-              onClick={() => setSpectate(partner.uid)}
-              title={lang === "fr" ? "Voir le plateau de ton partenaire" : "View your partner's board"}
-              className="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-emerald-500/50 bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-200"
-            >
-              <Users size={13} />
-              <span className="text-[11px] font-bold truncate max-w-[90px]">{partner.name}</span>
-              <span className="text-[11px] font-extrabold tabular-nums text-emerald-300">{Math.max(0, partner.hp)}</span>
-              <Heart size={11} />
-            </button>
+            <CoopPanel code={room.code} myUid={myUid} partner={{ uid: partner.uid, name: partner.name, hp: partner.hp, alive: partner.alive }} lang={lang} />
           )}
           <AugmentsBar augments={augments} lang={lang} />
 
@@ -1317,7 +1324,8 @@ export function NetGameClient() {
       {gameOver && (() => {
         // Final standings: every player ranked by placement (winner = #1), with
         // their final team so you can see how everyone finished before a rematch.
-        const standings = Object.values(players).sort((a, b) => (a.place ?? 99) - (b.place ?? 99));
+        // Double Up: keep teammates adjacent (they share a placement) by tie-breaking on team.
+        const standings = Object.values(players).sort((a, b) => (a.place ?? 99) - (b.place ?? 99) || (a.teamId ?? 0) - (b.teamId ?? 0) || (a.uid < b.uid ? -1 : 1));
         const medal = (place: number) => (place <= 3
           ? <TrophyIcon size={18} style={{ color: place === 1 ? "#fbbf24" : place === 2 ? "#cbd5e1" : "#d97706" }} />
           : `#${place}`);
@@ -1376,7 +1384,10 @@ export function NetGameClient() {
                     </span>
                     <div className="w-[120px] shrink-0 min-w-0">
                       <div className={`text-sm font-bold truncate ${first ? "text-amber-300" : isMe ? "text-sky-300" : "text-slate-200"}`}>{p.name}</div>
-                      <div className="text-[10px] text-slate-500">{Math.max(0, p.hp)} HP</div>
+                      <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
+                        <span>{Math.max(0, p.hp)} HP</span>
+                        {doubleUp && p.teamId != null && <span className="px-1 rounded bg-emerald-900/50 border border-emerald-600/40 text-emerald-300 font-bold">{lang === "fr" ? "Éq." : "Team"} {p.teamId + 1}</span>}
+                      </div>
                     </div>
                     <div className="flex-1 flex flex-wrap gap-0.5 justify-end items-center">
                       {team.length === 0

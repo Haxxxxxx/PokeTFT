@@ -117,6 +117,14 @@ type State = {
   buyXp: () => void;
   buyUnit: (slot: number) => void;
   sell: (iid: string) => void;
+  /** Double Up co-op: spend up to `amount` gold (returns the amount actually deducted). */
+  coopSpendGold: (amount: number) => number;
+  /** Double Up co-op: remove a bench unit to hand to a partner (returns a portable snapshot). */
+  coopRemoveUnit: (iid: string) => { defId: string; star: number; items: string[] } | null;
+  /** Double Up co-op: receive gold from a partner. */
+  coopReceiveGold: (amount: number) => void;
+  /** Double Up co-op: receive a unit from a partner onto the bench. */
+  coopReceiveUnit: (snap: { defId: string; star?: number; items?: string[] }) => void;
   moveToBoard: (iid: string, col: number, row: number) => void;
   deployUnit: (iid: string) => void;
   moveToBench: (iid: string) => void;
@@ -250,6 +258,38 @@ export const useGame = create<State>((set, get) => ({
       pool: { ...state.pool },
       items: [...state.items, ...unit.items], // recover any held items
     });
+  },
+
+  // ── Double Up co-op (Phase 2) ──────────────────────────────────────────────
+  // Deduct gold to send to a partner. Returns the amount actually sent (0 if too poor),
+  // so the caller only posts a transfer for gold that was really spent.
+  coopSpendGold: (amount) => {
+    const state = get();
+    const amt = Math.max(0, Math.min(amount, state.gold));
+    if (amt <= 0) return 0;
+    set({ gold: state.gold - amt });
+    return amt;
+  },
+  // Remove a bench unit to hand to a partner. Returns a portable snapshot (or null) — the
+  // unit leaves THIS player without returning to the pool (it's moving, not selling).
+  coopRemoveUnit: (iid) => {
+    const state = get();
+    const unit = state.units.find((u) => u.iid === iid && u.pos === null);
+    if (!unit) return null;
+    set({ units: state.units.filter((u) => u.iid !== iid) });
+    return { defId: unit.defId, star: unit.star, items: Array.isArray(unit.items) ? unit.items : [] };
+  },
+  coopReceiveGold: (amount) => {
+    if (!(amount > 0)) return;
+    set({ gold: get().gold + Math.round(amount) });
+  },
+  // Place a received unit on the bench (if there's room), merging copies like any pickup.
+  coopReceiveUnit: (snap) => {
+    const state = get();
+    if (state.units.filter((u) => u.pos === null).length >= BENCH_SIZE) { toast("Bench full — unit lost", "Banc plein — unité perdue"); return; }
+    const inst = { ...makeInstance(snap.defId), star: (snap.star ?? 1) as UnitInstance["star"], items: Array.isArray(snap.items) ? snap.items : [] };
+    const { units, dropped } = applyCombines([...state.units, inst]);
+    set({ units, items: [...state.items, ...dropped] });
   },
 
   moveToBoard: (iid, col, row) => {
