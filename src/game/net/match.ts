@@ -42,20 +42,21 @@ function rosterFor(room: Room): string[] {
 }
 
 /** A bot's board for a round, scaled by stage progress and difficulty. The "expert"/
- *  "ultimate" tiers draft synergies + items; a "clone" replays the host's last game (ghost). */
-function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string, allowed: string[], enabledItems?: string[], ghost?: Room["ghost"]): UnitInstance[] {
+ *  "ultimate" tiers draft synergies + items and COUNTER-DRAFT vs `opponentBoard` (the human
+ *  they're about to fight); a "clone" replays the host's last game (ghost). */
+function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string, allowed: string[], enabledItems?: string[], ghost?: Room["ghost"], opponentBoard?: UnitInstance[]): UnitInstance[] {
   const cr = cumulativeRound(stage, round);
   // Clone bot: field the host's last-game board for this cumulative round. Falls back to a
   // tough synergy board on the host's first-ever game (no ghost yet).
   if (difficulty === "clone") {
     const g = ghostBoardForRound(ghost, cr);
     if (g && g.length) return g.map((u, i) => ({ ...u, iid: `clone${salt}_${cr}_${i}` }));
-    return generatePlayerLikeBoard(stage, round, "expert", (() => { let s = 0; for (let i = 0; i < salt.length; i++) s = (s * 31 + salt.charCodeAt(i)) >>> 0; return s + cr; })(), allowed, enabledItems);
+    return generatePlayerLikeBoard(stage, round, "expert", (() => { let s = 0; for (let i = 0; i < salt.length; i++) s = (s * 31 + salt.charCodeAt(i)) >>> 0; return s + cr; })(), allowed, enabledItems, opponentBoard);
   }
   let seed = 0;
   for (let i = 0; i < salt.length; i++) seed = (seed * 31 + salt.charCodeAt(i)) >>> 0;
   // Economy-realistic: a board a real player could actually build at this round.
-  return generatePlayerLikeBoard(stage, round, difficulty, seed + cr, allowed, enabledItems);
+  return generatePlayerLikeBoard(stage, round, difficulty, seed + cr, allowed, enabledItems, opponentBoard);
 }
 
 /** Deterministic shuffle for pairings. */
@@ -373,13 +374,36 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
   const allowed = rosterFor(room);
   const botBoards: Record<string, UnitInstance[]> = {};
 
-  // Bots get a deterministic host-generated board each round (humans synced theirs).
-  for (const p of alive) {
-    if (p.isBot) {
-      const b = botBoard(stage, room.meta.round, p.botDifficulty, p.uid, allowed, room.rules?.itemsEnabled, room.ghost);
-      room.players[p.uid] = { ...p, board: b };
-      botBoards[p.uid] = b;
+  // Standard PvP: resolve the pairing FIRST so a bot can read (and counter-draft against) the
+  // board of the HUMAN it's about to fight. Same deterministic shuffle the assign loop reuses.
+  const isStandardPvp = kind !== "pve" && !isDoubleUp(room.rules);
+  let order: string[] = [];
+  const oppOf = new Map<string, string>();
+  if (isStandardPvp) {
+    order = shuffled(alive.map((p) => p.uid).sort(), stage * 131 + room.meta.round);
+    for (let i = 0; i + 1 < order.length; i += 2) {
+      if (room.players[order[i]]?.lastOpp === order[i + 1] && i + 2 < order.length) {
+        [order[i + 1], order[i + 2]] = [order[i + 2], order[i + 1]];
+      }
     }
+    for (let i = 0; i < order.length; i += 2) {
+      const a = order[i], b = order[i + 1];
+      if (b) { oppOf.set(a, b); oppOf.set(b, a); }
+      else if (order.length > 1) oppOf.set(a, order[i - 1]); // odd → ghost of the previous
+    }
+  }
+
+  // Bots get a deterministic host-generated board each round (humans synced theirs). A bot
+  // facing a HUMAN counter-drafts against that human's current board (bot opponents' boards
+  // aren't built yet, so those stay un-countered — no circular dependency).
+  for (const p of alive) {
+    if (!p.isBot) continue;
+    const oppUid = oppOf.get(p.uid);
+    const opp = oppUid ? room.players[oppUid] : undefined;
+    const oppBoard = opp && !opp.isBot ? board(opp) : undefined;
+    const b = botBoard(stage, room.meta.round, p.botDifficulty, p.uid, allowed, room.rules?.itemsEnabled, room.ghost, oppBoard);
+    room.players[p.uid] = { ...p, board: b };
+    botBoards[p.uid] = b;
   }
 
   const combat: Record<string, CombatAssign> = {};
@@ -418,13 +442,7 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
     // damage into the shared HP pool comes from a coherent clash, not two random fights.
     buildDoubleUpCombat(combat, room, alive, stage);
   } else {
-    const order = shuffled(alive.map((p) => p.uid).sort(), stage * 131 + room.meta.round);
-    // Avoid an immediate rematch when there's someone else to swap with.
-    for (let i = 0; i + 1 < order.length; i += 2) {
-      if (room.players[order[i]]?.lastOpp === order[i + 1] && i + 2 < order.length) {
-        [order[i + 1], order[i + 2]] = [order[i + 2], order[i + 1]];
-      }
-    }
+    // Reuse the pairing computed above (so it matches the bots' counter-draft opponents).
     for (let i = 0; i < order.length; i += 2) {
       const a = order[i];
       if (i + 1 < order.length) assign(combat, room, a, order[i + 1], stage, false);
