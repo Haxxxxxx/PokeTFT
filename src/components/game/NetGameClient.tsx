@@ -6,7 +6,7 @@ import { useGame, BENCH_SIZE, PENSION_COST, PENSION_ROUNDS, resolveBenchSlots } 
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, concede, markCarouselPicked, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS } from "@/game/net/match";
-import { simulate } from "@/game/engine/combat";
+import { simulate, type FrameUnit } from "@/game/engine/combat";
 import { getDef, spriteUrl, hasDef } from "@/game/data/mons";
 import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, modeTeamBuff, modeSignatureAugment, getMode, pickMonoType, isDoubleUp } from "@/game/data/gameModes";
 import { streakGold, roundKind, advanceRound, boardSizeForLevel, cumulativeRound, ECONOMY } from "@/game/config";
@@ -486,6 +486,17 @@ export function NetGameClient() {
     // late buzzer-beater sync for the same stage/round/opp) — not just on round id,
     // else the replay frames can drift from the authoritative win flag.
   }, [phase, meta?.stage, meta?.round, myCombat?.oppUid, myCombat?.flip, mySelfSig, myOppSig]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Remember my LAST fight's units (with cumulative damage/tank/heal) so the end screen can
+  // crown an MVP. My side is "ally" normally, "enemy" when the pairing flipped me.
+  const lastFightRef = useRef<FrameUnit[] | null>(null);
+  useEffect(() => {
+    if (!combatResult?.frames?.length || !myCombat) return;
+    const myTeam = myCombat.flip ? "enemy" : "ally";
+    const last = combatResult.frames[combatResult.frames.length - 1];
+    const mine = last.units.filter((u) => u.team === myTeam);
+    if (mine.length) lastFightRef.current = mine;
+  }, [combatResult, myCombat?.flip]);
 
   // Live replay of the rival I'm spectating (from the host's frozen boards).
   const spectateCombat = spectate && spectate !== myUid ? room?.combat?.[spectate] : undefined;
@@ -1346,6 +1357,35 @@ export function NetGameClient() {
               ? <div className="text-sm font-semibold text-rose-300">{lang === "fr" ? "L'hôte a quitté — partie terminée." : "The host left — game ended."}</div>
               : <div className="text-sm text-slate-400">{t.net_placed(me?.place ?? 1)}</div>}
           </div>
+
+          {/* MVP of your final fight — top damage dealer, with tank/heal. */}
+          {(() => {
+            const mine = lastFightRef.current;
+            if (!mine || !mine.length) return null;
+            const mvp = [...mine].sort((a, b) => b.dmgDealt - a.dmgDealt)[0];
+            if (!mvp || mvp.dmgDealt <= 0) return null;
+            const topTank = [...mine].sort((a, b) => b.dmgTaken - a.dmgTaken)[0];
+            const topHeal = [...mine].sort((a, b) => b.healed - a.healed)[0];
+            const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${Math.round(n)}`);
+            return (
+              <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10">
+                <div className="rounded-lg bg-black/30 border border-amber-500/40 p-1 shrink-0 relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={spriteUrl(mvp.dex)} alt="" width={44} height={44} style={{ imageRendering: "pixelated" }} />
+                  <span className="absolute -top-1.5 -left-1.5 text-sm">⭐</span>
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[9px] uppercase tracking-widest text-amber-200/70 font-bold">{lang === "fr" ? "MVP du dernier combat" : "Last-fight MVP"}</div>
+                  <div className="text-sm font-extrabold text-amber-200 truncate">{mvp.name}</div>
+                  <div className="flex items-center gap-2.5 mt-0.5 text-[10px] font-bold">
+                    <span className="text-rose-300" title={lang === "fr" ? "Dégâts" : "Damage"}>⚔ {fmt(mvp.dmgDealt)}</span>
+                    {topTank && topTank.dmgTaken > 0 && <span className="text-sky-300" title={lang === "fr" ? "Encaissé" : "Tanked"}>🛡 {fmt(topTank.dmgTaken)} ({topTank.name.split(" ")[0]})</span>}
+                    {topHeal && topHeal.healed > 0 && <span className="text-emerald-300" title={lang === "fr" ? "Soins" : "Healed"}>✚ {fmt(topHeal.healed)}</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Ranked LP outcome — what this game won/lost on the ladder. */}
           {rankResult && (() => {
