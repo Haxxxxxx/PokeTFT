@@ -9,6 +9,7 @@ import { getDef, spriteUrl } from "@/game/data/mons";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { TraitGlyph } from "@/components/game/TraitGlyph";
 import { TYPE_COLOR } from "@/game/ui";
+import { computeAchievements, ACHIEVEMENT_TIER_COLOR } from "@/game/data/achievements";
 import { ArrowLeft, Trophy, Medal, Swords, Crown, X } from "lucide-react";
 
 /** Placement → accent colour (1st gold, top-half emerald, rest slate). */
@@ -67,6 +68,12 @@ export function ProfileScreen() {
     return { games, wins, top4, avg };
   }, [history]);
 
+  const achievements = useMemo(
+    () => computeAchievements({ games: stats.games, wins: stats.wins, topHalf: stats.top4, rating: profile?.rating ?? START_RATING, history: history ?? [] }),
+    [stats, profile?.rating, history],
+  );
+  const earnedCount = achievements.filter((a) => a.earned).length;
+
   const name = profile?.username || (isOther ? "" : user?.displayName) || "Trainer";
   const photo = profile?.photoURL ?? (isOther ? null : user?.photoURL) ?? null;
   const tr = (en: string, fr: string) => (lang === "fr" ? fr : en);
@@ -124,6 +131,30 @@ export function ProfileScreen() {
           <StatCard icon={<Crown size={15} />} label={tr("Wins", "Victoires")} value={stats.wins} color="#fbbf24" />
           <StatCard icon={<Medal size={15} />} label={tr("Top half", "Top moitié")} value={stats.top4} color="#34d399" />
           <StatCard icon={<Trophy size={15} />} label={tr("Avg place", "Place moy.")} value={stats.games ? stats.avg.toFixed(1) : "—"} color="#38bdf8" />
+        </div>
+
+        {/* Achievements — earned light up, locked are dimmed. */}
+        <div className="panel rounded-2xl p-3">
+          <h2 className="text-[10px] uppercase tracking-widest text-amber-200/60 font-bold mb-2.5 px-1 flex items-center justify-between">
+            <span>{tr("Achievements", "Hauts faits")}</span>
+            <span className="text-slate-500 tabular-nums">{earnedCount}/{achievements.length}</span>
+          </h2>
+          <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+            {achievements.map((a) => {
+              const color = ACHIEVEMENT_TIER_COLOR[a.tier];
+              return (
+                <div
+                  key={a.id}
+                  title={`${tr(a.name, a.nameFr)} — ${tr(a.desc, a.descFr)}${a.earned ? "" : tr(" (locked)", " (verrouillé)")}`}
+                  className={`aspect-square rounded-lg border flex flex-col items-center justify-center gap-0.5 transition-all ${a.earned ? "" : "opacity-30 grayscale"}`}
+                  style={a.earned ? { borderColor: `${color}80`, background: `${color}14`, boxShadow: `0 0 14px -8px ${color}` } : { borderColor: "rgba(148,163,184,0.18)", background: "rgba(255,255,255,0.02)" }}
+                >
+                  <span className="text-lg leading-none">{a.icon}</span>
+                  <span className="text-[8px] font-bold text-center leading-tight px-0.5 truncate w-full" style={{ color: a.earned ? color : "#64748b" }}>{tr(a.name, a.nameFr)}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* History list */}
