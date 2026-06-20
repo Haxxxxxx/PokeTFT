@@ -2,8 +2,9 @@
 
 import type { UnitInstance, PokeType } from "../types";
 import { SHOP_ODDS, boardSizeForLevel, roundsInStage, type Cost } from "../config";
-import { UNITS, getDef } from "../data/mons";
+import { UNITS, getDef, typesForStar } from "../data/mons";
 import { TRAITS_BY_KEY } from "../data/traits";
+import { effectiveness } from "../data/typeChart";
 import { canMega, MEGA_STONE } from "../data/mega";
 import { makeRng, weightedPick, randInt, type Rng } from "./rng";
 
@@ -50,15 +51,40 @@ export function realisticLevel(stage: number, round: number): number {
   return Math.max(1, Math.min(10, Math.round(start + (end - start) * frac)));
 }
 
-/** Per-tier PLAY QUALITY (never stat cheats). lvlOff shifts where the bot sits relative to
- *  the good-player curve (≤ 0 so it's never ahead of what a player could field); the rest
- *  govern how WELL it plays — synergy count, star-up/item discipline, when it slams a Mega.
- *  hard/expert/ultimate map from the synergy generator's "base"/"strong"/"elite". */
-const TIER_PLAY = {
-  base:   { lvlOff: -1, themes: 1, starMult: 0.85, itemRate: 0.45, megaStage: 5 }, // hard
-  strong: { lvlOff: 0,  themes: 2, starMult: 1.0,  itemRate: 0.8,  megaStage: 4 }, // expert
-  elite:  { lvlOff: 0,  themes: 3, starMult: 1.1,  itemRate: 1.0,  megaStage: 3 }, // ultimate
-} as const;
+type TierName = "easy" | "medium" | "hard" | "expert" | "ultimate";
+
+/** Per-tier PLAY QUALITY (never stat cheats). Every tier rolls the same real shop and is
+ *  capped at the good-player level curve via `lvlOff` (≤ 0 — never ahead of a player). The
+ *  rest is pure skill: how many synergies it commits to + actually activates, how it
+ *  concentrates star-ups + items, when it Mega-evolves, and how hard it COUNTERS the
+ *  opponent's types (`counter`, 0 = doesn't read the foe → 1 = drafts a full type counter).
+ *  This is the whole difficulty ladder, smoothly graded from beginner to flawless. */
+const TIER_PLAY: Record<TierName, { lvlOff: number; themes: number; starMult: number; itemRate: number; megaStage: number; counter: number; smart: boolean }> = {
+  easy:     { lvlOff: -2, themes: 0, starMult: 0.4,  itemRate: 0,    megaStage: 99, counter: 0,   smart: false }, // a beginner: small board, no synergy/items
+  medium:   { lvlOff: -1, themes: 1, starMult: 0.7,  itemRate: 0.2,  megaStage: 6,  counter: 0,   smart: false }, // casual: one loose synergy
+  hard:     { lvlOff: -1, themes: 1, starMult: 0.85, itemRate: 0.5,  megaStage: 5,  counter: 0.4, smart: true  }, // solid: a real synergy + items, light counter
+  expert:   { lvlOff: 0,  themes: 2, starMult: 1.0,  itemRate: 0.8,  megaStage: 4,  counter: 0.8, smart: true  }, // strong: two synergies, counters you
+  ultimate: { lvlOff: 0,  themes: 3, starMult: 1.1,  itemRate: 1.0,  megaStage: 3,  counter: 1.0, smart: true  }, // flawless: triple synergy, full counter
+};
+
+/** Tally the opponent board's defensive typing (per-star, so an evolved Charizard counts as
+ *  Fire/Flying). Drives counter-drafting. */
+function opponentTypeCounts(board?: UnitInstance[]): Map<PokeType, number> {
+  const m = new Map<PokeType, number>();
+  for (const u of board ?? []) {
+    if (!u?.defId) continue;
+    for (const t of typesForStar(getDef(u.defId), u.star)) m.set(t, (m.get(t) ?? 0) + 1);
+  }
+  return m;
+}
+
+/** How effective MY type's attacks are against the opponent's spread (>1 = super-effective
+ *  on average, <1 = resisted). A theme of this type → units whose moves hit their weakness. */
+function counterScore(myType: PokeType, oppCounts: Map<PokeType, number>): number {
+  let s = 0, n = 0;
+  for (const [ot, c] of oppCounts) { s += effectiveness(myType, [ot]) * c; n += c; }
+  return n ? s / n : 1;
+}
 
 /** Build a board of `count` mons at shop-`level` quality. Exported for the test
  *  harnesses; in-app it's wrapped by generateCreepBoard / generatePlayerLikeBoard. */
@@ -87,42 +113,15 @@ export function generateBoard(level: number, count: number, seed: number, allowe
   return board;
 }
 
-/** An economy-realistic AI board: what a real player could actually field at this
- *  point in the game. Board size, unit cost, and star level all track a believable
- *  gold/level curve (no 4-cost 2-stars in the first PvP). Deterministic per seed. */
-export function generatePlayerLikeBoard(stage: number, round: number, difficulty: BotLevel | undefined, seed: number, allowedIds?: string[], enabledItems?: string[]): UnitInstance[] {
-  // The three skilled tiers draft synergies + items (their edge is PLAY, not stats):
-  //   hard → "base", expert → "strong", ultimate → "elite". None exceeds the good-player curve.
-  if (difficulty === "ultimate") return generateExpertBoard(stage, round, seed, allowedIds, enabledItems, "elite");
-  if (difficulty === "expert") return generateExpertBoard(stage, round, seed, allowedIds, enabledItems, "strong");
-  if (difficulty === "hard") return generateExpertBoard(stage, round, seed, allowedIds, enabledItems, "base");
-  const rng: Rng = makeRng(seed >>> 0);
-  const byCost = byCostFrom(allowedIds);
-
-  // easy/medium sit BELOW the good-player curve and roll a REAL shop (SHOP_ODDS by level),
-  // so they can never field more, higher-cost, or higher-star units than that level allows.
-  const lvlOff = difficulty === "easy" ? -2 : -1; // medium is the default branch
-  const starMult = difficulty === "easy" ? 0.4 : 0.7;
-  const level = Math.max(1, Math.min(10, realisticLevel(stage, round) + lvlOff));
-  const size = Math.max(1, Math.min(boardSizeForLevel(level), MAX_BOARD));
-  const odds = SHOP_ODDS[level];
-  const twoStarChance = Math.min(0.55, Math.max(0, (stage - 2) * 0.12)) * starMult;
-  const threeStarChance = stage >= 5 ? Math.min(0.18, (stage - 4) * 0.05) * starMult : 0;
-
-  const board: UnitInstance[] = [];
-  for (let i = 0; i < size; i++) {
-    let cost = (weightedPick(rng, odds) + 1) as Cost;
-    let t = 0; while (byCost[cost].length === 0 && t++ < 5) cost = ((cost % 5) + 1) as Cost;
-    const defId = byCost[cost][randInt(rng, byCost[cost].length)];
-    let star: 1 | 2 | 3 = 1;
-    // Cheaper units star up first, exactly like a real player's roster.
-    if (cost <= 2 && rng() < threeStarChance) star = 3;
-    else if (cost <= 3 && rng() < twoStarChance) star = 2;
-    const col = COL_ORDER[i % COL_ORDER.length];
-    const row = ROW_ORDER[Math.floor(i / COL_ORDER.length) % ROW_ORDER.length];
-    board.push({ iid: `g${seed}_${i}`, defId, star, pos: [col, row], items: [] });
-  }
-  return board;
+/** The single entry for every AI board. ALL difficulties run through one economy-accurate
+ *  generator (buildBotBoard) — capped at the good-player curve, rolling the real shop, no
+ *  stat cheats. The ONLY thing that changes between tiers is play skill (TIER_PLAY): how
+ *  many synergies it activates, how it concentrates upgrades/items, and how hard it counters
+ *  the opponent's types. `opponentBoard` (the human it's about to fight) lets it adapt.
+ *  Deterministic per seed (host-generated + persisted; clients just replay it). */
+export function generatePlayerLikeBoard(stage: number, round: number, difficulty: BotLevel | undefined, seed: number, allowedIds?: string[], enabledItems?: string[], opponentBoard?: UnitInstance[]): UnitInstance[] {
+  const tier: TierName = difficulty && difficulty in TIER_PLAY ? (difficulty as TierName) : "medium";
+  return buildBotBoard(stage, round, tier, seed, allowedIds, enabledItems, opponentBoard);
 }
 
 // ── Expert AI: synergy-aware drafting + item builds ──────────────────────────
@@ -161,19 +160,25 @@ function pickItems(pref: string[], enabled: Set<string> | null, n: number, used:
   return out;
 }
 
-/** Drafting intensity for the synergy/item bot. Mapped from difficulty after the ladder
- *  shift: hard→"base", expert→"strong", ultimate→"elite". */
+/** Legacy intensity tag (base/strong/elite). Kept so existing callers/tests keep working;
+ *  maps to the hard/expert/ultimate tiers. */
 export type ExpertIntensity = "base" | "strong" | "elite";
+const INTENSITY_TIER: Record<ExpertIntensity, TierName> = { base: "hard", strong: "expert", elite: "ultimate" };
 
-/** A synergy+item bot board. Its threat is PLAY QUALITY, never cheat stats: the board is
- *  hard-capped at a good player's level/size/shop for this round (realisticLevel + TIER_PLAY),
- *  rolls the SAME SHOP_ODDS a player of that level rolls, and never exceeds the achievable
- *  star/item economy. Intensity only changes how WELL it plays — synergy count, star/item
- *  discipline, Mega timing: "base"=hard, "strong"=expert, "elite"=ultimate (a flawless
- *  player, not a buffed one). Deterministic per seed. */
-export function generateExpertBoard(stage: number, round: number, seed: number, allowedIds?: string[], enabledItems?: string[], intensity: ExpertIntensity = "base"): UnitInstance[] {
+/** Thin compatibility wrapper — prefer generatePlayerLikeBoard(difficulty, …). */
+export function generateExpertBoard(stage: number, round: number, seed: number, allowedIds?: string[], enabledItems?: string[], intensity: ExpertIntensity = "base", opponentBoard?: UnitInstance[]): UnitInstance[] {
+  return buildBotBoard(stage, round, INTENSITY_TIER[intensity], seed, allowedIds, enabledItems, opponentBoard);
+}
+
+/** The one AI board generator for every tier. PLAY QUALITY only, never stat cheats: the
+ *  board is hard-capped at a good player's level/size/shop for this round (realisticLevel +
+ *  TIER_PLAY), rolls the SAME SHOP_ODDS a player of that level rolls, and never exceeds the
+ *  achievable star/item economy. Tier changes how WELL it plays; `opponentBoard` lets the
+ *  skilled tiers COUNTER-DRAFT — committing to synergies whose types are super-effective
+ *  against the opponent's spread. Deterministic per seed. */
+function buildBotBoard(stage: number, round: number, tier: TierName, seed: number, allowedIds?: string[], enabledItems?: string[], opponentBoard?: UnitInstance[]): UnitInstance[] {
   const rng: Rng = makeRng(seed >>> 0);
-  const cfg = TIER_PLAY[intensity];
+  const cfg = TIER_PLAY[tier];
   const byCost = byCostFrom(allowedIds);
   const allow = allowedIds && allowedIds.length ? new Set(allowedIds) : null;
 
@@ -188,14 +193,22 @@ export function generateExpertBoard(stage: number, round: number, seed: number, 
   // Only a unit the bot's level can actually ROLL is legal (SHOP_ODDS[cost] > 0).
   const legalCost = (id: string) => odds[getDef(id).cost - 1] > 0;
 
-  // Pick `cfg.themes` synergy types to commit to, weighted by ROSTER DEPTH (≥4 carriers) —
-  // a strong player commits to synergies they can actually fill to a breakpoint.
+  // COUNTER-DRAFT: read the opponent's typing so we commit to synergies that hit their
+  // weakness. A type whose attacks are super-effective vs their spread gets weighted up.
+  const oppCounts = opponentTypeCounts(opponentBoard);
+  const useCounter = cfg.counter > 0 && oppCounts.size > 0;
+
+  // Pick `cfg.themes` synergy types, weighted by ROSTER DEPTH (≥4 legal-cost carriers) AND
+  // counter advantage — a strong player commits to synergies they can fill that also punish
+  // the foe.
   const typeUnits = new Map<PokeType, string[]>();
   for (const u of UNITS) {
     if (allow && !allow.has(u.id)) continue;
     for (const t of u.types) { const arr = typeUnits.get(t) ?? (typeUnits.set(t, []).get(t)!); arr.push(u.id); }
   }
-  const pickable = [...typeUnits.entries()].filter(([, ids]) => ids.filter(legalCost).length >= 4).map(([k, ids]) => ({ k, w: ids.filter(legalCost).length }));
+  const pickable = [...typeUnits.entries()]
+    .filter(([, ids]) => ids.filter(legalCost).length >= 4)
+    .map(([k, ids]) => ({ k, w: Math.max(0.05, ids.filter(legalCost).length * (useCounter ? 1 + (counterScore(k, oppCounts) - 1) * cfg.counter * 1.6 : 1)) }));
   const themeList: PokeType[] = [];
   for (let i = 0; i < cfg.themes && pickable.length; i++) {
     const idx = weightedPick(rng, pickable.map((p) => p.w));
@@ -254,7 +267,7 @@ export function generateExpertBoard(stage: number, round: number, seed: number, 
   // Concentrate the rolled star-ups onto the best CARRIES (a good player upgrades their
   // damage dealers first). This re-allocates the SAME number of 2★/3★ (no extra — stays
   // legal: 3★ only on ≤2-cost, 2★ only on ≤3-cost), just onto higher-priority units.
-  if (intensity !== "base" && board.length) {
+  if (cfg.smart && board.length) {
     const prio = (u: UnitInstance) => (isTank(u.defId) ? 0 : 3) + getDef(u.defId).cost;
     const threes = board.filter((u) => u.star === 3).length;
     const twos = board.filter((u) => u.star === 2).length;
