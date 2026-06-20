@@ -180,13 +180,21 @@ export function LobbyScreen() {
 
           {/* Host: add AI */}
           {isHost && openSlots > 0 && (
-            <div className="flex items-center justify-center gap-2 mt-5 pt-4 border-t border-slate-800">
-              <span className="text-[10px] uppercase tracking-wide text-slate-500">{t.l_net_add_ai}</span>
-              {(["easy", "medium", "hard", "expert", "ultimate"] as const).map((d) => (
-                <button key={d} data-testid={`add-bot-${d}`} onClick={() => addBot(d)} className={`px-3 py-1.5 rounded-md border text-[11px] font-bold capitalize transition-colors ${d === "ultimate" ? "bg-rose-900/40 hover:bg-rose-700 border-rose-500/60 text-rose-200" : d === "expert" ? "bg-amber-900/40 hover:bg-amber-700 border-amber-600/60 text-amber-200" : "bg-violet-900/50 hover:bg-violet-700 border-violet-700 text-violet-200"}`}>
-                  {d === "easy" ? t.p_diff_easy : d === "medium" ? t.p_diff_medium : d === "hard" ? t.p_diff_hard : d === "expert" ? t.p_diff_expert : t.p_diff_ultimate}
-                </button>
-              ))}
+            <div className="flex flex-col items-center gap-2 mt-5 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <span className="text-[10px] uppercase tracking-wide text-slate-500">{t.l_net_add_ai}</span>
+                {(["easy", "medium", "hard", "expert", "ultimate"] as const).map((d) => (
+                  <button key={d} data-testid={`add-bot-${d}`} onClick={() => addBot(d)} className={`px-3 py-1.5 rounded-md border text-[11px] font-bold capitalize transition-colors ${d === "ultimate" ? "bg-rose-900/40 hover:bg-rose-700 border-rose-500/60 text-rose-200" : d === "expert" ? "bg-amber-900/40 hover:bg-amber-700 border-amber-600/60 text-amber-200" : "bg-violet-900/50 hover:bg-violet-700 border-violet-700 text-violet-200"}`}>
+                    {d === "easy" ? t.p_diff_easy : d === "medium" ? t.p_diff_medium : d === "hard" ? t.p_diff_hard : d === "expert" ? t.p_diff_expert : t.p_diff_ultimate}
+                  </button>
+                ))}
+              </div>
+              {/* Clone bot — replays YOUR last game, round by round. */}
+              <button data-testid="add-bot-clone" onClick={() => addBot("clone")}
+                title={lang === "fr" ? "Un clone qui rejoue TA dernière partie, tour par tour" : "A clone that replays YOUR last game, round by round"}
+                className="px-3 py-1.5 rounded-md border text-[11px] font-bold transition-colors bg-sky-900/40 hover:bg-sky-700 border-sky-500/60 text-sky-200 inline-flex items-center gap-1.5">
+                <span>🧬</span> {lang === "fr" ? "Clone (ta dernière partie)" : "Clone (your last game)"}
+              </button>
             </div>
           )}
 

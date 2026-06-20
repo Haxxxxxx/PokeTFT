@@ -9,7 +9,8 @@ import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, s
 import { simulate } from "@/game/engine/combat";
 import { getDef, spriteUrl, hasDef } from "@/game/data/mons";
 import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, modeTeamBuff, modeSignatureAugment, getMode, pickMonoType, isDoubleUp } from "@/game/data/gameModes";
-import { streakGold, roundKind, advanceRound, boardSizeForLevel, ECONOMY } from "@/game/config";
+import { streakGold, roundKind, advanceRound, boardSizeForLevel, cumulativeRound, ECONOMY } from "@/game/config";
+import { serializeBoard, saveGhost, type GhostUnit } from "@/game/net/ghost";
 import { interest } from "@/game/engine/economy";
 import { MEGA_STONE, canMega } from "@/game/data/mega";
 import { ITEM_POOL, RARITY_COLOR, COMPONENT_IDS } from "@/game/data/itemPool";
@@ -219,6 +220,9 @@ export function NetGameClient() {
   // setState is async, so the `picked`/`showAugment` gate alone isn't enough.
   const pickLatch = useRef<string | null>(null);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Clone-bot ghost: accumulate my board per cumulative round through the game, saved on
+  // game-over as users/{uid}/ghost so a future Clone bot can replay my last game.
+  const ghostSnaps = useRef<Record<number, GhostUnit[]>>({});
   const actedDeadline = useRef(-1);
   const [roundLog, setRoundLog] = useState<{ stage: number; round: number; won: boolean; pve: boolean; oppUid: string; oppName: string; dmg: number; survivors: number }[]>([]);
   // Past timeline chip the player tapped to see a fight recap (null = closed).
@@ -380,7 +384,7 @@ export function NetGameClient() {
       // save can still heal it via the self-heal branch below — a slow priv read can
       // never permanently wipe an in-progress game.
       if (save) { importSave({ ...save, units: asUnits(save.units) }, roster(), enabledItems); hydrated.current = "save"; }
-      else { newGame(roster(), enabledItems, modeStartItems(room.rules)); hydrated.current = "fresh"; }
+      else { newGame(roster(), enabledItems, modeStartItems(room.rules)); hydrated.current = "fresh"; ghostSnaps.current = {}; }
       // Mark the current planning round consumed so netRound doesn't double-grant it.
       lastRoundKey.current = phase === "planning" ? `${meta.stage}-${meta.round}` : "__hydrated__";
       return;
@@ -426,6 +430,8 @@ export function NetGameClient() {
     syncTimer.current = setTimeout(() => {
       const g = useGame.getState();
       syncBoard(room.code, myUid, g.units, g.exportSave(), g.level, g.augments);
+      // Snapshot my board for this cumulative round (last edit wins) for the Clone-bot ghost.
+      if (meta) ghostSnaps.current[cumulativeRound(meta.stage, meta.round)] = serializeBoard(g.units);
     }, 250);
     return () => { if (syncTimer.current) clearTimeout(syncTimer.current); };
   }, [units, gold, phase, myUid]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -618,6 +624,8 @@ export function NetGameClient() {
       const wonByTeam = meta?.winnerTeam != null && meP0?.teamId === meta.winnerTeam;
       const lastOneStanding = meP0?.place === 1 || meta?.winnerUid === myUid || wonByTeam;
       if (lastOneStanding) sfx.victory(); else sfx.defeat();
+      // Save this game's per-round boards as my ghost so a future Clone bot can replay it.
+      if (myUid) saveGhost(myUid, ghostSnaps.current, room?.rules?.generations).catch(() => {});
       setRankResult(null); // clear any prior game's LP until this one's applyRankedResult resolves
       // Record this finished game in the player's history (idempotent by room code).
       if (myUid && room?.code) {

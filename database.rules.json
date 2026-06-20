@@ -68,6 +68,7 @@
         "rules":    { ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
         "teams":    { ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)",
           "$tid": { "hp": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500" } } },
+        "ghost":    { ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
         "transfers": {
           ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)",
           "$toUid": {
