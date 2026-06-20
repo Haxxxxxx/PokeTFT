@@ -172,8 +172,9 @@ export function generateExpertBoard(stage: number, round: number, seed: number, 
   const threeStarChance = stage >= (elite ? 3 : strong ? 4 : 5) ? (stage - (elite ? 2 : strong ? 3 : 4)) * (elite ? 0.14 : strong ? 0.1 : 0.07) : 0;
   size = Math.max(1, Math.min(size, Math.min(boardSizeForLevel(strong ? 10 : 9), MAX_BOARD)));
   // Elite fields a flat stat advantage on every unit (like a mild boss) so it can't simply
-  // be out-economied — this is the lever that makes the top tier actually punishing.
-  const statScale = elite ? 1.18 + Math.min(stage, 8) * 0.025 : undefined;
+  // be out-economied — this is the lever that makes the top tier actually punishing. Tuned
+  // down from 1.23→1.38: now ~1.15 (stage 2) → ~1.27 (stage 8).
+  const statScale = elite ? 1.12 + Math.min(stage, 8) * 0.018 : undefined;
 
   // Tally every type in the legal roster, then pick a theme that actually has the
   // depth to reach a breakpoint (≥4 units), weighted toward the more populous types.
