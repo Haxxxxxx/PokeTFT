@@ -24,6 +24,8 @@ export type GameModeFlags = {
   megaMadness?: boolean;
   /** PvE rounds drop richer loot (more gold, more frequent free units/items). */
   treasure?: boolean;
+  /** 2v2: players pair into teams sharing ONE HP pool; combat pairs across teams. */
+  doubleUp?: boolean;
 };
 
 export type GameMode = {
@@ -128,6 +130,13 @@ export const MODES: GameMode[] = [
     descFr: "Les tours PvE vous comblent d'or, d'objets et d'unités gratuites.",
     group: "gimmick", color: "#fbbf24", flags: { treasure: true },
   },
+  {
+    id: "double-up",
+    name: "Double Up (2v2)", nameFr: "Duo (2c2)",
+    desc: "Pair into teams of 2 sharing one HP bar. Fight across teams — last team standing wins.",
+    descFr: "Formez des équipes de 2 partageant une barre de PV. Combattez entre équipes — la dernière debout gagne.",
+    group: "gimmick", color: "#34d399", flags: { doubleUp: true },
+  },
 ];
 
 export const MODE_BY_ID: Record<string, GameMode> = Object.fromEntries(MODES.map((m) => [m.id, m]));
@@ -214,4 +223,18 @@ export function modeBossId(rules: RoomRulesLike | undefined): string | null {
 /** The region's PvE boss display name, or "Boss". */
 export function modeBossName(rules: RoomRulesLike | undefined): string {
   return getMode(rules?.mode).bossName ?? "Boss";
+}
+
+/** True if this room is a 2v2 Double Up game. */
+export function isDoubleUp(rules: RoomRulesLike | undefined): boolean {
+  return !!getMode(rules?.mode).flags?.doubleUp;
+}
+
+/** Pair players into deterministic teams of 2 (sorted by uid so host + clients agree).
+ *  Returns a map uid → teamId (0,1,2,…). A trailing odd player forms a solo team. */
+export function assignTeams(uids: string[]): Record<string, number> {
+  const sorted = [...uids].sort();
+  const out: Record<string, number> = {};
+  for (let i = 0; i < sorted.length; i++) out[sorted[i]] = Math.floor(i / 2);
+  return out;
 }

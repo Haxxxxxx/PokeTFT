@@ -40,6 +40,8 @@ export type RoomPlayer = {
   /** Public combat augments (synced so host + clients resolve identical team buffs,
    *  and so rivals are scoutable). */
   augments?: string[];
+  /** Double Up: which team (0,1,2,…) this player belongs to. Partners share a team. */
+  teamId?: number;
   /** Legacy public economy snapshot. Econ now lives in the private priv/{code}/{uid}
    *  node (see roomStore.mySave); kept optional only so reconnect can fall back to
    *  it for sessions that synced before the privacy migration. */
@@ -65,6 +67,8 @@ export type RoomMeta = {
   /** Authoritative winner (place 1) written once when the game ends, so EVERY client
    *  shows the identical result instead of each deriving it from its own alive view. */
   winnerUid?: string;
+  /** Double Up: the winning team id (both partners share the win). */
+  winnerTeam?: number;
   updatedAt: number | object;
 };
 
@@ -116,6 +120,15 @@ export type RoomRules = {
   mode?: string;
 };
 
+/** Double Up: a team of 2 sharing one HP pool. Keyed by teamId under games/{code}/teams. */
+export type TeamState = {
+  hp: number;
+  alive: boolean;
+  place: number | null;
+  /** Member uids (for partner lookup + display). */
+  members: string[];
+};
+
 export type Room = {
   code: string;
   meta: RoomMeta;
@@ -126,6 +139,8 @@ export type Room = {
   carousel?: Record<string, string[]>;
   /** Pending invites — friends invited but not yet joined (shown as placeholder slots). */
   invited?: Record<string, { username: string; photoURL?: string | null }>;
+  /** Double Up: shared team HP pools, keyed by teamId. */
+  teams?: Record<number, TeamState>;
 };
 
 /** Lightweight discovery entry for the game browser (lobbies/{code}). */
