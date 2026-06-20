@@ -12,6 +12,20 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    id: "2026-06-21",
+    version: "v0.6",
+    title: { en: "Game Modes, Double Up & smarter AI", fr: "Modes de jeu, Duo & IA plus maligne" },
+    changes: [
+      { en: "New Game Modes: Region Clash — each of the 9 regions with its own modifier, legendary boss and signature gear — plus Mono-Type, Mega Madness and Treasure Hunt.", fr: "Nouveaux modes : Duel de Région — chacune des 9 régions avec son modificateur, son boss légendaire et son objet signature — ainsi que Mono-Type, Folie Méga et Chasse au Trésor." },
+      { en: "Double Up (2v2): pair into teams sharing one HP bar — send gold and bench units to your partner, and the last team standing wins.", fr: "Duo (2c2) : formez des équipes de 2 partageant une barre de PV — envoyez or et unités à votre partenaire, la dernière équipe debout gagne." },
+      { en: "Tougher AI: Expert & Ultimate opponents now draft real synergies and item builds — plus a new Clone bot that replays YOUR last game.", fr: "IA renforcée : les adversaires Expert et Ultime montent de vraies synergies et builds d'objets — et un nouveau bot Clone qui rejoue TA dernière partie." },
+      { en: "Augments now tailor to your board's playstyle, with a reroll to refresh your options — plus a batch of new combat augments.", fr: "Les augments s'adaptent désormais à ton plateau, avec une relance pour rafraîchir tes choix — et une fournée de nouveaux augments de combat." },
+      { en: "Mega Evolutions overhauled: buffs match each Mega's identity (bruiser, mage, wall…), Primal forms added, and some lines change type as they evolve.", fr: "Méga-Évolutions revues : les bonus collent à l'identité de chaque Méga (bagarreur, mage, mur…), formes Primal ajoutées, et certaines lignées changent de type en évoluant." },
+      { en: "Earn achievements on your profile, and see your last fight's MVP on the end screen.", fr: "Débloque des hauts faits sur ton profil, et découvre le MVP de ton dernier combat sur l'écran de fin." },
+      { en: "Ranked is fairer (bots count for less), a combat win now pays +1 gold, and a stability fix keeps games from stalling on the first timer.", fr: "Le classé est plus juste (les bots comptent moins), gagner un combat rapporte +1 or, et un correctif empêche les parties de bloquer au premier timer." },
+    ],
+  },
+  {
     id: "2026-06-16",
     version: "v0.5",
     title: { en: "Profiles, mobile & onboarding", fr: "Profils, mobile & prise en main" },
