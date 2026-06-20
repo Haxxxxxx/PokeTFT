@@ -7,7 +7,7 @@ import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, concede, markCarouselPicked, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate, type FrameUnit } from "@/game/engine/combat";
-import { getDef, spriteUrl, hasDef } from "@/game/data/mons";
+import { getDef, spriteUrl, hasDef, archetypeOf } from "@/game/data/mons";
 import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, modeTeamBuff, modeSignatureAugment, getMode, pickMonoType, isDoubleUp } from "@/game/data/gameModes";
 import { streakGold, roundKind, advanceRound, boardSizeForLevel, cumulativeRound, ECONOMY } from "@/game/config";
 import { serializeBoard, saveGhost, type GhostUnit } from "@/game/net/ghost";
@@ -22,8 +22,8 @@ import { finishCarouselEarly } from "@/game/net/serverGame";
 import { subscribeTransfers } from "@/game/net/coop";
 import { recordGameResult, applyRankedResult, rankOf, type RankedResult } from "@/game/net/users";
 import { computeTraits } from "@/game/engine/synergies";
-import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords } from "lucide-react";
-import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR, teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID } from "@/game/data/augments";
+import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords, RefreshCw } from "lucide-react";
+import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR, teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID, tailoredAugmentPicks } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
 import { useUi } from "@/game/store/uiStore";
 import { makeRng } from "@/game/engine/rng";
@@ -515,31 +515,51 @@ export function NetGameClient() {
 
   // Augment round? (stage 2/3/4 round 1). Show the pick until this slot is taken.
   const augSlotNow = meta && phase === "planning" && me?.alive && room?.rules?.augmentsEnabled !== false ? augmentSlot(meta.stage, meta.round) : null;
+  // Reroll: the first reroll of each slot is free, then AUG_REROLL_COST gold each. The nonce
+  // re-rolls the (purely local) offering. Reset whenever a new slot opens.
+  const [augReroll, setAugReroll] = useState(0);
+  useEffect(() => { setAugReroll(0); }, [augSlotNow]);
   const augOptions = useMemo(() => {
     if (augSlotNow == null) return [];
     const owned = new Set(useGame.getState().augments);
-    // Region signature augments (sig-*) are ONLY offered in their own Region Clash mode —
-    // never in the general pool.
+    // Region signature augments (sig-*) are ONLY offered in their own Region Clash mode.
     const sigId = modeSignatureAugment(room?.rules);
     const isSig = (id: string) => id.startsWith("sig-");
-    // Tier escalates with the slot (TFT-style): silver at 2-2, gold at 3-2,
-    // prismatic at 4-2. Fall back to the full pool if a tier runs dry.
+    // Tier escalates with the slot (silver at 2-2, gold at 3-2, prismatic at 4-2); fall back
+    // to the full pool if a tier runs dry.
     const tier = (["silver", "gold", "prismatic"] as const)[augSlotNow] ?? "gold";
     let pool = AUGMENTS.filter((a) => !owned.has(a.id) && !isSig(a.id) && a.tier === tier);
     if (pool.length < 3) pool = AUGMENTS.filter((a) => !owned.has(a.id) && !isSig(a.id));
-    let seed = augSlotNow * 9973 + 7;
+    // Board damage lean (physical vs special carries) → tailors which augments are offered.
+    const myBoard = useGame.getState().units.filter((u) => u.pos !== null);
+    const profile = myBoard.reduce((acc, u) => {
+      const arch = archetypeOf(getDef(u.defId));
+      if (arch === "physical") acc.ad += 1; else if (arch === "mage") acc.ap += 1;
+      return acc;
+    }, { ad: 0, ap: 0 });
+    // Seed folds the slot, my uid, AND the reroll count so each reroll yields a fresh offer.
+    let seed = augSlotNow * 9973 + 7 + augReroll * 131071;
     for (let i = 0; i < (myUid?.length ?? 0); i++) seed = (seed * 31 + myUid!.charCodeAt(i)) >>> 0;
-    const r = makeRng(seed >>> 0);
-    const a = [...pool];
-    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
-    const picks = a.slice(0, 3);
+    const picks = tailoredAugmentPicks(pool, profile, 3, makeRng(seed >>> 0));
     // Region Clash: guarantee the region's signature augment as the first option (once,
     // if not already owned), so each region's identity augment is always reachable.
     if (sigId && !owned.has(sigId) && AUGMENT_BY_ID[sigId] && !picks.some((p) => p.id === sigId)) {
       picks[0] = AUGMENT_BY_ID[sigId];
     }
     return picks;
-  }, [augSlotNow, myUid, room?.rules?.mode]);
+  }, [augSlotNow, myUid, room?.rules?.mode, augReroll]);
+
+  // Reroll the augment offer: first per slot is free, then 2 gold (button disabled if broke).
+  const AUG_REROLL_COST = 2;
+  const augRerollCost = augReroll === 0 ? 0 : AUG_REROLL_COST;
+  const rerollAugments = () => {
+    if (augRerollCost > 0) {
+      const g = useGame.getState().gold;
+      if (g < augRerollCost) return;
+      useGame.setState({ gold: g - augRerollCost });
+    }
+    setAugReroll((n) => n + 1);
+  };
 
   // Planning hotkeys: R reroll · L buy XP · S sell the inspected unit. Disabled
   // while spectating a rival — otherwise R/L/S silently mutate YOUR own economy
@@ -1325,6 +1345,18 @@ export function NetGameClient() {
               />
             ))}
             </div>
+            {/* Reroll — refresh the three options (first free, then a little gold). */}
+            <button
+              onClick={rerollAugments}
+              disabled={augRerollCost > 0 && gold < augRerollCost}
+              className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-900/50 hover:bg-violet-700 border border-violet-500/50 text-violet-100 text-[12px] font-bold disabled:opacity-35 disabled:cursor-not-allowed transition-colors"
+            >
+              <RefreshCw size={14} />
+              {lang === "fr" ? "Relancer" : "Reroll"}
+              {augRerollCost === 0
+                ? <span className="text-[10px] text-emerald-300 font-extrabold uppercase">{lang === "fr" ? "Gratuit" : "Free"}</span>
+                : <span className="inline-flex items-center gap-0.5 text-amber-300"><CoinIcon size={11} />{augRerollCost}</span>}
+            </button>
           </div>
           </div>
           )}
