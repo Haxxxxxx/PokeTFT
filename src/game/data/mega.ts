@@ -3,10 +3,35 @@ import type { PokeType } from "../types";
 /** The held item that unlocks Mega Evolution for a compatible mon. */
 export const MEGA_STONE = "mega-stone";
 
+/** Combat identity of a Mega form. Drives the stat profile so a Mega's buff matches
+ *  the mon it actually is — a physical bruiser gets Attack, a glass-cannon mage gets
+ *  Ability Power, a wall gets HP + defenses — instead of every Mega getting a flat
+ *  all-round boost. Also shown on the unit detail panel so the player knows what the
+ *  stone will do before slamming it on. */
+export type MegaArchetype = "physical" | "special" | "mixed" | "bruiser" | "tank" | "special-tank";
+
+/** Per-archetype stat profile. hp/ad/ap are multipliers on the mon's current-star stats;
+ *  armor/mr are flat additions. Tuned so each archetype reads clearly in combat. */
+const ARCHETYPE: Record<MegaArchetype, { hpMult: number; adMult: number; apMult: number; armorBonus: number; mrBonus: number; label: string; labelFr: string }> = {
+  // Glass-cannon auto-attacker — lives and dies by raw Attack.
+  physical:       { hpMult: 1.40, adMult: 1.90, apMult: 1.05, armorBonus: 18, mrBonus: 18, label: "Physical", labelFr: "Physique" },
+  // Glass-cannon caster — pours everything into Ability Power.
+  special:        { hpMult: 1.40, adMult: 1.05, apMult: 1.95, armorBonus: 15, mrBonus: 25, label: "Special", labelFr: "Spéciale" },
+  // Hits hard with both attacks and abilities.
+  mixed:          { hpMult: 1.45, adMult: 1.55, apMult: 1.55, armorBonus: 22, mrBonus: 24, label: "Mixed", labelFr: "Mixte" },
+  // Beefy physical threat — durable AND a real Attack carry.
+  bruiser:        { hpMult: 1.60, adMult: 1.65, apMult: 1.10, armorBonus: 38, mrBonus: 28, label: "Bruiser", labelFr: "Bagarreur" },
+  // Pure wall — soaks damage, light offense.
+  tank:           { hpMult: 1.75, adMult: 1.30, apMult: 1.30, armorBonus: 52, mrBonus: 38, label: "Tank", labelFr: "Tank" },
+  // Bulky caster — survives while it ramps its abilities.
+  "special-tank": { hpMult: 1.65, adMult: 1.10, apMult: 1.55, armorBonus: 34, mrBonus: 42, label: "Special Wall", labelFr: "Mur Spécial" },
+};
+
 export type MegaForm = {
   /** National-dex sprite id of the Mega form (PokéAPI form ids, 10000+). */
   megaDex: number;
   name: string;
+  archetype: MegaArchetype;
   /** Stat multipliers / bonuses applied on top of the mon's current-star stats. */
   hpMult: number;
   adMult: number;
@@ -15,64 +40,90 @@ export type MegaForm = {
   mrBonus: number;
   /** Optional typing shift while Mega (e.g. Charizard X gains Dragon). */
   addType?: PokeType;
+  /** Archetype display labels (for the unit detail panel). */
+  roleLabel: string;
+  roleLabelFr: string;
 };
 
+/** Build a Mega form from an archetype, with optional per-mon stat tweaks for signature
+ *  forms (e.g. Mewtwo Y leans even harder into AP). Keeps the data declarative + tailored. */
+function mega(megaDex: number, name: string, archetype: MegaArchetype, opts?: { addType?: PokeType; tweak?: Partial<Pick<MegaForm, "hpMult" | "adMult" | "apMult" | "armorBonus" | "mrBonus">> }): MegaForm {
+  const a = ARCHETYPE[archetype];
+  return {
+    megaDex, name, archetype,
+    hpMult: opts?.tweak?.hpMult ?? a.hpMult,
+    adMult: opts?.tweak?.adMult ?? a.adMult,
+    apMult: opts?.tweak?.apMult ?? a.apMult,
+    armorBonus: opts?.tweak?.armorBonus ?? a.armorBonus,
+    mrBonus: opts?.tweak?.mrBonus ?? a.mrBonus,
+    addType: opts?.addType,
+    roleLabel: a.label,
+    roleLabelFr: a.labelFr,
+  };
+}
+
 /**
- * Gen-1 mega-capable lines we field. Keyed by the base unit id (the mon you buy);
- * the Mega applies at combat start when that unit holds a Mega Stone.
+ * Mega-capable lines we field, keyed by the base unit id (the mon you buy). The Mega
+ * applies at combat start when that unit holds a Mega Stone. Each form's archetype is
+ * chosen to match how the Mega actually plays in the games.
  */
 export const MEGA_FORMS: Record<string, MegaForm> = {
-  charmander: { megaDex: 10034, name: "Mega Charizard X", hpMult: 1.45, adMult: 1.6, apMult: 1.5, armorBonus: 25, mrBonus: 20, addType: "dragon" },
-  bulbasaur:  { megaDex: 10033, name: "Mega Venusaur",    hpMult: 1.7,  adMult: 1.4, apMult: 1.5, armorBonus: 35, mrBonus: 35 },
-  squirtle:   { megaDex: 10036, name: "Mega Blastoise",   hpMult: 1.55, adMult: 1.45, apMult: 1.6, armorBonus: 30, mrBonus: 30 },
-  weedle:     { megaDex: 10090, name: "Mega Beedrill",    hpMult: 1.35, adMult: 1.8, apMult: 1.4, armorBonus: 15, mrBonus: 15 },
-  abra:       { megaDex: 10037, name: "Mega Alakazam",    hpMult: 1.35, adMult: 1.3, apMult: 1.8, armorBonus: 15, mrBonus: 25 },
-  gastly:     { megaDex: 10038, name: "Mega Gengar",      hpMult: 1.4,  adMult: 1.4, apMult: 1.7, armorBonus: 15, mrBonus: 25 },
-  magikarp:   { megaDex: 10041, name: "Mega Gyarados",    hpMult: 1.5,  adMult: 1.6, apMult: 1.5, armorBonus: 30, mrBonus: 25 },
-  aerodactyl: { megaDex: 10042, name: "Mega Aerodactyl",  hpMult: 1.4,  adMult: 1.65, apMult: 1.4, armorBonus: 25, mrBonus: 20 },
-  mewtwo:     { megaDex: 10044, name: "Mega Mewtwo Y",    hpMult: 1.4,  adMult: 1.4, apMult: 1.9, armorBonus: 20, mrBonus: 30 },
-
-  // ── Gen 1 (more) ──
-  pidgey:     { megaDex: 10073, name: "Mega Pidgeot",     hpMult: 1.4,  adMult: 1.4,  apMult: 1.7,  armorBonus: 20, mrBonus: 20 },
-  slowpoke:   { megaDex: 10071, name: "Mega Slowbro",     hpMult: 1.6,  adMult: 1.35, apMult: 1.6,  armorBonus: 40, mrBonus: 25 },
-  kangaskhan: { megaDex: 10039, name: "Mega Kangaskhan",  hpMult: 1.5,  adMult: 1.7,  apMult: 1.3,  armorBonus: 25, mrBonus: 25 },
-  pinsir:     { megaDex: 10040, name: "Mega Pinsir",      hpMult: 1.4,  adMult: 1.8,  apMult: 1.3,  armorBonus: 20, mrBonus: 15, addType: "flying" },
-  // ── Gen 2 ──
-  mareep:     { megaDex: 10045, name: "Mega Ampharos",    hpMult: 1.5,  adMult: 1.35, apMult: 1.75, armorBonus: 20, mrBonus: 30, addType: "dragon" },
-  steelix:    { megaDex: 10072, name: "Mega Steelix",     hpMult: 1.7,  adMult: 1.5,  apMult: 1.3,  armorBonus: 50, mrBonus: 30, addType: "ground" },
-  scyther:    { megaDex: 10046, name: "Mega Scizor",      hpMult: 1.45, adMult: 1.7,  apMult: 1.35, armorBonus: 30, mrBonus: 20, addType: "steel" },
-  heracross:  { megaDex: 10047, name: "Mega Heracross",   hpMult: 1.45, adMult: 1.85, apMult: 1.3,  armorBonus: 25, mrBonus: 20 },
-  houndour:   { megaDex: 10048, name: "Mega Houndoom",    hpMult: 1.4,  adMult: 1.45, apMult: 1.75, armorBonus: 20, mrBonus: 20 },
-  tyranitar:  { megaDex: 10049, name: "Mega Tyranitar",   hpMult: 1.6,  adMult: 1.7,  apMult: 1.4,  armorBonus: 40, mrBonus: 30 },
-  // ── Gen 3 ──
-  treecko:    { megaDex: 10065, name: "Mega Sceptile",    hpMult: 1.4,  adMult: 1.6,  apMult: 1.6,  armorBonus: 20, mrBonus: 20, addType: "dragon" },
-  torchic:    { megaDex: 10050, name: "Mega Blaziken",    hpMult: 1.45, adMult: 1.8,  apMult: 1.5,  armorBonus: 20, mrBonus: 20 },
-  mudkip:     { megaDex: 10064, name: "Mega Swampert",    hpMult: 1.6,  adMult: 1.7,  apMult: 1.4,  armorBonus: 35, mrBonus: 25 },
-  ralts:      { megaDex: 10051, name: "Mega Gardevoir",   hpMult: 1.4,  adMult: 1.3,  apMult: 1.85, armorBonus: 15, mrBonus: 30 },
-  sableye:    { megaDex: 10066, name: "Mega Sableye",     hpMult: 1.65, adMult: 1.35, apMult: 1.5,  armorBonus: 35, mrBonus: 35 },
-  mawile:     { megaDex: 10052, name: "Mega Mawile",      hpMult: 1.5,  adMult: 1.85, apMult: 1.35, armorBonus: 35, mrBonus: 25, addType: "fairy" },
-  aron:       { megaDex: 10053, name: "Mega Aggron",      hpMult: 1.75, adMult: 1.55, apMult: 1.3,  armorBonus: 55, mrBonus: 30, addType: "steel" },
-  meditite:   { megaDex: 10054, name: "Mega Medicham",    hpMult: 1.4,  adMult: 1.75, apMult: 1.5,  armorBonus: 20, mrBonus: 25 },
-  electrike:  { megaDex: 10055, name: "Mega Manectric",   hpMult: 1.4,  adMult: 1.4,  apMult: 1.7,  armorBonus: 20, mrBonus: 20 },
-  carvanha:   { megaDex: 10070, name: "Mega Sharpedo",    hpMult: 1.35, adMult: 1.9,  apMult: 1.4,  armorBonus: 15, mrBonus: 15 },
-  numel:      { megaDex: 10087, name: "Mega Camerupt",    hpMult: 1.55, adMult: 1.4,  apMult: 1.75, armorBonus: 30, mrBonus: 25 },
-  swablu:     { megaDex: 10067, name: "Mega Altaria",     hpMult: 1.5,  adMult: 1.4,  apMult: 1.6,  armorBonus: 25, mrBonus: 30, addType: "fairy" },
-  shuppet:    { megaDex: 10056, name: "Mega Banette",     hpMult: 1.4,  adMult: 1.7,  apMult: 1.55, armorBonus: 20, mrBonus: 20 },
-  absol:      { megaDex: 10057, name: "Mega Absol",       hpMult: 1.4,  adMult: 1.8,  apMult: 1.45, armorBonus: 20, mrBonus: 20 },
-  snorunt:    { megaDex: 10074, name: "Mega Glalie",      hpMult: 1.5,  adMult: 1.6,  apMult: 1.5,  armorBonus: 25, mrBonus: 25 },
-  salamence:  { megaDex: 10089, name: "Mega Salamence",   hpMult: 1.55, adMult: 1.75, apMult: 1.5,  armorBonus: 30, mrBonus: 25 },
-  metagross:  { megaDex: 10076, name: "Mega Metagross",   hpMult: 1.6,  adMult: 1.65, apMult: 1.55, armorBonus: 40, mrBonus: 30 },
-  latias:     { megaDex: 10062, name: "Mega Latias",      hpMult: 1.55, adMult: 1.35, apMult: 1.8,  armorBonus: 30, mrBonus: 35 },
-  latios:     { megaDex: 10063, name: "Mega Latios",      hpMult: 1.45, adMult: 1.45, apMult: 1.85, armorBonus: 20, mrBonus: 30 },
-  rayquaza:   { megaDex: 10079, name: "Mega Rayquaza",    hpMult: 1.6,  adMult: 1.8,  apMult: 1.8,  armorBonus: 30, mrBonus: 30 },
-  // ── Gen 4 ──
-  buneary:    { megaDex: 10088, name: "Mega Lopunny",     hpMult: 1.4,  adMult: 1.8,  apMult: 1.35, armorBonus: 20, mrBonus: 20, addType: "fighting" },
-  riolu:      { megaDex: 10059, name: "Mega Lucario",     hpMult: 1.4,  adMult: 1.75, apMult: 1.6,  armorBonus: 20, mrBonus: 20 },
-  snover:     { megaDex: 10060, name: "Mega Abomasnow",   hpMult: 1.6,  adMult: 1.55, apMult: 1.55, armorBonus: 30, mrBonus: 25 },
-  garchomp:   { megaDex: 10058, name: "Mega Garchomp",    hpMult: 1.6,  adMult: 1.75, apMult: 1.5,  armorBonus: 30, mrBonus: 25 },
+  // ── Gen 1 (Kanto) ──
+  charmander: mega(10034, "Mega Charizard X",  "bruiser",      { addType: "dragon" }), // physical dragon bruiser
+  bulbasaur:  mega(10033, "Mega Venusaur",     "tank"),                                  // defensive wall
+  squirtle:   mega(10036, "Mega Blastoise",    "special-tank"),                          // bulky cannon
+  weedle:     mega(10090, "Mega Beedrill",     "physical"),                              // hyper-offensive attacker
+  abra:       mega(10037, "Mega Alakazam",     "special",      { tweak: { apMult: 2.05 } }), // apex special sweeper
+  gastly:     mega(10038, "Mega Gengar",       "special"),                               // special nuke
+  magikarp:   mega(10041, "Mega Gyarados",     "bruiser",      { addType: "dark" }),     // physical bruiser
+  aerodactyl: mega(10042, "Mega Aerodactyl",   "physical"),                              // fast physical
+  mewtwo:     mega(10044, "Mega Mewtwo Y",     "special",      { tweak: { apMult: 2.1, hpMult: 1.45 } }), // strongest special
+  pidgey:     mega(10073, "Mega Pidgeot",      "special"),                               // special flyer
+  slowpoke:   mega(10071, "Mega Slowbro",      "special-tank"),                          // bulky caster
+  kangaskhan: mega(10039, "Mega Kangaskhan",   "physical"),                              // parental-bond physical
+  pinsir:     mega(10040, "Mega Pinsir",       "physical",     { addType: "flying" }),   // aerial physical
+  // ── Gen 2 (Johto) ──
+  mareep:     mega(10045, "Mega Ampharos",     "special",      { addType: "dragon" }),   // special dragon
+  onix:       mega(10072, "Mega Steelix",      "tank",         { addType: "steel", tweak: { armorBonus: 60 } }), // steel wall
+  steelix:    mega(10072, "Mega Steelix",      "tank",         { tweak: { armorBonus: 60 } }),
+  scyther:    mega(10046, "Mega Scizor",       "bruiser",      { addType: "steel" }),    // physical steel bruiser
+  heracross:  mega(10047, "Mega Heracross",    "physical",     { tweak: { adMult: 2.0 } }), // monstrous attack
+  houndour:   mega(10048, "Mega Houndoom",     "special"),                               // special fire/dark
+  tyranitar:  mega(10049, "Mega Tyranitar",    "bruiser",      { tweak: { hpMult: 1.65, armorBonus: 44 } }), // physical juggernaut
+  // ── Gen 3 (Hoenn) ──
+  treecko:    mega(10065, "Mega Sceptile",     "mixed",        { addType: "dragon" }),   // fast mixed
+  torchic:    mega(10050, "Mega Blaziken",     "physical",     { tweak: { adMult: 2.0 } }), // speed-boost attacker
+  mudkip:     mega(10064, "Mega Swampert",     "bruiser"),                               // bulky physical
+  ralts:      mega(10051, "Mega Gardevoir",    "special"),                               // fairy special
+  sableye:    mega(10066, "Mega Sableye",      "tank",         { tweak: { apMult: 1.5 } }), // bulky disruptor
+  mawile:     mega(10052, "Mega Mawile",       "physical",     { addType: "fairy", tweak: { adMult: 2.0, armorBonus: 30 } }), // huge-power
+  aron:       mega(10053, "Mega Aggron",       "tank",         { addType: "steel", tweak: { armorBonus: 60, hpMult: 1.8 } }), // hardest wall
+  meditite:   mega(10054, "Mega Medicham",     "physical",     { tweak: { adMult: 2.0 } }), // pure-power physical
+  electrike:  mega(10055, "Mega Manectric",    "special"),                               // fast special
+  carvanha:   mega(10070, "Mega Sharpedo",     "physical",     { tweak: { adMult: 2.0 } }), // glass-cannon attacker
+  numel:      mega(10087, "Mega Camerupt",     "special"),                               // slow special nuke
+  swablu:     mega(10067, "Mega Altaria",      "mixed",        { addType: "fairy" }),     // dragon/fairy mixed
+  shuppet:    mega(10056, "Mega Banette",      "physical"),                              // physical ghost
+  absol:      mega(10057, "Mega Absol",        "physical"),                              // magic-bounce attacker
+  snorunt:    mega(10074, "Mega Glalie",       "mixed"),                                 // refrigerate mixed
+  salamence:  mega(10089, "Mega Salamence",    "bruiser"),                               // aerilate physical bruiser
+  bagon:      mega(10089, "Mega Salamence",    "bruiser"),
+  metagross:  mega(10076, "Mega Metagross",    "bruiser",      { tweak: { adMult: 1.7, armorBonus: 40 } }), // steel bruiser
+  beldum:     mega(10076, "Mega Metagross",    "bruiser",      { tweak: { adMult: 1.7, armorBonus: 40 } }),
+  latias:     mega(10062, "Mega Latias",       "special-tank"),                          // bulky special
+  latios:     mega(10063, "Mega Latios",       "special"),                               // offensive special
+  rayquaza:   mega(10079, "Mega Rayquaza",     "mixed",        { tweak: { hpMult: 1.6, adMult: 1.8, apMult: 1.8, armorBonus: 30, mrBonus: 30 } }), // apex
+  kyogre:     mega(10077, "Primal Kyogre",     "special",      { tweak: { hpMult: 1.6, apMult: 1.95, mrBonus: 35 } }), // primal special
+  groudon:    mega(10078, "Primal Groudon",    "bruiser",      { addType: "fire", tweak: { hpMult: 1.65, adMult: 1.8, armorBonus: 45 } }), // primal physical
+  // ── Gen 4 (Sinnoh) ──
+  buneary:    mega(10088, "Mega Lopunny",      "physical",     { addType: "fighting" }), // scrappy physical
+  riolu:      mega(10059, "Mega Lucario",      "mixed"),                                 // adaptable mixed
+  snover:     mega(10060, "Mega Abomasnow",    "special-tank"),                          // bulky special
+  gible:      mega(10058, "Mega Garchomp",     "bruiser"),                               // physical bruiser
+  garchomp:   mega(10058, "Mega Garchomp",     "bruiser"),
   // ── Gen 5 / 6 ──
-  audino:     { megaDex: 10069, name: "Mega Audino",      hpMult: 1.7,  adMult: 1.3,  apMult: 1.5,  armorBonus: 35, mrBonus: 35, addType: "fairy" },
-  diancie:    { megaDex: 10075, name: "Mega Diancie",     hpMult: 1.45, adMult: 1.6,  apMult: 1.75, armorBonus: 30, mrBonus: 30 },
+  audino:     mega(10069, "Mega Audino",       "tank",         { addType: "fairy" }),    // healer wall
+  diancie:    mega(10075, "Mega Diancie",      "mixed"),                                 // rock/fairy mixed
 };
 
 export function megaFormFor(defId: string): MegaForm | undefined {

@@ -39,13 +39,14 @@ function rosterFor(room: Room): string[] {
   return rosterForGenerations(room.rules?.generations ?? [1], room.rules?.draftPoolSize, hashStr(room.code));
 }
 
-/** A bot's board for a round, scaled by stage progress and difficulty. */
-function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string, allowed: string[]): UnitInstance[] {
+/** A bot's board for a round, scaled by stage progress and difficulty. The "expert"
+ *  tier also drafts around a synergy and equips items (from the room's enabled pool). */
+function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string, allowed: string[], enabledItems?: string[]): UnitInstance[] {
   const cr = cumulativeRound(stage, round);
   let seed = 0;
   for (let i = 0; i < salt.length; i++) seed = (seed * 31 + salt.charCodeAt(i)) >>> 0;
   // Economy-realistic: a board a real player could actually build at this round.
-  return generatePlayerLikeBoard(stage, round, difficulty, seed + cr, allowed);
+  return generatePlayerLikeBoard(stage, round, difficulty, seed + cr, allowed, enabledItems);
 }
 
 /** Deterministic shuffle for pairings. */
@@ -297,7 +298,7 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
   // Bots get a deterministic host-generated board each round (humans synced theirs).
   for (const p of alive) {
     if (p.isBot) {
-      const b = botBoard(stage, room.meta.round, p.botDifficulty, p.uid, allowed);
+      const b = botBoard(stage, room.meta.round, p.botDifficulty, p.uid, allowed, room.rules?.itemsEnabled);
       room.players[p.uid] = { ...p, board: b };
       botBoards[p.uid] = b;
     }

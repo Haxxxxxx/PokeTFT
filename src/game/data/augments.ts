@@ -72,6 +72,21 @@ export const AUGMENTS: Augment[] = [
   { id: "calm-mind",     name: "Calm Mind",        nameFr: "Plénitude",         desc: "Your team gains +28% AP & +18 start mana.",  descFr: "Votre équipe : +28% Att. Spé & +18 mana.", kind: "passive", tier: "prismatic", combat: { apMult: 1.28, manaStart: 18 } },
   { id: "dragon-dance",  name: "Dragon Dance",     nameFr: "Danse-Draco",       desc: "Your team gains +18% Attack & +18% Attack Speed.", descFr: "Votre équipe : +18% Attaque & +18% Vitesse.", kind: "passive", tier: "prismatic", combat: { adMult: 1.18, asMult: 1.18 } },
   { id: "sturdy",        name: "Sturdy",           nameFr: "Fermeté",           desc: "Your team gains +25% Health & +25 Armor & MR.", descFr: "Votre équipe : +25% PV & +25 Déf & Déf Spé.", kind: "passive", tier: "prismatic", combat: { hpMult: 1.25, armorAdd: 25, mrAdd: 25 } },
+
+  // ── New combat augments (silver) ───────────────────────────────────────────
+  { id: "quick-feet",    name: "Quick Feet",       nameFr: "Pieds Agiles",      desc: "Your team gains +12% Attack Speed.", descFr: "Votre équipe gagne +12% Vitesse.",     kind: "passive", tier: "silver", combat: { asMult: 1.12 } },
+  { id: "leech-life",    name: "Leech Life",       nameFr: "Vampirisme",        desc: "Your team gains 10% lifesteal.",     descFr: "Votre équipe gagne 10% vol de vie.",   kind: "passive", tier: "silver", combat: { lifeSteal: 0.10 } },
+  { id: "hard-shell",    name: "Hard Shell",       nameFr: "Carapace Dure",     desc: "Your team gains +16 Armor & MR.",    descFr: "Votre équipe gagne +16 Déf & Déf Spé.", kind: "passive", tier: "silver", combat: { armorAdd: 16, mrAdd: 16 } },
+  // ── New combat augments (gold) ─────────────────────────────────────────────
+  { id: "keen-eye",      name: "Keen Eye",         nameFr: "Œil Perçant",       desc: "Your team gains +26% Crit chance.",  descFr: "Votre équipe gagne +26% Critique.",    kind: "passive", tier: "gold", combat: { critAdd: 0.26 } },
+  { id: "battle-frenzy", name: "Battle Frenzy",    nameFr: "Frénésie",          desc: "+14% Attack & +12% Attack Speed.",   descFr: "+14% Attaque & +12% Vitesse.",         kind: "passive", tier: "gold", combat: { adMult: 1.14, asMult: 1.12 } },
+  { id: "arcane-focus",  name: "Arcane Focus",     nameFr: "Focalisation",      desc: "+22% Ability Power & +12 start mana.", descFr: "+22% Att. Spé & +12 mana de départ.", kind: "passive", tier: "gold", combat: { apMult: 1.22, manaStart: 12 } },
+  { id: "vitality",      name: "Vitality",         nameFr: "Vitalité",          desc: "+20% Health & 12% lifesteal.",       descFr: "+20% PV & 12% vol de vie.",            kind: "passive", tier: "gold", combat: { hpMult: 1.20, lifeSteal: 0.12 } },
+  { id: "veteran",       name: "Veteran",          nameFr: "Vétéran",           desc: "+5 gold and +4 XP right now.",       descFr: "+5 or et +4 XP immédiatement.",        kind: "instant", tier: "gold" },
+  // ── New combat augments (prismatic) ────────────────────────────────────────
+  { id: "apex-predator", name: "Apex Predator",    nameFr: "Prédateur Alpha",   desc: "+24% Attack, +22% Crit & 18% lifesteal.", descFr: "+24% Attaque, +22% Crit & 18% vol de vie.", kind: "passive", tier: "prismatic", combat: { adMult: 1.24, critAdd: 0.22, lifeSteal: 0.18 } },
+  { id: "archmagus",     name: "Archmagus",        nameFr: "Archimage",         desc: "+30% Ability Power, +20 mana & +12% Attack Speed.", descFr: "+30% Att. Spé, +20 mana & +12% Vitesse.", kind: "passive", tier: "prismatic", combat: { apMult: 1.30, manaStart: 20, asMult: 1.12 } },
+  { id: "titanforged",   name: "Titanforged",      nameFr: "Forge Titan",       desc: "+22% Health, +30 Armor & MR, +12% Attack.", descFr: "+22% PV, +30 Déf & Déf Spé, +12% Attaque.", kind: "passive", tier: "prismatic", combat: { hpMult: 1.22, armorAdd: 30, mrAdd: 30, adMult: 1.12 } },
 ];
 
 export const AUGMENT_BY_ID: Record<string, Augment> = Object.fromEntries(AUGMENTS.map((a) => [a.id, a]));

@@ -123,8 +123,9 @@ type State = {
   reorderBench: (iid: string, toIndex: number) => void;
   fillBoard: () => void;
   toggleFreeze: () => void;
-  /** Multiplayer: grant a planning round's economy (income/xp/shop) for a host-driven round. */
-  netRound: (stage: number, round: number, streak: number) => void;
+  /** Multiplayer: grant a planning round's economy (income/xp/shop) for a host-driven round.
+   *  `wonLast` adds the TFT win-gold (+1) on top of base + interest when the previous combat was won. */
+  netRound: (stage: number, round: number, streak: number, wonLast?: boolean) => void;
   /** Multiplayer: take a carousel pick (unit or Mega Stone) without advancing the round. */
   netCarouselPick: (pick: string) => void;
   /** Pick an augment — applies its effect and persists it. */
@@ -349,12 +350,14 @@ export const useGame = create<State>((set, get) => ({
 
   // Multiplayer: economy for a host-driven planning round (stage/round/HP all come
   // from the room — this only grants the local econ: income, XP, shop, loot).
-  netRound: (stage, round, streak) => {
+  netRound: (stage, round, streak, wonLast) => {
     const state = get();
     // Passive augments: extra gold / XP each round.
     const augGold = (state.augments.includes("rich") ? 1 : 0) + (state.augments.includes("compound-interest") ? 2 : 0);
     const augXp = (state.augments.includes("scholar") ? 2 : 0) + (state.augments.includes("fast-learner") ? 3 : 0);
-    const income = ECONOMY.baseIncome + interest(state.gold) + streakGold(streak) + augGold;
+    // TFT win-gold: +1 for winning the previous combat, paid on top of base + interest + streak.
+    const winGold = wonLast ? ECONOMY.winGold : 0;
+    const income = ECONOMY.baseIncome + interest(state.gold) + streakGold(streak) + winGold + augGold;
     const newXp = state.xp + ECONOMY.passiveXpPerRound + augXp;
     const lvl = levelFromXp(newXp);
     const shop = state.frozen ? state.shop : rollShop(lvl, state.pool, rng, state.unitsByCost);
@@ -416,6 +419,7 @@ export const useGame = create<State>((set, get) => ({
       case "big-brain": xp += 8; break;
       case "prodigy": xp += 12; break;
       case "merchant": gold += 6; items = [...items, COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)]]; break;
+      case "veteran": gold += 5; xp += 4; break;
       case "mega-gift": items = [...items, MEGA_STONE]; break;
       case "treasure":
         for (let i = 0; i < 2; i++) items = [...items, COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)]];

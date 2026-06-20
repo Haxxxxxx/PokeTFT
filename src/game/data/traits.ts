@@ -144,14 +144,15 @@ const RAW: RawTrait[] = [
     ],
   },
   {
-    key: "evolver", label: "Evolver", description: "Evolvers reward a wide, upgraded board.",
-    // ~124 mons can evolve, so this is intentionally the HIGHEST-commitment trait:
-    // an average board barely touches the first tier, the payoff needs a board built
-    // almost entirely around it (raised from 6/9 — it was active on nearly every board).
+    key: "evolver", label: "Evolver", description: "Counts only EVOLVED (★★+) mons — reward for upgrading your board.",
+    // Almost every mon "can evolve", so a flat evolver count was active on every board
+    // and meaningless. It now counts ONLY units you've actually evolved to ★★ or ★★★
+    // (see computeTraits), making it a real build-around: a tempo/3-star board that
+    // commits to upgrading rather than going wide gets paid for it.
     tiers: [
-      { count: 8, effect: "Evolvers: +18% Attack Damage.", buff: { adMult: 1.18 } },
-      { count: 12, effect: "Evolvers: +38% Attack Damage, +15% HP.", buff: { adMult: 1.38, hpMult: 1.15 } },
-      { count: 16, effect: "Evolvers: +65% Attack Damage, +30% HP.", buff: { adMult: 1.65, hpMult: 1.3 } },
+      { count: 3, effect: "Evolved mons: +12% Attack Damage & Ability Power.", buff: { scope: "team", adMult: 1.12, apMult: 1.12 } },
+      { count: 5, effect: "All allies: +24% Attack Damage & Ability Power, +12% HP.", buff: { scope: "team", adMult: 1.24, apMult: 1.24, hpMult: 1.12 } },
+      { count: 7, effect: "All allies: +45% Attack Damage & Ability Power, +25% HP.", buff: { scope: "team", adMult: 1.45, apMult: 1.45, hpMult: 1.25 } },
     ],
   },
   {

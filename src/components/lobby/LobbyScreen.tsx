@@ -174,9 +174,9 @@ export function LobbyScreen() {
           {isHost && openSlots > 0 && (
             <div className="flex items-center justify-center gap-2 mt-5 pt-4 border-t border-slate-800">
               <span className="text-[10px] uppercase tracking-wide text-slate-500">{t.l_net_add_ai}</span>
-              {(["easy", "medium", "hard"] as const).map((d) => (
-                <button key={d} data-testid={`add-bot-${d}`} onClick={() => addBot(d)} className="px-3 py-1.5 rounded-md bg-violet-900/50 hover:bg-violet-700 border border-violet-700 text-[11px] font-bold text-violet-200 capitalize transition-colors">
-                  {d === "easy" ? t.p_diff_easy : d === "medium" ? t.p_diff_medium : t.p_diff_hard}
+              {(["easy", "medium", "hard", "expert"] as const).map((d) => (
+                <button key={d} data-testid={`add-bot-${d}`} onClick={() => addBot(d)} className={`px-3 py-1.5 rounded-md border text-[11px] font-bold capitalize transition-colors ${d === "expert" ? "bg-amber-900/40 hover:bg-amber-700 border-amber-600/60 text-amber-200" : "bg-violet-900/50 hover:bg-violet-700 border-violet-700 text-violet-200"}`}>
+                  {d === "easy" ? t.p_diff_easy : d === "medium" ? t.p_diff_medium : d === "hard" ? t.p_diff_hard : t.p_diff_expert}
                 </button>
               ))}
             </div>

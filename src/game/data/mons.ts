@@ -861,6 +861,31 @@ export const UNITS: UnitDef[] = [
   }
 }
 
+// Evolution type shifts: lines that GAIN or CHANGE a type as they evolve. The generated
+// roster only carries each line's BASE typing (so a generated Gyarados stayed pure Water),
+// which the player rightly noticed. This table restores the per-star typing for the
+// well-known shifting lines; it's applied to whatever unit holds the id (curated or
+// generated) only when that unit doesn't already define its own typesByStar. Index 0 = ★,
+// 1 = ★★, 2 = ★★★.
+const TYPE_SHIFTS: Record<string, PokeType[][]> = {
+  magikarp: [["water"], ["water"], ["water", "flying"]],                 // → Gyarados (Flying)
+  onix:     [["rock", "ground"], ["rock", "ground"], ["steel", "ground"]], // → Steelix (Steel)
+  bagon:    [["dragon"], ["dragon"], ["dragon", "flying"]],              // → Salamence (Flying)
+  swablu:   [["normal", "flying"], ["dragon", "flying"], ["dragon", "flying"]], // → Altaria (Dragon)
+  azurill:  [["normal", "fairy"], ["water", "fairy"], ["water", "fairy"]], // → Marill (Water)
+  trapinch: [["ground"], ["ground", "dragon"], ["ground", "dragon"]],    // → Vibrava/Flygon (Dragon)
+  seel:     [["water"], ["water", "ice"], ["water", "ice"]],             // → Dewgong (Ice)
+  shellder: [["water"], ["water", "ice"], ["water", "ice"]],             // → Cloyster (Ice)
+  staryu:   [["water"], ["water"], ["water", "psychic"]],                // → Starmie (Psychic)
+  scatterbug: [["bug"], ["bug"], ["bug", "flying"]],                     // → Vivillon (Flying)
+  fletchling: [["normal", "flying"], ["fire", "flying"], ["fire", "flying"]], // → Talonflame (Fire)
+  charcadet: [["fire"], ["fire", "ghost"], ["fire", "ghost"]],           // → Armarouge/Ceruledge
+};
+for (const u of UNITS) {
+  const shift = TYPE_SHIFTS[u.id];
+  if (shift && !u.typesByStar) u.typesByStar = shift as PokeType[][];
+}
+
 export const UNITS_BY_ID: Record<string, UnitDef> = Object.fromEntries(
   UNITS.map((u) => [u.id, u]),
 );

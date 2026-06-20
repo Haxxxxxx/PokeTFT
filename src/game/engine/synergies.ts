@@ -34,6 +34,9 @@ export function computeTraits(boardUnits: UnitInstance[]): ActiveTrait[] {
     const def = getDef(defId);
     const keys = new Set<string>([...typesForStar(def, star), ...def.roles]);
     for (const t of emblemTraits.get(defId) ?? []) keys.add(t);
+    // "Evolver" rewards UPGRADING the board, not merely owning evolvable mons (almost
+    // every mon can evolve). It only counts once a unit has actually evolved to ★★+.
+    if (star < 2) keys.delete("evolver");
     for (const key of keys) {
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
