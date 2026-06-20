@@ -1,6 +1,7 @@
 "use client";
 
 import { usePreLobby } from "@/game/store/preLobbyStore";
+import { MODES, getMode } from "@/game/data/gameModes";
 import { ALL_GENS, GEN_LABELS, MAX_REGIONS } from "@/game/data/generations";
 import { unitsForGenerations } from "@/game/data/mons";
 import { COMPLETED } from "@/game/data/itemPool";
@@ -56,21 +57,72 @@ export function GameRulesPanel({ isHost }: { isHost: boolean }) {
   const effectiveDraft = Math.min(rules.draftPoolSize, poolCount);
   const activeItems = rules.itemsEnabled.length;
 
+  const activeMode = getMode(rules.mode);
+  const regionLocked = activeMode.group === "region"; // region modes force their generation
+  // Selecting a mode applies its rule overrides (region modes lock the generation).
+  const selectMode = (id: string) => {
+    const m = getMode(id);
+    setRules({ mode: id, ...(m.rulesPatch ?? {}) });
+  };
+  const standardModes = MODES.filter((m) => m.group !== "region");
+  const regionModes = MODES.filter((m) => m.group === "region");
+
   return (
+    <div className="flex flex-col gap-4">
+      {/* Game mode — the headline selector, spanning the full width above the rules. */}
+      <SectionCard title={lang === "fr" ? "Mode de jeu" : "Game Mode"} badge={lang === "fr" ? activeMode.nameFr : activeMode.name}>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {standardModes.map((m) => {
+            const active = activeMode.id === m.id;
+            return (
+              <button
+                key={m.id}
+                disabled={!isHost}
+                onClick={() => selectMode(m.id)}
+                style={active ? { borderColor: `${m.color}aa`, color: m.color, background: `${m.color}15` } : undefined}
+                title={lang === "fr" ? m.descFr : m.desc}
+                className={`px-3 py-1.5 ${chipBase} ${active ? "shadow-[0_0_16px_-6px] font-extrabold" : chipIdle} disabled:opacity-40`}
+              >
+                {lang === "fr" ? m.nameFr : m.name}
+              </button>
+            );
+          })}
+        </div>
+        <div className="text-[10px] uppercase tracking-widest text-cyan-200/50 font-bold mb-1.5">{lang === "fr" ? "Duels de région" : "Region Clash"}</div>
+        <div className="flex flex-wrap gap-1.5">
+          {regionModes.map((m) => {
+            const active = activeMode.id === m.id;
+            return (
+              <button
+                key={m.id}
+                disabled={!isHost}
+                onClick={() => selectMode(m.id)}
+                style={active ? { borderColor: "#22d3ee", color: "#67e8f9", background: "#22d3ee15" } : undefined}
+                title={lang === "fr" ? m.descFr : m.desc}
+                className={`px-2.5 py-1 ${chipBase} ${active ? "font-extrabold" : chipIdle} disabled:opacity-40`}
+              >
+                {lang === "fr" ? m.nameFr : m.name}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-slate-500 mt-2">{lang === "fr" ? activeMode.descFr : activeMode.desc}</p>
+      </SectionCard>
+
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
       {/* Left column: generations + the two small numeric rules. */}
       <div className="flex flex-col gap-4">
-        <SectionCard title={t.r_gens} badge={`${rules.generations.length}/${MAX_REGIONS} · ${t.r_pool(poolCount)}`}>
-          <div className="grid grid-cols-2 gap-1.5">
+        <SectionCard title={t.r_gens} badge={regionLocked ? (lang === "fr" ? "verrouillé par le mode" : "locked by mode") : `${rules.generations.length}/${MAX_REGIONS} · ${t.r_pool(poolCount)}`}>
+          <div className={`grid grid-cols-2 gap-1.5 ${regionLocked ? "opacity-60" : ""}`}>
             {ALL_GENS.map((gen) => {
               const active = rules.generations.includes(gen);
               const atCap = !active && rules.generations.length >= MAX_REGIONS;
               return (
                 <button
                   key={gen}
-                  disabled={!isHost || genCounts[gen] === 0 || atCap}
+                  disabled={!isHost || genCounts[gen] === 0 || atCap || regionLocked}
                   onClick={() => toggleGeneration(gen)}
-                  title={atCap ? `Up to ${MAX_REGIONS} regions per match` : undefined}
+                  title={regionLocked ? (lang === "fr" ? "Le mode Région fixe la région" : "Region mode fixes the region") : atCap ? `Up to ${MAX_REGIONS} regions per match` : undefined}
                   className={`flex items-center justify-between gap-1.5 px-3 py-2.5 ${chipBase} ${active ? chipActive : chipIdle} disabled:opacity-40`}
                 >
                   <span className="truncate font-semibold">{GEN_LABELS[gen]}</span>
@@ -217,6 +269,7 @@ export function GameRulesPanel({ isHost }: { isHost: boolean }) {
           })}
         </div>
       </SectionCard>
+    </div>
     </div>
   );
 }

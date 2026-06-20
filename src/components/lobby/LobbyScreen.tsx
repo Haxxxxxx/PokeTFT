@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRoom } from "@/game/net/roomStore";
 import { usePreLobby } from "@/game/store/preLobbyStore";
+import { getMode } from "@/game/data/gameModes";
 import { beginMatch, addInvitePlaceholder } from "@/game/net/match";
 import { kickoffServerGame } from "@/game/net/serverGame";
 import { useAuth } from "@/game/net/authStore";
@@ -60,8 +61,8 @@ export function LobbyScreen() {
 
   useEffect(() => {
     if (!room || !isHost) return;
-    setRules({ startingHp: preRules.startingHp, generations: preRules.generations, itemsEnabled: preRules.itemsEnabled, draftPoolSize: preRules.draftPoolSize, maxPlayers: preRules.maxPlayers, augmentsEnabled: preRules.augmentsEnabled, serverDriven: preRules.serverDriven, isPrivate: preRules.isPrivate });
-  }, [isHost, room, setRules, preRules.startingHp, preRules.generations, preRules.itemsEnabled, preRules.draftPoolSize, preRules.maxPlayers, preRules.augmentsEnabled, preRules.serverDriven, preRules.isPrivate]);
+    setRules({ startingHp: preRules.startingHp, generations: preRules.generations, itemsEnabled: preRules.itemsEnabled, draftPoolSize: preRules.draftPoolSize, maxPlayers: preRules.maxPlayers, augmentsEnabled: preRules.augmentsEnabled, serverDriven: preRules.serverDriven, isPrivate: preRules.isPrivate, mode: preRules.mode });
+  }, [isHost, room, setRules, preRules.startingHp, preRules.generations, preRules.itemsEnabled, preRules.draftPoolSize, preRules.maxPlayers, preRules.augmentsEnabled, preRules.serverDriven, preRules.isPrivate, preRules.mode]);
 
   const roomGenKey = (room?.rules?.generations ?? [1]).join(",");
   const roomItemKey = (room?.rules?.itemsEnabled ?? []).join(",");
@@ -76,8 +77,9 @@ export function LobbyScreen() {
       maxPlayers: room.rules?.maxPlayers ?? 8,
       augmentsEnabled: room.rules?.augmentsEnabled !== false,
       isPrivate: room.rules?.isPrivate === true,
+      mode: room.rules?.mode ?? "standard",
     });
-  }, [isHost, room, setPreRules, roomHp, roomGenKey, roomItemKey, room?.rules?.draftPoolSize, room?.rules?.maxPlayers, room?.rules?.augmentsEnabled, room?.rules?.isPrivate]);
+  }, [isHost, room, setPreRules, roomHp, roomGenKey, roomItemKey, room?.rules?.draftPoolSize, room?.rules?.maxPlayers, room?.rules?.augmentsEnabled, room?.rules?.isPrivate, room?.rules?.mode]);
 
   if (!room) return null;
 
@@ -121,6 +123,12 @@ export function LobbyScreen() {
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {(() => {
+            const gm = getMode(room.rules?.mode);
+            if (gm.id === "standard") return null;
+            return <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full border text-[11px] font-extrabold"
+              style={{ borderColor: `${gm.color}66`, color: gm.color, background: `${gm.color}14` }}>{lang === "fr" ? gm.nameFr : gm.name}</span>;
+          })()}
           <button onClick={leave} className="px-2.5 sm:px-3 py-2 rounded-lg bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.l_net_leave}</button>
         </div>
       </header>

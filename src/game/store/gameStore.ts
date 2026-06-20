@@ -112,7 +112,7 @@ type State = {
   boardUnits: () => UnitInstance[];
 
   // actions
-  newGame: (allowedIds?: string[], enabledItems?: string[]) => void;
+  newGame: (allowedIds?: string[], enabledItems?: string[], startItems?: string[]) => void;
   reroll: () => void;
   buyXp: () => void;
   buyUnit: (slot: number) => void;
@@ -124,8 +124,10 @@ type State = {
   fillBoard: () => void;
   toggleFreeze: () => void;
   /** Multiplayer: grant a planning round's economy (income/xp/shop) for a host-driven round.
-   *  `wonLast` adds the TFT win-gold (+1) on top of base + interest when the previous combat was won. */
-  netRound: (stage: number, round: number, streak: number, wonLast?: boolean) => void;
+   *  `wonLast` adds the TFT win-gold (+1) on top of base + interest when the previous combat was won.
+   *  `mode` carries game-mode round grants (a recurring item like Mega Madness's stone, and a
+   *  PvE loot multiplier for Treasure Hunt). */
+  netRound: (stage: number, round: number, streak: number, wonLast?: boolean, mode?: { roundItem?: string | null; lootScale?: number }) => void;
   /** Multiplayer: take a carousel pick (unit or Mega Stone) without advancing the round. */
   netCarouselPick: (pick: string) => void;
   /** Pick an augment — applies its effect and persists it. */
@@ -173,7 +175,7 @@ export const useGame = create<State>((set, get) => ({
   benchUnits: () => get().units.filter((u) => u.pos === null),
   boardUnits: () => get().units.filter((u) => u.pos !== null),
 
-  newGame: (allowedIds?: string[], enabledItems?: string[]) => {
+  newGame: (allowedIds?: string[], enabledItems?: string[], startItems?: string[]) => {
     // Fresh, independent randomness each game (and per player) — not a fixed seed,
     // so every player's shop rolls differently.
     rng = makeRng((Math.floor(Math.random() * 0x7fffffff) ^ Date.now()) >>> 0);
@@ -193,7 +195,8 @@ export const useGame = create<State>((set, get) => ({
       pool, unitsByCost, enabledItems: enabledItems && enabledItems.length ? enabledItems : null,
       pension: null,
       gold: 4, xp: 0, level: 1,
-      streak: 0, units, frozen: false, items: [], drops: [], augments: [],
+      // Game-mode starting items (region signature Emblem + item, Mega Madness stone).
+      streak: 0, units, frozen: false, items: startItems ? [...startItems] : [], drops: [], augments: [],
       shop: rollShop(1, pool, rng, unitsByCost),
     });
   },
@@ -350,7 +353,7 @@ export const useGame = create<State>((set, get) => ({
 
   // Multiplayer: economy for a host-driven planning round (stage/round/HP all come
   // from the room — this only grants the local econ: income, XP, shop, loot).
-  netRound: (stage, round, streak, wonLast) => {
+  netRound: (stage, round, streak, wonLast, mode) => {
     const state = get();
     // Passive augments: extra gold / XP each round.
     const augGold = (state.augments.includes("rich") ? 1 : 0) + (state.augments.includes("compound-interest") ? 2 : 0);
@@ -369,22 +372,28 @@ export const useGame = create<State>((set, get) => ({
     // Auto-collect any drops the player didn't click last round (never lose an item).
     let items = [...state.items, ...state.drops.map((d) => d.itemId)];
     let units = state.units;
+    const lootScale = mode?.lootScale ?? 1; // Treasure Hunt mode pours out richer PvE loot.
     const prev = round > 1 ? { stage, round: round - 1 } : { stage: stage - 1, round: roundsInStage(stage - 1) };
     if (prev.stage >= 1 && roundKind(prev.stage, prev.round) === "pve") {
-      bonusGold = 2 + Math.floor(stage / 2);
+      bonusGold = Math.round((2 + Math.floor(stage / 2)) * lootScale);
       const cheap = [...(state.unitsByCost[1] ?? []), ...(state.unitsByCost[2] ?? [])];
-      if (rng() < 0.25 && cheap.length && units.filter((u) => u.pos === null).length < BENCH_SIZE) {
+      if (rng() < 0.25 * lootScale && cheap.length && units.filter((u) => u.pos === null).length < BENCH_SIZE) {
         const pickId = cheap[randInt(rng, cheap.length)];
         takeFromPool(state.pool, pickId); // free PvE drop is a real pool copy — debit it
         const r = applyCombines([...units, makeInstance(pickId)]);
         units = r.units; items = [...items, ...r.dropped];
       }
+      // Treasure Hunt: an extra item component on every PvE round.
+      if (lootScale > 1) items = [...items, COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)]];
     }
 
     // Prospector augment: a free item component every 3rd round.
     if (state.augments.includes("prospector") && round % 3 === 0) {
       items = [...items, COMPONENT_IDS[randInt(rng, COMPONENT_IDS.length)]];
     }
+
+    // Mega Madness mode: a fresh Mega Stone every round.
+    if (mode?.roundItem) items = [...items, mode.roundItem];
 
     // Pension trains one planning round closer to maturity (down to 0 = ready).
     const pension = state.pension ? { ...state.pension, roundsLeft: Math.max(0, state.pension.roundsLeft - 1) } : null;

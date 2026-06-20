@@ -22,6 +22,8 @@ export type GameRules = {
   /** Private lobby — not listed in the public game browser (friends can still join
    *  via the Friends panel). Default false (public). */
   isPrivate: boolean;
+  /** Game mode id (see data/gameModes.ts). Default "standard". */
+  mode: string;
 };
 
 /** Host-side draft of the rules before a room is created. Once a room exists the
@@ -49,6 +51,7 @@ const DEFAULT_RULES: GameRules = {
   // between players. The client keeps a 4s fallback if the server is ever late.
   serverDriven: true,
   isPrivate: false,
+  mode: "standard",
 };
 
 export const usePreLobby = create<PreLobbyState>((set) => ({
