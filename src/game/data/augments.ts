@@ -177,6 +177,55 @@ export function combineTeamBuffs(...buffs: (TeamBuff | undefined | null)[]): Tea
   return capBuff(out);
 }
 
+/** Coarse category of an augment, used to tailor + diversify the offering.
+ *   ad  — physical-leaning combat (Attack / Speed / Crit / lifesteal)
+ *   ap  — special-leaning combat (Ability Power / start mana)
+ *   def — defensive combat (Armor / MR / Health)
+ *   econ— everything non-combat (gold / XP / items / units / emblems) */
+export type AugmentCategory = "ad" | "ap" | "def" | "econ";
+
+export function augmentCategory(a: Augment): AugmentCategory {
+  const c = a.combat;
+  if (!c) return "econ";
+  const ap = c.apMult ?? 1, ad = c.adMult ?? 1;
+  if (ap > 1 && ap >= ad) return "ap";
+  if (ad > 1 || c.asMult || c.critAdd || c.lifeSteal) return "ad";
+  if (c.manaStart && ap <= 1 && ad <= 1) return "ap";
+  if (c.armorAdd || c.mrAdd || c.hpMult) return "def";
+  return "econ";
+}
+
+/** A board's damage lean, for tailoring augment offers. Counts physical vs special carries. */
+export type BoardProfile = { ad: number; ap: number };
+
+/** Pick `count` augments from `pool`, weighted toward the board's damage lean and spread
+ *  across categories (so you rarely see three of the same flavour). Deterministic per `rng`.
+ *  The relevance weighting is what makes the offer feel tailored rather than random. */
+export function tailoredAugmentPicks(pool: Augment[], profile: BoardProfile, count: number, rng: () => number): Augment[] {
+  const lean = profile.ad === profile.ap ? "none" : profile.ad > profile.ap ? "ad" : "ap";
+  const weightFor = (a: Augment): number => {
+    const cat = augmentCategory(a);
+    if (cat === "def") return 1.3;            // always somewhat useful
+    if (cat === "econ") return 1.0;
+    if (lean === "none") return 1.2;          // no board lean yet → combat slightly favoured
+    if (cat === lean) return 2.6;             // matches your carries → boosted
+    return 0.5;                               // off-profile combat → downweighted
+  };
+  const remaining = pool.map((a) => ({ a, w: weightFor(a) }));
+  const out: Augment[] = [];
+  for (let k = 0; k < count && remaining.length; k++) {
+    const total = remaining.reduce((s, x) => s + x.w, 0);
+    let roll = rng() * total, idx = 0;
+    for (; idx < remaining.length - 1; idx++) { roll -= remaining[idx].w; if (roll <= 0) break; }
+    const [chosen] = remaining.splice(idx, 1);
+    out.push(chosen.a);
+    // Soft diversity: dampen anything in the same category so the next pick differs.
+    const cat = augmentCategory(chosen.a);
+    for (const x of remaining) if (augmentCategory(x.a) === cat) x.w *= 0.35;
+  }
+  return out;
+}
+
 /** Which augment slot (0,1,2) a given round opens, or null. One per early stage,
  *  offered at round 2 — AFTER the stage's first fight (the carousel is the mid-stage
  *  event at round 4, so the two rewards never share a round). */
