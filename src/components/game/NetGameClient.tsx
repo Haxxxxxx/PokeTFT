@@ -8,7 +8,7 @@ import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, concede, markCarouselPicked, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate } from "@/game/engine/combat";
 import { getDef, spriteUrl, hasDef } from "@/game/data/mons";
-import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, getMode, pickMonoType } from "@/game/data/gameModes";
+import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, modeTeamBuff, modeSignatureAugment, getMode, pickMonoType } from "@/game/data/gameModes";
 import { streakGold, roundKind, advanceRound, boardSizeForLevel, ECONOMY } from "@/game/config";
 import { interest } from "@/game/engine/economy";
 import { MEGA_STONE, canMega } from "@/game/data/mega";
@@ -20,7 +20,7 @@ import { finishCarouselEarly } from "@/game/net/serverGame";
 import { recordGameResult, applyRankedResult, rankOf, type RankedResult } from "@/game/net/users";
 import { computeTraits } from "@/game/engine/synergies";
 import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords } from "lucide-react";
-import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR, teamBuffForAugments } from "@/game/data/augments";
+import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR, teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
 import { useUi } from "@/game/store/uiStore";
 import { makeRng } from "@/game/engine/rng";
@@ -455,8 +455,10 @@ export function NetGameClient() {
     // Owners of p1/p2 follow the flip; PvE creeps (p2 when pve) get no buff.
     const pl = room?.players ?? {};
     const [u1, u2] = myCombat.flip ? [myCombat.oppUid, myUid] : [myUid, myCombat.oppUid];
-    const allyBuff = teamBuffForAugments(pl[u1 ?? ""]?.augments);
-    const enemyBuff = myCombat.pve ? undefined : teamBuffForAugments(pl[u2 ?? ""]?.augments);
+    // Fold the region modifier into BOTH human sides exactly like the host (teamBuffFor).
+    const modBuff = modeTeamBuff(room?.rules);
+    const allyBuff = combineTeamBuffs(teamBuffForAugments(pl[u1 ?? ""]?.augments), modBuff);
+    const enemyBuff = myCombat.pve ? undefined : combineTeamBuffs(teamBuffForAugments(pl[u2 ?? ""]?.augments), modBuff);
     return simulate(asBoard(p1), asBoard(p2), allyBuff, enemyBuff);
     // Re-run when the frozen boards themselves change (host failover re-freeze or a
     // late buzzer-beater sync for the same stage/round/opp) — not just on round id,
@@ -472,8 +474,9 @@ export function NetGameClient() {
     const [p1, p2] = spectateCombat.flip ? [spectateCombat.oppBoard, spectateCombat.selfBoard] : [spectateCombat.selfBoard, spectateCombat.oppBoard];
     const pl = room?.players ?? {};
     const [u1, u2] = spectateCombat.flip ? [spectateCombat.oppUid, spectate] : [spectate, spectateCombat.oppUid];
-    const allyBuff = teamBuffForAugments(pl[u1 ?? ""]?.augments);
-    const enemyBuff = spectateCombat.pve ? undefined : teamBuffForAugments(pl[u2 ?? ""]?.augments);
+    const modBuff = modeTeamBuff(room?.rules);
+    const allyBuff = combineTeamBuffs(teamBuffForAugments(pl[u1 ?? ""]?.augments), modBuff);
+    const enemyBuff = spectateCombat.pve ? undefined : combineTeamBuffs(teamBuffForAugments(pl[u2 ?? ""]?.augments), modBuff);
     return simulate(asBoard(p1), asBoard(p2), allyBuff, enemyBuff);
   }, [phase, meta?.stage, meta?.round, spectate, spectateCombat?.oppUid, spectateCombat?.flip, specSelfSig, specOppSig]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -482,18 +485,28 @@ export function NetGameClient() {
   const augOptions = useMemo(() => {
     if (augSlotNow == null) return [];
     const owned = new Set(useGame.getState().augments);
+    // Region signature augments (sig-*) are ONLY offered in their own Region Clash mode —
+    // never in the general pool.
+    const sigId = modeSignatureAugment(room?.rules);
+    const isSig = (id: string) => id.startsWith("sig-");
     // Tier escalates with the slot (TFT-style): silver at 2-2, gold at 3-2,
     // prismatic at 4-2. Fall back to the full pool if a tier runs dry.
     const tier = (["silver", "gold", "prismatic"] as const)[augSlotNow] ?? "gold";
-    let pool = AUGMENTS.filter((a) => !owned.has(a.id) && a.tier === tier);
-    if (pool.length < 3) pool = AUGMENTS.filter((a) => !owned.has(a.id));
+    let pool = AUGMENTS.filter((a) => !owned.has(a.id) && !isSig(a.id) && a.tier === tier);
+    if (pool.length < 3) pool = AUGMENTS.filter((a) => !owned.has(a.id) && !isSig(a.id));
     let seed = augSlotNow * 9973 + 7;
     for (let i = 0; i < (myUid?.length ?? 0); i++) seed = (seed * 31 + myUid!.charCodeAt(i)) >>> 0;
     const r = makeRng(seed >>> 0);
     const a = [...pool];
     for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
-    return a.slice(0, 3);
-  }, [augSlotNow, myUid]);
+    const picks = a.slice(0, 3);
+    // Region Clash: guarantee the region's signature augment as the first option (once,
+    // if not already owned), so each region's identity augment is always reachable.
+    if (sigId && !owned.has(sigId) && AUGMENT_BY_ID[sigId] && !picks.some((p) => p.id === sigId)) {
+      picks[0] = AUGMENT_BY_ID[sigId];
+    }
+    return picks;
+  }, [augSlotNow, myUid, room?.rules?.mode]);
 
   // Planning hotkeys: R reroll · L buy XP · S sell the inspected unit. Disabled
   // while spectating a rival — otherwise R/L/S silently mutate YOUR own economy
