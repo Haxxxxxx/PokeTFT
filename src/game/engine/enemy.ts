@@ -3,6 +3,7 @@
 import type { UnitInstance, PokeType } from "../types";
 import { SHOP_ODDS, boardSizeForLevel, roundsInStage, type Cost } from "../config";
 import { UNITS, getDef } from "../data/mons";
+import { TRAITS_BY_KEY } from "../data/traits";
 import { canMega, MEGA_STONE } from "../data/mega";
 import { makeRng, weightedPick, randInt, type Rng } from "./rng";
 
@@ -184,33 +185,56 @@ export function generateExpertBoard(stage: number, round: number, seed: number, 
   const twoStarChance = Math.min(0.55, Math.max(0, (stage - 2) * 0.12)) * cfg.starMult;
   const threeStarChance = stage >= 5 ? Math.min(0.18, (stage - 4) * 0.05) * cfg.starMult : 0;
 
-  // Pick up to `cfg.themes` distinct viable synergy types (≥4 carriers) to cluster around —
-  // this is the legit skill: hitting real breakpoints.
+  // Only a unit the bot's level can actually ROLL is legal (SHOP_ODDS[cost] > 0).
+  const legalCost = (id: string) => odds[getDef(id).cost - 1] > 0;
+
+  // Pick `cfg.themes` synergy types to commit to, weighted by ROSTER DEPTH (≥4 carriers) —
+  // a strong player commits to synergies they can actually fill to a breakpoint.
   const typeUnits = new Map<PokeType, string[]>();
   for (const u of UNITS) {
     if (allow && !allow.has(u.id)) continue;
     for (const t of u.types) { const arr = typeUnits.get(t) ?? (typeUnits.set(t, []).get(t)!); arr.push(u.id); }
   }
-  const viable = [...typeUnits.entries()].filter(([, ids]) => ids.length >= 4).map(([k]) => k);
-  const themes = new Set<PokeType>();
-  for (let i = 0; i < cfg.themes; i++) {
-    const pool = viable.filter((t) => !themes.has(t));
-    if (!pool.length) break;
-    themes.add(pool[randInt(rng, pool.length)]);
+  const pickable = [...typeUnits.entries()].filter(([, ids]) => ids.filter(legalCost).length >= 4).map(([k, ids]) => ({ k, w: ids.filter(legalCost).length }));
+  const themeList: PokeType[] = [];
+  for (let i = 0; i < cfg.themes && pickable.length; i++) {
+    const idx = weightedPick(rng, pickable.map((p) => p.w));
+    themeList.push(pickable[idx].k); pickable.splice(idx, 1);
   }
 
-  // Draft a real shop: roll a COST the level can afford (SHOP_ODDS), then PREFER a theme unit
-  // of that cost (synergy) over a random one. Distinct defIds, like a player's roster.
   const chosen: string[] = [];
   const taken = new Set<string>();
-  for (let i = 0; i < size; i++) {
+  // Per-theme unit budget: the primary synergy gets the lion's share, secondary less, the
+  // rest minimal — then each is snapped DOWN to a real breakpoint so the trait ACTIVATES.
+  const themeBudget = (i: number) => (i === 0 ? Math.ceil(size * 0.6) : i === 1 ? Math.ceil(size * 0.4) : 2);
+  for (let ti = 0; ti < themeList.length && chosen.length < size; ti++) {
+    const theme = themeList[ti];
+    const avail = (typeUnits.get(theme) ?? []).filter((id) => !taken.has(id) && legalCost(id));
+    const cap = Math.min(themeBudget(ti), avail.length, size - chosen.length);
+    const bps = TRAITS_BY_KEY[theme]?.breakpoints ?? [];
+    let target = 0; for (const bp of bps) if (bp <= cap) target = bp; // largest breakpoint that fits
+    if (!target) target = cap;                                        // none fits → just cluster
+    // Draft the cheapest theme carriers (what a player rolls first), with light variety.
+    const cheap = [...avail].sort((a, b) => getDef(a).cost - getDef(b).cost);
+    for (let k = 0; k < target && chosen.length < size; k++) {
+      const floorCost = getDef(cheap.find((id) => !taken.has(id))!).cost;
+      const band = cheap.filter((id) => !taken.has(id) && getDef(id).cost <= floorCost + 1);
+      const pick = band.length ? band[randInt(rng, band.length)] : cheap.find((id) => !taken.has(id));
+      if (!pick) break;
+      chosen.push(pick); taken.add(pick);
+    }
+  }
+  // Fill remaining slots with real-shop rolls (cost by SHOP_ODDS), preferring theme units.
+  const themes = new Set(themeList);
+  let fillGuard = 0;
+  while (chosen.length < size && fillGuard++ < 200) {
     let cost = (weightedPick(rng, odds) + 1) as Cost;
     let t = 0;
     while (byCost[cost].filter((id) => !taken.has(id)).length === 0 && t++ < 6) cost = ((cost % 5) + 1) as Cost;
     const pool = byCost[cost].filter((id) => !taken.has(id));
     if (!pool.length) break;
-    const themed = themes.size ? pool.filter((id) => getDef(id).types.some((ty) => themes.has(ty))) : [];
-    const pick = (themed.length && rng() < 0.85) ? themed[randInt(rng, themed.length)] : pool[randInt(rng, pool.length)];
+    const themed = pool.filter((id) => getDef(id).types.some((ty) => themes.has(ty)));
+    const pick = (themed.length && rng() < 0.7) ? themed[randInt(rng, themed.length)] : pool[randInt(rng, pool.length)];
     chosen.push(pick); taken.add(pick);
   }
 
@@ -226,6 +250,20 @@ export function generateExpertBoard(stage: number, round: number, seed: number, 
     const row = ROW_ORDER[Math.floor(i / COL_ORDER.length) % ROW_ORDER.length];
     return { iid: `x${seed}_${i}`, defId, star, pos: [col, row], items: [] as string[] };
   });
+
+  // Concentrate the rolled star-ups onto the best CARRIES (a good player upgrades their
+  // damage dealers first). This re-allocates the SAME number of 2★/3★ (no extra — stays
+  // legal: 3★ only on ≤2-cost, 2★ only on ≤3-cost), just onto higher-priority units.
+  if (intensity !== "base" && board.length) {
+    const prio = (u: UnitInstance) => (isTank(u.defId) ? 0 : 3) + getDef(u.defId).cost;
+    const threes = board.filter((u) => u.star === 3).length;
+    const twos = board.filter((u) => u.star === 2).length;
+    for (const u of board) u.star = 1;
+    const c2 = board.filter((u) => getDef(u.defId).cost <= 2).sort((a, b) => prio(b) - prio(a));
+    for (let i = 0; i < threes && i < c2.length; i++) c2[i].star = 3;
+    const c3 = board.filter((u) => getDef(u.defId).cost <= 3 && u.star < 3).sort((a, b) => prio(b) - prio(a));
+    for (let i = 0; i < twos && i < c3.length; i++) c3[i].star = 2;
+  }
 
   // Items: a REALISTIC count — a player nets ~1 completed item per stage from carousels +
   // PvE drops (capped at 6), so only that many here, scaled by the tier's discipline. No
