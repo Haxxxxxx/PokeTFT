@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test:engine": "tsx test/combat-determinism.ts",
     "test:sim": "tsx test/sim-game.ts 24",
-    "test": "tsx test/combat-determinism.ts && tsx test/sim-game.ts 24"
+    "test:doubleup": "tsx test/double-up-flow.ts && tsx test/double-up-coop.ts",
+    "test": "tsx test/combat-determinism.ts && tsx test/sim-game.ts 24 && tsx test/double-up-flow.ts && tsx test/double-up-coop.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
