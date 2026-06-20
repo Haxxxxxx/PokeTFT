@@ -131,8 +131,12 @@ export async function beginMatch(code: string, room: Room): Promise<void> {
     "meta/serverDriven": true, // #110 — every game is server-driven (no host-loop mode)
     combat: null,
     invited: null,
-    teams: null, // cleared, then (re)built below for Double Up
     transfers: null, // clear any stale co-op transfers from a prior game
+    // NOTE: `teams` is set as ONE whole-node value below (either the fresh pools or null).
+    // It must NOT also appear as a separate `teams: null` key here — an update containing
+    // both `teams` and `teams/0` is an ancestor/descendant path conflict the Firebase SDK
+    // rejects client-side, which silently broke Double Up's start (in-memory tests don't
+    // enforce that rule; caught via a live prod run).
   };
   // Double Up: pair every participant (humans + bots) into deterministic teams of 2,
   // each sharing ONE HP pool. Same uid→team mapping on host + clients (sorted uids).
@@ -159,11 +163,15 @@ export async function beginMatch(code: string, room: Room): Promise<void> {
     }
   }
   // One shared HP pool per team (the team's "Little Legend"). A 2-player team feeds
-  // damage from both boards into this single bar; the team is out when it hits 0.
+  // damage from both boards into this single bar; the team is out when it hits 0. Written
+  // as a SINGLE whole-node value (not per-`teams/{t}` keys) so it replaces any stale pools
+  // AND avoids an ancestor/descendant path conflict in the same atomic update.
   if (doubleUp) {
-    for (const [t, members] of Object.entries(teamMembers)) {
-      u[`teams/${t}`] = { hp, alive: true, place: null, members };
-    }
+    const teamsNode: Record<number, { hp: number; alive: boolean; place: number | null; members: string[] }> = {};
+    for (const [t, members] of Object.entries(teamMembers)) teamsNode[Number(t)] = { hp, alive: true, place: null, members };
+    u["teams"] = teamsNode;
+  } else {
+    u["teams"] = null; // FFA: ensure no stale team pools linger
   }
   await dbAdapter().update(gamePath(code), u);
 }
