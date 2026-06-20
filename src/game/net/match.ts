@@ -132,6 +132,7 @@ export async function beginMatch(code: string, room: Room): Promise<void> {
     combat: null,
     invited: null,
     teams: null, // cleared, then (re)built below for Double Up
+    transfers: null, // clear any stale co-op transfers from a prior game
   };
   // Double Up: pair every participant (humans + bots) into deterministic teams of 2,
   // each sharing ONE HP pool. Same uid→team mapping on host + clients (sorted uids).
@@ -298,6 +299,41 @@ async function withClaimGuard(code: string, body: () => Promise<void>): Promise<
   }
 }
 
+/** Double Up team-vs-team PvP pairing. Groups alive players by team, pairs teams two at a
+ *  time (deterministic shuffle), and within a pair sets member-vs-member fights so both
+ *  partners clash with the SAME enemy team. A short side (a downed partner) is padded with
+ *  a ghost; an odd team out fights ghosts. All damage still pools per team in endCombat. */
+function buildDoubleUpCombat(combat: Record<string, CombatAssign>, room: Room, alive: RoomPlayer[], stage: number): void {
+  const byTeam = new Map<number, string[]>();
+  for (const p of alive) {
+    if (p.teamId == null) continue;
+    (byTeam.get(p.teamId) ?? byTeam.set(p.teamId, []).get(p.teamId)!).push(p.uid);
+  }
+  for (const ids of byTeam.values()) ids.sort(); // stable member order
+  const teamIds = shuffled([...byTeam.keys()].sort((a, b) => a - b), stage * 131 + room.meta.round * 7 + 3);
+
+  const ghostMirror = (uid: string) => {
+    combat[uid] = { oppUid: uid, oppName: "—", ghost: true, won: true, survivors: 0, dmg: 0, selfBoard: rtdbSafe(board(room.players[uid])), oppBoard: [] };
+  };
+
+  for (let i = 0; i < teamIds.length; i += 2) {
+    const A = byTeam.get(teamIds[i]) ?? [];
+    if (i + 1 < teamIds.length) {
+      const B = byTeam.get(teamIds[i + 1]) ?? [];
+      const n = Math.max(A.length, B.length);
+      for (let k = 0; k < n; k++) {
+        const a = A[k], b = B[k];
+        if (a && b) assign(combat, room, a, b, stage, false);            // real cross-team fight
+        else if (a) assign(combat, room, a, B[0] ?? a, stage, true);     // B short → A ghosts vs a B copy
+        else if (b) assign(combat, room, b, A[0] ?? b, stage, true);     // A short → B ghosts vs an A copy
+      }
+    } else {
+      // Odd team out (no opponent team this round): both members fight a ghost.
+      for (const a of A) ghostMirror(a);
+    }
+  }
+}
+
 /** Host: decide what a planning round opens into (PvP / PvE / carousel). */
 export async function resolveRoundStart(code: string, room: Room): Promise<void> {
   if (roundKind(room.meta.stage, room.meta.round) === "carousel") return startCarousel(code, room);
@@ -355,15 +391,16 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
       const dmg = isBossRound && r.winner !== "ally" ? Math.min(8, stageBaseDamage(stage)) : 0;
       combat[p.uid] = { oppUid: p.uid, oppName: pveName, ghost: true, pve: true, won: r.winner === "ally", survivors: 0, dmg, selfBoard: self, oppBoard: creeps };
     }
+  } else if (isDoubleUp(room.rules)) {
+    // Double Up (Phase 3): TEAM-vs-TEAM matchmaking — both partners face the two members
+    // of ONE enemy team this round (each member fights one opponent), so the combined
+    // damage into the shared HP pool comes from a coherent clash, not two random fights.
+    buildDoubleUpCombat(combat, room, alive, stage);
   } else {
     const order = shuffled(alive.map((p) => p.uid).sort(), stage * 131 + room.meta.round);
-    const doubleUp = isDoubleUp(room.rules);
-    const sameTeam = (a: string, b: string) => doubleUp && room.players[a]?.teamId != null && room.players[a]?.teamId === room.players[b]?.teamId;
-    // Avoid an immediate rematch (and, in Double Up, never pair teammates) when there's
-    // someone else to swap with.
+    // Avoid an immediate rematch when there's someone else to swap with.
     for (let i = 0; i + 1 < order.length; i += 2) {
-      const clash = room.players[order[i]]?.lastOpp === order[i + 1] || sameTeam(order[i], order[i + 1]);
-      if (clash && i + 2 < order.length) {
+      if (room.players[order[i]]?.lastOpp === order[i + 1] && i + 2 < order.length) {
         [order[i + 1], order[i + 2]] = [order[i + 2], order[i + 1]];
       }
     }
@@ -670,6 +707,7 @@ export async function returnToLobby(code: string, room: Room): Promise<void> {
     carousel: null,
     invited: null,
     teams: null, // Double Up team pools cleared; rebuilt at next beginMatch
+    transfers: null, // clear any pending co-op transfers
   };
   for (const p of Object.values(room.players ?? {})) {
     u[`players/${p.uid}/hp`] = hp;
