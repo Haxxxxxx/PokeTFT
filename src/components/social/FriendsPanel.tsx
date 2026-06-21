@@ -15,6 +15,7 @@ export function FriendsPanel() {
   const addFriendByName = useAuth((s) => s.addFriendByName);
   const unfriend = useAuth((s) => s.unfriend);
   const join = useRoom((s) => s.join);
+  const spectate = useRoom((s) => s.spectate);
   const myCode = useRoom((s) => s.code);
   const openUserProfile = useAppStore((s) => s.openUserProfile);
   const [name, setName] = useState("");
@@ -81,7 +82,12 @@ export function FriendsPanel() {
                   </span>
                 </button>
                 {f.currentGame && f.currentGame !== myCode && (
-                  <button onClick={() => join(f.currentGame!, profile?.username ?? "Player")} className="px-2 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-[10px] font-bold text-white">Join</button>
+                  <>
+                    {/* Join only lands in a not-yet-started lobby; Watch attaches as a
+                        read-only spectator to an in-progress game. */}
+                    <button onClick={() => join(f.currentGame!, profile?.username ?? "Player")} className="px-2 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-[10px] font-bold text-white">Join</button>
+                    <button onClick={() => spectate(f.currentGame!, f.uid)} title="Spectate this game (read-only)" className="px-2 py-1 rounded-md bg-violet-600 hover:bg-violet-500 text-[10px] font-bold text-white">Watch</button>
+                  </>
                 )}
                 <button onClick={() => unfriend(f.uid)} title="Remove" className="text-slate-600 hover:text-rose-400 text-sm opacity-0 group-hover:opacity-100">×</button>
               </div>

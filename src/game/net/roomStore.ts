@@ -174,6 +174,12 @@ type RoomState = {
   error: string | null;
   /** True while reconnect() is re-attaching to a saved room after a refresh. */
   reconnecting: boolean;
+  /** Read-only spectator attachment: we observe games/{code} but NEVER write a
+   *  player node, presence, priv econ, or drive the host loop. Friends watching a
+   *  friend's ongoing game. */
+  spectator: boolean;
+  /** The friend uid we opened the spectate on — the default "follow" target. */
+  spectateUid: string | null;
   /** Open games available to browse/join (from the lobbies index). */
   lobbies: LobbySummary[];
   /** Subscribe / unsubscribe to the open-games list (game browser). */
@@ -188,6 +194,8 @@ type RoomState = {
 
   host: (name: string, rules?: Partial<RoomRules>) => Promise<string | null>;
   join: (code: string, name: string) => Promise<boolean>;
+  /** Attach to a game as a read-only spectator (watch a friend's ongoing match). */
+  spectate: (code: string, watchUid?: string) => Promise<boolean>;
   setReady: (ready: boolean) => void;
   updateMe: (patch: Partial<RoomPlayer>) => void;
   setMeta: (patch: Partial<RoomMeta>) => void;
@@ -253,6 +261,8 @@ export const useRoom = create<RoomState>((setState, getState) => ({
   status: "idle",
   error: null,
   reconnecting: false,
+  spectator: false,
+  spectateUid: null,
   lobbies: [],
 
   watchLobbies: () => {
@@ -361,6 +371,29 @@ export const useRoom = create<RoomState>((setState, getState) => ({
     }
   },
 
+  spectate: async (code, watchUid) => {
+    code = code.trim().toUpperCase();
+    setState({ status: "connecting", error: null });
+    try {
+      const uid = await ensureAuth();
+      const snap = await get(roomRef(code));
+      if (!snap.exists() || !isValidRoom(snap.val())) {
+        setState({ status: "error", error: "Game not found" });
+        return false;
+      }
+      // Read-only attach: no player node, no presence, no priv read, no host loop.
+      // We just observe games/{code} (readable by any authed user per the rules).
+      // myUid is our own real uid (so render guards pass) but it never matches a
+      // player in the watched game — every write/host path is gated on !spectator.
+      subscribe(code, uid, setState, /* spectator */ true);
+      setState({ code, myUid: uid, spectator: true, spectateUid: watchUid ?? null, status: "connected" });
+      return true;
+    } catch (e) {
+      setState({ status: "error", error: (e as Error).message });
+      return false;
+    }
+  },
+
   setReady: (ready) => getState().updateMe({ ready }),
 
   addBot: (difficulty) => {
@@ -429,10 +462,16 @@ export const useRoom = create<RoomState>((setState, getState) => ({
   },
 
   leave: () => {
-    const { code, myUid, room } = getState();
+    const { code, myUid, room, spectator } = getState();
     if (unsub) { unsub(); unsub = null; }
     if (privUnsub) { privUnsub(); privUnsub = null; }
     if (privWatchdog) { clearTimeout(privWatchdog); privWatchdog = null; }
+    // Spectator detach: we never wrote anything (no player node, no presence, no
+    // priv, no currentGame), so just drop our local subscription and reset.
+    if (spectator) {
+      setState({ code: null, myUid: null, room: null, liveRoom: null, mySave: undefined, status: "idle", error: null, spectator: false, spectateUid: null });
+      return;
+    }
     if (myUid) setCurrentGame(myUid, null);
     if (code && myUid) {
       const otherHumans = Object.values(room?.players ?? {}).filter((p) => !p.isBot && p.uid !== myUid);
@@ -474,10 +513,18 @@ function roomSig(room: Room): string {
 }
 let lastSig: string | null = null;
 
-function subscribe(code: string, uid: string, setState: (p: Partial<RoomState>) => void) {
+function subscribe(code: string, uid: string, setState: (p: Partial<RoomState>) => void, spectator = false) {
   if (unsub) unsub();
-  if (privUnsub) privUnsub();
+  if (privUnsub) { privUnsub(); privUnsub = null; }
+  if (privWatchdog) { clearTimeout(privWatchdog); privWatchdog = null; }
   lastSig = null;
+  // Spectators never have an econ of their own — skip the private read entirely and
+  // mark the save resolved-empty so nothing waits on it.
+  if (spectator) {
+    setState({ mySave: null });
+    subscribeRoomNode(code, setState);
+    return;
+  }
   // Listen to my OWN private econ snapshot (priv/{code}/{uid}) — readable only by
   // me — so a refresh can rehydrate gold/shop/items without ever exposing them to
   // opponents. undefined → null/value once it loads (gates reconnect fresh-start).
@@ -501,6 +548,15 @@ function subscribe(code: string, uid: string, setState: (p: Partial<RoomState>) 
     const s = useRoom.getState();
     if (s.code === code && s.mySave === undefined) setState({ mySave: null });
   }, 15000);
+  subscribeRoomNode(code, setState);
+  // mark ourselves connected (in case of rejoin) — swallow transient
+  // permission/offline rejections so they don't surface as unhandled rejections.
+  update(ref(db(), `games/${code}/players/${uid}`), { connected: true }).catch(onWriteErr);
+}
+
+/** The shared games/{code} onValue listener (used by both players and spectators).
+ *  Read-only: it only mirrors the room into the store, never writes. */
+function subscribeRoomNode(code: string, setState: (p: Partial<RoomState>) => void) {
   const r = roomRef(code);
   unsub = onValue(r, (snap) => {
     if (!snap.exists()) {
@@ -530,7 +586,4 @@ function subscribe(code: string, uid: string, setState: (p: Partial<RoomState>) 
       setState({ liveRoom: next });
     }
   });
-  // mark ourselves connected (in case of rejoin) — swallow transient
-  // permission/offline rejections so they don't surface as unhandled rejections.
-  update(ref(db(), `games/${code}/players/${uid}`), { connected: true }).catch(onWriteErr);
 }
