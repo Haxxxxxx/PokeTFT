@@ -259,8 +259,13 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
   const level = Math.max(1, Math.min(10, realisticLevel(stage, round) + cfg.lvlOff));
   const size = Math.max(1, Math.min(boardSizeForLevel(level), MAX_BOARD));
   const odds = SHOP_ODDS[level];
-  const twoStarChance = Math.min(0.55, Math.max(0, (stage - 2) * 0.12)) * cfg.starMult;
-  const threeStarChance = stage >= 5 ? Math.min(0.18, (stage - 4) * 0.05) * cfg.starMult : 0;
+  // Star-up reality of a GOOD player: by mid-game most of your low-cost board is 2★ and a
+  // carry 3★ arrives stage 6-7. The old curve was far too shallow (~40% 2★ at stage 5), so
+  // skilled bots fielded half-1★ boards that hit like wet noodles. Steeper now, but still
+  // capped below a flawless board and applied ONLY to ≤3-cost (2★) / ≤2-cost (3★) — a 4/5-cost
+  // never auto-stars, so this stays inside legitimate economy. starMult sets the tier spread.
+  const twoStarChance = Math.min(0.9, Math.max(0, (stage - 1) * 0.18)) * cfg.starMult;
+  const threeStarChance = stage >= 4 ? Math.min(0.3, (stage - 3) * 0.08) * cfg.starMult : 0;
 
   // Only a unit the bot's level can actually ROLL is legal (SHOP_ODDS[cost] > 0).
   const legalCost = (id: string) => odds[getDef(id).cost - 1] > 0;
