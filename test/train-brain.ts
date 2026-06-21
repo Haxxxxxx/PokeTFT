@@ -19,7 +19,7 @@ import { generatePlayerLikeBoard } from "../src/game/engine/enemy";
 import { simulate, type TeamBuff } from "../src/game/engine/combat";
 import { accrueComp, metaWeights, activeTraitKeys, type CompStats } from "../src/game/engine/botBrain";
 import { MODES, rosterForRoom, modeStartItems, modeTeamBuff } from "../src/game/data/gameModes";
-import { canMega, MEGA_STONE } from "../src/game/data/mega";
+import { MEGA_STONE } from "../src/game/data/mega";
 import { EMBLEM_TRAIT, COMPLETED_IDS } from "../src/game/data/items";
 import { getDef, typesForStar } from "../src/game/data/mons";
 import type { UnitInstance } from "../src/game/types";
@@ -37,9 +37,8 @@ function applyModeEffects(board: UnitInstance[], mode: Mode, rules: Record<strin
   const room = (n: number) => board.filter((u) => (u.items?.length ?? 0) < 3).slice(0, n);
   const addItem = (u: UnitInstance, id: string) => { u.items = [...(u.items ?? []), id]; };
 
-  if (mode.flags?.megaMadness) {
-    for (const u of board) if (canMega(u.defId) && (u.items?.length ?? 0) < 3 && !(u.items ?? []).includes(MEGA_STONE)) addItem(u, MEGA_STONE);
-  }
+  // Mega Madness stones are applied during DRAFT now (preferMega in the generator), so we
+  // only handle region/treasure loot here.
   // Region signature emblem + item (modeStartItems): place the emblem where it adds a NEW type.
   for (const id of modeStartItems(rules)) {
     if (id === MEGA_STONE) continue; // handled above
@@ -95,7 +94,7 @@ function trainMode(mode: Mode): CompStats {
     let buff: TeamBuff | undefined;
     for (let f = 0; f < FLEET; f++) {
       const seed = (g * 7919 + f * 104729 + 1) >>> 0;
-      const b = generatePlayerLikeBoard(stage, 5, "ultimate", seed, roster, undefined, undefined, { metaWeights: meta });
+      const b = generatePlayerLikeBoard(stage, 5, "ultimate", seed, roster, undefined, undefined, { metaWeights: meta, preferMega: !!mode.flags?.megaMadness });
       buff = applyModeEffects(b, mode, baseRules); // gimmick effects (megas/emblem/loot); buff is mode-wide
       boards.push(b);
     }
