@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { useGame } from "@/game/store/gameStore";
 import { useUi } from "@/game/store/uiStore";
 import { MEGA_STONE } from "@/game/data/mega";
 import { ITEM_POOL, RARITY_COLOR, isEmblem } from "@/game/data/itemPool";
-import { Hammer, Sparkles } from "lucide-react";
+import { Hammer, Sparkles, BookOpen } from "lucide-react";
 import { MegaIcon } from "./icons";
 import { ItemGlyph } from "./ItemGlyph";
+import { RecipeBook } from "./RecipeBook";
 import { useT } from "@/lib/i18n";
 
 const ITEM_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
@@ -47,6 +48,7 @@ export function ItemsPanel() {
   const forgeEmblem = useGame((s) => s.forgeEmblem);
   const inspectedItem = useUi((s) => s.inspectedItem);
   const setInspectedItem = useUi((s) => s.setInspectedItem);
+  const [recipesOpen, setRecipesOpen] = useState(false);
 
   // Esc closes the item inspection.
   useEffect(() => {
@@ -64,8 +66,18 @@ export function ItemsPanel() {
     <div data-inspectable className="gilded rounded-2xl p-3">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-[10px] uppercase tracking-widest text-amber-200/60 font-bold">{t.sh_items_title}</h2>
-        <span className="text-[10px] text-slate-500">{items.length}</span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setRecipesOpen(true)}
+            className="flex items-center gap-1 text-[10px] font-bold text-amber-200/70 hover:text-amber-200"
+            title={t.it_recipes_title}
+          >
+            <BookOpen size={12} /> {t.it_recipes}
+          </button>
+          <span className="text-[10px] text-slate-500">{items.length}</span>
+        </div>
       </div>
+      {recipesOpen && <RecipeBook onClose={() => setRecipesOpen(false)} />}
       {distinct.length === 0 ? (
         <p className="text-[11px] text-slate-600 leading-relaxed">{t.it_empty}</p>
       ) : (

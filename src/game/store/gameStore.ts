@@ -583,7 +583,8 @@ export const useGame = create<State>((set, get) => ({
     // they form a recipe with fuses them into the completed item (2 → 1) — but
     // only if that completed item is enabled by the lobby rules (else the pieces
     // just stay as separate held components).
-    const itemAllowed = (id: string) => !state.enabledItems || state.enabledItems.includes(id);
+    // Emblems are always craftable (Spatula recipes) regardless of the lobby item list.
+    const itemAllowed = (id: string) => isEmblem(id) || !state.enabledItems || state.enabledItems.includes(id);
     if (isComponent(itemId)) {
       for (let i = 0; i < unit.items.length; i++) {
         const held = unit.items[i];

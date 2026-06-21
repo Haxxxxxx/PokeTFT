@@ -92,6 +92,8 @@ export type Dict = {
   it_drag_equip: string;
   it_reforge: string;
   it_forge_emblem: string;
+  it_recipes: string;
+  it_recipes_title: string;
   // Combat stage
   cs_your_team: string;
   cs_vs: string;
@@ -215,6 +217,8 @@ export const FR: Dict = {
   it_drag_equip: "Glisse un objet sur un mon pour l'équiper.",
   it_reforge: "Reforger",
   it_forge_emblem: "Emblème",
+  it_recipes: "Recettes",
+  it_recipes_title: "Voir toutes les recettes d'objets",
   cs_your_team: "Votre équipe",
   cs_vs: "VS",
   cs_overtime: "PROLONGATION",
@@ -336,6 +340,8 @@ export const EN: Dict = {
   it_drag_equip: "Drag an item onto a mon to equip it.",
   it_reforge: "Reforge",
   it_forge_emblem: "Emblem",
+  it_recipes: "Recipes",
+  it_recipes_title: "View all item recipes",
   cs_your_team: "Your Team",
   cs_vs: "VS",
   cs_overtime: "OVERTIME",
