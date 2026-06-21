@@ -206,6 +206,10 @@ export type BotBrain = {
   /** Mega Madness: a smart player builds AROUND megas (every round hands out a Mega Stone),
    *  so the bot drafts mega-capable carries and stones every capable mon. Off = drafts normally. */
   preferMega?: boolean;
+  /** Treasure Hunt: the mode pours out ~2.5× loot, so a smart player fields heavily-itemized
+   *  carries. Multiplies the bot's item budget to match (1 = normal). Still inside the mode's
+   *  real economy — these are the items the mode actually hands out. */
+  itemBudgetMult?: number;
 };
 
 // ── Expert AI: synergy-aware drafting + item builds ──────────────────────────
@@ -429,7 +433,9 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
   // Itemize to COUNTER the foe: stack the defense their damage type actually cares about.
   const oppLean = (() => { const p = boardProfileOf(opponentBoard ?? []); return p.ap > p.ad ? "ap" : p.ad > p.ap ? "ad" : "none"; })();
   const tankPref = oppLean === "ap" ? MR_ITEMS : oppLean === "ad" ? ARMOR_ITEMS : TANK_ITEMS;
-  let budget = Math.round(Math.max(0, Math.min(stage - 1, 6)) * cfg.itemRate);
+  // Treasure Hunt multiplies the loot → more items on the board (itemBudgetMult). The base is
+  // still the realistic ~1-item-per-stage economy; the mode just hands out more.
+  let budget = Math.round(Math.max(0, Math.min(stage - 1, 6)) * cfg.itemRate * (brain?.itemBudgetMult ?? 1));
   if (budget > 0 && board.length) {
     const ranked = [...board].sort((a, b) => (getDef(b.defId).cost - getDef(a.defId).cost) || (b.star - a.star));
     const carry = ranked.find((u) => !isTank(u.defId)) ?? ranked[0];
