@@ -203,6 +203,9 @@ export type BotBrain = {
   metaWeights?: Record<string, number>;
   counterAffinity?: Record<string, number>;
   defendTypes?: Record<string, number>;
+  /** Mega Madness: a smart player builds AROUND megas (every round hands out a Mega Stone),
+   *  so the bot drafts mega-capable carries and stones every capable mon. Off = drafts normally. */
+  preferMega?: boolean;
 };
 
 // ── Expert AI: synergy-aware drafting + item builds ──────────────────────────
@@ -341,7 +344,10 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
     for (let k = 0; k < target && chosen.length < size; k++) {
       const floorCost = getDef(cheap.find((id) => !taken.has(id))!).cost;
       const band = cheap.filter((id) => !taken.has(id) && getDef(id).cost <= floorCost + 1);
-      const pick = band.length ? band[randInt(rng, band.length)] : cheap.find((id) => !taken.has(id));
+      // Mega Madness: within the affordable band, reach for mega-capable carriers first.
+      const megaBand = brain?.preferMega ? band.filter((id) => canMega(id)) : [];
+      const fromBand = megaBand.length ? megaBand : band;
+      const pick = fromBand.length ? fromBand[randInt(rng, fromBand.length)] : cheap.find((id) => !taken.has(id));
       if (!pick) break;
       chosen.push(pick); taken.add(pick);
     }
@@ -376,7 +382,12 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
     const pool = byCost[cost].filter((id) => !taken.has(id));
     if (!pool.length) break;
     const themed = pool.filter((id) => getDef(id).types.some((ty) => themes.has(ty)));
-    const pick = (themed.length && rng() < 0.7) ? themed[randInt(rng, themed.length)] : pool[randInt(rng, pool.length)];
+    // Mega Madness: a mega-capable mon (ideally also on-theme) wins the slot most of the time.
+    const megaPool = brain?.preferMega ? pool.filter((id) => canMega(id)) : [];
+    const megaThemed = megaPool.filter((id) => getDef(id).types.some((ty) => themes.has(ty)));
+    const pick = (megaPool.length && rng() < 0.7) ? (megaThemed.length ? megaThemed : megaPool)[randInt(rng, (megaThemed.length ? megaThemed : megaPool).length)]
+      : (themed.length && rng() < 0.7) ? themed[randInt(rng, themed.length)]
+      : pool[randInt(rng, pool.length)];
     chosen.push(pick); taken.add(pick);
   }
 
@@ -427,9 +438,14 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
     carry.items = [...carryItems];
     budget -= carryItems.length;
     // A Mega Stone (a player would have one from a carousel by now) on a mega-capable unit.
+    // In Mega Madness the stones are handed out every round, so stone EVERY capable mon.
     if (stage >= cfg.megaStage) {
-      const megaTarget = canMega(carry.defId) ? carry : board.find((u) => canMega(u.defId));
-      if (megaTarget && megaTarget.items.length < 3) megaTarget.items = [...megaTarget.items, MEGA_STONE];
+      if (brain?.preferMega) {
+        for (const u of board) if (canMega(u.defId) && u.items.length < 3 && !u.items.includes(MEGA_STONE)) u.items = [...u.items, MEGA_STONE];
+      } else {
+        const megaTarget = canMega(carry.defId) ? carry : board.find((u) => canMega(u.defId));
+        if (megaTarget && megaTarget.items.length < 3) megaTarget.items = [...megaTarget.items, MEGA_STONE];
+      }
     }
     for (const u of ranked) {
       if (budget <= 0) break;

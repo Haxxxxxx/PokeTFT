@@ -434,6 +434,8 @@ function buildCombat(room: Room, brainCtx?: BrainCtx): { combat: Record<string, 
   // Bots get a deterministic host-generated board each round (humans synced theirs). A bot
   // facing a HUMAN counter-drafts against that human's current board (bot opponents' boards
   // aren't built yet, so those stay un-countered — no circular dependency).
+  // Mega Madness: bots build AROUND megas (draft mega-capable carries, stone them all).
+  const preferMega = !!getMode(room.rules?.mode).flags?.megaMadness;
   for (const p of alive) {
     if (!p.isBot) continue;
     const oppUid = oppOf.get(p.uid);
@@ -445,6 +447,7 @@ function buildCombat(room: Room, brainCtx?: BrainCtx): { combat: Record<string, 
       metaWeights: brainCtx?.meta,
       counterAffinity: opp && !opp.isBot ? brainCtx?.affinityByHuman?.[opp.uid] : undefined,
       defendTypes: p.botMem,
+      preferMega,
     };
     // Adaptive difficulty: the effective tier rubber-bands to how the lobby's best human is doing.
     const effDiff = adaptiveDifficulty(p.botDifficulty, room);
