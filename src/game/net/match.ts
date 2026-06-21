@@ -5,7 +5,7 @@ import { makeRng } from "../engine/rng";
 import { generatePlayerLikeBoard, generateCreepBoard, generateBossBoard, pickCarouselOptions, boardProfileOf, type BotBrain } from "../engine/enemy";
 import { type CompStats, type TypeAffinity, metaWeights, counterAffinity, accrueComp, accrueAffinity, rememberLoss, activeTraitKeys } from "../engine/botBrain";
 import { hasDef } from "../data/mons";
-import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem, isDoubleUp, assignTeams, getMode } from "../data/gameModes";
+import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem, modeLootScale, isDoubleUp, assignTeams, getMode } from "../data/gameModes";
 import { loadGhost, ghostBoardForRound } from "./ghost";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
@@ -436,6 +436,8 @@ function buildCombat(room: Room, brainCtx?: BrainCtx): { combat: Record<string, 
   // aren't built yet, so those stay un-countered — no circular dependency).
   // Mega Madness: bots build AROUND megas (draft mega-capable carries, stone them all).
   const preferMega = !!getMode(room.rules?.mode).flags?.megaMadness;
+  // Treasure Hunt: the mode's loot multiplier → bots field heavily-itemized carries.
+  const itemBudgetMult = modeLootScale(room.rules);
   for (const p of alive) {
     if (!p.isBot) continue;
     const oppUid = oppOf.get(p.uid);
@@ -448,6 +450,7 @@ function buildCombat(room: Room, brainCtx?: BrainCtx): { combat: Record<string, 
       counterAffinity: opp && !opp.isBot ? brainCtx?.affinityByHuman?.[opp.uid] : undefined,
       defendTypes: p.botMem,
       preferMega,
+      itemBudgetMult,
     };
     // Adaptive difficulty: the effective tier rubber-bands to how the lobby's best human is doing.
     const effDiff = adaptiveDifficulty(p.botDifficulty, room);

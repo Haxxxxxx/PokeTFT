@@ -18,9 +18,9 @@ import { writeFileSync } from "node:fs";
 import { generatePlayerLikeBoard } from "../src/game/engine/enemy";
 import { simulate, type TeamBuff } from "../src/game/engine/combat";
 import { accrueComp, metaWeights, activeTraitKeys, type CompStats } from "../src/game/engine/botBrain";
-import { MODES, rosterForRoom, modeStartItems, modeTeamBuff } from "../src/game/data/gameModes";
+import { MODES, rosterForRoom, modeStartItems, modeTeamBuff, modeLootScale } from "../src/game/data/gameModes";
 import { MEGA_STONE } from "../src/game/data/mega";
-import { EMBLEM_TRAIT, COMPLETED_IDS } from "../src/game/data/items";
+import { EMBLEM_TRAIT } from "../src/game/data/items";
 import { getDef, typesForStar } from "../src/game/data/mons";
 import type { UnitInstance } from "../src/game/types";
 
@@ -50,11 +50,7 @@ function applyModeEffects(board: UnitInstance[], mode: Mode, rules: Record<strin
       const tgt = room(1)[0]; if (tgt) addItem(tgt, id);
     }
   }
-  if (mode.flags?.treasure) {
-    // ~2.5× loot → a couple of extra completed items onto whoever has slots, deterministic by id.
-    const slots = room(3);
-    slots.forEach((u, i) => addItem(u, COMPLETED_IDS[(getDef(u.defId).cost * 7 + i) % COMPLETED_IDS.length]));
-  }
+  // Treasure loot is handled during DRAFT now (itemBudgetMult in the generator).
   return modeTeamBuff(rules);
 }
 
@@ -94,7 +90,7 @@ function trainMode(mode: Mode): CompStats {
     let buff: TeamBuff | undefined;
     for (let f = 0; f < FLEET; f++) {
       const seed = (g * 7919 + f * 104729 + 1) >>> 0;
-      const b = generatePlayerLikeBoard(stage, 5, "ultimate", seed, roster, undefined, undefined, { metaWeights: meta, preferMega: !!mode.flags?.megaMadness });
+      const b = generatePlayerLikeBoard(stage, 5, "ultimate", seed, roster, undefined, undefined, { metaWeights: meta, preferMega: !!mode.flags?.megaMadness, itemBudgetMult: modeLootScale(baseRules) });
       buff = applyModeEffects(b, mode, baseRules); // gimmick effects (megas/emblem/loot); buff is mode-wide
       boards.push(b);
     }
