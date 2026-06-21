@@ -5,7 +5,7 @@ import { makeRng } from "../engine/rng";
 import { generatePlayerLikeBoard, generateCreepBoard, generateBossBoard, pickCarouselOptions, boardProfileOf, type BotBrain } from "../engine/enemy";
 import { type CompStats, type TypeAffinity, metaWeights, counterAffinity, accrueComp, accrueAffinity, rememberLoss, activeTraitKeys } from "../engine/botBrain";
 import { hasDef } from "../data/mons";
-import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem, isDoubleUp, assignTeams } from "../data/gameModes";
+import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem, isDoubleUp, assignTeams, getMode } from "../data/gameModes";
 import { loadGhost, ghostBoardForRound } from "./ghost";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
@@ -506,8 +506,12 @@ function buildCombat(room: Room, brainCtx?: BrainCtx): { combat: Record<string, 
   return { combat, botBoards, botAugments };
 }
 
-/** RTDB path for the global meta-learning store (type → placement record). */
-const META_PATH = "meta_learn/comp";
+/** RTDB path for the meta-learning store, keyed PER GAME MODE — each mode (region locks,
+ *  mono-type, mega-madness, treasure, double-up, standard) has its own roster/rules, so the
+ *  comps that win differ. A bot learns the meta for the mode it's actually playing. */
+function metaPath(room: Room): string {
+  return `meta_learn/byMode/${getMode(room.rules?.mode).id}/comp`;
+}
 
 /** Host: load the adaptive-learning context once per combat — the global meta weights plus,
  *  for each alive human, the counter-weights of the types they HABITUALLY play. Best-effort:
@@ -515,7 +519,7 @@ const META_PATH = "meta_learn/comp";
 async function loadBrainCtx(room: Room): Promise<BrainCtx> {
   const ctx: BrainCtx = {};
   try {
-    const stats = await dbAdapter().get<CompStats>(META_PATH);
+    const stats = await dbAdapter().get<CompStats>(metaPath(room));
     ctx.meta = metaWeights(stats);
   } catch { /* cold meta — bots draft on synergy depth alone */ }
   // Only bother if there's at least one bot that could use it.
@@ -543,8 +547,8 @@ async function persistLearning(room: Room): Promise<void> {
   const total = players.length;
   const finished = humans.filter((p) => p.place != null && Array.isArray(p.board));
   if (!finished.length) return;
-  // Global meta: one transaction folds every finished human's comp into the store.
-  await dbAdapter().transaction<CompStats>(META_PATH, (cur) => {
+  // Per-mode meta: one transaction folds every finished human's comp into this mode's store.
+  await dbAdapter().transaction<CompStats>(metaPath(room), (cur) => {
     let next: CompStats = cur ?? {};
     for (const p of finished) {
       const types = activeTraitKeys((p.board ?? []) as UnitInstance[]);
