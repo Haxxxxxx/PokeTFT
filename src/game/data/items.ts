@@ -57,6 +57,10 @@ export const COMPONENTS: ItemDef[] = [
   { id: "c-res",  name: "Stone Plate",  nameFr: "Plaque Pierre",  rarity: "common", kind: "component", effect: { armorAdd: 18, mrAdd: 18 }, text: "+18 Armor & MR", textFr: "+18 Déf & Déf Spé" },
   { id: "c-crit", name: "Keen Edge",    nameFr: "Lame Affûtée",   rarity: "common", kind: "component", effect: { critAdd: 0.12 },  text: "+12% Crit",           textFr: "+12% Critique" },
   { id: "c-mana", name: "Leppa Berry",  nameFr: "Baie Mepo",      rarity: "common", kind: "component", effect: { manaStart: 15 },  text: "+15 Starting Mana",   textFr: "+15 Mana de départ" },
+  // The Spatula — a rare crafting component. On its own it's a little bulk; combined with
+  // ANY component it forges a Trait Emblem (see SPATULA_RECIPES). The TFT-style way to make
+  // your own emblems instead of relying on carousel/anvil RNG.
+  { id: "spatula", name: "Spatula", nameFr: "Spatule", rarity: "rare", kind: "component", effect: { hpMult: 1.12 }, text: "Combine with a component to forge a Trait Emblem.", textFr: "Combine avec un objet pour forger un Emblème de trait." },
 ];
 
 /** Completed items — one per unordered component pair (recipe key in RECIPES). */
@@ -122,7 +126,11 @@ export const ITEM_POOL: ItemDef[] = [...COMPONENTS, ...COMPLETED, ...EMBLEMS];
 export const ITEM_BY_ID: Record<string, ItemDef> = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 export const ITEM_EFFECT: Record<string, ItemEffect> = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i.effect]));
 
-export const COMPONENT_IDS = COMPONENTS.map((c) => c.id);
+/** The Spatula is a component (so isComponent + recipes recognise it) but it must NOT be
+ *  in the common drop/carousel pool — it's earned via a rare carousel slot. So the public
+ *  COMPONENT_IDS (used by every random-drop site) excludes it. */
+export const SPATULA_ID = "spatula";
+export const COMPONENT_IDS = COMPONENTS.filter((c) => c.id !== SPATULA_ID).map((c) => c.id);
 export const COMPLETED_IDS = COMPLETED.map((c) => c.id);
 /** Rules panel lists the completed items (the build targets). */
 export const DEFAULT_ITEMS_ENABLED = COMPLETED.map((i) => i.id);
@@ -163,6 +171,17 @@ export const RECIPES: Record<string, string> = {
   [combineKey("c-mana", "c-hp")]: "soul-vessel",
   [combineKey("c-mana", "c-res")]: "mana-veil",
   [combineKey("c-mana", "c-crit")]: "resonance",
+  // Spatula recipes — the TFT-style way to FORGE a Trait Emblem of your choice. Each
+  // component picks the emblem matching its stat identity; two spatulas make the dragon
+  // emblem (the "prestige" craft). Other emblems remain anvil/carousel-only.
+  [combineKey("spatula", "c-ad")]: "emblem-fighting",
+  [combineKey("spatula", "c-ap")]: "emblem-psychic",
+  [combineKey("spatula", "c-as")]: "emblem-flying",
+  [combineKey("spatula", "c-hp")]: "emblem-ground",
+  [combineKey("spatula", "c-res")]: "emblem-steel",
+  [combineKey("spatula", "c-crit")]: "emblem-dark",
+  [combineKey("spatula", "c-mana")]: "emblem-water",
+  [combineKey("spatula", "spatula")]: "emblem-dragon",
 };
 
 export function isComponent(id: string): boolean {

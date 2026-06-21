@@ -8,7 +8,7 @@ import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem
 import { loadGhost, ghostBoardForRound } from "./ghost";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { MEGA_STONE } from "../data/mega";
-import { COMPONENT_IDS, EMBLEM_IDS } from "../data/items";
+import { COMPONENT_IDS, EMBLEM_IDS, SPATULA_ID } from "../data/items";
 import { teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID, pickBotAugments } from "../data/augments";
 import type { UnitInstance } from "../types";
 import type { Room, RoomPlayer, CombatAssign, BotDifficulty } from "./roomStore";
@@ -520,8 +520,13 @@ export async function startCarousel(code: string, room: Room): Promise<void> {
       const behind = aliveHumans.length > 1 && p.hp < medianHp;
       const emblemGate = behind ? 2 : 4;            // % gate: 1-in-2 vs 1-in-4
       const wantEmblem = room.meta.stage >= (behind ? 2 : 3) && (salt >>> 11) % emblemGate === 0;
+      // Spatula: a rare headline component (~1-in-6 from stage 2+) that lets a player
+      // FORGE the emblem of their choice instead of relying on the random emblem gate.
+      const wantSpatula = !wantEmblem && room.meta.stage >= 2 && (salt >>> 17) % 6 === 0;
       const item = wantEmblem
         ? EMBLEM_IDS[(salt >>> 5) % EMBLEM_IDS.length]
+        : wantSpatula
+        ? SPATULA_ID
         : itemPool[(salt >>> 3) % itemPool.length];
       carousel[p.uid] = [item, ...pickCarouselOptions(room.meta.stage, salt, 4, rosterFor(room))];
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { createElement } from "react";
-import { Sword, Sparkles, Zap, Heart, Shield, Crosshair, Gem, Coins, GraduationCap, Dices, Users, Package, Hammer, Star, type LucideIcon } from "lucide-react";
+import { Sword, Sparkles, Zap, Heart, Shield, Crosshair, Gem, Coins, GraduationCap, Dices, Users, Package, Hammer, Star, Utensils, type LucideIcon } from "lucide-react";
 import { ITEM_EFFECT, EMBLEM_TRAIT, isEmblem } from "@/game/data/items";
 import { MEGA_STONE } from "@/game/data/mega";
 import { AUGMENT_BY_ID } from "@/game/data/augments";
@@ -11,6 +11,7 @@ import { TraitGlyph } from "./TraitGlyph";
  *  so every item shows a meaningful glyph instead of an emoji. */
 function itemIcon(id: string): LucideIcon {
   if (id === MEGA_STONE) return Gem;
+  if (id === "spatula") return Utensils; // the TFT spatula — forges any Trait Emblem
   const e = ITEM_EFFECT[id];
   if (!e) return Sword;
   if (e.armorAdd || e.mrAdd) return Shield;
