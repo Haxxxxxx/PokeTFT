@@ -1,10 +1,24 @@
 {
   "rules": {
+    "meta_learn": {
+      "comp": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "$type": {
+          "n": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "s": { ".validate": "newData.isNumber()" }
+        }
+      }
+    },
     "users": {
       "$uid": {
         ".read": "auth != null",
         ".write": "auth != null && $uid === auth.uid",
         "username":      { ".validate": "newData.isString() && newData.val().length <= 16" },
+        "typeAff": {
+          ".write": "auth != null",
+          "$type": { ".validate": "newData.isNumber() && newData.val() >= 0" }
+        },
         "usernameLower": { ".validate": "newData.isString() && newData.val().length <= 16" },
         "friends": {
           "$fid": { ".write": "auth != null && ($uid === auth.uid || $fid === auth.uid)" }
