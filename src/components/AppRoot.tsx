@@ -31,6 +31,7 @@ export function AppRoot() {
   const authStatus = useAuth((s) => s.status);
   const code = useRoom((s) => s.code);
   const room = useRoom((s) => s.room);
+  const spectator = useRoom((s) => s.spectator);
   const reconnecting = useRoom((s) => s.reconnecting);
   const reconnect = useRoom((s) => s.reconnect);
   const profileOpen = useAppStore((s) => s.profileOpen);
@@ -67,6 +68,9 @@ export function AppRoot() {
   else if (profileOpen && (!code || !room)) view = <ProfileScreen />;
   else if (leaderboardOpen && (!code || !room)) view = <LeaderboardScreen />;
   else if (!code || !room) view = <WelcomeScreen />;
+  // Spectators always get the read-only match view (never the player-facing lobby),
+  // for whatever phase the watched game is in.
+  else if (spectator) { view = <NetGameClient />; inMatch = true; }
   else if (room.meta?.phase === "lobby") view = <LobbyScreen />;
   else { view = <NetGameClient />; inMatch = true; }
 
@@ -75,8 +79,9 @@ export function AppRoot() {
       {view}
       {/* The fixed-canvas match is the only view that needs landscape — gate it. */}
       {inMatch && <OrientationGate />}
-      {/* Learn-by-doing coach for a brand-new trainer's first match (self-dismissing). */}
-      {inMatch && <FirstMatchCoach />}
+      {/* Learn-by-doing coach for a brand-new trainer's first match (self-dismissing).
+          Never for spectators — they have no board of their own to coach. */}
+      {inMatch && !spectator && <FirstMatchCoach />}
     </ErrorBoundary>
   );
 }

@@ -175,6 +175,10 @@ export function NetGameClient() {
   const myUid = useRoom((s) => s.myUid);
   const mySave = useRoom((s) => s.mySave);
   const leave = useRoom((s) => s.leave);
+  // Read-only spectator: we observe a friend's game but must NEVER write to it
+  // (no player node, no host loop, no econ). Every write/loop effect below is gated.
+  const isSpectator = useRoom((s) => s.spectator);
+  const spectateUid = useRoom((s) => s.spectateUid);
   const inspect = useUi((s) => s.inspect);
   const inspectedItem = useUi((s) => s.inspectedItem);
 
@@ -308,7 +312,7 @@ export function NetGameClient() {
   // exactly once per deadline (idempotent — guards against the 700ms loop
   // double-firing before the async write propagates).
   useEffect(() => {
-    if (!myUid) return;
+    if (!myUid || isSpectator) return; // spectators never drive or claim the host loop
     const id = setInterval(() => {
       // Async + guarded: a rejected RTDB write (network blip / permission) must
       // not become an unhandled rejection that silently freezes the round loop.
@@ -346,13 +350,28 @@ export function NetGameClient() {
       })();
     }, 700);
     return () => clearInterval(id);
-  }, [myUid]);
+  }, [myUid, isSpectator]);
 
   const meta = room?.meta;
   const players = room?.players ?? {};
   const me = myUid ? players[myUid] : undefined;
   // Keep the boot-veil readiness flag in a ref (read by the veil interval above).
-  useEffect(() => { bootReadyRef.current = !!room && !!me; }, [room, me]);
+  useEffect(() => { bootReadyRef.current = !!room && (!!me || isSpectator); }, [room, me, isSpectator]);
+
+  // Spectator follow target: always be watching SOMEONE. Default to the friend we
+  // opened the spectate on; if they've left the game (their node is gone), fall back
+  // to the leader. We don't auto-switch off a player who merely died — you keep
+  // watching their final board, same as in-match scouting.
+  useEffect(() => {
+    if (!isSpectator || !room) return;
+    if (spectate && players[spectate]) return; // already following a valid player
+    const pick = spectateUid && players[spectateUid]
+      ? spectateUid
+      : Object.values(players).sort((a, b) => Number(b.alive) - Number(a.alive) || b.hp - a.hp)[0]?.uid;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (pick) setSpectate(pick);
+  }, [isSpectator, spectateUid, spectate, players, room]);
+
   const phase = meta?.phase;
   const myCombat = myUid ? room?.combat?.[myUid] : undefined;
 
@@ -366,7 +385,7 @@ export function NetGameClient() {
   // restore a synced save (reconnect) or start fresh — never wipe an in-progress
   // game by re-running newGame.
   useEffect(() => {
-    if (!room || !meta) return;
+    if (!room || !meta || isSpectator) return; // spectators have no econ to grant
     // Same roster the host uses (selected gens, drawn to the draft size, seeded by
     // the room code) — so the shop pool always respects the lobby's region/draft
     // rules, on a fresh start AND on a reconnect/restore.
@@ -413,18 +432,18 @@ export function NetGameClient() {
   // mailbox entry is deleted (in coop.ts). Only mounts in a Double Up game.
   useEffect(() => {
     const code = room?.code;
-    if (!code || !myUid || !isDoubleUp(room?.rules)) return;
+    if (!code || !myUid || isSpectator || !isDoubleUp(room?.rules)) return;
     const unsub = subscribeTransfers(code, myUid, (t) => {
       if (t.kind === "gold") coopReceiveGold(t.gold);
       else if (t.kind === "unit") coopReceiveUnit(t.unit);
     });
     return unsub;
-  }, [room?.code, myUid, room?.rules?.mode, coopReceiveGold, coopReceiveUnit]);
+  }, [room?.code, myUid, isSpectator, room?.rules?.mode, coopReceiveGold, coopReceiveUnit]);
 
   // Push my board + economy snapshot to the room (debounced) — board for combat,
   // save for reconnect.
   useEffect(() => {
-    if (!room || !myUid || phase !== "planning") return;
+    if (!room || !myUid || isSpectator || phase !== "planning") return;
     if (hydrated.current === "none") return; // never push defaults over the real priv save
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
@@ -444,7 +463,7 @@ export function NetGameClient() {
   // actual final board. (The sim itself is already deterministic; this just keeps
   // the FROZEN input honest.)
   useEffect(() => {
-    if (!myUid || phase !== "planning") return;
+    if (!myUid || isSpectator || phase !== "planning") return;
     const id = setInterval(() => {
       const r = useRoom.getState().liveRoom;
       if (!r?.meta || r.meta.phase !== "planning") return;
@@ -458,7 +477,7 @@ export function NetGameClient() {
       }
     }, 200);
     return () => clearInterval(id);
-  }, [phase, myUid]);
+  }, [phase, myUid, isSpectator]);
 
   // Cheap board signatures, memoized so they're not recomputed (asBoard+sort+join)
   // on every render of this hot component — only when the frozen board ref changes.
@@ -647,6 +666,9 @@ export function NetGameClient() {
   // const is derived after the early-return guard, so it isn't in scope here).
   const prevPhase = useRef<string | null>(null);
   useEffect(() => {
+    // Spectators have no stake in the game — never save a ghost, record history, or
+    // apply ranked LP from a match they're only watching.
+    if (isSpectator) { prevPhase.current = phase ?? null; return; }
     if (phase === "over" && prevPhase.current !== "over") {
       const ps = room?.players ?? {};
       // Win detection works for FFA and Double Up alike: place 1 (both partners get it),
@@ -959,13 +981,21 @@ export function NetGameClient() {
         {/* Top HUD bar: stat chips, then the phase/timer segment + controls.
             (The stage badge lives next to the timeline above.) */}
         <div className="gilded flex items-center gap-2.5 flex-wrap px-3.5 py-2.5 rounded-xl">
-          <StatChip label={t.net_hp} accent="#ff6b6b" value={Math.max(0, me?.hp ?? 0)} />
-          <StatChip label={t.net_gold} accent="#fbbf24" value={<span className="inline-flex items-center gap-1"><CoinIcon size={13} />{gold}</span>} />
-          <StatChip label={t.net_interest} accent="#fcd34d" value={`+${interest(gold)}`} />
-          <StatChip label={t.net_streak} accent={streak >= 0 ? "#34d399" : "#f87171"} value={`${streak >= 0 ? "W" : "L"}${Math.abs(streak)}`} sub={`+${streakGold(streak)}`}
-            title={lang === "fr"
-              ? "Or de série (victoires OU défaites d'affilée) : 2–3 → +1, 4 → +2, 5+ → +3 or par tour."
-              : "Streak gold (a run of wins OR losses): 2–3 → +1, 4 → +2, 5+ → +3 gold per round."} />
+          {isSpectator ? (
+            <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-400/40 text-[11px] font-extrabold text-amber-300">
+              <Eye size={13} /> {t.net_spectate_badge}
+            </span>
+          ) : (
+            <>
+              <StatChip label={t.net_hp} accent="#ff6b6b" value={Math.max(0, me?.hp ?? 0)} />
+              <StatChip label={t.net_gold} accent="#fbbf24" value={<span className="inline-flex items-center gap-1"><CoinIcon size={13} />{gold}</span>} />
+              <StatChip label={t.net_interest} accent="#fcd34d" value={`+${interest(gold)}`} />
+              <StatChip label={t.net_streak} accent={streak >= 0 ? "#34d399" : "#f87171"} value={`${streak >= 0 ? "W" : "L"}${Math.abs(streak)}`} sub={`+${streakGold(streak)}`}
+                title={lang === "fr"
+                  ? "Or de série (victoires OU défaites d'affilée) : 2–3 → +1, 4 → +2, 5+ → +3 or par tour."
+                  : "Streak gold (a run of wins OR losses): 2–3 → +1, 4 → +2, 5+ → +3 gold per round."} />
+            </>
+          )}
           <StatChip label={t.net_alive(aliveCount).replace(/[0-9]+\s*/, "")} accent="#cbd5e1" value={aliveCount} />
           {phase === "planning" && (() => {
             // Deterministic pairing → show who you're about to fight this round.
@@ -1023,8 +1053,8 @@ export function NetGameClient() {
                 return (
                   <div
                     key={p.uid}
-                    onClick={() => setSpectate(p.uid === myUid ? null : (spectate === p.uid ? null : p.uid))}
-                    title={p.uid === myUid ? "Your board" : `View ${p.name}'s board`}
+                    onClick={() => setSpectate(isSpectator ? p.uid : (p.uid === myUid ? null : (spectate === p.uid ? null : p.uid)))}
+                    title={p.uid === myUid && !isSpectator ? "Your board" : `View ${p.name}'s board`}
                     className={`flex items-center gap-2 px-1.5 py-1 rounded-lg cursor-pointer hover:bg-slate-700/50 ${p.uid === myUid ? "bg-slate-700/70 ring-1 ring-sky-500/50" : ""} ${spectate === p.uid ? "ring-1 ring-amber-400/70 bg-amber-500/10" : ""} ${!p.alive ? "opacity-40" : ""}`}
                   >
                     <span className="w-4 text-[10px] text-slate-500 font-bold text-center">{p.place ?? i + 1}</span>
@@ -1067,6 +1097,7 @@ export function NetGameClient() {
               column (one slot per 10 gold) that fills bottom-up toward the +5 cap.
               Always reflects YOUR own gold. */}
           <div className="flex flex-col items-center justify-center gap-2 min-h-0">
+            {!isSpectator && <>
             <span className="text-base font-extrabold text-amber-300 tabular-nums drop-shadow">+{interest(gold)}</span>
             <div className="flex flex-col-reverse gap-2">
               {Array.from({ length: ECONOMY.interestCap }).map((_, i) => {
@@ -1084,6 +1115,7 @@ export function NetGameClient() {
               })}
             </div>
             <span className="text-[8px] font-bold uppercase tracking-wide text-amber-200/45 mt-0.5 text-center leading-tight">{lang === "fr" ? "Intérêt" : "Interest"}</span>
+            </>}
           </div>
 
           {/* Center: the shared field. Locked to CENTER_H in EVERY phase so the
@@ -1096,7 +1128,9 @@ export function NetGameClient() {
               <div key={`spec-${spectate}`} className="board-swap absolute inset-0 flex flex-col gap-2">
                 <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 shrink-0">
                   <span className="text-xs font-bold text-amber-300">{t.net_viewing(spectateP?.name ?? "rival")}</span>
-                  <button onClick={() => setSpectate(null)} className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-300">{t.net_back_to_mine}</button>
+                  {isSpectator
+                    ? <span className="text-[10px] text-amber-200/60">{t.net_spectate_switch}</span>
+                    : <button onClick={() => setSpectate(null)} className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-300">{t.net_back_to_mine}</button>}
                 </div>
                 <div className="relative flex-1 min-h-0 flex items-center justify-center">
                   {phase === "combat" && spectateCombatResult ? (
@@ -1114,7 +1148,14 @@ export function NetGameClient() {
               </div>
             ) : (
               <div key={`mine-${phase === "combat" ? "fight" : "plan"}`} className="board-swap absolute inset-0 flex items-center justify-center">
-                {phase === "combat" && combatResult && me?.alive ? (
+                {isSpectator ? (
+                  // Spectator with no follow target yet (about to be picked) — never
+                  // show our own stale local board; just a brief loading state.
+                  <div className="flex items-center gap-3 text-slate-500">
+                    <div className="w-5 h-5 rounded-full border-2 border-amber-400/40 border-t-amber-400 animate-spin" />
+                    <span className="text-xs">{t.net_spectate_switch}</span>
+                  </div>
+                ) : phase === "combat" && combatResult && me?.alive ? (
                   <CombatStage
                     result={combatResult}
                     flip={!!myCombat?.flip}
@@ -1159,8 +1200,9 @@ export function NetGameClient() {
           </div>
         </div>
 
-        {/* Bottom bar: board controls + bench (centred), then the shop. */}
-        <div className="flex flex-col items-center gap-2">
+        {/* Bottom bar: board controls + bench (centred), then the shop. Spectators
+            have no board/economy of their own, so the whole bar is hidden for them. */}
+        {!isSpectator && <div className="flex flex-col items-center gap-2">
           <div className="flex items-stretch gap-2">
             {/* Board capacity (placed / cap) + one-click auto-fill from the bench. */}
             {(() => {
@@ -1208,7 +1250,7 @@ export function NetGameClient() {
               <Kbd k="S" label={lang === "fr" ? "Vendre" : "Sell"} />
             </div>
           )}
-        </div>
+        </div>}
       </div>
       </div>
 

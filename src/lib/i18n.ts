@@ -71,6 +71,8 @@ export type Dict = {
   net_placed: (n: number) => string;
   net_viewing: (name: string) => string;
   net_back_to_mine: string;
+  net_spectate_badge: string;
+  net_spectate_switch: string;
   net_victory: string;
   net_gameover: string;
   net_spectating: string;
@@ -197,6 +199,8 @@ export const FR: Dict = {
   net_placed: (n) => `Classé #${n}`,
   net_viewing: (name) => `Plateau de ${name}`,
   net_back_to_mine: "Retour au mien",
+  net_spectate_badge: "Spectateur",
+  net_spectate_switch: "Clique un dresseur pour le suivre",
   net_victory: "Victoire Royale",
   net_gameover: "Game Over",
   net_spectating: "spectateur",
@@ -320,6 +324,8 @@ export const EN: Dict = {
   net_placed: (n) => `You placed #${n}`,
   net_viewing: (name) => `${name}'s board`,
   net_back_to_mine: "Back to mine",
+  net_spectate_badge: "Spectating",
+  net_spectate_switch: "Click a trainer to follow",
   net_victory: "Victory Royale",
   net_gameover: "Game Over",
   net_spectating: "spectating",
