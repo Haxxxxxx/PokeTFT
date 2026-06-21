@@ -186,10 +186,24 @@ export function generateBoard(level: number, count: number, seed: number, allowe
  *  many synergies it activates, how it concentrates upgrades/items, and how hard it counters
  *  the opponent's types. `opponentBoard` (the human it's about to fight) lets it adapt.
  *  Deterministic per seed (host-generated + persisted; clients just replay it). */
-export function generatePlayerLikeBoard(stage: number, round: number, difficulty: BotLevel | undefined, seed: number, allowedIds?: string[], enabledItems?: string[], opponentBoard?: UnitInstance[]): UnitInstance[] {
+export function generatePlayerLikeBoard(stage: number, round: number, difficulty: BotLevel | undefined, seed: number, allowedIds?: string[], enabledItems?: string[], opponentBoard?: UnitInstance[], brain?: BotBrain): UnitInstance[] {
   const tier: TierName = difficulty && difficulty in TIER_PLAY ? (difficulty as TierName) : "medium";
-  return buildBotBoard(stage, round, tier, seed, allowedIds, enabledItems, opponentBoard);
+  return buildBotBoard(stage, round, tier, seed, allowedIds, enabledItems, opponentBoard, brain);
 }
+
+/** Adaptive "learning" signals fed into a bot's draft — all OPTIONAL and host-supplied, so
+ *  the generator stays a pure function of its inputs (determinism intact; clients replay the
+ *  persisted board). None of these grant stats — they only make the bot DRAFT smarter:
+ *   · metaWeights     — global type strength learned from real game placements (meta-learning)
+ *   · counterAffinity — the human opponent's HABITUAL types, from their history (personalized)
+ *   · defendTypes     — types that beat THIS bot earlier this game (in-game self-correction)
+ *  counterAffinity + defendTypes act as extra "virtual opponent" presence so the bot
+ *  counter-drafts types super-effective against them. */
+export type BotBrain = {
+  metaWeights?: Record<string, number>;
+  counterAffinity?: Record<string, number>;
+  defendTypes?: Record<string, number>;
+};
 
 // ── Expert AI: synergy-aware drafting + item builds ──────────────────────────
 
@@ -248,7 +262,7 @@ export function generateExpertBoard(stage: number, round: number, seed: number, 
  *  achievable star/item economy. Tier changes how WELL it plays; `opponentBoard` lets the
  *  skilled tiers COUNTER-DRAFT — committing to synergies whose types are super-effective
  *  against the opponent's spread. Deterministic per seed. */
-function buildBotBoard(stage: number, round: number, tier: TierName, seed: number, allowedIds?: string[], enabledItems?: string[], opponentBoard?: UnitInstance[]): UnitInstance[] {
+function buildBotBoard(stage: number, round: number, tier: TierName, seed: number, allowedIds?: string[], enabledItems?: string[], opponentBoard?: UnitInstance[], brain?: BotBrain): UnitInstance[] {
   const rng: Rng = makeRng(seed >>> 0);
   const cfg = TIER_PLAY[tier];
   const byCost = byCostFrom(allowedIds);
@@ -272,7 +286,14 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
 
   // COUNTER-DRAFT: read the opponent's typing so we commit to synergies that hit their
   // weakness. A type whose attacks are super-effective vs their spread gets weighted up.
+  // The learning signals add "virtual opponent" presence: the human's HABITUAL types
+  // (personalized counter) and the types that BEAT this bot earlier (in-game memory), so a
+  // skilled bot also pre-counters who you usually play and adjusts to what just beat it.
   const oppCounts = opponentTypeCounts(opponentBoard);
+  if (cfg.counter > 0) {
+    for (const [t, w] of Object.entries(brain?.counterAffinity ?? {})) oppCounts.set(t as PokeType, (oppCounts.get(t as PokeType) ?? 0) + w);
+    for (const [t, w] of Object.entries(brain?.defendTypes ?? {})) oppCounts.set(t as PokeType, (oppCounts.get(t as PokeType) ?? 0) + w);
+  }
   const useCounter = cfg.counter > 0 && oppCounts.size > 0;
 
   // Pick `cfg.themes` synergy types, weighted by ROSTER DEPTH (≥4 legal-cost carriers) AND
@@ -283,9 +304,14 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
     if (allow && !allow.has(u.id)) continue;
     for (const t of u.types) { const arr = typeUnits.get(t) ?? (typeUnits.set(t, []).get(t)!); arr.push(u.id); }
   }
+  // metaWeights (>1 = a synergy that places well across real games) tilts the draft toward
+  // the proven-strong comps — the bot population "advances" as the live meta is discovered.
+  const meta = brain?.metaWeights;
   const pickable = [...typeUnits.entries()]
     .filter(([, ids]) => ids.filter(legalCost).length >= 4)
-    .map(([k, ids]) => ({ k, w: Math.max(0.05, ids.filter(legalCost).length * (useCounter ? 1 + (counterScore(k, oppCounts) - 1) * cfg.counter * 1.6 : 1)) }));
+    .map(([k, ids]) => ({ k, w: Math.max(0.05, ids.filter(legalCost).length
+      * (useCounter ? 1 + (counterScore(k, oppCounts) - 1) * cfg.counter * 1.6 : 1)
+      * (meta?.[k] ?? 1)) }));
   const themeList: PokeType[] = [];
   for (let i = 0; i < cfg.themes && pickable.length; i++) {
     const idx = weightedPick(rng, pickable.map((p) => p.w));

@@ -2,7 +2,8 @@ import { dbAdapter } from "./db-adapter";
 import { serverNow } from "./serverTime";
 import { simulate } from "../engine/combat";
 import { makeRng } from "../engine/rng";
-import { generatePlayerLikeBoard, generateCreepBoard, generateBossBoard, pickCarouselOptions, boardProfileOf } from "../engine/enemy";
+import { generatePlayerLikeBoard, generateCreepBoard, generateBossBoard, pickCarouselOptions, boardProfileOf, type BotBrain } from "../engine/enemy";
+import { type CompStats, type TypeAffinity, metaWeights, counterAffinity, accrueComp, accrueAffinity, rememberLoss, activeTraitKeys } from "../engine/botBrain";
 import { hasDef } from "../data/mons";
 import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem, isDoubleUp, assignTeams } from "../data/gameModes";
 import { loadGhost, ghostBoardForRound } from "./ghost";
@@ -44,19 +45,46 @@ function rosterFor(room: Room): string[] {
 /** A bot's board for a round, scaled by stage progress and difficulty. The "expert"/
  *  "ultimate" tiers draft synergies + items and COUNTER-DRAFT vs `opponentBoard` (the human
  *  they're about to fight); a "clone" replays the host's last game (ghost). */
-function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string, allowed: string[], enabledItems?: string[], ghost?: Room["ghost"], opponentBoard?: UnitInstance[]): UnitInstance[] {
+function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string, allowed: string[], enabledItems?: string[], ghost?: Room["ghost"], opponentBoard?: UnitInstance[], brain?: BotBrain): UnitInstance[] {
   const cr = cumulativeRound(stage, round);
   // Clone bot: field the host's last-game board for this cumulative round. Falls back to a
   // tough synergy board on the host's first-ever game (no ghost yet).
   if (difficulty === "clone") {
     const g = ghostBoardForRound(ghost, cr);
     if (g && g.length) return g.map((u, i) => ({ ...u, iid: `clone${salt}_${cr}_${i}` }));
-    return generatePlayerLikeBoard(stage, round, "expert", (() => { let s = 0; for (let i = 0; i < salt.length; i++) s = (s * 31 + salt.charCodeAt(i)) >>> 0; return s + cr; })(), allowed, enabledItems, opponentBoard);
+    return generatePlayerLikeBoard(stage, round, "expert", (() => { let s = 0; for (let i = 0; i < salt.length; i++) s = (s * 31 + salt.charCodeAt(i)) >>> 0; return s + cr; })(), allowed, enabledItems, opponentBoard, brain);
   }
   let seed = 0;
   for (let i = 0; i < salt.length; i++) seed = (seed * 31 + salt.charCodeAt(i)) >>> 0;
   // Economy-realistic: a board a real player could actually build at this round.
-  return generatePlayerLikeBoard(stage, round, difficulty, seed + cr, allowed, enabledItems, opponentBoard);
+  return generatePlayerLikeBoard(stage, round, difficulty, seed + cr, allowed, enabledItems, opponentBoard, brain);
+}
+
+/** All adaptive-learning state the host loads once per combat and feeds to the bots. */
+type BrainCtx = {
+  meta?: Record<string, number>;                 // global learned type weights
+  affinityByHuman?: Record<string, Record<string, number>>; // uid → counter-weights of their habits
+};
+
+/** Adaptive difficulty (rubber-band): nudge a bot's effective tier by how DOMINANT the
+ *  strongest human is. Stomping the lobby (big HP lead + win streak) → bots a notch sharper;
+ *  getting crushed → a notch softer. Never exceeds the top tier and never cheats stats — it
+ *  only swaps which legit play-skill tier the bot drafts at. Pure (derives from room state). */
+const TIER_LADDER: BotDifficulty[] = ["easy", "medium", "hard", "expert", "ultimate"];
+function adaptiveDifficulty(base: BotDifficulty | undefined, room: Room): BotDifficulty | undefined {
+  if (!base || base === "clone") return base;            // clone is its own thing
+  const idx = TIER_LADDER.indexOf(base);
+  if (idx < 0) return base;
+  const humans = Object.values(room.players ?? {}).filter((p) => !p.isBot && p.alive);
+  if (humans.length === 0) return base;
+  const startHp = room.rules?.startingHp ?? 100;
+  // Dominance = the best human's HP lead over start + their win streak. Positive → cruising.
+  const top = humans.reduce((a, b) => (b.hp > a.hp ? b : a));
+  const hpLead = (top.hp - startHp * 0.6) / startHp;     // >0 once comfortably above ~60% start
+  const streak = Math.max(0, top.streak ?? 0);
+  const dom = hpLead + streak * 0.12;
+  const shift = dom > 0.45 ? 1 : dom < -0.15 ? -1 : 0;   // only shift at clear extremes
+  return TIER_LADDER[Math.min(TIER_LADDER.length - 1, Math.max(0, idx + shift))];
 }
 
 /** Deterministic shuffle for pairings. */
@@ -376,7 +404,7 @@ function botAugmentCount(stage: number, difficulty: BotDifficulty | undefined): 
  *  if it ever finds an empty/missing combat map (e.g. after a host migration),
  *  rather than silently applying zero damage. Same room + stage/round always
  *  yields the same pairings and outcomes. */
-function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoards: Record<string, UnitInstance[]>; botAugments: Record<string, string[]> } {
+function buildCombat(room: Room, brainCtx?: BrainCtx): { combat: Record<string, CombatAssign>; botBoards: Record<string, UnitInstance[]>; botAugments: Record<string, string[]> } {
   const stage = room.meta.stage;
   const kind = roundKind(stage, room.meta.round);
   const alive = alivePlayers(room);
@@ -411,10 +439,19 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
     const oppUid = oppOf.get(p.uid);
     const opp = oppUid ? room.players[oppUid] : undefined;
     const oppBoard = opp && !opp.isBot ? board(opp) : undefined;
-    const b = botBoard(stage, room.meta.round, p.botDifficulty, p.uid, allowed, room.rules?.itemsEnabled, room.ghost, oppBoard);
+    // Assemble this bot's BRAIN: global meta + the human opponent's habits (personalized) +
+    // what beat THIS bot earlier this game (in-game memory, stored on the bot's player node).
+    const brain: BotBrain = {
+      metaWeights: brainCtx?.meta,
+      counterAffinity: opp && !opp.isBot ? brainCtx?.affinityByHuman?.[opp.uid] : undefined,
+      defendTypes: p.botMem,
+    };
+    // Adaptive difficulty: the effective tier rubber-bands to how the lobby's best human is doing.
+    const effDiff = adaptiveDifficulty(p.botDifficulty, room);
+    const b = botBoard(stage, room.meta.round, effDiff, p.uid, allowed, room.rules?.itemsEnabled, room.ghost, oppBoard, brain);
     // Augments — bots get the same buff a player picks (tailored to their board), so they're
     // not fighting under-powered. Folded into teamBuffFor via the player's `augments` field.
-    const aCount = botAugmentCount(stage, p.botDifficulty);
+    const aCount = botAugmentCount(stage, effDiff);
     let aSeed = 0; for (let i = 0; i < p.uid.length; i++) aSeed = (aSeed * 31 + p.uid.charCodeAt(i)) >>> 0;
     const augs = aCount > 0 ? pickBotAugments(boardProfileOf(b), aCount, makeRng(aSeed >>> 0)) : [];
     room.players[p.uid] = { ...p, board: b, augments: augs };
@@ -469,12 +506,66 @@ function buildCombat(room: Room): { combat: Record<string, CombatAssign>; botBoa
   return { combat, botBoards, botAugments };
 }
 
+/** RTDB path for the global meta-learning store (type → placement record). */
+const META_PATH = "meta_learn/comp";
+
+/** Host: load the adaptive-learning context once per combat — the global meta weights plus,
+ *  for each alive human, the counter-weights of the types they HABITUALLY play. Best-effort:
+ *  a failed read just yields an empty brain (bots fall back to their base smart play). */
+async function loadBrainCtx(room: Room): Promise<BrainCtx> {
+  const ctx: BrainCtx = {};
+  try {
+    const stats = await dbAdapter().get<CompStats>(META_PATH);
+    ctx.meta = metaWeights(stats);
+  } catch { /* cold meta — bots draft on synergy depth alone */ }
+  // Only bother if there's at least one bot that could use it.
+  const humans = Object.values(room.players ?? {}).filter((p) => !p.isBot && p.alive);
+  const hasBots = Object.values(room.players ?? {}).some((p) => p.isBot);
+  if (hasBots && humans.length) {
+    ctx.affinityByHuman = {};
+    await Promise.all(humans.map(async (h) => {
+      try {
+        const aff = await dbAdapter().get<TypeAffinity>(`users/${h.uid}/typeAff`);
+        const ca = counterAffinity(aff);
+        if (Object.keys(ca).length) ctx.affinityByHuman![h.uid] = ca;
+      } catch { /* no history yet */ }
+    }));
+  }
+  return ctx;
+}
+
+/** Host: persist what the population LEARNED from a finished game — credit each human's active
+ *  synergies by their placement (global meta) and tally their habitual types (personalized).
+ *  Transactional so concurrent games can't clobber each other. Fire-and-forget (best-effort). */
+async function persistLearning(room: Room): Promise<void> {
+  const players = Object.values(room.players ?? {});
+  const humans = players.filter((p) => !p.isBot);
+  const total = players.length;
+  const finished = humans.filter((p) => p.place != null && Array.isArray(p.board));
+  if (!finished.length) return;
+  // Global meta: one transaction folds every finished human's comp into the store.
+  await dbAdapter().transaction<CompStats>(META_PATH, (cur) => {
+    let next: CompStats = cur ?? {};
+    for (const p of finished) {
+      const types = activeTraitKeys((p.board ?? []) as UnitInstance[]);
+      next = { ...next, ...accrueComp(next, types, p.place!, total) };
+    }
+    return next;
+  }).catch(() => {});
+  // Per-player affinity: each human's own comp taste.
+  await Promise.all(finished.map((p) =>
+    dbAdapter().transaction<TypeAffinity>(`users/${p.uid}/typeAff`, (cur) =>
+      accrueAffinity(cur, activeTraitKeys((p.board ?? []) as UnitInstance[]))).catch(() => {}),
+  ));
+}
+
 /** Host: planning → combat (PvP pairing or PvE creeps). Freezes boards. */
 export async function startCombat(code: string, room: Room): Promise<void> {
   if (!(await claimTransition(code, "planning", room.meta.deadline))) return;
   return withClaimGuard(code, async () => {
     room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
-    const { combat, botBoards, botAugments } = buildCombat(room);
+    const brainCtx = await loadBrainCtx(room);
+    const { combat, botBoards, botAugments } = buildCombat(room, brainCtx);
 
     const u: Updates = { "meta/phase": "combat", "meta/deadline": serverNow() + COMBAT_MS, "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow() };
     for (const uid of Object.keys(combat)) {
@@ -610,6 +701,15 @@ export async function endCombat(code: string, room: Room): Promise<void> {
       if (c) {
         const s = p.streak ?? 0;
         u[`players/${uid}/streak`] = c.won ? (s >= 0 ? s + 1 : 1) : (s <= 0 ? s - 1 : -1);
+        // In-game memory: a bot that LOST a real (non-PvE) fight remembers the winner's
+        // types, so next round it counter-drafts the recurring threat (self-correction).
+        if (p.isBot && !c.won && !c.pve && Array.isArray(c.oppBoard) && c.oppBoard.length) {
+          const winnerTypes = activeTraitKeys(c.oppBoard as UnitInstance[]);
+          if (winnerTypes.length) {
+            const mem = rememberLoss(p.botMem, winnerTypes);
+            u[`players/${uid}/botMem`] = mem;
+          }
+        }
       }
     }
 
@@ -650,6 +750,17 @@ export async function endCombat(code: string, room: Room): Promise<void> {
     u["meta/hostBeat"] = serverNow();
     u["meta/updatedAt"] = serverNow();
     await dbAdapter().update(gamePath(code), u);
+
+    // Game over → the population LEARNS. Merge the final placements into a snapshot and
+    // credit each human's synergies + tally their habits. Best-effort, off the hot path.
+    if (u["meta/phase"] === "over") {
+      const finalPlayers: Record<string, RoomPlayer> = {};
+      for (const [uid, p] of Object.entries(room.players ?? {})) {
+        const place = (u[`players/${uid}/place`] as number | undefined) ?? p.place ?? null;
+        finalPlayers[uid] = { ...p, place };
+      }
+      void persistLearning({ ...room, players: finalPlayers }).catch(() => {});
+    }
   });
 }
 

@@ -42,6 +42,9 @@ export type RoomPlayer = {
   augments?: string[];
   /** Double Up: which team (0,1,2,…) this player belongs to. Partners share a team. */
   teamId?: number;
+  /** Bot in-game memory: types that beat this bot earlier this game (decaying weights),
+   *  fed back into its counter-draft so it self-corrects round to round. Host-written. */
+  botMem?: Record<string, number>;
   /** Legacy public economy snapshot. Econ now lives in the private priv/{code}/{uid}
    *  node (see roomStore.mySave); kept optional only so reconnect can fall back to
    *  it for sessions that synced before the privacy migration. */
