@@ -46,6 +46,32 @@ export function accrueComp(prev: CompStats, types: string[], place: number, tota
   return out;
 }
 
+/** Fold a BATCH of self-play outcomes into the store at once (the scheduled re-train), WITHOUT
+ *  the per-sample decay accrueComp applies — replaying hundreds of decays would over-decay and
+ *  wipe real-game data. Instead each self-play sample ADDS a small `weight`, and n is capped (so
+ *  the store stays bounded and recent). Net effect: self-play gently anchors the average toward
+ *  what wins in simulation, while real games (full weight, one at a time) keep adjusting it. */
+export function accrueBatch(
+  prev: CompStats | null | undefined,
+  outcomes: { types: string[]; place: number; total: number }[],
+  weight = 0.1,
+  cap = 200,
+): CompStats {
+  const next: CompStats = { ...(prev ?? {}) };
+  for (const o of outcomes) {
+    const v = placementValue(o.place, o.total);
+    for (const t of o.types) {
+      const c = next[t] ?? { n: 0, s: 0 };
+      next[t] = { n: c.n + weight, s: c.s + v * weight };
+    }
+  }
+  // Cap n (scale s with it) so a long-lived store stays bounded + recency-weighted.
+  for (const t of Object.keys(next)) {
+    if (next[t].n > cap) { const k = cap / next[t].n; next[t] = { n: cap, s: next[t].s * k }; }
+  }
+  return next;
+}
+
 /** Convert the learned stats into draft multipliers (>1 favours a type). Needs a minimum
  *  sample before it trusts a type; clamps so the meta nudges the draft, never dictates it. */
 export function metaWeights(stats: CompStats | null | undefined, minSamples = 8): Record<string, number> {

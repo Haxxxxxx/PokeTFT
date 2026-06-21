@@ -26,6 +26,10 @@ import { logger } from "firebase-functions/v2";
 import { setDbAdapter } from "../../src/game/net/db-adapter";
 import { resolveRoundStart, endCombat, endCarousel } from "../../src/game/net/match";
 import type { Room } from "../../src/game/net/roomStore";
+import { generatePlayerLikeBoard } from "../../src/game/engine/enemy";
+import { simulate } from "../../src/game/engine/combat";
+import { accrueBatch, metaWeights, activeTraitKeys, type CompStats } from "../../src/game/engine/botBrain";
+import { MODES, rosterForRoom, modeTeamBuff, modeLootScale } from "../../src/game/data/gameModes";
 
 initializeApp();
 const adb = getDatabase();
@@ -209,3 +213,68 @@ export const pruneStale = onSchedule({ region: REGION, schedule: "every 30 minut
 
   logger.info(`pruneStale: removed ${prunedGames} games, ${guestUids.length} guest profiles (${prunedAuth} auth)`);
 });
+
+// ── Scheduled brain re-train ─────────────────────────────────────────────────
+/**
+ * Nightly self-play that keeps the per-mode bot meta fresh — re-deriving what wins after
+ * balance changes and warming low-traffic modes that real games rarely touch. It ACCRUES
+ * into the live store with a small weight (accrueBatch), so it gently anchors the meta
+ * toward simulation truth WITHOUT swamping real-game learning (which carries full weight).
+ *
+ * Bounded to stay well inside the function timeout: ~120 lobbies × 14 modes × 28 fights.
+ * Mirrors the live draft (per-mode roster + meta + Mega Madness preferMega + Treasure loot +
+ * region modifier buff), so the outcomes it credits match how bots actually play each mode.
+ */
+const RETRAIN_LOBBIES = 120;
+const RETRAIN_FLEET = 8;
+const RETRAIN_STAGES = [4, 5, 6, 6];
+const RETRAIN_WEIGHT = 0.1; // self-play counts ~1/10th of a real game per sample
+
+export const retrainBrain = onSchedule(
+  { region: REGION, schedule: "every 24 hours", timeoutSeconds: 540, memory: "512MiB" },
+  async () => {
+    const base = Date.now() >>> 0; // run-to-run seed variety (fresh lobbies each night)
+    let modesDone = 0, lobbiesRun = 0;
+    for (const mode of MODES) {
+      const metaPath = `meta_learn/byMode/${mode.id}/comp`;
+      const cur = ((await adb.ref(metaPath).get()).val() as CompStats | null) ?? {};
+      const weights = metaWeights(cur);                  // on-policy: draft with the live meta
+      const baseRules = { mode: mode.id, ...(mode.rulesPatch ?? {}) };
+      const preferMega = !!mode.flags?.megaMadness;
+      const itemBudgetMult = modeLootScale(baseRules);
+      const buff = modeTeamBuff(baseRules);
+      const outcomes: { types: string[]; place: number; total: number }[] = [];
+      for (let g = 0; g < RETRAIN_LOBBIES; g++) {
+        const stage = RETRAIN_STAGES[g % RETRAIN_STAGES.length];
+        const roster = rosterForRoom(baseRules, (base + g * 2654435761) >>> 0);
+        if (!roster.length) break;
+        const boards = [];
+        for (let f = 0; f < RETRAIN_FLEET; f++) {
+          const seed = (base ^ (g * 7919 + f * 104729 + 1)) >>> 0;
+          boards.push(generatePlayerLikeBoard(stage, 5, "ultimate", seed, roster, undefined, undefined, { metaWeights: weights, preferMega, itemBudgetMult }));
+        }
+        const valid = boards.filter((b) => b.length);
+        if (valid.length < 2) continue;
+        const wins = valid.map(() => 0), surv = valid.map(() => 0);
+        for (let i = 0; i < valid.length; i++) for (let j = i + 1; j < valid.length; j++) {
+          const r = simulate(valid[i], valid[j], buff, buff);
+          if (r.winner === "ally") { wins[i]++; surv[i] += r.survivors ?? 0; }
+          else if (r.winner === "enemy") { wins[j]++; surv[j] += r.survivors ?? 0; }
+        }
+        const order = valid.map((_, i) => i).sort((a, b) => (wins[b] - wins[a]) || (surv[b] - surv[a]));
+        const place: number[] = new Array(valid.length);
+        order.forEach((idx, rank) => { place[idx] = rank + 1; });
+        for (let f = 0; f < valid.length; f++) {
+          const types = activeTraitKeys(valid[f]);
+          if (types.length) outcomes.push({ types, place: place[f], total: valid.length });
+        }
+        lobbiesRun++;
+      }
+      // Transaction-merge: re-reads the LATEST store (incl. real-game writes since we began) and
+      // folds our self-play evidence on top, so nothing concurrent is lost.
+      await adb.ref(metaPath).transaction((prev: CompStats | null) => accrueBatch(prev, outcomes, RETRAIN_WEIGHT));
+      modesDone++;
+    }
+    logger.info(`retrainBrain: ${modesDone} modes, ${lobbiesRun} self-play lobbies accrued (weight ${RETRAIN_WEIGHT})`);
+  },
+);
