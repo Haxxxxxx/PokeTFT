@@ -40,23 +40,55 @@ const MAX_BOARD = COL_ORDER.length * ROW_ORDER.length;
 
 // Smart positioning: tanks centered on the FRONT line to soak; carries on the BACK line
 // pushed to the CORNERS so the opponent's splash/line abilities can't catch two at once.
+// Local board coords: row 0 is the FRONT (allyToField maps it to the field row nearest
+// the enemy), row 3 is the back edge. Columns center-out for the wall, corners-in for
+// the squishies. See hex.ts allyToField.
 const FRONT_COLS = [3, 2, 4, 1, 5, 0, 6]; // center-out for the wall
 const CARRY_COLS = [0, 6, 1, 5, 2, 4, 3]; // corners-in for the damage dealers
 const FRONT_ROWS = [0, 1];
 const BACK_ROWS = [3, 2];
 
-/** Place units like a thoughtful player: tanks front-centre, carries spread to the back
- *  corners. Mutates each unit's `pos`. */
+/** Effective HP of a unit at its star (hp scaled by its resistances) — the bulk metric
+ *  for who anchors the front line. */
+function effHp(u: UnitInstance): number {
+  const s = getDef(u.defId).stats;
+  return s.hp[u.star - 1] * (1 + (s.armor + s.magicResist) / 100);
+}
+
+/** Does this unit belong on the FRONT line? A thoughtful player fronts melee bruisers and
+ *  tanks (range 1 or naturally bulky) and keeps RANGED carries (range ≥ 2) at the back —
+ *  range is the primary signal, tankiness the tiebreak. */
+function isFrontline(u: UnitInstance): boolean {
+  const def = getDef(u.defId);
+  if (def.stats.range >= 2) return false; // ranged → always back, regardless of bulk
+  return true;                            // melee (incl. bruisers/tanks) → front
+}
+
+/** Place units like a thoughtful player who KNOWS each card's range: melee bruisers + tanks
+ *  form a front wall (bulkiest dead-centre), ranged carries spread along the back corners
+ *  (anti-splash, out of melee reach). Mutates each unit's `pos`. */
 function placeSmart(units: UnitInstance[]): void {
   const used = new Set<string>();
   const claim = (cols: number[], rows: number[]): [number, number] | null => {
     for (const r of rows) for (const c of cols) { const k = `${c},${r}`; if (!used.has(k)) { used.add(k); return [c, r]; } }
     return null;
   };
-  for (const u of units) {
-    const isT = isTank(u.defId);
-    const pos = claim(isT ? FRONT_COLS : CARRY_COLS, isT ? FRONT_ROWS : BACK_ROWS)
-      ?? claim(FRONT_COLS, [1, 0, 2, 3]); // overflow → any free cell
+  let front = units.filter(isFrontline);
+  const back = units.filter((u) => !isFrontline(u));
+  // All-ranged team → the bulkiest still has to soak as the wall, or melee just walks in.
+  if (front.length === 0 && back.length > 0) {
+    back.sort((a, b) => effHp(b) - effHp(a));
+    front = [back.shift()!];
+  }
+  // Bulkiest mons anchor the centre of the wall; squishiest carries hug the far corners.
+  front.sort((a, b) => effHp(b) - effHp(a));
+  back.sort((a, b) => effHp(a) - effHp(b));
+  for (const u of front) {
+    const pos = claim(FRONT_COLS, FRONT_ROWS) ?? claim(FRONT_COLS, BACK_ROWS) ?? claim(FRONT_COLS, [1, 0, 2, 3]);
+    if (pos) u.pos = pos;
+  }
+  for (const u of back) {
+    const pos = claim(CARRY_COLS, BACK_ROWS) ?? claim(CARRY_COLS, FRONT_ROWS) ?? claim(CARRY_COLS, [2, 3, 1, 0]);
     if (pos) u.pos = pos;
   }
 }
@@ -266,7 +298,13 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
     const cap = Math.min(themeBudget(ti), avail.length, size - chosen.length);
     const bps = TRAITS_BY_KEY[theme]?.breakpoints ?? [];
     let target = 0; for (const bp of bps) if (bp <= cap) target = bp; // largest breakpoint that fits
-    if (!target) target = cap;                                        // none fits → just cluster
+    if (!target) {
+      // Can't reach even the smallest breakpoint with the room left → drafting orphan
+      // units of this type activates NOTHING. A good player wouldn't; skip the theme and
+      // leave the slots for the other synergies / themed fills.
+      if (bps.length) continue;
+      target = cap; // a breakpoint-less role trait (shouldn't happen for types) → cluster
+    }
     // Draft the cheapest theme carriers (what a player rolls first), with light variety.
     const cheap = [...avail].sort((a, b) => getDef(a).cost - getDef(b).cost);
     for (let k = 0; k < target && chosen.length < size; k++) {
@@ -277,6 +315,26 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
       chosen.push(pick); taken.add(pick);
     }
   }
+  // Double down: a strong player deepens their PRIMARY synergy toward its NEXT breakpoint
+  // when slots remain, rather than leaving it at the minimum activation. Cheapest carriers
+  // first (what you actually roll), so the deepen stays economy-honest.
+  if (themeList.length) {
+    const theme = themeList[0];
+    const curr = chosen.filter((id) => getDef(id).types.includes(theme)).length;
+    const bps = TRAITS_BY_KEY[theme]?.breakpoints ?? [];
+    const next = bps.find((bp) => bp > curr);
+    if (next) {
+      const avail = (typeUnits.get(theme) ?? [])
+        .filter((id) => !taken.has(id) && legalCost(id))
+        .sort((a, b) => getDef(a).cost - getDef(b).cost);
+      for (let c = curr; c < next && chosen.length < size; c++) {
+        const pick = avail.find((id) => !taken.has(id));
+        if (!pick) break;
+        chosen.push(pick); taken.add(pick);
+      }
+    }
+  }
+
   // Fill remaining slots with real-shop rolls (cost by SHOP_ODDS), preferring theme units.
   const themes = new Set(themeList);
   let fillGuard = 0;
