@@ -1,12 +1,16 @@
 {
   "rules": {
     "meta_learn": {
-      "comp": {
-        ".read": "auth != null",
-        ".write": "auth != null",
-        "$type": {
-          "n": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-          "s": { ".validate": "newData.isNumber()" }
+      "byMode": {
+        "$mode": {
+          "comp": {
+            ".read": "auth != null",
+            ".write": "auth != null",
+            "$type": {
+              "n": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+              "s": { ".validate": "newData.isNumber()" }
+            }
+          }
         }
       }
     },
