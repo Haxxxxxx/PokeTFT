@@ -16,22 +16,61 @@
  */
 import { writeFileSync } from "node:fs";
 import { generatePlayerLikeBoard } from "../src/game/engine/enemy";
-import { simulate } from "../src/game/engine/combat";
+import { simulate, type TeamBuff } from "../src/game/engine/combat";
 import { accrueComp, metaWeights, activeTraitKeys, type CompStats } from "../src/game/engine/botBrain";
-import { MODES, rosterForRoom } from "../src/game/data/gameModes";
+import { MODES, rosterForRoom, modeStartItems, modeTeamBuff } from "../src/game/data/gameModes";
+import { canMega, MEGA_STONE } from "../src/game/data/mega";
+import { EMBLEM_TRAIT, COMPLETED_IDS } from "../src/game/data/items";
+import { getDef, typesForStar } from "../src/game/data/mons";
 import type { UnitInstance } from "../src/game/types";
+
+type Mode = typeof MODES[number];
+
+/** Apply a mode's GIMMICK EFFECTS to a freshly-drafted board so training reflects how the
+ *  mode actually plays — not just its roster. Mutates items in place; returns the mode's
+ *  team-wide combat buff (region modifier) to feed into simulate(). Mirrors the live game:
+ *   · Mega Madness — every mega-capable mon holds a Mega Stone (simulate megas it).
+ *   · Region       — the signature Emblem lands on a mon lacking the type (lifts the synergy),
+ *                    the signature item on a carry, and the region modifier buffs every fight.
+ *   · Treasure     — extra completed items (the mode pours out ~2.5× loot). */
+function applyModeEffects(board: UnitInstance[], mode: Mode, rules: Record<string, unknown>): TeamBuff | undefined {
+  const room = (n: number) => board.filter((u) => (u.items?.length ?? 0) < 3).slice(0, n);
+  const addItem = (u: UnitInstance, id: string) => { u.items = [...(u.items ?? []), id]; };
+
+  if (mode.flags?.megaMadness) {
+    for (const u of board) if (canMega(u.defId) && (u.items?.length ?? 0) < 3 && !(u.items ?? []).includes(MEGA_STONE)) addItem(u, MEGA_STONE);
+  }
+  // Region signature emblem + item (modeStartItems): place the emblem where it adds a NEW type.
+  for (const id of modeStartItems(rules)) {
+    if (id === MEGA_STONE) continue; // handled above
+    if (id in EMBLEM_TRAIT) {
+      const t = EMBLEM_TRAIT[id];
+      const tgt = board.find((u) => (u.items?.length ?? 0) < 3 && !typesForStar(getDef(u.defId), u.star).includes(t as never));
+      if (tgt) addItem(tgt, id);
+    } else {
+      const tgt = room(1)[0]; if (tgt) addItem(tgt, id);
+    }
+  }
+  if (mode.flags?.treasure) {
+    // ~2.5× loot → a couple of extra completed items onto whoever has slots, deterministic by id.
+    const slots = room(3);
+    slots.forEach((u, i) => addItem(u, COMPLETED_IDS[(getDef(u.defId).cost * 7 + i) % COMPLETED_IDS.length]));
+  }
+  return modeTeamBuff(rules);
+}
 
 const GAMES = Number(process.argv[2] ?? 2500);  // lobbies per mode
 const FLEET = Number(process.argv[3] ?? 8);     // lobby size
 const STAGES = [4, 5, 6, 6];                     // rotate stages; weight late game
 
-/** Round-robin a lobby and rank by (wins, then survivors) → placement 1..FLEET. */
-function rankLobby(boards: UnitInstance[][]): number[] {
+/** Round-robin a lobby and rank by (wins, then survivors) → placement 1..FLEET. Both teams
+ *  in a lobby share the mode's team buff (same modifier applies to everyone). */
+function rankLobby(boards: UnitInstance[][], buff?: TeamBuff): number[] {
   const wins = boards.map(() => 0);
   const surv = boards.map(() => 0);
   for (let i = 0; i < boards.length; i++) {
     for (let j = i + 1; j < boards.length; j++) {
-      const r = simulate(boards[i], boards[j]);
+      const r = simulate(boards[i], boards[j], buff, buff);
       if (r.winner === "ally") { wins[i]++; surv[i] += r.survivors ?? 0; }
       else if (r.winner === "enemy") { wins[j]++; surv[j] += r.survivors ?? 0; }
     }
@@ -42,8 +81,8 @@ function rankLobby(boards: UnitInstance[][]): number[] {
   return place;
 }
 
-/** Train one mode's meta from self-play over its own roster. */
-function trainMode(mode: typeof MODES[number]): CompStats {
+/** Train one mode's meta from self-play over its own roster + gimmick effects. */
+function trainMode(mode: Mode): CompStats {
   let stats: CompStats = {};
   const baseRules = { mode: mode.id, ...(mode.rulesPatch ?? {}) };
   for (let g = 0; g < GAMES; g++) {
@@ -53,13 +92,16 @@ function trainMode(mode: typeof MODES[number]): CompStats {
     const roster = rosterForRoom(baseRules, (g * 2654435761) >>> 0);
     if (!roster.length) break;                // mode produced no roster — skip
     const boards: UnitInstance[][] = [];
+    let buff: TeamBuff | undefined;
     for (let f = 0; f < FLEET; f++) {
       const seed = (g * 7919 + f * 104729 + 1) >>> 0;
-      boards.push(generatePlayerLikeBoard(stage, 5, "ultimate", seed, roster, undefined, undefined, { metaWeights: meta }));
+      const b = generatePlayerLikeBoard(stage, 5, "ultimate", seed, roster, undefined, undefined, { metaWeights: meta });
+      buff = applyModeEffects(b, mode, baseRules); // gimmick effects (megas/emblem/loot); buff is mode-wide
+      boards.push(b);
     }
     const valid = boards.filter((b) => b.length);
     if (valid.length < 2) continue;
-    const place = rankLobby(valid);
+    const place = rankLobby(valid, buff);
     for (let f = 0; f < valid.length; f++) {
       const types = activeTraitKeys(valid[f]);
       if (types.length) stats = { ...stats, ...accrueComp(stats, types, place[f], valid.length) };
