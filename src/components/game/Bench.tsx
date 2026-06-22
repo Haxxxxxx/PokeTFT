@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useGame, BENCH_SIZE, resolveBenchSlots } from "@/game/store/gameStore";
 import { UnitChip } from "./UnitChip";
@@ -24,7 +25,7 @@ function BenchSlot({ index, unit, interactive, canDeploy }: { index: number; uni
  *  shop and sell during a fight; only the board is locked). `canDeploy` = double-click
  *  quick-deploy to the board, which is planning-only. Both go false while spectating a
  *  rival so neither can mutate your own state. */
-export function Bench({ interactive = true, canDeploy = true }: { interactive?: boolean; canDeploy?: boolean }) {
+function BenchBase({ interactive = true, canDeploy = true }: { interactive?: boolean; canDeploy?: boolean }) {
   const units = useGame((s) => s.units);
   // Resolve units to their explicit bench slots (gaps allowed); new/unplaced units
   // fall into the first free slot.
@@ -44,3 +45,5 @@ export function Bench({ interactive = true, canDeploy = true }: { interactive?: 
     </div>
   );
 }
+
+export const Bench = memo(BenchBase);

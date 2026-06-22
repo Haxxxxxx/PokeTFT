@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useGame } from "@/game/store/gameStore";
 import { useUi } from "@/game/store/uiStore";
 import { getDef, spriteUrl } from "@/game/data/mons";
@@ -31,7 +32,7 @@ function ownedByDef(units: UnitInstance[]): Map<string, Owned> {
   return m;
 }
 
-export function ShopBar() {
+function ShopBarBase() {
   const shop = useGame((s) => s.shop);
   const gold = useGame((s) => s.gold);
   const level = useGame((s) => s.level);
@@ -223,3 +224,5 @@ function TraitChip({ label, color, active, traitKey }: { label: string; color: s
     </span>
   );
 }
+
+export const ShopBar = memo(ShopBarBase);
