@@ -14,6 +14,7 @@ import { PokeballIcon } from "@/components/game/icons";
 import { Settings, Swords, UserPlus, X, Bot, Dna } from "lucide-react";
 import { enterFullscreen } from "@/lib/fullscreen";
 import { GameRulesPanel } from "./GameRulesPanel";
+import { ModeSelect } from "./ModeSelect";
 import { unitsForGenerations } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 
@@ -44,6 +45,9 @@ export function LobbyScreen() {
   const lang = useAppStore((s) => s.settings.language);
   const [showRules, setShowRules] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  // 2-step lobby: the host first picks a game mode (Step 1), then lands in the party lobby
+  // (Step 2). Joiners skip Step 1 entirely — the host already set the mode.
+  const [step, setStep] = useState<"mode" | "lobby">("mode");
   const [invited, setInvited] = useState<Record<string, boolean>>({});
   const [startError, setStartError] = useState<string | null>(null);
   // Auto-clear the start error so a transient failure message doesn't linger after the
@@ -89,6 +93,9 @@ export function LobbyScreen() {
   }, [isHost, room, setPreRules, roomHp, roomGenKey, roomItemKey, room?.rules?.draftPoolSize, room?.rules?.maxPlayers, room?.rules?.augmentsEnabled, room?.rules?.isPrivate, room?.rules?.mode]);
 
   if (!room) return null;
+
+  // Step 1 — mode selection (host only). Joiners go straight to the party lobby.
+  if (isHost && step === "mode") return <ModeSelect isHost={isHost} onContinue={() => setStep("lobby")} />;
 
   const players = Object.values(room.players ?? {})
     .filter((p) => p.connected)
@@ -159,9 +166,16 @@ export function LobbyScreen() {
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {(() => {
             const gm = getMode(room.rules?.mode);
-            if (gm.id === "standard") return null;
-            return <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full border text-[11px] font-extrabold"
-              style={{ borderColor: `${gm.color}66`, color: gm.color, background: `${gm.color}14` }}>{lang === "fr" ? gm.nameFr : gm.name}</span>;
+            // Mode badge — clickable for the host to jump back to Step 1 and change it.
+            const badge = (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-extrabold"
+                style={{ borderColor: `${gm.color}66`, color: gm.color, background: `${gm.color}14` }}>
+                {lang === "fr" ? gm.nameFr : gm.name}{isHost && <Settings size={11} className="opacity-70" />}
+              </span>
+            );
+            return isHost
+              ? <button onClick={() => setStep("mode")} title={lang === "fr" ? "Changer de mode" : "Change mode"} className="transition-transform hover:scale-[1.03]">{badge}</button>
+              : gm.id === "standard" ? null : <span className="hidden sm:inline-flex">{badge}</span>;
           })()}
           <button onClick={leave} className="px-2.5 sm:px-3 py-2 rounded-lg bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.l_net_leave}</button>
         </div>
@@ -318,7 +332,7 @@ export function LobbyScreen() {
               <button onClick={() => setShowRules(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-300 hover:bg-white/[0.06] transition-colors"><X size={18} /></button>
             </div>
             <div className="p-5">
-              <GameRulesPanel isHost={isHost} />
+              <GameRulesPanel isHost={isHost} showMode={false} />
             </div>
           </aside>
         </div>
