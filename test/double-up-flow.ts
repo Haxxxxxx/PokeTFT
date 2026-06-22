@@ -9,6 +9,7 @@
  */
 import { setDbAdapter } from "../src/game/net/db-adapter";
 import { beginMatch, startCombat, endCombat } from "../src/game/net/match";
+import { weightedRatingDelta } from "../src/game/rating";
 import type { Room, RoomPlayer } from "../src/game/net/roomStore";
 import type { UnitInstance } from "../src/game/types";
 
@@ -168,6 +169,21 @@ async function run() {
   assert(room.players.p2.alive === false && room.players.p3.alive === false, "both team-1 partners eliminated");
   assert(room.players.p2.place === room.players.p3.place && (room.players.p2.place ?? 0) > 1, "team-1 partners share a worse placement");
   assert(room.teams?.[0]?.alive === true && room.teams?.[1]?.alive === false, "team 0 alive, team 1 dead");
+
+  // 4) Server-authoritative rating (PR-B shadow): every human got a results/{uid} row and its
+  // delta matches the shared client formula. 4-human lobby → total 4, 3 human opponents, 0 bots.
+  console.log("\nServer rating shadow (results/{uid}):");
+  const results = (getPath(store, `games/${CODE}/results`) ?? {}) as Record<string, { place: number; players: number; humans: number; bots: number; delta: number }>;
+  for (const uid of ["p0", "p1", "p2", "p3"]) {
+    const r = results[uid];
+    const place = room.players[uid].place ?? 0;
+    const expected = weightedRatingDelta(place, 4, 3, 0);
+    assert(!!r, `${uid} has a server result row`);
+    assert(!!r && r.delta === expected, `${uid} server delta ${r?.delta} === client formula ${expected} (place ${place})`);
+  }
+  // (In 2-team Double Up the losing team places 2nd of 4, above the 2.5 midpoint, so it can
+  // still gain LP — pre-existing client behavior the server mirrors. The invariant is ordering.)
+  assert(results.p0.delta > results.p2.delta, "winning team earned more LP than the losing team");
 
   console.log(`\n${failures === 0 ? "✅ Double Up flow verified end to end" : `❌ ${failures} assertion(s) failed`}`);
   process.exit(failures === 0 ? 0 : 1);
