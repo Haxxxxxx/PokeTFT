@@ -69,10 +69,15 @@ export async function ensureAuth(): Promise<string> {
   const a = auth();
   if (a.currentUser) return a.currentUser.uid;
   try {
-    const cred = await signInAnonymously(a);
+    // Cap anonymous sign-in: on a flaky/slow connection it can hang indefinitely, freezing
+    // create/join/reconnect. After 5s, fall back to a per-tab id so the UI never stalls on auth.
+    const cred = await Promise.race([
+      signInAnonymously(a),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("auth-timeout")), 5000)),
+    ]);
     return cred.user.uid;
   } catch (e) {
-    console.warn("[auth] anonymous sign-in unavailable, using fallback id:", (e as Error)?.message);
+    console.warn("[auth] anonymous sign-in unavailable/slow, using fallback id:", (e as Error)?.message);
     return fallbackId();
   }
 }
