@@ -26,6 +26,18 @@ export async function kickoffServerGame(code: string): Promise<void> {
   }
 }
 
+/** Forfeit: tell the server to eliminate me at the worst alive placement and apply LP.
+ *  The server owns both the place decision and the rating write — the client is read-only. */
+export async function callConcede(code: string): Promise<void> {
+  try {
+    db();
+    const fns = getFunctions(undefined, "europe-west1");
+    await httpsCallable(fns, "concede")({ code });
+  } catch (e) {
+    console.error("[concede]", e);
+  }
+}
+
 /** Ask the server to end the current carousel early (everyone already picked). */
 export async function finishCarouselEarly(code: string): Promise<void> {
   try {

@@ -24,7 +24,7 @@ import { getAuth } from "firebase-admin/auth";
 import { logger } from "firebase-functions/v2";
 
 import { setDbAdapter } from "../../src/game/net/db-adapter";
-import { resolveRoundStart, endCombat, endCarousel } from "../../src/game/net/match";
+import { resolveRoundStart, endCombat, endCarousel, concede as eliminatePlayer, applyRatingFor } from "../../src/game/net/match";
 import type { Room } from "../../src/game/net/roomStore";
 import { generatePlayerLikeBoard } from "../../src/game/engine/enemy";
 import { simulate } from "../../src/game/engine/combat";
@@ -142,6 +142,25 @@ export const finishEarly = onCall({ region: REGION }, async (req) => {
   const now = Date.now();
   await adb.ref(`games/${code}/meta`).update({ deadline: now });
   await scheduleNext(code, now); // fireAt clamps to now+100 → resolves right away
+  return { ok: true };
+});
+
+/** Forfeit: the authenticated caller surrenders at the worst currently-alive placement.
+ *  The server picks the place, writes the elimination, and applies LP — the client can no
+ *  longer choose its own placement or manipulate rating by picking a favourable spot. */
+export const concede = onCall({ region: REGION }, async (req) => {
+  if (!req.auth) throw new HttpsError("unauthenticated", "sign in required");
+  const code = String(req.data?.code ?? "");
+  if (!code) throw new HttpsError("invalid-argument", "code required");
+  const uid = req.auth.uid;
+  const room = await freshRoom(code);
+  if (!room) throw new HttpsError("not-found", "game not found");
+  const p = room.players?.[uid];
+  if (!p || p.isBot) throw new HttpsError("permission-denied", "not a player in this game");
+  if (!p.alive) return { ok: true }; // already eliminated — idempotent no-op
+  const place = Object.values(room.players ?? {}).filter((q) => q.alive).length;
+  await eliminatePlayer(code, uid, place);
+  await applyRatingFor(code, room, uid, place).catch(() => {});
   return { ok: true };
 });
 

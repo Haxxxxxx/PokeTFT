@@ -8,7 +8,8 @@ import { hasDef } from "../data/mons";
 import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem, modeLootScale, isDoubleUp, assignTeams, getMode } from "../data/gameModes";
 import { loadGhost, ghostBoardForRound } from "./ghost";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
-import { weightedRatingDelta } from "../rating";
+import { weightedRatingDelta, START_RATING } from "../rating";
+import { computeTraits } from "../engine/synergies";
 import { MEGA_STONE } from "../data/mega";
 import { COMPONENT_IDS, EMBLEM_IDS, SPATULA_ID } from "../data/items";
 import { teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID, pickBotAugments } from "../data/augments";
@@ -159,19 +160,52 @@ function alivePlayers(room: Room): RoomPlayer[] {
   return Object.values(room.players ?? {}).filter((p) => p.alive);
 }
 
-/** Server-authoritative ranked result for one human at the moment their `place` is decided.
- *  PR-B (shadow): stashed under games/{code}/results/{uid} for QA comparison against the
- *  client-applied delta — it does NOT yet mutate rating/leaderboard (the client still owns
- *  those until PR-C). Returns null for bots (no rating). Mirrors the client's exact inputs:
- *  total = every player in the lobby, opponents weighted by how human the lobby was. */
-function shadowRatingResult(room: Room, uid: string, place: number): { place: number; players: number; humans: number; bots: number; delta: number } | null {
+/** Build the history row written to users/{uid}/history/{code}.
+ *  Uses the authoritative room snapshot — board and rules come from server state. */
+function buildHistoryRow(room: Room, uid: string, place: number, total: number, delta: number) {
   const p = room.players?.[uid];
-  if (!p || p.isBot) return null;
+  const board = (p?.board ?? []).filter((u) => u.pos !== null);
+  return {
+    code: room.code,
+    place,
+    players: total,
+    regions: room.rules?.generations ?? [1],
+    won: place === 1,
+    team: board.map((u) => ({ d: u.defId, s: u.star })),
+    traits: computeTraits(board).filter((tr) => tr.tier > 0).map((tr) => ({ k: tr.key, t: tr.tier })),
+    lp: delta,
+    mode: room.rules?.mode ?? "standard",
+    ts: serverNow(),
+  };
+}
+
+/** Server-authoritative rating write for one human at the moment their place is decided.
+ *  Idempotent via a per-player games/{code}/rated/{uid} claim — safe to call on Cloud Tasks
+ *  retries. Writes rating (transaction), leaderboard, history, and results/{uid} so the client
+ *  end screen can read the LP outcome without touching the write path. */
+export async function applyRatingFor(code: string, room: Room, uid: string, place: number): Promise<void> {
+  const p = room.players?.[uid];
+  if (!p || p.isBot) return;
+  // Idempotency: claim per-player once. Abort if already applied (retry-safe).
+  const claim = await dbAdapter().transaction<boolean>(`games/${code}/rated/${uid}`, (cur) => (cur ? undefined : true));
+  if (!claim.committed) return;
+
   const players = Object.values(room.players ?? {});
   const total = players.length;
   const humans = players.filter((q) => !q.isBot && q.uid !== uid).length;
   const bots = players.filter((q) => q.isBot).length;
-  return { place, players: total, humans, bots, delta: weightedRatingDelta(place, total, humans, bots) };
+  const delta = weightedRatingDelta(place, total, humans, bots);
+
+  const res = await dbAdapter().transaction<number>(`users/${uid}/rating`, (cur) =>
+    Math.max(0, (typeof cur === "number" ? cur : START_RATING) + delta),
+  );
+  const rating = (res.value as number) ?? START_RATING;
+
+  await dbAdapter().update("", {
+    [`leaderboard/${uid}`]: { username: p.name, rating, photoURL: p.photoURL ?? null },
+    [`users/${uid}/history/${code}`]: buildHistoryRow(room, uid, place, total, delta),
+    [`games/${code}/results/${uid}`]: { place, delta, prevRating: rating - delta, rating },
+  });
 }
 
 /** Host: start the match — reset every player and open round 1 planning. */
@@ -774,21 +808,20 @@ export async function endCombat(code: string, room: Room): Promise<void> {
     // Assign DISTINCT placements to everyone who died this round, ordered by their
     // pre-damage HP (higher HP → better place) so a multi-death round doesn't hand
     // out duplicate medals. Lowest HP gets the worst remaining place.
+    const ratingJobs: Array<{ uid: string; place: number }> = [];
     const deadByHp = [...dead].sort((a, b) => (room.players[a]?.hp ?? 0) - (room.players[b]?.hp ?? 0));
     deadByHp.forEach((uid, i) => {
       const place = surviving.length + dead.length - i;
       u[`players/${uid}/alive`] = false;
       u[`players/${uid}/place`] = place;
-      const shadow = shadowRatingResult(room, uid, place); // PR-B: server-computed LP (shadow only)
-      if (shadow) u[`results/${uid}`] = shadow;
+      ratingJobs.push({ uid, place });
     });
 
     if (surviving.length <= 1) {
       if (surviving.length === 1) {
         u[`players/${surviving[0]}/place`] = 1;
         u["meta/winnerUid"] = surviving[0]; // authoritative — every client reads this
-        const shadow = shadowRatingResult(room, surviving[0], 1); // PR-B: winner's LP (shadow only)
-        if (shadow) u[`results/${surviving[0]}`] = shadow;
+        ratingJobs.push({ uid: surviving[0], place: 1 });
       }
       u["meta/phase"] = "over";
     } else {
@@ -802,6 +835,7 @@ export async function endCombat(code: string, room: Room): Promise<void> {
     u["meta/hostBeat"] = serverNow();
     u["meta/updatedAt"] = serverNow();
     await dbAdapter().update(gamePath(code), u);
+    await Promise.all(ratingJobs.map(({ uid, place }) => applyRatingFor(code, room, uid, place).catch(() => {})));
 
     // Game over → the population LEARNS. Merge the final placements into a snapshot and
     // credit each human's synergies + tally their habits. Best-effort, off the hot path.
@@ -861,6 +895,7 @@ async function resolveDoubleUpCombat(code: string, room: Room, combat: Record<st
   }
 
   // Distinct team placements, worst HP → worst remaining place.
+  const ratingJobs: Array<{ uid: string; place: number }> = [];
   const deadByHp = [...deadTeams].sort((a, b) => hpBefore[a] - hpBefore[b]);
   deadByHp.forEach((t, i) => {
     const place = survivingTeams.length + deadTeams.length - i;
@@ -869,8 +904,7 @@ async function resolveDoubleUpCombat(code: string, room: Room, combat: Record<st
     for (const uid of teams[t].members ?? []) {
       u[`players/${uid}/alive`] = false;
       u[`players/${uid}/place`] = place;
-      const shadow = shadowRatingResult(room, uid, place); // PR-B: server LP (shadow only)
-      if (shadow) u[`results/${uid}`] = shadow;
+      ratingJobs.push({ uid, place });
     }
   });
 
@@ -883,8 +917,7 @@ async function resolveDoubleUpCombat(code: string, room: Room, combat: Record<st
       u["meta/winnerUid"] = (teams[wt].members ?? [])[0] ?? null;
       for (const uid of teams[wt].members ?? []) {
         u[`players/${uid}/place`] = 1;
-        const shadow = shadowRatingResult(room, uid, 1); // PR-B: winning-team LP (shadow only)
-        if (shadow) u[`results/${uid}`] = shadow;
+        ratingJobs.push({ uid, place: 1 });
       }
     }
     u["meta/phase"] = "over";
@@ -899,6 +932,7 @@ async function resolveDoubleUpCombat(code: string, room: Room, combat: Record<st
   u["meta/hostBeat"] = serverNow();
   u["meta/updatedAt"] = serverNow();
   await dbAdapter().update(gamePath(code), u);
+  await Promise.all(ratingJobs.map(({ uid, place }) => applyRatingFor(code, room, uid, place).catch(() => {})));
 }
 
 /** End screen → rematch: send the whole room back to the pre-game lobby. Resets
@@ -986,14 +1020,15 @@ export async function maybeClaimHost(code: string, room: Room, myUid: string): P
       const survivors = Object.values(room.players ?? {})
         .filter((p) => p.place == null)
         .sort((a, b) => (b.alive ? 1 : 0) - (a.alive ? 1 : 0) || (b.hp ?? 0) - (a.hp ?? 0));
+      const abandonRatingJobs: Array<{ uid: string; place: number }> = [];
       survivors.forEach((p, i) => {
         u[`players/${p.uid}/place`] = i + 1;
         u[`players/${p.uid}/alive`] = false;
-        const shadow = shadowRatingResult(room, p.uid, i + 1); // PR-B: abandon-path LP (shadow only)
-        if (shadow) u[`results/${p.uid}`] = shadow;
+        abandonRatingJobs.push({ uid: p.uid, place: i + 1 });
       });
       if (survivors[0]) u["meta/winnerUid"] = survivors[0].uid; // place-1 = authoritative winner
       await dbAdapter().update(gamePath(code), u).catch(() => {});
+      await Promise.all(abandonRatingJobs.map(({ uid, place }) => applyRatingFor(code, room, uid, place).catch(() => {})));
     }
     return false;
   }
