@@ -6,10 +6,10 @@ import { ALL_GENS, GEN_LABELS, MAX_REGIONS } from "@/game/data/generations";
 import { unitsForGenerations } from "@/game/data/mons";
 import { COMPLETED } from "@/game/data/itemPool";
 import { ItemGlyph } from "@/components/game/ItemGlyph";
-import { ShieldCheck, Check } from "lucide-react";
+import { ShieldCheck, Check, ChevronDown } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { useAppStore } from "@/game/store/appStore";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 const HP_OPTIONS = [50, 75, 100, 125, 150, 200];
 
@@ -52,6 +52,7 @@ export function GameRulesPanel({ isHost, showMode = true }: { isHost: boolean; s
   const toggleGeneration = usePreLobby((s) => s.toggleGeneration);
   const toggleItem = usePreLobby((s) => s.toggleItem);
   const setRules = usePreLobby((s) => s.setRules);
+  const [itemsOpen, setItemsOpen] = useState(false);
 
   const poolCount = unitsForGenerations(rules.generations).length;
   const genCounts: Record<number, number> = Object.fromEntries(ALL_GENS.map((g) => [g, unitsForGenerations([g]).length]));
@@ -210,42 +211,49 @@ export function GameRulesPanel({ isHost, showMode = true }: { isHost: boolean; s
         </SectionCard>
       </div>
 
-      {/* Items — compact icon chips (icon + name + check), tooltip carries the full effect. */}
-      <SectionCard
-        title={t.r_items}
-        badge={`${activeItems}/${COMPLETED.length}`}
-        action={isHost ? (
-          <div className="flex gap-1">
-            <button onClick={() => setRules({ itemsEnabled: COMPLETED.map((i) => i.id) })} className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-800/70 border border-slate-700/70 text-slate-300 hover:text-amber-200 hover:border-amber-700/50 transition-colors">{lang === "fr" ? "Tout" : "All"}</button>
-            <button onClick={() => setRules({ itemsEnabled: [] })} className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-800/70 border border-slate-700/70 text-slate-300 hover:text-rose-300 hover:border-rose-700/50 transition-colors">{lang === "fr" ? "Aucun" : "None"}</button>
+      {/* Items — a collapsible dropdown (collapsed by default so the drawer stays short). */}
+      <section className="gilded rounded-xl">
+        <button onClick={() => setItemsOpen((o) => !o)} className="w-full flex items-center gap-3 p-4">
+          <h3 className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-gold whitespace-nowrap">{t.r_items}</h3>
+          <span className="h-px flex-1 bg-gradient-to-r from-[var(--panel-edge)] to-transparent" />
+          <span className="shrink-0 text-[10px] font-semibold text-amber-200/80 px-2 py-0.5 rounded-md bg-amber-500/10 border border-[var(--panel-edge)] tabular-nums">{activeItems}/{COMPLETED.length}</span>
+          <ChevronDown size={16} className={`shrink-0 text-slate-400 transition-transform ${itemsOpen ? "rotate-180" : ""}`} />
+        </button>
+        {itemsOpen && (
+          <div className="px-4 pb-4">
+            {isHost && (
+              <div className="flex gap-1 mb-2">
+                <button onClick={() => setRules({ itemsEnabled: COMPLETED.map((i) => i.id) })} className="text-[10px] font-bold px-2.5 py-1 rounded-md bg-slate-800/70 border border-slate-700/70 text-slate-300 hover:text-amber-200 hover:border-amber-700/50 transition-colors">{lang === "fr" ? "Tout" : "All"}</button>
+                <button onClick={() => setRules({ itemsEnabled: [] })} className="text-[10px] font-bold px-2.5 py-1 rounded-md bg-slate-800/70 border border-slate-700/70 text-slate-300 hover:text-rose-300 hover:border-rose-700/50 transition-colors">{lang === "fr" ? "Aucun" : "None"}</button>
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {COMPLETED.map((item) => {
+                const active = rules.itemsEnabled.includes(item.id);
+                return (
+                  <button
+                    key={item.id}
+                    disabled={!isHost}
+                    title={lang === "en" ? item.text : item.textFr}
+                    onClick={() => toggleItem(item.id)}
+                    className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border text-left transition-all disabled:cursor-not-allowed ${
+                      active
+                        ? "bg-amber-950/30 border-amber-600/50 shadow-[0_0_16px_-9px_rgba(212,175,55,0.7)]"
+                        : "bg-slate-900/30 border-slate-800 opacity-60 hover:opacity-100 hover:border-slate-700"
+                    }`}
+                  >
+                    <span className={`shrink-0 ${active ? "text-amber-300" : "text-slate-400"}`}><ItemGlyph id={item.id} size={16} /></span>
+                    <span className={`flex-1 min-w-0 text-[11px] font-bold truncate ${active ? "text-amber-200" : "text-slate-400"}`}>
+                      {lang === "en" ? item.name : item.nameFr}
+                    </span>
+                    {active && <Check size={13} className="text-amber-400 shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        ) : undefined}
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-          {COMPLETED.map((item) => {
-            const active = rules.itemsEnabled.includes(item.id);
-            return (
-              <button
-                key={item.id}
-                disabled={!isHost}
-                title={lang === "en" ? item.text : item.textFr}
-                onClick={() => toggleItem(item.id)}
-                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border text-left transition-all disabled:cursor-not-allowed ${
-                  active
-                    ? "bg-amber-950/30 border-amber-600/50 shadow-[0_0_16px_-9px_rgba(212,175,55,0.7)]"
-                    : "bg-slate-900/30 border-slate-800 opacity-60 hover:opacity-100 hover:border-slate-700"
-                }`}
-              >
-                <span className={`shrink-0 ${active ? "text-amber-300" : "text-slate-400"}`}><ItemGlyph id={item.id} size={16} /></span>
-                <span className={`flex-1 min-w-0 text-[11px] font-bold truncate ${active ? "text-amber-200" : "text-slate-400"}`}>
-                  {lang === "en" ? item.name : item.nameFr}
-                </span>
-                {active && <Check size={13} className="text-amber-400 shrink-0" />}
-              </button>
-            );
-          })}
-        </div>
-      </SectionCard>
+        )}
+      </section>
     </div>
   );
 }
