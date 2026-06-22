@@ -520,41 +520,42 @@ function CombatUnit({
   const ally = unit.team === "ally";
   const ring = unit.mega ? "#f0abfc" : ally ? "#34d399" : "#fb7185";
   const flip = ally ? faceLeft : !faceLeft; // mons face their target
+  // The sprite is the star: bigger (60px) and forward, with team identity carried by a soft
+  // back-glow + the feet ring rather than a hard disc, so it reads as a Pokémon, not a token.
   return (
     <div
       className="absolute"
-      style={{ left: x - 28, top: y - 38, width: 56, transform: `translate(${lunge.dx}px, ${lunge.dy}px)`, transition: "transform 90ms ease-out" }}
+      style={{ left: x - 34, top: y - 52, width: 68, transform: `translate(${lunge.dx}px, ${lunge.dy}px)`, transition: "transform 90ms ease-out" }}
     >
-      {/* Grounding "feet" glow under the sprite — the TFT team-coloured ring. */}
-      <span className="absolute left-1/2 -translate-x-1/2 rounded-[50%] pointer-events-none" style={{ bottom: -3, width: 38, height: 12, background: `radial-gradient(ellipse at center, ${ring}66, transparent 72%)` }} />
-      <div className="h-2 w-14 rounded-full bg-black/70 overflow-hidden mx-auto mb-[3px]" style={{ outline: `1px solid ${ring}66` }}>
-        <div className="h-full rounded-full" style={{ width: `${hpFrac * 100}%`, background: hpColor(hpFrac) }} />
+      {/* HP bar */}
+      <div className="h-[7px] w-full rounded-full bg-black/75 overflow-hidden mb-[3px]" style={{ outline: `1px solid ${ring}55` }}>
+        <div className="h-full rounded-full transition-[width] duration-100" style={{ width: `${hpFrac * 100}%`, background: hpColor(hpFrac) }} />
       </div>
-      <div className="h-[4px] w-14 rounded-full bg-black/70 overflow-hidden mx-auto mb-[3px]">
+      {/* mana bar */}
+      <div className="h-[4px] w-[88%] mx-auto rounded-full bg-black/70 overflow-hidden mb-1">
         <div className="h-full bg-sky-400" style={{ width: `${manaFrac * 100}%` }} />
       </div>
-      <div
-        className="relative mx-auto rounded-full flex items-center justify-center"
-        style={{
-          width: 52, height: 52,
-          background: `radial-gradient(circle, ${ring}${unit.mega ? "55" : "33"}, transparent 70%)`,
-          boxShadow: unit.mega ? `0 0 0 2px ${ring}, 0 0 12px 2px ${ring}aa` : `0 0 0 2px ${ring}cc, 0 3px 8px rgba(0,0,0,0.5)`,
-        }}
-      >
+      {/* Grounding "feet" ellipse — team-coloured, sits under the sprite. */}
+      <span className="absolute left-1/2 -translate-x-1/2 rounded-[50%] pointer-events-none" style={{ bottom: -2, width: 48, height: 13, background: `radial-gradient(ellipse at center, ${ring}77, transparent 72%)` }} />
+      <div className="relative mx-auto flex items-end justify-center" style={{ width: 64, height: 60 }}>
+        {/* Soft team aura behind the mon (stronger for mega) — replaces the hard ring disc. */}
+        <span className="absolute inset-0 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle at 50% 60%, ${ring}${unit.mega ? "55" : "2e"}, transparent 68%)` }} />
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={spriteUrl(unit.dex)} alt="" width={46} height={46} style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none", filter: unit.disabled ? "brightness(1.3) saturate(0.4)" : unit.burning ? "saturate(1.4)" : "none" }} draggable={false} />
-        {flash && <span key={flash} className="absolute inset-0 rounded-full combat-hitflash" style={{ background: "#fff" }} />}
-        {unit.burning && (
-          <span className="absolute inset-0 rounded-full pointer-events-none" style={{ boxShadow: "inset 0 0 10px 2px #f9731699, 0 0 8px 1px #ea580c88" }} />
-        )}
-        {unit.disabled && (
-          <span className="absolute inset-0 rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, #bae6fd55, transparent 70%)", boxShadow: "inset 0 0 8px 2px #7dd3fcaa" }} />
-        )}
+        <img
+          src={spriteUrl(unit.dex)}
+          alt=""
+          width={60}
+          height={60}
+          className="relative drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)]"
+          style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none", filter: unit.disabled ? "brightness(1.25) saturate(0.4) drop-shadow(0 0 6px #7dd3fc)" : unit.burning ? "saturate(1.45) drop-shadow(0 0 6px #f97316)" : `drop-shadow(0 0 5px ${ring}88)` }}
+          draggable={false}
+        />
+        {flash && <span key={flash} className="absolute inset-0 combat-hitflash" style={{ background: "radial-gradient(circle, #fff, #ffffff00 70%)" }} />}
         {unit.mega && (
-          <span className="absolute -top-1.5 -right-1.5 text-[8px] font-extrabold bg-fuchsia-500 text-black rounded px-0.5 leading-tight">M</span>
+          <span className="absolute -top-1 -right-0.5 text-[8px] font-bold bg-fuchsia-500 text-black rounded px-0.5 leading-tight shadow">M</span>
         )}
-        {unit.disabled && <span className="absolute -top-1.5 -left-1.5 text-sky-300 drop-shadow"><SnowIcon size={12} /></span>}
-        {unit.burning && !unit.disabled && <span className="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-full bg-orange-500 shadow-[0_0_6px_2px_rgba(249,115,22,0.7)]" />}
+        {unit.disabled && <span className="absolute -top-1 -left-1 text-sky-300 drop-shadow"><SnowIcon size={13} /></span>}
+        {unit.burning && !unit.disabled && <span className="absolute -top-0.5 -left-0.5 w-2.5 h-2.5 rounded-full bg-orange-500 shadow-[0_0_6px_2px_rgba(249,115,22,0.7)]" />}
       </div>
     </div>
   );
@@ -563,9 +564,9 @@ function CombatUnit({
 function Corpse({ unit }: { unit: FrameUnit }) {
   const p = hexToPixel({ c: unit.c, r: unit.r }, TILE_W, TILE_H);
   return (
-    <div key={unit.id} className="absolute pointer-events-none combat-die" style={{ left: p.x - 18, top: p.y - 18 }}>
+    <div key={unit.id} className="absolute pointer-events-none combat-die" style={{ left: p.x - 23, top: p.y - 23 }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={spriteUrl(unit.dex)} alt="" width={36} height={36} style={{ imageRendering: "pixelated", filter: "grayscale(1) brightness(0.6)" }} draggable={false} />
+      <img src={spriteUrl(unit.dex)} alt="" width={46} height={46} style={{ imageRendering: "pixelated", filter: "grayscale(1) brightness(0.6)" }} draggable={false} />
     </div>
   );
 }
