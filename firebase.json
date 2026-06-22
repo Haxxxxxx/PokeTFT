@@ -36,6 +36,13 @@
         "headers": [
           { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
         ]
+      },
+      {
+        "comment": "Mirrored Pokémon sprites — a given dex's sprite never changes, so cache forever (overrides the no-cache catch-all). This replaced flaky raw.githubusercontent.com loads.",
+        "source": "/sprites/**",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        ]
       }
     ]
   }
