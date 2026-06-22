@@ -920,9 +920,9 @@ export function NetGameClient() {
             colour win/loss and stay clickable for a recap. */}
         <div className="gilded relative flex items-center gap-3 px-3 py-1.5 rounded-lg">
           {/* Current stage/round recap, pinned beside the round tracker. */}
-          <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/30 border border-[var(--panel-edge)]">
-            <span className="text-[8px] uppercase tracking-[0.15em] text-amber-300/70 leading-none">{t.net_stage}</span>
-            <span className="text-base font-extrabold tabular-nums gild-text leading-none">{meta.stage}-{meta.round}</span>
+          <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/[0.06]">
+            <span className="text-[8px] uppercase tracking-[0.15em] text-slate-400/70 leading-none">{t.net_stage}</span>
+            <span className="text-base font-bold tabular-nums gild-text leading-none">{meta.stage}-{meta.round}</span>
           </div>
           <div className="flex-1 flex items-center justify-center gap-1 overflow-x-auto">
             {schedule.map(({ stage, round, kind }) => {
@@ -986,9 +986,9 @@ export function NetGameClient() {
 
         {/* Top HUD bar: stat chips, then the phase/timer segment + controls.
             (The stage badge lives next to the timeline above.) */}
-        <div className="gilded flex items-center gap-2.5 flex-wrap px-3.5 py-2.5 rounded-xl">
+        <div className="gilded flex items-center gap-2 flex-wrap px-3 py-2 rounded-xl">
           {isSpectator ? (
-            <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-400/40 text-[11px] font-extrabold text-amber-300">
+            <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-400/40 text-[11px] font-bold text-amber-300">
               <Eye size={13} /> {t.net_spectate_badge}
             </span>
           ) : (
@@ -1017,8 +1017,8 @@ export function NetGameClient() {
             if (gm.id === "standard") return null;
             const mono = gm.flags?.monoType ? pickMonoType(room.rules?.generations ?? [1], codeSeed(room.code)) : null;
             return (
-              <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-extrabold"
-                style={{ borderColor: `${gm.color}66`, color: gm.color, background: `${gm.color}14` }}
+              <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-bold"
+                style={{ borderColor: `${gm.color}55`, color: gm.color, background: `${gm.color}12` }}
                 title={lang === "fr" ? gm.descFr : gm.desc}>
                 {lang === "fr" ? gm.nameFr : gm.name}{mono ? ` · ${mono}` : ""}
               </span>
@@ -1768,7 +1768,7 @@ function PhaseTimer({ phase, phaseLabel, deadline, totalMs, resolvingLabel }: { 
   return (
     <div className="flex-1 min-w-[220px] flex flex-col gap-1 px-2">
       <div className="flex justify-between items-baseline">
-        <span className={`text-xs font-extrabold uppercase tracking-wide ${resolving ? "text-amber-300 animate-pulse" : phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{resolving ? resolvingLabel : phaseLabel}</span>
+        <span className={`text-xs font-bold uppercase tracking-wide ${resolving ? "text-amber-300 animate-pulse" : phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{resolving ? resolvingLabel : phaseLabel}</span>
         <span className="text-sm font-bold tabular-nums text-slate-200">
           {resolving
             ? <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-amber-400/25 border-t-amber-400 animate-spin align-middle" />
@@ -1784,10 +1784,10 @@ function PhaseTimer({ phase, phaseLabel, deadline, totalMs, resolvingLabel }: { 
 
 function StatChip({ label, value, accent, sub, title }: { label: string; value: ReactNode; accent?: string; sub?: string; title?: string }) {
   return (
-    <div title={title} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/25 border border-[var(--panel-edge)] shadow-[inset_0_1px_0_rgba(231,198,107,0.06)] shrink-0">
-      <span className="text-[9px] uppercase tracking-wider text-amber-200/55 leading-none">{label}</span>
-      <span className="text-base font-extrabold leading-none inline-flex items-baseline gap-1" style={{ color: accent }}>
-        {value}{sub && <span className="text-[10px] font-bold text-slate-400">{sub}</span>}
+    <div title={title} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] shrink-0">
+      <span className="text-[9px] uppercase tracking-wide text-slate-400/70 leading-none">{label}</span>
+      <span className="text-[15px] font-bold leading-none inline-flex items-baseline gap-1" style={{ color: accent }}>
+        {value}{sub && <span className="text-[10px] font-semibold text-slate-400">{sub}</span>}
       </span>
     </div>
   );
