@@ -12,6 +12,7 @@ import { TraitGlyph } from "@/components/game/TraitGlyph";
 import { TYPE_COLOR } from "@/game/ui";
 import { computeAchievements, ACHIEVEMENT_TIER_COLOR } from "@/game/data/achievements";
 import { ArrowLeft, Trophy, Medal, Swords, Crown, X } from "lucide-react";
+import { useT } from "@/lib/i18n";
 
 /** Placement → accent colour (1st gold, top-half emerald, rest slate). */
 function placeColor(place: number, players: number): string {
@@ -236,6 +237,7 @@ export function ProfileScreen() {
 /** A full recap of one finished game: placement, regions, every active trait, and the
  *  complete final comp with stars — the "whole game" view behind a history row. */
 function MatchDetail({ game, lang, onClose }: { game: GameResult; lang: string; onClose: () => void }) {
+  const t = useT();
   const tr = (en: string, fr: string) => (lang === "fr" ? fr : en);
   const color = placeColor(game.place, game.players);
   const regions = game.regions?.map((r) => (GEN_LABELS[r] ?? `Gen ${r}`).split("—")[1]?.trim() ?? `Gen ${r}`).join(", ");
@@ -259,7 +261,7 @@ function MatchDetail({ game, lang, onClose }: { game: GameResult; lang: string; 
               {regions || "—"}{typeof game.ts === "number" ? ` · ${new Date(game.ts).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-amber-300 shrink-0"><X size={18} /></button>
+          <button onClick={onClose} aria-label={t.a_close} className="text-slate-500 hover:text-amber-300 shrink-0"><X size={18} /></button>
         </div>
 
         {/* Active traits */}

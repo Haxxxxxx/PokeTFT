@@ -69,7 +69,7 @@ function ItemCard({ id }: { id: string }) {
           <h2 className="text-base font-bold tracking-tight">{name}</h2>
           <span className="text-[10px] uppercase tracking-wide" style={{ color }}>{isMega ? t.it_mega_stone : t.it_held_item}</span>
         </div>
-        <button onClick={() => setInspectedItem(null)} aria-label="Close" className="text-slate-500 hover:text-white shrink-0"><CloseIcon size={16} /></button>
+        <button onClick={() => setInspectedItem(null)} aria-label={t.a_close} className="text-slate-500 hover:text-white shrink-0"><CloseIcon size={16} /></button>
       </div>
       <p className="text-[12px] text-slate-300 leading-relaxed p-3">{effect}</p>
       <div className="px-3 pb-3">
@@ -171,7 +171,7 @@ function Card() {
             ))}
           </div>
         </div>
-        <button onClick={clear} aria-label="Close" className="text-slate-500 hover:text-white transition-colors shrink-0">
+        <button onClick={clear} aria-label={t.a_close} className="text-slate-500 hover:text-white transition-colors shrink-0">
           <CloseIcon size={16} />
         </button>
       </div>
@@ -300,7 +300,7 @@ function HeldItems({ iid }: { iid?: string }) {
               </div>
               <button
                 onClick={() => unequipItem(unit.iid, id)}
-                title="Unequip (back to inventory)"
+                title={t.ud_unequip}
                 className="shrink-0 w-6 h-6 rounded-md bg-slate-900 hover:bg-rose-900/60 border border-slate-600 text-slate-400 hover:text-rose-300 flex items-center justify-center"
               >
                 <CloseIcon size={12} />

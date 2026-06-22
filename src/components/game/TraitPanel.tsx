@@ -9,12 +9,14 @@ import { TYPE_COLOR, COST_COLOR } from "@/game/ui";
 import { TraitGlyph } from "./TraitGlyph";
 import { getDef, spriteUrl } from "@/game/data/mons";
 import { EMBLEM_TRAIT } from "@/game/data/itemPool";
+import { useT } from "@/lib/i18n";
 
 import type { UnitInstance } from "@/game/types";
 
 type Trait = ReturnType<typeof computeTraits>[number];
 
 export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {}) {
+  const tr = useT();
   const storeUnits = useGame((s) => s.units);
   const unitsByCost = useGame((s) => s.unitsByCost);
   const units = override ?? storeUnits;
@@ -70,8 +72,8 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
 
   return (
     <div className="gilded w-full h-full min-h-0 flex flex-col p-3 rounded-xl">
-      <h2 className="text-xs uppercase tracking-wide text-amber-200/60 mb-2 shrink-0">Synergies</h2>
-      {traits.length === 0 && <p className="text-xs text-slate-500">Place mons to activate traits.</p>}
+      <h2 className="text-xs uppercase tracking-wide text-amber-200/60 mb-2 shrink-0">{tr.tp_synergies}</h2>
+      {traits.length === 0 && <p className="text-xs text-slate-500">{tr.tp_place_mons}</p>}
       {/* Scrolls when the list gets long. */}
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-1.5 pr-0.5">
         {traits.map((t) => {
@@ -95,7 +97,7 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
               </span>
               <span className="text-xs font-semibold flex-1">{t.label}</span>
               {active && <span style={{ background: color }} className="text-[9px] font-bold px-1 rounded text-black/80">{t.tier}</span>}
-              {capped && !active && <span className="text-[8px] font-bold uppercase tracking-wide text-slate-600" title={`Only ${poolMax} in this region — can't reach the next tier`}>max {poolMax}</span>}
+              {capped && !active && <span className="text-[8px] font-bold uppercase tracking-wide text-slate-600" title={`${tr.tp_cap_only} ${poolMax} ${tr.tp_cap_rest}`}>max {poolMax}</span>}
               <span className="text-[11px] text-slate-400">{t.count}{nextBp ? `/${nextBp}` : " ✓"}</span>
             </div>
           );

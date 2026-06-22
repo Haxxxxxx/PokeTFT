@@ -38,6 +38,7 @@ export function Stars({ star }: { star: number }) {
 }
 
 export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true, shape = "square" }: { unit: UnitInstance; size?: number; interactive?: boolean; canDeploy?: boolean; shape?: "square" | "hex" }) {
+  const t = useT();
   const def = getDef(unit.defId);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: unit.iid, disabled: !interactive });
   const setInspect = useUi((s) => s.setInspect);
@@ -73,7 +74,7 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
   }
 
   const ring = megaReady ? "#f0abfc" : color;
-  const title = megaReady ? `${def.stageNames[unit.star - 1]} · Mega ready` : `${def.stageNames[unit.star - 1]} · click for details`;
+  const title = megaReady ? `${def.stageNames[unit.star - 1]} · ${t.uc_mega_ready}` : `${def.stageNames[unit.star - 1]} · ${t.uc_click_details}`;
   // Fill the token: the mon is the point, so let the sprite take nearly the whole cell (the
   // hex token has no border to clear; the square chip leaves room for its 2px frame).
   const spriteSize = shape === "hex" ? size - 2 : size - 6;
