@@ -213,7 +213,7 @@ export function ProfileScreen() {
                             const dex = getDef(u.d).dex[Math.min(2, Math.max(0, u.s - 1))];
                             return (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img key={i} src={spriteUrl(dex)} alt="" width={22} height={22} title={getDef(u.d).name} style={{ imageRendering: "pixelated" }} className="opacity-90" />
+                              <img key={i} src={spriteUrl(dex)} alt="" width={22} height={22} title={getDef(u.d).name} style={{ imageRendering: "pixelated" }} loading="lazy" className="opacity-90" />
                             );
                           })}
                         </div>
@@ -298,7 +298,7 @@ function MatchDetail({ game, lang, onClose }: { game: GameResult; lang: string; 
                   <div key={i} className="flex flex-col items-center gap-1 p-2 rounded-lg bg-white/[0.02] border border-white/[0.05]">
                     <span className="text-[9px] font-bold text-amber-300 leading-none tabular-nums">{"★".repeat(u.s)}</span>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={spriteUrl(dex)} alt="" width={44} height={44} style={{ imageRendering: "pixelated" }} />
+                    <img src={spriteUrl(dex)} alt="" width={44} height={44} loading="lazy" style={{ imageRendering: "pixelated" }} />
                     <span className="text-[10px] font-semibold text-slate-300 text-center leading-tight truncate max-w-full">{name}</span>
                   </div>
                 );

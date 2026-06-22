@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { FIELD, TILE, ALLY_ROW0, HEX_CLIP, hexToPixel, fieldPixelSize } from "@/game/engine/hex";
 import { useGame } from "@/game/store/gameStore";
@@ -51,7 +52,9 @@ function HexCell({ c, r, unit, interactive }: { c: number; r: number; unit?: Uni
       />
       {unit && (
         <div className="absolute flex items-center justify-center pointer-events-none" style={{ left: x - TILE_W / 2, top: y - TILE_H / 2, width: TILE_W, height: TILE_H }}>
-          <span className={`unit-glow ${ally ? "" : "enemy"}`} />
+          {/* The pulsing feet-glow is an infinite GPU animation per unit — only run it on YOUR
+              own interactive planning board, not on spectated/dimmed boards (toaster perf). */}
+          {interactive && <span className={`unit-glow ${ally ? "" : "enemy"}`} />}
           {/* Upper rows paint ABOVE lower rows so a mon below never covers the
               item pips in the bottom-right corner of the mon above it. */}
           <div className="pointer-events-auto relative" style={{ zIndex: FIELD.rows - r }}>
@@ -63,7 +66,7 @@ function HexCell({ c, r, unit, interactive }: { c: number; r: number; unit?: Uni
   );
 }
 
-export function Board({ units, interactive = true }: { units?: UnitInstance[]; interactive?: boolean }) {
+function BoardBase({ units, interactive = true }: { units?: UnitInstance[]; interactive?: boolean }) {
   const storeUnits = useGame((s) => s.units);
   const drops = useGame((s) => s.drops);
   const collectDrop = useGame((s) => s.collectDrop);
@@ -118,3 +121,7 @@ export function Board({ units, interactive = true }: { units?: UnitInstance[]; i
     </div>
   );
 }
+
+/** Memoized — only re-renders when its props (units/interactive) actually change, not on
+ *  every parent render (e.g. each unit placement / room tick). */
+export const Board = memo(BoardBase);

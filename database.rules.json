@@ -19,6 +19,8 @@
         ".read": "auth != null",
         ".write": "auth != null && $uid === auth.uid",
         "username":      { ".validate": "newData.isString() && newData.val().length <= 16" },
+        "rating":         { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 30000" },
+        "ultimateBotWins":{ ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
         "typeAff": {
           ".write": "auth != null",
           "$type": { ".validate": "newData.isNumber() && newData.val() >= 0" }
@@ -45,7 +47,7 @@
       ".indexOn": ["rating"],
       "$uid": {
         ".write": "auth != null && $uid === auth.uid",
-        "rating":   { ".validate": "newData.isNumber()" },
+        "rating":   { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 30000" },
         "username": { ".validate": "newData.isString() && newData.val().length <= 16" }
       }
     },
@@ -80,7 +82,7 @@
           "round": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 12" }
         },
 
-        "invited":  { ".write": "auth != null" },
+        "invited":  { ".write": "auth != null && (root.child('games').child($code).child('players').child(auth.uid).exists() || !newData.exists())" },
         "combat":   { ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
         "carousel": { ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
         "rules":    { ".write": "auth != null && (!root.child('games').child($code).child('meta/hostUid').exists() || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
@@ -104,6 +106,10 @@
             "name":  { ".validate": "newData.isString() && newData.val().length <= 24" },
             "hp":    { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500" },
             "level": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10" },
+            "gold":  { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 999)" },
+            "place": { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 1 && newData.val() <= 8)" },
+            "board": { ".validate": "!newData.exists() || !newData.hasChild('40')" },
+            "bench": { ".validate": "!newData.exists() || !newData.hasChild('40')" },
             "teamId": { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 4)" },
             "augments": {
               ".validate": "!newData.exists() || !newData.hasChild('3')",

@@ -168,7 +168,7 @@ function TraitTooltip({ t, top, left, members, board, onEnter, onLeave }: { t: T
                   className={`relative w-10 h-10 rounded-md border bg-black/40 flex items-center justify-center overflow-hidden transition-transform hover:scale-110 hover:z-10 ${owned ? "" : "opacity-45 grayscale"}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={spriteUrl(d.dex[0])} alt={d.name} width={36} height={36} style={{ imageRendering: "pixelated" }} draggable={false} />
+                  <img src={spriteUrl(d.dex[0])} alt={d.name} width={36} height={36} style={{ imageRendering: "pixelated" }} loading="lazy" draggable={false} />
                   {owned && <span className="absolute inset-x-0 bottom-0 h-[2px]" style={{ background: color }} />}
                 </span>
               );
