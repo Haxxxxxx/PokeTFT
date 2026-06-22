@@ -42,7 +42,7 @@ export function FriendsPanel() {
   };
 
   return (
-    <div className="panel w-full flex flex-col gap-3 rounded-2xl p-4">
+    <div className="panel w-full flex flex-col gap-3 rounded-xl p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Friends</h2>
         {profile?.username && <span className="text-[11px] text-slate-500">you: <span className="text-amber-300 font-semibold">{profile.username}</span></span>}

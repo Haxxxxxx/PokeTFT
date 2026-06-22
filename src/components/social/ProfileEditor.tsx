@@ -24,7 +24,7 @@ export function ProfileEditor({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="w-full max-w-[440px] rounded-2xl border border-slate-700 bg-slate-900 p-6 flex flex-col gap-5" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-[440px] rounded-xl border border-slate-700 bg-slate-900 p-6 flex flex-col gap-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-extrabold text-slate-100">Edit profile</h2>
           <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-xl leading-none">×</button>

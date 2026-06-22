@@ -53,7 +53,7 @@ export function ModeSelect({ isHost, onContinue }: { isHost: boolean; onContinue
                   className={`group relative flex items-center gap-3 text-left rounded-xl border p-3 transition-all disabled:cursor-not-allowed ${
                     sel ? "bg-white/[0.05]" : "bg-slate-900/40 border-slate-800 hover:border-slate-600"
                   }`}
-                  style={sel ? { borderColor: `${m.color}cc`, boxShadow: `0 0 24px -12px ${m.color}` } : undefined}
+                  style={sel ? { borderColor: `${m.color}cc`, background: `${m.color}0f` } : undefined}
                 >
                   <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${m.color}1f`, color: m.color }}><Icon size={20} /></span>
                   <span className="min-w-0 flex-1">
@@ -110,7 +110,7 @@ export function ModeSelect({ isHost, onContinue }: { isHost: boolean; onContinue
           </div>
           <button
             onClick={onContinue}
-            className="shrink-0 inline-flex items-center gap-2 px-5 py-3 rounded-xl font-extrabold text-sm tracking-wide bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black shadow-lg shadow-amber-500/20 transition-all"
+            className="btn-primary shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm tracking-wide"
           >
             {isHost ? (lang === "fr" ? "Continuer" : "Continue") : (lang === "fr" ? "Entrer" : "Enter")} <ChevronRight size={17} />
           </button>

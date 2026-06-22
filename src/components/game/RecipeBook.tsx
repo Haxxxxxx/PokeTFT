@@ -32,7 +32,7 @@ export function RecipeBook({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
-        className="gilded rounded-2xl p-4 w-full max-w-2xl max-h-[85vh] overflow-y-auto"
+        className="gilded rounded-xl p-4 w-full max-w-2xl max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-3">

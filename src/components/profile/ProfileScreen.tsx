@@ -96,7 +96,7 @@ export function ProfileScreen() {
         </div>
 
         {/* Identity card */}
-        <div className="panel rounded-2xl p-4 flex items-center gap-3.5">
+        <div className="panel rounded-xl p-4 flex items-center gap-3.5">
           <span className="w-16 h-16 rounded-xl bg-white/[0.03] border border-amber-500/25 flex items-center justify-center overflow-hidden shrink-0">
             {photo ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -134,7 +134,7 @@ export function ProfileScreen() {
         </div>
 
         {/* Achievements — earned light up, locked are dimmed. */}
-        <div className="panel rounded-2xl p-3">
+        <div className="panel rounded-xl p-3">
           <h2 className="text-[10px] uppercase tracking-widest text-amber-200/60 font-bold mb-2.5 px-1 flex items-center justify-between">
             <span>{tr("Achievements", "Hauts faits")}</span>
             <span className="text-slate-500 tabular-nums">{earnedCount}/{achievements.length}</span>
@@ -158,7 +158,7 @@ export function ProfileScreen() {
         </div>
 
         {/* History list */}
-        <div className="panel rounded-2xl p-3">
+        <div className="panel rounded-xl p-3">
           <h2 className="text-[10px] uppercase tracking-widest text-amber-200/60 font-bold mb-2 px-1">{tr("Match history", "Historique")}</h2>
           {history === null ? (
             <p className="text-[12px] text-slate-500 py-6 text-center">{tr("Loading…", "Chargement…")}</p>
@@ -233,7 +233,7 @@ function MatchDetail({ game, lang, onClose }: { game: GameResult; lang: string; 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="panel w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="panel w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-xl p-5" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <span className="w-11 h-11 rounded-xl flex items-center justify-center font-extrabold text-base shrink-0" style={{ background: `${color}22`, color, border: `1px solid ${color}66` }}>

@@ -140,11 +140,11 @@ export function LobbyScreen() {
   };
 
   const Portrait = ({ name, photo, ready, isBot, nightmare }: { name?: string; photo?: string | null; ready?: boolean; isBot?: boolean; nightmare?: boolean }) => (
-    <div className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center text-xl font-extrabold overflow-hidden shrink-0 transition-all ${
-      nightmare ? "bg-rose-950/70 border-rose-600 text-rose-300 shadow-[0_0_22px_-2px_rgba(225,29,72,0.85)] animate-pulse"
-      : isBot ? "bg-violet-950/50 border-violet-600 text-violet-300"
-      : ready ? "bg-slate-800 border-emerald-500/70 shadow-[0_0_18px_-4px_rgba(16,185,129,0.7)] text-emerald-200"
-      : "bg-slate-800 border-slate-600 text-slate-300"}`}>
+    <div className={`w-16 h-16 rounded-xl border flex items-center justify-center text-xl font-bold overflow-hidden shrink-0 transition-all ${
+      nightmare ? "bg-rose-950/60 border-rose-600/70 text-rose-300 animate-pulse"
+      : isBot ? "bg-violet-950/40 border-violet-600/50 text-violet-300"
+      : ready ? "bg-slate-800/80 border-emerald-500/60 text-emerald-200"
+      : "bg-slate-800/60 border-white/10 text-slate-300"}`}>
       {nightmare ? "💀" : isBot ? <Bot size={26} /> : photo
         // eslint-disable-next-line @next/next/no-img-element
         ? <img src={photo} alt="" width={56} height={56} style={{ imageRendering: "pixelated" }} />
@@ -183,7 +183,7 @@ export function LobbyScreen() {
 
       {/* Party stage */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center gap-7 p-4 sm:p-8 overflow-y-auto">
-        <div className="panel w-full max-w-[680px] rounded-2xl p-5 sm:p-7">
+        <div className="panel w-full max-w-[680px] rounded-xl p-5 sm:p-7">
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className="text-base font-extrabold gild-text leading-none">{lang === "fr" ? "Salon" : "Lobby"}</h2>
@@ -208,7 +208,7 @@ export function LobbyScreen() {
             {/* Pending invites — placeholder slots until the friend accepts. */}
             {pendingInvites.map((p) => (
               <div key={`inv-${p.uid}`} className="flex flex-col items-center gap-1.5 w-20">
-                <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-amber-500/40 bg-amber-500/[0.04] flex items-center justify-center overflow-hidden shrink-0 animate-pulse">
+                <div className="w-16 h-16 rounded-xl border-2 border-dashed border-amber-500/40 bg-amber-500/[0.04] flex items-center justify-center overflow-hidden shrink-0 animate-pulse">
                   {p.photoURL
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={p.photoURL} alt="" width={44} height={44} style={{ imageRendering: "pixelated", opacity: 0.5 }} />
@@ -220,7 +220,7 @@ export function LobbyScreen() {
             ))}
             {Array.from({ length: openSlots }).map((_, i) => (
               <div key={`o-${i}`} className="flex flex-col items-center gap-1.5 w-20">
-                <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-slate-700/70 flex items-center justify-center text-slate-700 text-2xl">+</div>
+                <div className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-700/70 flex items-center justify-center text-slate-700 text-2xl">+</div>
                 <span className="text-[10px] text-slate-600">{t.l_net_open_slot}</span>
               </div>
             ))}
@@ -300,7 +300,7 @@ export function LobbyScreen() {
         {/* Start / ready */}
         {!isHost ? (
           <button onClick={() => setReady(!me?.ready)}
-            className={`w-full max-w-md py-4 rounded-2xl font-extrabold text-base tracking-wide transition-all ${me?.ready ? "bg-slate-700 hover:bg-slate-600 text-slate-200" : "bg-gradient-to-b from-emerald-500 to-emerald-600 hover:from-emerald-400 text-white shadow-lg shadow-emerald-500/20"}`}>
+            className={`w-full max-w-md py-3.5 rounded-xl font-bold text-[15px] tracking-wide transition-colors border ${me?.ready ? "bg-white/[0.03] border-white/10 text-slate-300 hover:bg-white/[0.06]" : "bg-emerald-500 border-emerald-400/50 text-white hover:bg-emerald-400"}`}>
             {me?.ready ? t.l_net_not_ready : t.l_net_ready_up}
           </button>
         ) : (
@@ -312,7 +312,7 @@ export function LobbyScreen() {
                 .then(() => kickoffServerGame(room.code)) // every game is server-driven (#110)
                 .catch((e) => { console.error("[beginMatch]", e); setStartError(lang === "fr" ? "Échec du lancement. Réessaie." : "Couldn't start the match. Try again."); });
             }}
-              className="w-full py-4 rounded-2xl font-extrabold text-base tracking-wide transition-all bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black shadow-lg shadow-amber-500/20 disabled:opacity-30 disabled:shadow-none disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500">
+              className="btn-primary w-full py-3.5 rounded-xl font-bold text-[15px] tracking-wide disabled:cursor-not-allowed">
               <span className="inline-flex items-center justify-center gap-2"><Swords size={18} /> {t.l_net_start}</span>
             </button>
             {!canStart && <p className="text-xs text-slate-600">{t.l_net_wait_ready}</p>}

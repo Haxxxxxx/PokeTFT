@@ -79,7 +79,7 @@ export function Board({ units, interactive = true }: { units?: UnitInstance[]; i
 
   return (
     <div
-      className="relative rounded-2xl border border-slate-700/50"
+      className="relative rounded-xl border border-slate-700/50"
       style={{
         width: w + 28,
         height: h + 28,

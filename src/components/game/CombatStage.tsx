@@ -264,7 +264,7 @@ export function CombatStage({
           right into the reserved rail space. Fullscreen centers the pair. */}
       <div className={`flex items-start gap-3 w-full ${inline ? "justify-start" : "justify-center"}`}>
       <div
-        className="relative shrink-0 rounded-2xl overflow-hidden"
+        className="relative shrink-0 rounded-xl overflow-hidden"
         style={{
           width: w + 24, height: h + 24, padding: 12,
           background: "radial-gradient(120% 90% at 50% 50%, #1a263f 0%, #0a1020 75%)",

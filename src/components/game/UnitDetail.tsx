@@ -60,7 +60,7 @@ function ItemCard({ id }: { id: string }) {
   const effect = isMega ? "Holds on a Mega-capable mon → it Mega Evolves at combat start." : (lang === "fr" ? def?.textFr : def?.text) ?? "";
   const color = isMega ? "#c084fc" : def ? RARITY_COLOR[def.rarity] : "#a78bfa";
   return (
-    <div style={{ borderColor: `${color}aa`, boxShadow: `0 10px 40px -12px ${color}44` }} className="rounded-2xl border bg-[#0d1426] text-slate-100 overflow-hidden">
+    <div style={{ borderColor: `${color}aa`, boxShadow: `0 10px 40px -12px ${color}44` }} className="rounded-xl border bg-[#0d1426] text-slate-100 overflow-hidden">
       <div className="flex items-start gap-3 p-3 border-b border-white/5" style={{ background: `linear-gradient(105deg, ${color}1f, transparent 70%)` }}>
         <div style={{ borderColor: `${color}99` }} className="rounded-xl border bg-black/30 w-14 h-14 flex items-center justify-center text-3xl shrink-0">
           {isMega ? <MegaIcon size={34} /> : <ItemGlyph id={id} size={30} />}
@@ -84,7 +84,7 @@ function ItemCard({ id }: { id: string }) {
 function EmptyState() {
   const t = useT();
   return (
-    <div className="h-full min-h-[120px] rounded-2xl border border-slate-700/50 bg-slate-900/50 p-6 text-center flex flex-col items-center justify-center">
+    <div className="h-full min-h-[120px] rounded-xl border border-slate-700/50 bg-slate-900/50 p-6 text-center flex flex-col items-center justify-center">
       <div className="flex justify-center text-slate-600 mb-2"><InfoIcon size={22} /></div>
       <p className="text-xs text-slate-500 leading-relaxed">{t.ud_click_hint}</p>
     </div>
@@ -138,7 +138,7 @@ function Card() {
   return (
     <div
       style={{ borderColor: `${color}aa`, boxShadow: `0 10px 40px -12px ${color}44` }}
-      className="rounded-2xl border bg-[#0d1426] text-slate-100 overflow-hidden"
+      className="rounded-xl border bg-[#0d1426] text-slate-100 overflow-hidden"
     >
       {/* Header */}
       <div className="flex items-start gap-3 p-3 border-b border-white/5" style={{ background: `linear-gradient(105deg, ${color}1f, transparent 70%)` }}>

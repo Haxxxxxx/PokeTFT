@@ -63,7 +63,7 @@ export function ItemsPanel() {
   const distinct = [...counts.keys()];
 
   return (
-    <div data-inspectable className="gilded rounded-2xl p-3">
+    <div data-inspectable className="gilded rounded-xl p-3">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-[10px] uppercase tracking-widest text-amber-200/60 font-bold">{t.sh_items_title}</h2>
         <div className="flex items-center gap-2">

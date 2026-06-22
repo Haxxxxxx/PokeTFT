@@ -37,7 +37,7 @@ export function ProfileTile() {
   return (
     <button
       onClick={() => setProfileOpen(true)}
-      className="panel rounded-2xl p-4 w-full text-left group hover:border-amber-500/25 transition-colors"
+      className="panel rounded-xl p-4 w-full text-left group hover:border-amber-500/25 transition-colors"
     >
       <div className="flex items-center gap-3">
         <span className="w-14 h-14 rounded-xl bg-white/[0.03] border border-amber-500/25 flex items-center justify-center overflow-hidden shrink-0">

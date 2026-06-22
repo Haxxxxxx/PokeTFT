@@ -20,7 +20,7 @@ export function RankInfoModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label={tr("Ranks", "Rangs")}>
-      <div className="panel w-full max-w-md max-h-[88vh] overflow-y-auto rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="panel w-full max-w-md max-h-[88vh] overflow-y-auto rounded-xl p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-white/[0.06]">
           <span className="text-amber-400"><TrendingUp size={18} /></span>
           <h2 className="text-base font-extrabold gild-text flex-1">{tr("Ranks & how to climb", "Rangs & progression")}</h2>

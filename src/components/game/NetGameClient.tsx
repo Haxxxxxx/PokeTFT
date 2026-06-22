@@ -885,7 +885,7 @@ export function NetGameClient() {
       {/* Concede / forfeit confirm */}
       {confirmLeave && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setConfirmLeave(false)}>
-          <div className="gilded gilded-strong w-full max-w-sm rounded-2xl p-5 flex flex-col gap-3" onClick={(e) => e.stopPropagation()}>
+          <div className="gilded gilded-strong w-full max-w-sm rounded-xl p-5 flex flex-col gap-3" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-extrabold text-rose-300">{lang === "fr" ? "Abandonner la partie ?" : "Forfeit the match?"}</h3>
             <p className="text-[12px] text-slate-400">{lang === "fr" ? "Vous serez éliminé à la dernière place restante et la partie sera enregistrée comme une défaite." : "You'll be eliminated at the worst remaining place and the game is recorded as a loss."}</p>
             <div className="flex gap-2 mt-1">
