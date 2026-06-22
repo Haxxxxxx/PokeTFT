@@ -163,7 +163,7 @@ export function WelcomeScreen() {
             </div>
 
             <div className="text-center relative z-10">
-              <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full border border-amber-500/30 bg-amber-500/5 text-[10px] font-extrabold uppercase tracking-[0.25em] text-amber-300/80">
+              <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full border border-amber-500/30 bg-amber-500/5 text-[10px] font-extrabold uppercase tracking-[0.18em] text-amber-300/80">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> {lobbies.length} {lobbies.length === 1 ? "lobby" : "lobbies"} live
               </div>
               <h1 className="font-bold tracking-tight text-3xl sm:text-5xl text-slate-100">{t.w_hero_title}</h1>
@@ -179,7 +179,7 @@ export function WelcomeScreen() {
                 {/* Live game browser — find + join an open game without a code. */}
                 <div className="w-full">
                   <div className="flex items-center justify-between mb-1.5 px-0.5">
-                    <span className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400">{t.w_open_games}</span>
+                    <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">{t.w_open_games}</span>
                     <span className="text-[10px] text-slate-600 tabular-nums">{lobbies.length}</span>
                   </div>
                   <div className="flex flex-col gap-1.5 max-h-[176px] overflow-y-auto pr-0.5">

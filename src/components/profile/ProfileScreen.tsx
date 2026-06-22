@@ -5,6 +5,7 @@ import { useAuth } from "@/game/net/authStore";
 import { useAppStore } from "@/game/store/appStore";
 import { getHistory, getProfile, rankOf, START_RATING, type GameResult, type UserProfile } from "@/game/net/users";
 import { GEN_LABELS } from "@/game/data/generations";
+import { getMode } from "@/game/data/gameModes";
 import { getDef, spriteUrl } from "@/game/data/mons";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { TraitGlyph } from "@/components/game/TraitGlyph";
@@ -135,7 +136,7 @@ export function ProfileScreen() {
 
         {/* Achievements — earned light up, locked are dimmed. */}
         <div className="panel rounded-xl p-3">
-          <h2 className="text-[10px] uppercase tracking-widest text-amber-200/60 font-bold mb-2.5 px-1 flex items-center justify-between">
+          <h2 className="text-[10px] uppercase tracking-wide text-amber-200/60 font-bold mb-2.5 px-1 flex items-center justify-between">
             <span>{tr("Achievements", "Hauts faits")}</span>
             <span className="text-slate-500 tabular-nums">{earnedCount}/{achievements.length}</span>
           </h2>
@@ -159,7 +160,7 @@ export function ProfileScreen() {
 
         {/* History list */}
         <div className="panel rounded-xl p-3">
-          <h2 className="text-[10px] uppercase tracking-widest text-amber-200/60 font-bold mb-2 px-1">{tr("Match history", "Historique")}</h2>
+          <h2 className="text-[10px] uppercase tracking-wide text-amber-200/60 font-bold mb-2 px-1">{tr("Match history", "Historique")}</h2>
           {history === null ? (
             <p className="text-[12px] text-slate-500 py-6 text-center">{tr("Loading…", "Chargement…")}</p>
           ) : history.length === 0 ? (
@@ -176,8 +177,13 @@ export function ProfileScreen() {
                         #{g.place}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <div className="text-[12px] font-bold text-slate-200 truncate">
-                          {g.place === 1 ? tr("Victory", "Victoire") : tr(`Placed ${g.place} of ${g.players}`, `${g.place}ᵉ sur ${g.players}`)}
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-[12px] font-bold text-slate-200 truncate">
+                            {g.place === 1 ? tr("Victory", "Victoire") : tr(`Placed ${g.place} of ${g.players}`, `${g.place}ᵉ sur ${g.players}`)}
+                          </span>
+                          {g.mode && g.mode !== "standard" && (() => { const gm = getMode(g.mode); return (
+                            <span className="shrink-0 text-[8px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ color: gm.color, background: `${gm.color}1f` }}>{lang === "fr" ? gm.nameFr : gm.name}</span>
+                          ); })()}
                         </div>
                         <div className="text-[10px] text-slate-500 truncate">{regions}</div>
                       </div>
@@ -248,7 +254,10 @@ function MatchDetail({ game, lang, onClose }: { game: GameResult; lang: string; 
             <div className="text-base font-extrabold gild-text">
               {game.place === 1 ? tr("Victory", "Victoire") : tr(`Placed ${game.place} of ${game.players}`, `${game.place}ᵉ sur ${game.players}`)}
             </div>
-            <div className="text-[11px] text-slate-500 truncate">{regions || "—"}{typeof game.ts === "number" ? ` · ${new Date(game.ts).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}</div>
+            <div className="text-[11px] text-slate-500 truncate">
+              {game.mode && game.mode !== "standard" && <span className="font-bold" style={{ color: getMode(game.mode).color }}>{(lang === "fr" ? getMode(game.mode).nameFr : getMode(game.mode).name)} · </span>}
+              {regions || "—"}{typeof game.ts === "number" ? ` · ${new Date(game.ts).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}
+            </div>
           </div>
           <button onClick={onClose} className="text-slate-500 hover:text-amber-300 shrink-0"><X size={18} /></button>
         </div>
@@ -256,7 +265,7 @@ function MatchDetail({ game, lang, onClose }: { game: GameResult; lang: string; 
         {/* Active traits */}
         {traits.length > 0 && (
           <div className="mb-4">
-            <h3 className="text-[10px] uppercase tracking-widest text-amber-200/60 font-bold mb-2">{tr("Synergies", "Synergies")}</h3>
+            <h3 className="text-[10px] uppercase tracking-wide text-amber-200/60 font-bold mb-2">{tr("Synergies", "Synergies")}</h3>
             <div className="flex flex-wrap gap-1.5">
               {traits.map((t) => {
                 const c = (TYPE_COLOR as Record<string, string>)[t.k] ?? "#94a3b8";
@@ -275,7 +284,7 @@ function MatchDetail({ game, lang, onClose }: { game: GameResult; lang: string; 
 
         {/* Final comp */}
         <div>
-          <h3 className="text-[10px] uppercase tracking-widest text-amber-200/60 font-bold mb-2">{tr("Final board", "Composition finale")} · {team.length}</h3>
+          <h3 className="text-[10px] uppercase tracking-wide text-amber-200/60 font-bold mb-2">{tr("Final board", "Composition finale")} · {team.length}</h3>
           {team.length === 0 ? (
             <p className="text-[12px] text-slate-600 py-4 text-center">{tr("No board recorded.", "Aucune composition enregistrée.")}</p>
           ) : (

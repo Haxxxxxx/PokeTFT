@@ -511,9 +511,9 @@ export function NetGameClient() {
   // Remember my LAST fight's units (with cumulative damage/tank/heal) so the end screen can
   // crown an MVP. My side is "ally" normally, "enemy" when the pairing flipped me.
   const lastFightRef = useRef<FrameUnit[] | null>(null);
-  // Both teams' final-frame stats, kept so the recap is reviewable DURING planning (and shows
-  // the enemy team too, not just yours).
-  const lastFightBothRef = useRef<{ mine: FrameUnit[]; theirs: FrameUnit[]; oppName: string } | null>(null);
+  // Both teams' final-frame stats, kept as STATE (read in render for the planning recap, so a
+  // ref would be a "ref-during-render" violation) — and it shows the enemy team too, not just yours.
+  const [lastFight, setLastFight] = useState<{ mine: FrameUnit[]; theirs: FrameUnit[]; oppName: string } | null>(null);
   useEffect(() => {
     if (!combatResult?.frames?.length || !myCombat) return;
     const myTeam = myCombat.flip ? "enemy" : "ally";
@@ -522,7 +522,8 @@ export function NetGameClient() {
     const theirs = last.units.filter((u) => u.team !== myTeam);
     if (mine.length) {
       lastFightRef.current = mine;
-      if (!myCombat.pve) lastFightBothRef.current = { mine, theirs, oppName: myCombat.oppName ?? "Rival" };
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (!myCombat.pve) setLastFight({ mine, theirs, oppName: myCombat.oppName ?? "Rival" });
     }
   }, [combatResult, myCombat?.flip]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -714,6 +715,7 @@ export function NetGameClient() {
           team,
           traits,
           lp,
+          mode: room.rules?.mode ?? "standard",
         }).catch(() => {});
         applyRankedResult(myUid, place, all.length, meP?.name ?? "Player", meP?.photoURL, { humans: humanOpp, bots: botOpp }).then(setRankResult).catch(() => {});
         // Hidden progression: a WIN against a lobby that held an ultimate (or nightmare) bot
@@ -792,6 +794,7 @@ export function NetGameClient() {
         team: finalBoard.map((u) => ({ d: u.defId, s: u.star })),
         traits: computeTraits(finalBoard).filter((tr) => tr.tier > 0).map((tr) => ({ k: tr.key, t: tr.tier })),
         lp,
+        mode: room.rules?.mode ?? "standard",
       });
       applyRankedResult(myUid, place, all.length, me?.name ?? "Player", me?.photoURL, { humans: humanOpp, bots: botOpp }).catch(() => {});
     } catch { /* best-effort */ }
@@ -1050,7 +1053,7 @@ export function NetGameClient() {
           {isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1 shrink-0">{t.net_host_badge}</span>}
           <div className="flex items-center gap-2 shrink-0">
             {/* Last-fight recap — reviewable while planning (your team + the enemy's). */}
-            {phase === "planning" && !isSpectator && lastFightBothRef.current && (
+            {phase === "planning" && !isSpectator && lastFight && (
               <button onClick={() => setShowRecap((s) => !s)} title={lang === "fr" ? "Récap du dernier combat" : "Last fight recap"}
                 className={`px-2.5 py-1.5 rounded-md border text-xs font-bold inline-flex items-center gap-1.5 transition-colors ${showRecap ? "bg-amber-500/90 text-black border-amber-400" : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"}`}>
                 <BarChart3 size={13} /> {lang === "fr" ? "Récap" : "Recap"}
@@ -1571,8 +1574,8 @@ export function NetGameClient() {
         );
       })()}
 
-      {showRecap && phase === "planning" && lastFightBothRef.current && (
-        <FightRecap data={lastFightBothRef.current} lang={lang} onClose={() => setShowRecap(false)} />
+      {showRecap && phase === "planning" && lastFight && (
+        <FightRecap data={lastFight} lang={lang} onClose={() => setShowRecap(false)} />
       )}
       {booting && <BootVeil
         label={lang === "fr" ? "Connexion au serveur…" : "Connecting to the arena…"}
@@ -1704,20 +1707,21 @@ function Kbd({ k, label }: { k: string; label: string }) {
 /** Ornate gold-framed TFT card (used for carousel rewards + augments): a gilded
  *  border with corner brackets, a blue gilded body, and a dark info panel. */
 function OrnateFrame({ onClick, frame = "#d4af37", height, children }: { onClick: () => void; frame?: string; height: number; children: ReactNode }) {
-  // The gilded border, corner brackets and glow are tinted to `frame` so the card
-  // reads its rarity (cost colour for units, amber for items, violet for augments).
-  const cornerCls = "absolute w-3.5 h-3.5 pointer-events-none";
+  // Thin rarity card: a hairline frame-coloured border + a subtle cost-wash body (matching the
+  // shop cards) + slim corner accents — keeps the TFT identity without the heavy glow/2px frame.
+  const cornerCls = "absolute w-2.5 h-2.5 pointer-events-none";
   return (
-    <button onClick={onClick} style={{ height, boxShadow: `0 0 30px -10px ${frame}` }} className="group relative w-[160px] shrink-0 rounded-md hover:-translate-y-1.5 transition-all">
-      <div className="absolute inset-0 rounded-md p-[2px]" style={{ background: `linear-gradient(155deg, ${frame}, ${frame} 42%, rgba(2,6,23,0.6))` }}>
-        <div className="w-full h-full rounded-[4px] overflow-hidden flex flex-col bg-gradient-to-b from-sky-700/55 via-sky-950/90 to-slate-950 group-hover:from-sky-600/70 transition-colors">
-          {children}
-        </div>
-      </div>
-      <span className={`${cornerCls} top-0 left-0 border-t-2 border-l-2 rounded-tl-md`} style={{ borderColor: frame }} />
-      <span className={`${cornerCls} top-0 right-0 border-t-2 border-r-2 rounded-tr-md`} style={{ borderColor: frame }} />
-      <span className={`${cornerCls} bottom-0 left-0 border-b-2 border-l-2 rounded-bl-md`} style={{ borderColor: frame }} />
-      <span className={`${cornerCls} bottom-0 right-0 border-b-2 border-r-2 rounded-br-md`} style={{ borderColor: frame }} />
+    <button
+      onClick={onClick}
+      style={{ height, borderColor: `${frame}99`, boxShadow: "0 10px 28px -18px rgba(0,0,0,0.85)" }}
+      className="group relative w-[160px] shrink-0 rounded-lg border overflow-hidden hover:-translate-y-1 hover:brightness-110 transition-all"
+    >
+      <span className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(180deg, #0b1020 0%, ${frame}14 68%, ${frame}30 100%)` }} />
+      <div className="relative z-10 w-full h-full flex flex-col">{children}</div>
+      <span className={`${cornerCls} top-0 left-0 border-t border-l rounded-tl-lg`} style={{ borderColor: frame }} />
+      <span className={`${cornerCls} top-0 right-0 border-t border-r rounded-tr-lg`} style={{ borderColor: frame }} />
+      <span className={`${cornerCls} bottom-0 left-0 border-b border-l rounded-bl-lg`} style={{ borderColor: frame }} />
+      <span className={`${cornerCls} bottom-0 right-0 border-b border-r rounded-br-lg`} style={{ borderColor: frame }} />
     </button>
   );
 }
@@ -1758,9 +1762,9 @@ function CarouselCard({ onClick, color, name, sub, cost, types, art, disabled, n
     <div className={disabled ? "opacity-45 grayscale pointer-events-none relative" : "relative"}>
       <OrnateFrame onClick={disabled ? () => {} : onClick} frame={color} height={200}>
         <div className="flex-1 flex items-center justify-center pt-3 pb-1">{art}</div>
-        <div className="px-2 py-2 bg-slate-950/80 border-t border-amber-600/40 flex flex-col items-center gap-1">
-          <span className="text-sm font-extrabold text-amber-50 text-center leading-tight drop-shadow">{name}</span>
-          {cost != null && <span style={{ color }} className="inline-flex items-center gap-0.5 text-[11px] font-extrabold"><CoinIcon size={11} />{cost}</span>}
+        <div className="px-2 py-2 bg-black/40 border-t border-white/10 flex flex-col items-center gap-1">
+          <span className="text-sm font-bold text-slate-100 text-center leading-tight drop-shadow">{name}</span>
+          {cost != null && <span style={{ color }} className="inline-flex items-center gap-0.5 text-[11px] font-bold"><CoinIcon size={11} />{cost}</span>}
           {types && (
             <div className="flex flex-wrap gap-0.5 justify-center">
               {types.map((ty) => <span key={ty} style={{ background: TYPE_COLOR[ty] }} className="text-[8px] px-1 rounded text-black/80 font-bold uppercase">{ty.slice(0, 3)}</span>)}
@@ -1784,14 +1788,14 @@ function OrnateAugmentCard({ onClick, icon, name, desc, tier, frame, combat }: {
   return (
     <OrnateFrame onClick={onClick} frame={frame} height={272}>
       <div className="flex flex-col items-center pt-5 px-3">
-        <div className="w-16 h-16 rounded-lg flex items-center justify-center" style={{ background: `${frame}1f`, border: `1px solid ${frame}66`, boxShadow: `inset 0 0 14px ${frame}40`, color: frame }}>{icon}</div>
+        <div className="w-16 h-16 rounded-lg flex items-center justify-center" style={{ background: `${frame}1a`, border: `1px solid ${frame}55`, color: frame }}>{icon}</div>
         <div className="mt-1.5 flex items-center gap-1.5">
-          <span className="text-[9px] font-extrabold uppercase tracking-[0.18em]" style={{ color: frame }}>{tier}</span>
-          {combat && <span className="inline-flex items-center gap-0.5 text-[8px] font-extrabold uppercase tracking-wide px-1 rounded bg-rose-500/20 text-rose-300 border border-rose-400/40"><Swords size={8} /> Combat</span>}
+          <span className="text-[9px] font-bold uppercase tracking-[0.18em]" style={{ color: frame }}>{tier}</span>
+          {combat && <span className="inline-flex items-center gap-0.5 text-[8px] font-bold uppercase tracking-wide px-1 rounded bg-rose-500/20 text-rose-300 border border-rose-400/40"><Swords size={8} /> Combat</span>}
         </div>
-        <span className="mt-1 text-[15px] font-extrabold text-amber-50 text-center leading-tight drop-shadow">{name}</span>
+        <span className="mt-1 text-[15px] font-bold text-slate-100 text-center leading-tight drop-shadow">{name}</span>
       </div>
-      <div className="mt-auto bg-slate-950/80 border-t border-amber-600/30 px-3 py-3 text-center">
+      <div className="mt-auto bg-black/40 border-t border-white/10 px-3 py-3 text-center">
         <span className="text-[11px] text-slate-300 leading-snug">{desc}</span>
       </div>
     </OrnateFrame>
