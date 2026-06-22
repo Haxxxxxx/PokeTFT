@@ -221,6 +221,8 @@ export type GameResult = {
   team?: { d: string; s: number }[];
   /** Active traits at the end — k=key, t=tier. */
   traits?: { k: string; t: number }[];
+  /** LP (rating) gained (+) or lost (−) for this game — same weighted delta applyRankedResult applied. */
+  lp?: number;
 };
 
 /** Record (or idempotently overwrite) a finished game's result for this player. */

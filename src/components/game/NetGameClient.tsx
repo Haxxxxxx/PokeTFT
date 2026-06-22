@@ -20,7 +20,7 @@ import { AugmentsBar } from "./AugmentsBar";
 import { CoopPanel } from "./CoopPanel";
 import { finishCarouselEarly } from "@/game/net/serverGame";
 import { subscribeTransfers } from "@/game/net/coop";
-import { recordGameResult, applyRankedResult, rankOf, recordUltimateBotWin, type RankedResult } from "@/game/net/users";
+import { recordGameResult, applyRankedResult, rankOf, recordUltimateBotWin, weightedRatingDelta, type RankedResult } from "@/game/net/users";
 import { computeTraits } from "@/game/engine/synergies";
 import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords, RefreshCw } from "lucide-react";
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR, teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID, tailoredAugmentPicks } from "@/game/data/augments";
@@ -689,6 +689,14 @@ export function NetGameClient() {
         const finalBoard = useGame.getState().units.filter((u) => u.pos !== null);
         const team = finalBoard.map((u) => ({ d: u.defId, s: u.star }));
         const traits = computeTraits(finalBoard).filter((tr) => tr.tier > 0).map((tr) => ({ k: tr.key, t: tr.tier }));
+        // Ranked: placement is over the WHOLE lobby (bots are real opponents on the board),
+        // but the LP swing is weighted by how human the lobby was — bots count for less, so
+        // practice still nudges your rating without being worth a full game (see weightedRatingDelta).
+        const all = Object.values(ps);
+        const humanOpp = all.filter((p) => !p.isBot && p.uid !== myUid).length;
+        const botOpp = all.filter((p) => p.isBot).length;
+        // Same pure delta applyRankedResult applies → store it so history shows LP per game.
+        const lp = weightedRatingDelta(place, all.length, humanOpp, botOpp);
         recordGameResult(myUid, room.code, {
           place,
           players: total,
@@ -696,13 +704,8 @@ export function NetGameClient() {
           won: place === 1 || meta?.winnerUid === myUid,
           team,
           traits,
+          lp,
         }).catch(() => {});
-        // Ranked: placement is over the WHOLE lobby (bots are real opponents on the board),
-        // but the LP swing is weighted by how human the lobby was — bots count for less, so
-        // practice still nudges your rating without being worth a full game (see weightedRatingDelta).
-        const all = Object.values(ps);
-        const humanOpp = all.filter((p) => !p.isBot && p.uid !== myUid).length;
-        const botOpp = all.filter((p) => p.isBot).length;
         applyRankedResult(myUid, place, all.length, meP?.name ?? "Player", meP?.photoURL, { humans: humanOpp, bots: botOpp }).then(setRankResult).catch(() => {});
         // Hidden progression: a WIN against a lobby that held an ultimate (or nightmare) bot
         // advances the nightmare unlock — once past the threshold, ultimate bots start being
@@ -769,16 +772,18 @@ export function NetGameClient() {
     try {
       await concede(room.code, myUid, place);
       const finalBoard = useGame.getState().units.filter((u) => u.pos !== null);
-      recordGameResult(myUid, room.code, {
-        place, players: Object.values(ps).length, regions: room.rules?.generations ?? [1], won: false,
-        team: finalBoard.map((u) => ({ d: u.defId, s: u.star })),
-        traits: computeTraits(finalBoard).filter((tr) => tr.tier > 0).map((tr) => ({ k: tr.key, t: tr.tier })),
-      });
       // Forfeit at the worst currently-alive placement (over the whole lobby); LP swing is
       // weighted so a bot-heavy practice game moves the rating less than a real lobby.
       const all = Object.values(ps);
       const humanOpp = all.filter((p) => !p.isBot && p.uid !== myUid).length;
       const botOpp = all.filter((p) => p.isBot).length;
+      const lp = weightedRatingDelta(place, all.length, humanOpp, botOpp);
+      recordGameResult(myUid, room.code, {
+        place, players: Object.values(ps).length, regions: room.rules?.generations ?? [1], won: false,
+        team: finalBoard.map((u) => ({ d: u.defId, s: u.star })),
+        traits: computeTraits(finalBoard).filter((tr) => tr.tier > 0).map((tr) => ({ k: tr.key, t: tr.tier })),
+        lp,
+      });
       applyRankedResult(myUid, place, all.length, me?.name ?? "Player", me?.photoURL, { humans: humanOpp, bots: botOpp }).catch(() => {});
     } catch { /* best-effort */ }
     leave();

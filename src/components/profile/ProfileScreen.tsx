@@ -181,6 +181,11 @@ export function ProfileScreen() {
                         </div>
                         <div className="text-[10px] text-slate-500 truncate">{regions}</div>
                       </div>
+                      {typeof g.lp === "number" && (
+                        <span className={`text-[11px] font-extrabold tabular-nums shrink-0 ${g.lp >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                          {g.lp >= 0 ? "+" : ""}{g.lp} <span className="text-[8px] font-bold opacity-70">LP</span>
+                        </span>
+                      )}
                       {typeof g.ts === "number" && (
                         <span className="text-[10px] text-slate-600 shrink-0">{new Date(g.ts).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" })}</span>
                       )}
