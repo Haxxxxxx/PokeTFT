@@ -161,6 +161,81 @@ export type Dict = {
   uc_mega_ready: string; uc_click_details: string; ud_unequip: string;
   fr_added: string; fr_failed: string; fr_net_err: string; fr_you: string; fr_spectate_t: string;
   net_rival: string;
+  // NetGameClient — Pension (Day Care)
+  net_pension: string;
+  net_pension_title: (cost: number, rounds: number) => string;
+  net_pension_collect: string;
+  net_pension_rounds: (n: number) => string;
+  // NetGameClient — reconnect / error screen
+  net_reconnecting: string;
+  net_back_home: string;
+  // NetGameClient — forfeit confirm dialog
+  net_forfeit_title: string;
+  net_forfeit_body: string;
+  net_forfeit_confirm: string;
+  net_forfeit_cancel: string;
+  // NetGameClient — cannot Mega Evolve toast
+  net_no_mega: string;
+  // NetGameClient — stage-up banner
+  net_stage_banner: string;
+  net_stage_early: string;
+  net_stage_mid: string;
+  net_stage_powerspike: string;
+  net_stage_endgame: string;
+  // NetGameClient — round-tracker recap chip
+  net_round_win: string;
+  net_round_loss: string;
+  // NetGameClient — HUD chips
+  net_streak_title: string;
+  net_next_opp: string;
+  net_wild: string;
+  net_ghost_suffix: string;
+  net_ghost_title: string;
+  net_resolving: string;
+  net_interest_label: string;
+  net_gold_label: string;
+  // NetGameClient — board controls
+  net_board_label: string;
+  net_board_fill_title: string;
+  net_board_fill: string;
+  net_keys_label: string;
+  net_key_sell: string;
+  // NetGameClient — carousel overlay
+  net_carousel_title: string;
+  net_carousel_comeback: string;
+  net_carousel_picked_waiting: (n: number) => string;
+  net_carousel_picked_round: string;
+  net_carousel_pick_free: string;
+  net_bench_full: string;
+  net_carousel_mega_sub: string;
+  net_show_choices: string;
+  net_hide_view_board: string;
+  // NetGameClient — augment overlay
+  net_augment_pick_one: string;
+  net_augment_reroll: string;
+  net_augment_free: string;
+  // NetGameClient — game-over screen
+  net_host_left: string;
+  net_waiting_host: string;
+  net_mvp_label: string;
+  net_mvp_damage: string;
+  net_mvp_tanked: string;
+  net_mvp_healed: string;
+  net_rank_promoted: string;
+  net_rank_demoted: string;
+  net_team_label: string;
+  // NetGameClient — boot veil
+  net_boot_connecting: string;
+  net_boot_trainers: (n: number, total: number) => string;
+  // NetGameClient — fight recap panel
+  net_fight_last: string;
+  net_fight_you: string;
+  // NetGameClient — scoreboard hover
+  net_view_board: (name: string) => string;
+  // NetGameClient — spectate bench empty
+  net_bench_empty: string;
+  // NetGameClient — level badge prefix
+  net_lv: string;
 };
 
 export const FR: Dict = {
@@ -305,6 +380,65 @@ export const FR: Dict = {
   uc_mega_ready: "Méga prêt", uc_click_details: "cliquer pour détails", ud_unequip: "Déséquiper (retour à l'inventaire)",
   fr_added: "Ajouté", fr_failed: "Échec", fr_net_err: "Erreur réseau — réessayez", fr_you: "vous :", fr_spectate_t: "Observer cette partie (lecture seule)",
   net_rival: "Rival",
+  net_pension: "Pension",
+  net_pension_title: (cost, rounds) => `Glissez un ★ pour élever une copie (${cost} or, ${rounds} tours)`,
+  net_pension_collect: "Récupérer +1",
+  net_pension_rounds: (n) => `${n} tour${n > 1 ? "s" : ""}`,
+  net_reconnecting: "Reconnexion à la partie…",
+  net_back_home: "Retour à l'accueil",
+  net_forfeit_title: "Abandonner la partie ?",
+  net_forfeit_body: "Vous serez éliminé à la dernière place restante et la partie sera enregistrée comme une défaite.",
+  net_forfeit_confirm: "Abandonner",
+  net_forfeit_cancel: "Annuler",
+  net_no_mega: "Ce Pokémon ne peut pas Méga-Évoluer",
+  net_stage_banner: "Manche",
+  net_stage_early: "Le début de partie",
+  net_stage_mid: "Le milieu de partie commence",
+  net_stage_powerspike: "Pic de puissance",
+  net_stage_endgame: "Fin de partie",
+  net_round_win: "Victoire",
+  net_round_loss: "Défaite",
+  net_streak_title: "Or de série (victoires OU défaites d'affilée) : 2–3 → +1, 4 → +2, 5+ → +3 or par tour.",
+  net_next_opp: "Prochain",
+  net_wild: "Sauvages",
+  net_ghost_suffix: " (clone)",
+  net_ghost_title: "Combat fantôme (copie d'un adversaire)",
+  net_resolving: "Résolution…",
+  net_interest_label: "Intérêt",
+  net_gold_label: "or",
+  net_board_label: "Plateau",
+  net_board_fill_title: "Remplir le plateau depuis le banc",
+  net_board_fill: "Remplir",
+  net_keys_label: "Raccourcis",
+  net_key_sell: "Vendre",
+  net_carousel_title: "Carrousel",
+  net_carousel_comeback: "Bonus de remontée",
+  net_carousel_picked_waiting: (n) => `Choisi — en attente de ${n} dresseur${n > 1 ? "s" : ""}…`,
+  net_carousel_picked_round: "Choisi — en attente du tour…",
+  net_carousel_pick_free: "Choisis une récompense gratuite.",
+  net_bench_full: "Banc plein",
+  net_carousel_mega_sub: "Méga-Évolution",
+  net_show_choices: "Afficher les choix",
+  net_hide_view_board: "Voir mon plateau",
+  net_augment_pick_one: "Choisis un bonus permanent.",
+  net_augment_reroll: "Relancer",
+  net_augment_free: "Gratuit",
+  net_host_left: "L'hôte a quitté — partie terminée.",
+  net_waiting_host: "En attente de l'hôte…",
+  net_mvp_label: "MVP du dernier combat",
+  net_mvp_damage: "Dégâts",
+  net_mvp_tanked: "Encaissé",
+  net_mvp_healed: "Soins",
+  net_rank_promoted: "Promu",
+  net_rank_demoted: "Rétrogradé",
+  net_team_label: "Éq.",
+  net_boot_connecting: "Connexion au serveur…",
+  net_boot_trainers: (n, total) => `${n}/${total} dresseurs prêts`,
+  net_fight_last: "Dernier combat",
+  net_fight_you: "Vous",
+  net_view_board: (name) => `Voir le plateau de ${name}`,
+  net_bench_empty: "Banc vide",
+  net_lv: "Nv",
 };
 
 export const EN: Dict = {
@@ -449,6 +583,65 @@ export const EN: Dict = {
   uc_mega_ready: "Mega ready", uc_click_details: "click for details", ud_unequip: "Unequip (back to inventory)",
   fr_added: "Added", fr_failed: "Failed", fr_net_err: "Network error — try again", fr_you: "you:", fr_spectate_t: "Spectate this game (read-only)",
   net_rival: "Rival",
+  net_pension: "Day Care",
+  net_pension_title: (cost, rounds) => `Drag a ★ mon to breed a copy of it (${cost} gold, ${rounds} rounds)`,
+  net_pension_collect: "Collect +1",
+  net_pension_rounds: (n) => `${n} round${n > 1 ? "s" : ""}`,
+  net_reconnecting: "Reconnecting to your game…",
+  net_back_home: "Back to home",
+  net_forfeit_title: "Forfeit the match?",
+  net_forfeit_body: "You'll be eliminated at the worst remaining place and the game is recorded as a loss.",
+  net_forfeit_confirm: "Forfeit",
+  net_forfeit_cancel: "Cancel",
+  net_no_mega: "This Pokémon can't Mega Evolve",
+  net_stage_banner: "Stage",
+  net_stage_early: "The early game",
+  net_stage_mid: "The midgame begins",
+  net_stage_powerspike: "Powerspike",
+  net_stage_endgame: "Endgame",
+  net_round_win: "Win",
+  net_round_loss: "Loss",
+  net_streak_title: "Streak gold (a run of wins OR losses): 2–3 → +1, 4 → +2, 5+ → +3 gold per round.",
+  net_next_opp: "Next",
+  net_wild: "Wild",
+  net_ghost_suffix: " (copy)",
+  net_ghost_title: "Ghost fight (a copy of a rival)",
+  net_resolving: "Resolving…",
+  net_interest_label: "Interest",
+  net_gold_label: "gold",
+  net_board_label: "Board",
+  net_board_fill_title: "Fill the board from the bench",
+  net_board_fill: "Fill",
+  net_keys_label: "Keys",
+  net_key_sell: "Sell",
+  net_carousel_title: "Carousel",
+  net_carousel_comeback: "Comeback bonus",
+  net_carousel_picked_waiting: (n) => `Picked — waiting for ${n} trainer${n > 1 ? "s" : ""}…`,
+  net_carousel_picked_round: "Picked — waiting for the round…",
+  net_carousel_pick_free: "Pick one free reward.",
+  net_bench_full: "Bench full",
+  net_carousel_mega_sub: "Mega Evolve",
+  net_show_choices: "Show choices",
+  net_hide_view_board: "Hide & view board",
+  net_augment_pick_one: "Pick one permanent boost.",
+  net_augment_reroll: "Reroll",
+  net_augment_free: "Free",
+  net_host_left: "The host left — game ended.",
+  net_waiting_host: "Waiting for host…",
+  net_mvp_label: "Last-fight MVP",
+  net_mvp_damage: "Damage",
+  net_mvp_tanked: "Tanked",
+  net_mvp_healed: "Healed",
+  net_rank_promoted: "Promoted",
+  net_rank_demoted: "Demoted",
+  net_team_label: "Team",
+  net_boot_connecting: "Connecting to the arena…",
+  net_boot_trainers: (n, total) => `${n}/${total} trainers ready`,
+  net_fight_last: "Last fight",
+  net_fight_you: "You",
+  net_view_board: (name) => `${name}'s board`,
+  net_bench_empty: "Empty bench",
+  net_lv: "Lv",
 };
 
 export function useT(): Dict {
