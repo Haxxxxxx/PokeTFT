@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRoom } from "@/game/net/roomStore";
 import { usePreLobby } from "@/game/store/preLobbyStore";
-import { getMode } from "@/game/data/gameModes";
+import { getMode, isDoubleUp } from "@/game/data/gameModes";
 import { beginMatch, addInvitePlaceholder } from "@/game/net/match";
 import { kickoffServerGame } from "@/game/net/serverGame";
 import { useAuth } from "@/game/net/authStore";
 import { useAppStore } from "@/game/store/appStore";
 import { sendInvite, nightmareParams } from "@/game/net/users";
-import type { BotDifficulty } from "@/game/net/roomStore";
+import type { BotDifficulty, RoomPlayer } from "@/game/net/roomStore";
 import { PokeballIcon } from "@/components/game/icons";
 import { Settings, Swords, UserPlus, X, Bot, Dna } from "lucide-react";
 import { enterFullscreen } from "@/lib/fullscreen";
@@ -34,6 +34,7 @@ export function LobbyScreen() {
   const setRules = useRoom((s) => s.setRules);
   const addBot = useRoom((s) => s.addBot);
   const removePlayer = useRoom((s) => s.removePlayer);
+  const setPlayerTeam = useRoom((s) => s.setPlayerTeam);
   const leave = useRoom((s) => s.leave);
   const publishLobby = useRoom((s) => s.publishLobby);
   const removeLobby = useRoom((s) => s.removeLobby);
@@ -75,6 +76,20 @@ export function LobbyScreen() {
     setRules({ startingHp: preRules.startingHp, generations: preRules.generations, itemsEnabled: preRules.itemsEnabled, draftPoolSize: preRules.draftPoolSize, maxPlayers: preRules.maxPlayers, augmentsEnabled: preRules.augmentsEnabled, serverDriven: preRules.serverDriven, isPrivate: preRules.isPrivate, mode: preRules.mode });
   }, [isHost, room, setRules, preRules.startingHp, preRules.generations, preRules.itemsEnabled, preRules.draftPoolSize, preRules.maxPlayers, preRules.augmentsEnabled, preRules.serverDriven, preRules.isPrivate, preRules.mode]);
 
+  // Double Up: the host keeps every connected player on a team (0..3, two per team), filling
+  // the lowest open team for anyone unassigned. Idempotent — only writes when a slot is missing.
+  useEffect(() => {
+    if (!room || !isHost || !isDoubleUp(room.rules)) return;
+    const conn = Object.values(room.players ?? {}).filter((p) => p.connected);
+    const counts = [0, 0, 0, 0];
+    for (const p of conn) if (typeof p.teamId === "number" && p.teamId >= 0 && p.teamId <= 3) counts[p.teamId]++;
+    for (const p of conn) {
+      if (typeof p.teamId === "number" && p.teamId >= 0 && p.teamId <= 3) continue;
+      const t = counts.findIndex((c) => c < 2);
+      if (t >= 0) { counts[t]++; setPlayerTeam(p.uid, t); }
+    }
+  }, [room, isHost, setPlayerTeam]);
+
   const roomGenKey = (room?.rules?.generations ?? [1]).join(",");
   const roomItemKey = (room?.rules?.itemsEnabled ?? []).join(",");
   const roomHp = room?.rules?.startingHp;
@@ -115,6 +130,16 @@ export function LobbyScreen() {
   const gens = room.rules?.generations ?? [1];
   const poolCount = unitsForGenerations(gens).length;
   const items = room.rules?.itemsEnabled ?? [];
+
+  // Double Up: 4 teams of 2 — group connected players by teamId so the lobby shows who's paired.
+  const doubleUp = isDoubleUp(room.rules);
+  const TEAM_COLORS = ["#fbbf24", "#34d399", "#60a5fa", "#f472b6"];
+  const teams: RoomPlayer[][] = [[], [], [], []];
+  if (doubleUp) for (const p of players) { const tid = typeof p.teamId === "number" ? p.teamId : -1; if (tid >= 0 && tid <= 3) teams[tid].push(p); }
+  // Move a player to the next team that has an open seat (host control).
+  const moveToNextTeam = (uid: string, cur: number) => {
+    for (let k = 1; k <= 3; k++) { const tnext = (cur + k) % 4; if (teams[tnext].length < 2) { setPlayerTeam(uid, tnext); return; } }
+  };
 
   // The escalating AI difficulty ladder — one cohesive segmented control, accent warming with
   // threat. (Nightmare is NOT here: it's the hidden boss tier that silently replaces ultimate.)
@@ -191,11 +216,12 @@ export function LobbyScreen() {
             </div>
             <span className="text-[12px] font-extrabold px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.07] text-slate-200 tabular-nums">{players.length + pendingInvites.length}/{maxPlayers}</span>
           </div>
-          {/* Party portrait row (wraps responsively) */}
-          <div className="flex flex-wrap items-start justify-center gap-3 sm:gap-4">
-            {players.map((p) => (
-              <div key={p.uid} className="relative flex flex-col items-center gap-1.5 w-20">
+          {/* PlayerTile — one party member (portrait + name + badges + status). */}
+          {(() => {
+            const PlayerTile = ({ p, extra }: { p: RoomPlayer; extra?: ReactNode }) => (
+              <div className="relative flex flex-col items-center gap-1.5 w-20">
                 {isHost && p.isBot && <button onClick={() => removePlayer(p.uid)} className="absolute -top-1.5 -right-0.5 z-10 w-5 h-5 rounded-full bg-slate-800 border border-slate-600 text-slate-400 hover:text-rose-400 text-xs leading-none">×</button>}
+                {extra}
                 <Portrait name={p.name} photo={p.photoURL} ready={p.ready} isBot={p.isBot} nightmare={p.botDifficulty === "nightmare"} />
                 <span className="text-xs font-bold text-slate-200 truncate max-w-full text-center">{p.name}</span>
                 <div className="flex flex-wrap gap-0.5 justify-center">
@@ -204,27 +230,69 @@ export function LobbyScreen() {
                 </div>
                 <span className={`text-[10px] font-semibold capitalize ${p.botDifficulty === "nightmare" ? "text-rose-400 tracking-[0.15em]" : p.isBot ? "text-violet-300/80" : p.ready ? "text-emerald-400" : "text-slate-500"}`}>{p.isBot ? diffLabel(p.botDifficulty) : p.ready ? t.l_net_ready_up : t.l_net_not_ready}</span>
               </div>
-            ))}
-            {/* Pending invites — placeholder slots until the friend accepts. */}
-            {pendingInvites.map((p) => (
-              <div key={`inv-${p.uid}`} className="flex flex-col items-center gap-1.5 w-20">
-                <div className="w-16 h-16 rounded-xl border-2 border-dashed border-amber-500/40 bg-amber-500/[0.04] flex items-center justify-center overflow-hidden shrink-0 animate-pulse">
+            );
+            const EmptySeat = () => (
+              <div className="flex flex-col items-center gap-1.5 w-20">
+                <div className="w-16 h-16 rounded-xl border border-dashed border-white/10 flex items-center justify-center text-slate-700 text-2xl">+</div>
+                <span className="text-[10px] text-slate-600">{t.l_net_open_slot}</span>
+              </div>
+            );
+            const PendingTile = ({ p }: { p: { uid: string; username?: string; photoURL?: string | null } }) => (
+              <div className="flex flex-col items-center gap-1.5 w-20">
+                <div className="w-16 h-16 rounded-xl border border-dashed border-amber-500/40 bg-amber-500/[0.04] flex items-center justify-center overflow-hidden shrink-0 animate-pulse">
                   {p.photoURL
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={p.photoURL} alt="" width={44} height={44} style={{ imageRendering: "pixelated", opacity: 0.5 }} />
-                    : <span className="text-lg font-extrabold text-amber-300/50">{(p.username || "?").slice(0, 1).toUpperCase()}</span>}
+                    : <span className="text-lg font-bold text-amber-300/50">{(p.username || "?").slice(0, 1).toUpperCase()}</span>}
                 </div>
                 <span className="text-xs font-bold text-slate-400 truncate max-w-full text-center">{p.username}</span>
                 <span className="text-[10px] font-semibold text-amber-400/80">{lang === "fr" ? "Invité…" : "Invited…"}</span>
               </div>
-            ))}
-            {Array.from({ length: openSlots }).map((_, i) => (
-              <div key={`o-${i}`} className="flex flex-col items-center gap-1.5 w-20">
-                <div className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-700/70 flex items-center justify-center text-slate-700 text-2xl">+</div>
-                <span className="text-[10px] text-slate-600">{t.l_net_open_slot}</span>
+            );
+
+            // Double Up: 4 team cards of 2 so you see exactly who plays with who.
+            if (doubleUp) {
+              const canMove = teams.filter((tm) => tm.length < 2).length > 0;
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {teams.map((members, ti) => {
+                    const color = TEAM_COLORS[ti];
+                    return (
+                      <div key={ti} className="rounded-xl border p-3" style={{ borderColor: `${color}40`, background: `${color}0c` }}>
+                        <div className="flex items-center justify-between mb-2.5">
+                          <span className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color }}>{lang === "fr" ? "Équipe" : "Team"} {ti + 1}</span>
+                          <span className="text-[10px] tabular-nums font-bold" style={{ color: `${color}bb` }}>{members.length}/2</span>
+                        </div>
+                        <div className="flex items-start justify-center gap-3">
+                          {[0, 1].map((slot) => {
+                            const p = members[slot];
+                            if (!p) return <EmptySeat key={slot} />;
+                            return <PlayerTile key={p.uid} p={p} extra={isHost && canMove
+                              ? <button onClick={() => moveToNextTeam(p.uid, ti)} title={lang === "fr" ? "Changer d'équipe" : "Move team"} className="absolute -top-1.5 -left-0.5 z-10 w-5 h-5 rounded-full bg-slate-800 border border-slate-600 text-slate-400 hover:text-sky-300 text-[11px] leading-none">⇄</button>
+                              : undefined} />;
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {pendingInvites.length > 0 && (
+                    <div className="sm:col-span-2 flex flex-wrap items-start justify-center gap-3 pt-1">
+                      {pendingInvites.map((p) => <PendingTile key={`inv-${p.uid}`} p={p} />)}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // Standard / FFA: a single wrapping party row.
+            return (
+              <div className="flex flex-wrap items-start justify-center gap-3 sm:gap-4">
+                {players.map((p) => <PlayerTile key={p.uid} p={p} />)}
+                {pendingInvites.map((p) => <PendingTile key={`inv-${p.uid}`} p={p} />)}
+                {Array.from({ length: openSlots }).map((_, i) => <EmptySeat key={`o-${i}`} />)}
               </div>
-            ))}
-          </div>
+            );
+          })()}
 
           {/* Host: add AI — an escalating difficulty ladder + the Clone special. */}
           {isHost && openSlots > 0 && (

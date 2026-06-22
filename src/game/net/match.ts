@@ -180,7 +180,15 @@ export async function beginMatch(code: string, room: Room): Promise<void> {
   // Double Up: pair every participant (humans + bots) into deterministic teams of 2,
   // each sharing ONE HP pool. Same uid→team mapping on host + clients (sorted uids).
   const doubleUp = isDoubleUp(room.rules);
-  const teamOf = doubleUp ? assignTeams(Object.values(room.players ?? {}).filter((p) => p.connected).map((p) => p.uid)) : {};
+  // Prefer the teams the host arranged in the lobby (each player's teamId). Only fall back to a
+  // fresh deterministic pairing if they're missing or unbalanced (a team with >2 members).
+  const conn = Object.values(room.players ?? {}).filter((p) => p.connected);
+  const lobbyTeamsValid = doubleUp && conn.length > 0
+    && conn.every((p) => typeof p.teamId === "number" && p.teamId >= 0 && p.teamId <= 3)
+    && (() => { const c: Record<number, number> = {}; for (const p of conn) c[p.teamId!] = (c[p.teamId!] ?? 0) + 1; return Object.values(c).every((n) => n <= 2); })();
+  const teamOf = !doubleUp ? {}
+    : lobbyTeamsValid ? Object.fromEntries(conn.map((p) => [p.uid, p.teamId as number]))
+    : assignTeams(conn.map((p) => p.uid));
   const teamMembers: Record<number, string[]> = {};
   for (const p of Object.values(room.players ?? {})) {
     if (!p.connected) continue;

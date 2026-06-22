@@ -24,7 +24,8 @@ export function ModeSelect({ isHost, onContinue }: { isHost: boolean; onContinue
   const selectMode = (id: string) => {
     if (!isHost) return;
     const m = getMode(id);
-    setRules({ mode: id, ...(m.rulesPatch ?? {}) });
+    // Double Up needs the full 8 seats (4 teams of 2) — force the cap so the team grid fills.
+    setRules({ mode: id, ...(m.rulesPatch ?? {}), ...(m.flags?.doubleUp ? { maxPlayers: 8 } : {}) });
   };
 
   const primary = MODES.filter((m) => m.group !== "region");

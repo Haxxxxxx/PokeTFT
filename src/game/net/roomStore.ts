@@ -212,6 +212,8 @@ type RoomState = {
   addBot: (difficulty: BotDifficulty, opts?: { statBuff?: number; name?: string }) => void;
   /** Host: remove a player or bot from the lobby. */
   removePlayer: (uid: string) => void;
+  /** Host: assign a player to a Double Up team (0..3) in the lobby. */
+  setPlayerTeam: (uid: string, teamId: number) => void;
   /** Re-attach to the room saved in this tab (after a page refresh). */
   reconnect: () => Promise<void>;
   leave: () => void;
@@ -425,6 +427,14 @@ export const useRoom = create<RoomState>((setState, getState) => ({
     const { code } = getState();
     if (!code) return;
     remove(ref(db(), `games/${code}/players/${uid}`)).catch(onWriteErr);
+  },
+
+  /** Host: set a player's Double Up lobby team (0..3). Persisted so beginMatch keeps the
+   *  pairings the host arranged instead of re-shuffling them. */
+  setPlayerTeam: (uid, teamId) => {
+    const { code } = getState();
+    if (!code) return;
+    update(ref(db(), `games/${code}/players/${uid}`), { teamId }).catch(onWriteErr);
   },
 
   updateMe: (patch) => {
