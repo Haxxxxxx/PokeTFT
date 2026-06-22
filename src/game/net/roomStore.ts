@@ -41,6 +41,10 @@ export type RoomPlayer = {
   carouselPicked?: string;
   /** The player's current on-board units (synced during planning). */
   board?: UnitInstance[];
+  /** Bench units (pos === null) — PUBLIC for scouting/spectating (lobby chose full transparency). */
+  bench?: UnitInstance[];
+  /** Current gold — PUBLIC for scouting/spectating (drives the interest readout too). */
+  gold?: number;
   /** Public combat augments (synced so host + clients resolve identical team buffs,
    *  and so rivals are scoutable). */
   augments?: string[];

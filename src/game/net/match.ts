@@ -2,7 +2,7 @@ import { dbAdapter } from "./db-adapter";
 import { serverNow } from "./serverTime";
 import { simulate } from "../engine/combat";
 import { makeRng } from "../engine/rng";
-import { generatePlayerLikeBoard, generateCreepBoard, generateBossBoard, pickCarouselOptions, boardProfileOf, type BotBrain } from "../engine/enemy";
+import { generatePlayerLikeBoard, generateCreepBoard, generateBossBoard, pickCarouselOptions, boardProfileOf, botBoardLevel, type BotBrain } from "../engine/enemy";
 import { type CompStats, type TypeAffinity, metaWeights, counterAffinity, accrueComp, accrueAffinity, rememberLoss, activeTraitKeys } from "../engine/botBrain";
 import { hasDef } from "../data/mons";
 import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem, modeLootScale, isDoubleUp, assignTeams, getMode } from "../data/gameModes";
@@ -241,17 +241,19 @@ function rtdbSafe<T>(v: T): T {
  *  full economy snapshot (gold, shop roll, items, bench) is PRIVATE — written to
  *  priv/{code}/{uid}, readable only by me — so opponents can't scout my gold or
  *  shop. A refresh rehydrates my own state from there. */
-export async function syncBoard(code: string, uid: string, units: UnitInstance[], save?: unknown, level?: number, augments?: string[]): Promise<void> {
+export async function syncBoard(code: string, uid: string, units: UnitInstance[], save?: unknown, level?: number, augments?: string[], gold?: number): Promise<void> {
   const onBoard = rtdbSafe(units.filter((un) => un.pos !== null));
-  // `board` + `level` + `augments` are PUBLIC: scouting shows each rival's level (like
-  // TFT), and combat augments must be public so the host AND every client resolve the
-  // identical team buffs. The full econ save stays private under priv/.
-  const pub: Record<string, unknown> = { board: onBoard };
+  // `board` + `level` + `augments` + `bench` + `gold` are PUBLIC: scouting shows each rival's
+  // full state (board, bench, level, gold/interest) — the lobby chose full transparency.
+  // The shop roll + held-item inventory still live in the private econ snapshot under priv/.
+  const bench = rtdbSafe(units.filter((un) => un.pos === null));
+  const pub: Record<string, unknown> = { board: onBoard, bench };
   // Clamp to the valid range so a bad/edited client value can't get the whole update
   // rejected by the DB rule (level validates 1..10) — and the scoreboard stays sane.
   // isFinite guard: a NaN would survive the typeof check and get the WHOLE player update
   // (board + augments) rejected by RTDB, silently freezing this player's sync.
   if (typeof level === "number" && Number.isFinite(level)) pub.level = Math.max(1, Math.min(10, Math.round(level)));
+  if (typeof gold === "number" && Number.isFinite(gold)) pub.gold = Math.max(0, Math.round(gold));
   // Only sync KNOWN augment ids, capped at 3 — keeps the public node clean and within
   // the DB rule even if local state somehow holds junk.
   if (augments) pub.augments = rtdbSafe(augments.filter((id) => AUGMENT_BY_ID[id]).slice(0, 3));
@@ -414,13 +416,14 @@ function botAugmentCount(stage: number, difficulty: BotDifficulty | undefined): 
  *  if it ever finds an empty/missing combat map (e.g. after a host migration),
  *  rather than silently applying zero damage. Same room + stage/round always
  *  yields the same pairings and outcomes. */
-function buildCombat(room: Room, brainCtx?: BrainCtx): { combat: Record<string, CombatAssign>; botBoards: Record<string, UnitInstance[]>; botAugments: Record<string, string[]> } {
+function buildCombat(room: Room, brainCtx?: BrainCtx): { combat: Record<string, CombatAssign>; botBoards: Record<string, UnitInstance[]>; botAugments: Record<string, string[]>; botLevels: Record<string, number> } {
   const stage = room.meta.stage;
   const kind = roundKind(stage, room.meta.round);
   const alive = alivePlayers(room);
   const allowed = rosterFor(room);
   const botBoards: Record<string, UnitInstance[]> = {};
   const botAugments: Record<string, string[]> = {};
+  const botLevels: Record<string, number> = {};
 
   // Standard PvP: resolve the pairing FIRST so a bot can read (and counter-draft against) the
   // board of the HUMAN it's about to fight. Same deterministic shuffle the assign loop reuses.
@@ -472,8 +475,12 @@ function buildCombat(room: Room, brainCtx?: BrainCtx): { combat: Record<string, 
     const aCount = botAugmentCount(stage, effDiff);
     let aSeed = 0; for (let i = 0; i < p.uid.length; i++) aSeed = (aSeed * 31 + p.uid.charCodeAt(i)) >>> 0;
     const augs = aCount > 0 ? pickBotAugments(boardProfileOf(b), aCount, makeRng(aSeed >>> 0)) : [];
-    room.players[p.uid] = { ...p, board: b, augments: augs };
+    // The bot's effective shop level this round → synced public so the scoreboard shows the real
+    // level (bots used to sit at a stale "1" the whole game).
+    const lvl = botBoardLevel(stage, room.meta.round, p.botDifficulty);
+    room.players[p.uid] = { ...p, board: b, augments: augs, level: lvl };
     botBoards[p.uid] = b;
+    botLevels[p.uid] = lvl;
     if (augs.length) botAugments[p.uid] = augs;
   }
 
@@ -521,7 +528,7 @@ function buildCombat(room: Room, brainCtx?: BrainCtx): { combat: Record<string, 
       else combat[a] = { oppUid: a, oppName: "—", ghost: true, won: true, survivors: 0, dmg: 0, selfBoard: rtdbSafe(board(room.players[a])), oppBoard: [] };
     }
   }
-  return { combat, botBoards, botAugments };
+  return { combat, botBoards, botAugments, botLevels };
 }
 
 /** RTDB path for the meta-learning store, keyed PER GAME MODE — each mode (region locks,
@@ -587,7 +594,7 @@ export async function startCombat(code: string, room: Room): Promise<void> {
   return withClaimGuard(code, async () => {
     room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
     const brainCtx = await loadBrainCtx(room);
-    const { combat, botBoards, botAugments } = buildCombat(room, brainCtx);
+    const { combat, botBoards, botAugments, botLevels } = buildCombat(room, brainCtx);
 
     const u: Updates = { "meta/phase": "combat", "meta/deadline": serverNow() + COMBAT_MS, "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow() };
     for (const uid of Object.keys(combat)) {
@@ -597,6 +604,8 @@ export async function startCombat(code: string, room: Room): Promise<void> {
     for (const uid of Object.keys(botBoards)) u[`players/${uid}/board`] = botBoards[uid]; // persist for replay
     // Persist bot augments too, so clients fold the IDENTICAL team buff when they replay.
     for (const uid of Object.keys(botAugments)) u[`players/${uid}/augments`] = botAugments[uid];
+    // Sync each bot's effective level so the scoreboard shows it (was stuck at the lobby "1").
+    for (const uid of Object.keys(botLevels)) u[`players/${uid}/level`] = botLevels[uid];
     await dbAdapter().update(gamePath(code), u);
   });
 }
