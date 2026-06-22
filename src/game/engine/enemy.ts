@@ -119,12 +119,16 @@ type TierName = "easy" | "medium" | "hard" | "expert" | "ultimate";
 // only, a 2★ 5-cost two stages later). A real player rolls a 2★ 4-cost carry by mid/late game,
 // so this is legitimate earned power — the main fair reason a top board out-trades you — never
 // a stat cheat (it's a legal star level on a legal unit). 0 = never (the weak tiers).
-const TIER_PLAY: Record<TierName, { lvlOff: number; themes: number; starMult: number; itemRate: number; megaStage: number; counter: number; smart: boolean; emblem: boolean; bigCarry: number }> = {
-  easy:     { lvlOff: -2, themes: 0, starMult: 0.4,  itemRate: 0,    megaStage: 99, counter: 0,   smart: false, emblem: false, bigCarry: 0 }, // a beginner: small board, no synergy/items
-  medium:   { lvlOff: -1, themes: 1, starMult: 0.75, itemRate: 0.2,  megaStage: 6,  counter: 0,   smart: false, emblem: false, bigCarry: 0 }, // casual: one loose synergy
-  hard:     { lvlOff: -1, themes: 1, starMult: 0.9,  itemRate: 0.5,  megaStage: 5,  counter: 0.4, smart: true,  emblem: false, bigCarry: 7 }, // solid: a real synergy + items, light counter
-  expert:   { lvlOff: 0,  themes: 2, starMult: 1.0,  itemRate: 0.8,  megaStage: 4,  counter: 0.8, smart: true,  emblem: false, bigCarry: 6 }, // strong: two synergies, counters you, a 2★ 4-cost carry
-  ultimate: { lvlOff: 0,  themes: 3, starMult: 1.15, itemRate: 1.0,  megaStage: 3,  counter: 1.0, smart: true,  emblem: true,  bigCarry: 5 }, // flawless: triple synergy, full counter, emblem + 2★ 4/5-cost carries
+// `vicious` (expert/ultimate): commit harder to the BEST synergy — weight theme picks by trait
+// POWER (not just roster depth), give the primary a bigger board share, and deepen it to the
+// TOP breakpoint the board can reach (a flat +85% AD Fire 8 beats two half-active traits). Still
+// no stat cheats — it's just optimal drafting, the way a strong player actually builds.
+const TIER_PLAY: Record<TierName, { lvlOff: number; themes: number; starMult: number; itemRate: number; megaStage: number; counter: number; smart: boolean; emblem: boolean; bigCarry: number; vicious: boolean }> = {
+  easy:     { lvlOff: -2, themes: 0, starMult: 0.4,  itemRate: 0,    megaStage: 99, counter: 0,   smart: false, emblem: false, bigCarry: 0, vicious: false }, // a beginner: small board, no synergy/items
+  medium:   { lvlOff: -1, themes: 1, starMult: 0.75, itemRate: 0.2,  megaStage: 6,  counter: 0,   smart: false, emblem: false, bigCarry: 0, vicious: false }, // casual: one loose synergy
+  hard:     { lvlOff: -1, themes: 1, starMult: 0.9,  itemRate: 0.5,  megaStage: 5,  counter: 0.4, smart: true,  emblem: false, bigCarry: 7, vicious: false }, // solid: a real synergy + items, light counter
+  expert:   { lvlOff: 0,  themes: 2, starMult: 1.0,  itemRate: 0.85, megaStage: 4,  counter: 0.8, smart: true,  emblem: false, bigCarry: 6, vicious: true  }, // strong: two POWER synergies, counters you, a 2★ 4-cost carry
+  ultimate: { lvlOff: 0,  themes: 3, starMult: 1.15, itemRate: 1.0,  megaStage: 3,  counter: 1.0, smart: true,  emblem: true,  bigCarry: 5, vicious: true  }, // flawless: dominant primary + full counter, 2 emblems + 2★ 4/5-cost carries
 };
 
 /** A board's physical-vs-special damage lean (for tailoring augments + items to it). */
@@ -155,6 +159,23 @@ function counterScore(myType: PokeType, oppCounts: Map<PokeType, number>): numbe
   let s = 0, n = 0;
   for (const [ot, c] of oppCounts) { s += effectiveness(myType, [ot]) * c; n += c; }
   return n ? s / n : 1;
+}
+
+/** Rough magnitude of a trait at its TOP breakpoint — lets the vicious tiers prefer high-impact
+ *  carry traits over merely deep utility ones. Heuristic (not exact damage): it only needs to
+ *  rank e.g. Fire 8 (+85% AD) above a flat utility trait. Team-scoped buffs count more (they
+ *  hit the whole board). Returns ≥1 (1 = negligible), used as a draft-weight multiplier. */
+function traitPower(key: string): number {
+  const t = TRAITS_BY_KEY[key];
+  if (!t?.tiers?.length) return 1;
+  const b = t.tiers[t.tiers.length - 1].buff;
+  if (!b) return 1;
+  const mult = ((b.adMult ?? 1) - 1) + ((b.apMult ?? 1) - 1) + ((b.asMult ?? 1) - 1) * 0.9 + ((b.hpMult ?? 1) - 1) * 0.7;
+  const flat = (b.shieldPct ?? 0) + (b.critAdd ?? 0) + (b.lifeSteal ?? 0) + (b.armorPen ?? 0)
+    + (b.burnDps ?? 0) * 3 + (b.regenPerSec ?? 0) * 2 + ((b.armorAdd ?? 0) + (b.mrAdd ?? 0)) / 200 + (b.manaAdd ?? 0) / 120
+    + (b.stunChance ?? 0) * 0.5 + (b.freezeChance ?? 0) * 0.5;
+  const scope = b.scope === "team" ? 1.6 : 1;
+  return 1 + Math.max(0, (mult + flat) * scope);
 }
 
 /** Build a board of `count` mons at shop-`level` quality. Exported for the test
@@ -322,6 +343,8 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
     .filter(([, ids]) => ids.filter(legalCost).length >= 4)
     .map(([k, ids]) => ({ k, w: Math.max(0.05, ids.filter(legalCost).length
       * (useCounter ? 1 + (counterScore(k, oppCounts) - 1) * cfg.counter * 1.6 : 1)
+      // Vicious tiers chase POWER: a high-magnitude carry trait outweighs a merely deep one.
+      * (cfg.vicious ? traitPower(k) : 1)
       * (meta?.[k] ?? 1)) }));
   const themeList: PokeType[] = [];
   for (let i = 0; i < cfg.themes && pickable.length; i++) {
@@ -339,7 +362,9 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
   const themeCap = Math.max(1, size - anchorSlots);
   // Per-theme unit budget: the primary synergy gets the lion's share, secondary less, the
   // rest minimal — then each is snapped DOWN to a real breakpoint so the trait ACTIVATES.
-  const themeBudget = (i: number) => (i === 0 ? Math.ceil(size * 0.6) : i === 1 ? Math.ceil(size * 0.4) : 2);
+  // Vicious tiers commit a bigger share to the dominant primary (a stronger active bonus).
+  const primaryShare = cfg.vicious ? 0.72 : 0.6;
+  const themeBudget = (i: number) => (i === 0 ? Math.ceil(size * primaryShare) : i === 1 ? Math.ceil(size * 0.4) : 2);
   for (let ti = 0; ti < themeList.length && chosen.length < themeCap; ti++) {
     const theme = themeList[ti];
     const avail = (typeUnits.get(theme) ?? []).filter((id) => !taken.has(id) && legalCost(id));
@@ -366,23 +391,25 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
       chosen.push(pick); taken.add(pick);
     }
   }
-  // Double down: a strong player deepens their PRIMARY synergy toward its NEXT breakpoint
-  // when slots remain, rather than leaving it at the minimum activation. Cheapest carriers
-  // first (what you actually roll), so the deepen stays economy-honest.
+  // Double down: a strong player deepens their PRIMARY synergy when slots remain, rather than
+  // leaving it at the minimum activation. Normal tiers push to the NEXT breakpoint; VICIOUS
+  // tiers push to the TOP breakpoint the board + roster can actually reach (e.g. Fire 6→8), the
+  // dominant-carry build. Cheapest carriers first (what you roll), so it stays economy-honest.
   if (themeList.length) {
     const theme = themeList[0];
     const curr = chosen.filter((id) => getDef(id).types.includes(theme)).length;
     const bps = TRAITS_BY_KEY[theme]?.breakpoints ?? [];
+    const avail = (typeUnits.get(theme) ?? [])
+      .filter((id) => !taken.has(id) && legalCost(id))
+      .sort((a, b) => getDef(a).cost - getDef(b).cost);
+    const reach = curr + Math.min(avail.length, themeCap - chosen.length);  // most we could field
     const next = bps.find((bp) => bp > curr);
-    if (next) {
-      const avail = (typeUnits.get(theme) ?? [])
-        .filter((id) => !taken.has(id) && legalCost(id))
-        .sort((a, b) => getDef(a).cost - getDef(b).cost);
-      for (let c = curr; c < next && chosen.length < themeCap; c++) {
-        const pick = avail.find((id) => !taken.has(id));
-        if (!pick) break;
-        chosen.push(pick); taken.add(pick);
-      }
+    const top = bps.filter((bp) => bp <= reach).pop();                       // largest reachable
+    const target = (cfg.vicious ? (top ?? next) : next) ?? 0;
+    for (let c = curr; c < target && chosen.length < themeCap; c++) {
+      const pick = avail.find((id) => !taken.has(id));
+      if (!pick) break;
+      chosen.push(pick); taken.add(pick);
     }
   }
 
@@ -509,17 +536,24 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
     }
   }
 
-  // Trait emblem splash (ultimate, like a player with a Spatula): an emblem of the PRIMARY
-  // synergy on a frontline unit that doesn't already carry that type — pushing the trait up
-  // a breakpoint for a bigger active bonus.
+  // Trait emblem splash (ultimate, like a player with a Spatula): an emblem of a key synergy on
+  // a unit that doesn't already carry that type — pushing the trait up a breakpoint for a bigger
+  // active bonus. Ultimate fields ONE emblem normally, and a SECOND (for the secondary synergy)
+  // late game, mirroring a strong player who's banked two emblems by then.
   if (cfg.emblem && themeList.length) {
-    const emblemId = `emblem-${themeList[0]}`;
-    if (EMBLEM_TRAIT[emblemId]) {
-      // Only worth it on a unit that does NOT already carry the type (so it adds +1 to the
-      // count toward the next breakpoint) — prefer a sturdy frontliner.
-      const noType = board.filter((u) => (u.items?.length ?? 0) < 3 && !typesForStar(getDef(u.defId), u.star).includes(themeList[0]));
+    const emblemThemes = [themeList[0]];
+    if (tier === "ultimate" && stage >= 7 && themeList[1]) emblemThemes.push(themeList[1]);
+    const emblemPlaced = new Set<string>();
+    for (const th of emblemThemes) {
+      const emblemId = `emblem-${th}`;
+      if (!EMBLEM_TRAIT[emblemId]) continue;
+      // Place on a unit that does NOT already carry the type (so it adds +1 toward the next
+      // breakpoint), has a free item slot, and hasn't just taken the other emblem — prefer a
+      // sturdy frontliner.
+      const noType = board.filter((u) => (u.items?.length ?? 0) < 3 && !emblemPlaced.has(u.iid)
+        && !typesForStar(getDef(u.defId), u.star).includes(th));
       const target = noType.find((u) => isTank(u.defId)) ?? noType[0];
-      if (target) target.items = [...(target.items ?? []), emblemId];
+      if (target) { target.items = [...(target.items ?? []), emblemId]; emblemPlaced.add(target.iid); }
     }
   }
 
