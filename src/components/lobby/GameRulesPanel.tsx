@@ -181,7 +181,7 @@ export function GameRulesPanel({ isHost, showMode = true }: { isHost: boolean; s
           </div>
         </SectionCard>
 
-        <SectionCard title="Augments">
+        <SectionCard title={t.r_augments}>
           <div className="flex gap-1.5">
             {[true, false].map((on) => (
               <button key={String(on)} disabled={!isHost} onClick={() => setRules({ augmentsEnabled: on })}

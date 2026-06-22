@@ -88,6 +88,13 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
     />
   );
 
+  // Tiny cost number — a colorblind-safe backup for the cost-COLOUR ring (so rarity reads
+  // without relying on the green/blue/purple/gold hue alone).
+  const costBadge = (
+    <span className="absolute -bottom-0.5 -left-0.5 z-10 text-[8px] font-extrabold leading-none px-[3px] py-px rounded pointer-events-none"
+      style={{ background: color, color: "#0b1020", boxShadow: "0 0 0 1px rgba(0,0,0,0.4)" }}>{def.cost}</span>
+  );
+
   // Hex token (on the board) — the colored token follows the hexagonal cell.
   if (shape === "hex") {
     return (
@@ -111,6 +118,7 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
         <div className="absolute -top-1 inset-x-0 flex justify-center pointer-events-none">
           <Stars star={unit.star} />
         </div>
+        {costBadge}
         <ItemPips items={heldItems} megaReady={megaReady} />
       </div>
     );
@@ -139,6 +147,7 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
       <div className="absolute top-0 left-0 right-0">
         <Stars star={unit.star} />
       </div>
+      {costBadge}
       <ItemPips items={heldItems} megaReady={megaReady} />
     </div>
   );

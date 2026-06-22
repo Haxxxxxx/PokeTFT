@@ -79,7 +79,7 @@ export function FirstMatchCoach() {
         <span className="text-[11px] font-extrabold uppercase tracking-wide text-amber-200 flex-1">
           {lang === "fr" ? "Premiers pas" : "First steps"}
         </span>
-        <button onClick={finish} title={lang === "fr" ? "Passer" : "Skip"} className="text-slate-500 hover:text-slate-300"><X size={14} /></button>
+        <button onClick={finish} aria-label={lang === "fr" ? "Passer" : "Skip"} title={lang === "fr" ? "Passer" : "Skip"} className="text-slate-500 hover:text-slate-300"><X size={14} /></button>
       </div>
 
       <ul className="flex flex-col gap-1.5">

@@ -468,7 +468,7 @@ function CombatRecapTabs({ units, label, onClose }: { units: FrameUnit[]; label:
     <div className="gilded w-[210px] shrink-0 rounded-xl p-2 self-stretch">
       <div className="flex items-center justify-between mb-1.5 px-0.5">
         <span className="text-[9px] uppercase tracking-wider text-amber-200/55">{label}</span>
-        <button onClick={onClose} title={t.cs_hide_recap} className="text-slate-500 hover:text-slate-200 text-xs leading-none">✕</button>
+        <button onClick={onClose} title={t.cs_hide_recap} aria-label={t.cs_hide_recap} className="text-slate-500 hover:text-slate-200 text-xs leading-none">✕</button>
       </div>
       <div className="flex gap-1 mb-2">
         {RECAP_TABS.map((tb) => (
