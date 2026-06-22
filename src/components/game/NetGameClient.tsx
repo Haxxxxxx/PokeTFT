@@ -1076,9 +1076,9 @@ export function NetGameClient() {
           <div className="flex items-center gap-2 shrink-0">
             {/* Last-fight recap — reviewable while planning (your team + the enemy's). */}
             {phase === "planning" && !isSpectator && lastFight && (
-              <button onClick={() => setShowRecap((s) => !s)} title={lang === "fr" ? "Récap du dernier combat" : "Last fight recap"}
+              <button onClick={() => setShowRecap((s) => !s)} title={t.net_recap_title}
                 className={`px-2.5 py-1.5 rounded-md border text-xs font-bold inline-flex items-center gap-1.5 transition-colors ${showRecap ? "bg-amber-500/90 text-black border-amber-400" : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"}`}>
-                <BarChart3 size={13} /> {lang === "fr" ? "Récap" : "Recap"}
+                <BarChart3 size={13} /> {t.net_recap}
               </button>
             )}
             <OptionsMenu />
@@ -1107,7 +1107,7 @@ export function NetGameClient() {
                   <div
                     key={p.uid}
                     onClick={() => setSpectate(isSpectator ? p.uid : (p.uid === myUid ? null : (spectate === p.uid ? null : p.uid)))}
-                    title={p.uid === myUid && !isSpectator ? "Your board" : `View ${p.name}'s board`}
+                    title={p.uid === myUid && !isSpectator ? t.net_your_board : `View ${p.name}'s board`}
                     className={`flex items-center gap-2 px-1.5 py-1 rounded-lg cursor-pointer hover:bg-slate-700/50 ${p.uid === myUid ? "bg-slate-700/70 ring-1 ring-sky-500/50" : ""} ${spectate === p.uid ? "ring-1 ring-amber-400/70 bg-amber-500/10" : ""} ${isNm && p.alive ? "ring-1 ring-rose-600/50 bg-rose-950/20" : ""} ${!p.alive ? "opacity-40" : ""}`}
                   >
                     <span className="w-4 text-[10px] text-slate-500 font-bold text-center">{p.place ?? i + 1}</span>
@@ -1695,6 +1695,7 @@ function BootVeil({ label, sub, progress }: { label: string; sub?: string; progr
 /** Top-bar fullscreen toggle. Tracks the current fullscreen state so the icon
  *  reflects whether you're in or out. */
 function FullscreenButton() {
+  const t = useT();
   const [fs, setFs] = useState(false);
   useEffect(() => {
     const on = () => setFs(isFullscreen());
@@ -1709,8 +1710,8 @@ function FullscreenButton() {
   return (
     <button
       onClick={() => toggleFullscreen()}
-      title={fs ? "Exit fullscreen" : "Fullscreen"}
-      aria-label={fs ? "Exit fullscreen" : "Enter fullscreen"}
+      title={fs ? t.net_exit_fullscreen : t.net_fullscreen}
+      aria-label={fs ? t.net_exit_fullscreen : t.net_fullscreen}
       className="px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-300 leading-none"
     >
       {fs ? <Minimize size={14} /> : <Maximize size={14} />}

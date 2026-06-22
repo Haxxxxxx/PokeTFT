@@ -39,7 +39,7 @@ export function RecipeBook({ onClose }: { onClose: () => void }) {
           <h2 className="text-xs uppercase tracking-wide text-amber-200/80 font-bold">
             {fr ? "Recettes d'objets" : "Item Recipes"}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200" title={fr ? "Fermer" : "Close"}>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200" title={fr ? "Fermer" : "Close"} aria-label={fr ? "Fermer" : "Close"}>
             <X size={18} />
           </button>
         </div>

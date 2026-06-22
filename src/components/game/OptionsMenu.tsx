@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/game/store/appStore";
 import { music } from "@/lib/audio";
+import { useT } from "@/lib/i18n";
 import { Settings2, Volume2, VolumeX } from "lucide-react";
 
 /** Compact in-game options popover: volume slider, mute toggle, language. */
@@ -11,6 +12,7 @@ export function OptionsMenu() {
   const settings = useAppStore((s) => s.settings);
   const setSettings = useAppStore((s) => s.setSettings);
   const ref = useRef<HTMLDivElement>(null);
+  const t = useT();
 
   useEffect(() => {
     if (!open) return;
@@ -20,14 +22,13 @@ export function OptionsMenu() {
   }, [open]);
 
   const vol = typeof settings.volume === "number" ? settings.volume : 0.7;
-  const fr = settings.language === "fr";
 
   return (
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        title={fr ? "Options" : "Options"}
-        aria-label="Options"
+        title={t.o_options}
+        aria-label={t.o_options}
         aria-expanded={open}
         className={`flex items-center justify-center w-8 h-8 rounded-md border transition-colors ${open ? "bg-amber-500 text-black border-amber-400" : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"}`}
       >
@@ -38,8 +39,8 @@ export function OptionsMenu() {
           {/* Volume */}
           <div>
             <div className="flex items-center justify-between text-[11px] font-semibold text-slate-300 mb-1.5">
-              <span className="inline-flex items-center gap-1.5 text-amber-200/80">{settings.soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />} {fr ? "Volume" : "Volume"}</span>
-              <span className="text-slate-500 tabular-nums">{settings.soundEnabled ? `${Math.round(vol * 100)}%` : (fr ? "Muet" : "Muted")}</span>
+              <span className="inline-flex items-center gap-1.5 text-amber-200/80">{settings.soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />} {t.o_volume}</span>
+              <span className="text-slate-500 tabular-nums">{settings.soundEnabled ? `${Math.round(vol * 100)}%` : t.o_muted}</span>
             </div>
             <input
               type="range" min={0} max={100} value={Math.round(vol * 100)}
@@ -53,12 +54,12 @@ export function OptionsMenu() {
             onClick={() => { setSettings({ soundEnabled: !settings.soundEnabled }); music.sync(); }}
             className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${settings.soundEnabled ? "bg-emerald-950/40 border border-emerald-700/50 text-emerald-300" : "bg-slate-800 border border-slate-700 text-slate-400"}`}
           >
-            <span>{fr ? "Son" : "Sound"}</span>
-            <span>{settings.soundEnabled ? (fr ? "Activé" : "On") : (fr ? "Coupé" : "Off")}</span>
+            <span>{t.o_sound}</span>
+            <span>{settings.soundEnabled ? t.o_on : t.o_off}</span>
           </button>
           {/* Language */}
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-semibold text-slate-400">{fr ? "Langue" : "Language"}</span>
+            <span className="text-[11px] font-semibold text-slate-400">{t.o_language}</span>
             <div className="flex gap-1 p-0.5 rounded-lg bg-white/[0.03] border border-white/[0.06]">
               {(["fr", "en"] as const).map((l) => (
                 <button key={l} onClick={() => setSettings({ language: l })} style={{ minWidth: 40 }}

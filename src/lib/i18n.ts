@@ -137,6 +137,22 @@ export type Dict = {
   ud_deals: (n: number, type: string) => string;
   ud_type_eff: string;
   ud_mana_label: string;
+  // Auth + account
+  a_signin_sub: string; a_google: string; a_or: string; a_email: string; a_password: string;
+  a_signin: string; a_create_account: string; a_no_account: string; a_have_account: string;
+  a_forgot: string; a_username_rule: string; a_continue: string; a_signout: string;
+  // Profile editor + tile
+  pe_title: string; pe_guest: string; pe_username: string; pe_avatar: string; pe_done: string;
+  pe_delete: string; pe_delete_confirm: string; pe_delete_forever: string; pe_cancel: string;
+  pt_view: string; pt_games: string; pt_wins: string; pt_best: string;
+  // Friends
+  fr_title: string; fr_create_acct: string; fr_add_ph: string; fr_add: string; fr_empty: string;
+  fr_in_game: string; fr_online: string; fr_offline: string; fr_join: string; fr_watch: string; fr_remove: string;
+  // Options menu
+  o_options: string; o_volume: string; o_sound: string; o_language: string; o_muted: string; o_on: string; o_off: string;
+  // In-game misc
+  net_enemy: string; net_recap: string; net_recap_title: string; net_fullscreen: string; net_exit_fullscreen: string; net_your_board: string;
+  r_augments: string;
 };
 
 export const FR: Dict = {
@@ -263,6 +279,17 @@ export const FR: Dict = {
   ud_deals: (n, type) => `Inflige ${n} dégâts ${type}.`,
   ud_type_eff: "L'efficacité de type multiplie les dégâts.",
   ud_mana_label: "Mana",
+  a_signin_sub: "Connecte-toi pour jouer avec tes amis", a_google: "Continuer avec Google", a_or: "ou", a_email: "E-mail", a_password: "Mot de passe (6+ car.)",
+  a_signin: "Se connecter", a_create_account: "Créer un compte", a_no_account: "Pas de compte ? Créez-en un", a_have_account: "Déjà un compte ? Connectez-vous",
+  a_forgot: "Mot de passe oublié ?", a_username_rule: "3–16 lettres, chiffres ou tiret bas.", a_continue: "Continuer", a_signout: "Se déconnecter",
+  pe_title: "Modifier le profil", pe_guest: "Compte invité", pe_username: "Nom d'utilisateur", pe_avatar: "Avatar", pe_done: "Terminé",
+  pe_delete: "Supprimer le compte", pe_delete_confirm: "Cela supprime définitivement ton compte, ton rang et ton historique. Es-tu sûr ?", pe_delete_forever: "Supprimer définitivement", pe_cancel: "Annuler",
+  pt_view: "Voir le profil", pt_games: "Parties", pt_wins: "Victoires", pt_best: "Meilleur",
+  fr_title: "Amis", fr_create_acct: "Crée un compte pour ajouter des amis et rejoindre leurs parties.", fr_add_ph: "Ajouter par nom", fr_add: "Ajouter", fr_empty: "Aucun ami — ajoute quelqu'un par son nom.",
+  fr_in_game: "en partie", fr_online: "en ligne", fr_offline: "hors ligne", fr_join: "Rejoindre", fr_watch: "Regarder", fr_remove: "Retirer",
+  o_options: "Options", o_volume: "Volume", o_sound: "Son", o_language: "Langue", o_muted: "Coupé", o_on: "Activé", o_off: "Désactivé",
+  net_enemy: "Ennemi", net_recap: "Récap", net_recap_title: "Récap du dernier combat", net_fullscreen: "Plein écran", net_exit_fullscreen: "Quitter le plein écran", net_your_board: "Ton plateau",
+  r_augments: "Augmentations",
 };
 
 export const EN: Dict = {
@@ -389,6 +416,17 @@ export const EN: Dict = {
   ud_deals: (n, type) => `Deals ${n} ${type} damage.`,
   ud_type_eff: "Type-effectiveness multiplies the damage.",
   ud_mana_label: "Mana",
+  a_signin_sub: "Sign in to play with friends", a_google: "Continue with Google", a_or: "or", a_email: "Email", a_password: "Password (6+ chars)",
+  a_signin: "Sign in", a_create_account: "Create account", a_no_account: "No account? Create one", a_have_account: "Already have an account? Sign in",
+  a_forgot: "Forgot password?", a_username_rule: "3–16 letters, numbers or underscore.", a_continue: "Continue", a_signout: "Sign out",
+  pe_title: "Edit profile", pe_guest: "Guest account", pe_username: "Username", pe_avatar: "Avatar", pe_done: "Done",
+  pe_delete: "Delete account", pe_delete_confirm: "This permanently deletes your account, rank and history. Are you sure?", pe_delete_forever: "Delete forever", pe_cancel: "Cancel",
+  pt_view: "View profile", pt_games: "Games", pt_wins: "Wins", pt_best: "Best",
+  fr_title: "Friends", fr_create_acct: "Create an account to add friends and quick-join their games.", fr_add_ph: "Add by username", fr_add: "Add", fr_empty: "No friends yet — add someone by their username.",
+  fr_in_game: "in game", fr_online: "online", fr_offline: "offline", fr_join: "Join", fr_watch: "Watch", fr_remove: "Remove",
+  o_options: "Options", o_volume: "Volume", o_sound: "Sound", o_language: "Language", o_muted: "Muted", o_on: "On", o_off: "Off",
+  net_enemy: "Enemy", net_recap: "Recap", net_recap_title: "Last fight recap", net_fullscreen: "Enter fullscreen", net_exit_fullscreen: "Exit fullscreen", net_your_board: "Your board",
+  r_augments: "Augments",
 };
 
 export function useT(): Dict {

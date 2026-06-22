@@ -6,6 +6,7 @@ import { FIELD, TILE, ALLY_ROW0, HEX_CLIP, hexToPixel, fieldPixelSize } from "@/
 import { useGame } from "@/game/store/gameStore";
 import { UnitChip } from "./UnitChip";
 import { ItemGlyph } from "./ItemGlyph";
+import { useT } from "@/lib/i18n";
 import type { UnitInstance } from "@/game/types";
 
 // Same tessellation + tile size as the combat field: the planning board IS the
@@ -67,6 +68,7 @@ function HexCell({ c, r, unit, interactive }: { c: number; r: number; unit?: Uni
 }
 
 function BoardBase({ units, interactive = true }: { units?: UnitInstance[]; interactive?: boolean }) {
+  const t = useT();
   const storeUnits = useGame((s) => s.units);
   const drops = useGame((s) => s.drops);
   const collectDrop = useGame((s) => s.collectDrop);
@@ -94,7 +96,7 @@ function BoardBase({ units, interactive = true }: { units?: UnitInstance[]; inte
       <div className="absolute" style={{ left: 14, top: 14, width: w, height: h }}>
         {/* Enemy half cue — your opponent's army drops in here for combat. */}
         <span className="absolute left-1/2 -translate-x-1/2 top-1 text-[9px] font-bold uppercase tracking-[0.18em] text-rose-300/30 pointer-events-none">
-          Enemy
+          {t.net_enemy}
         </span>
         <div className="absolute pointer-events-none" style={{ left: 0, top: splitY, width: w, height: 1, background: "linear-gradient(90deg, transparent, rgba(148,163,184,0.28), transparent)" }} />
         {Array.from({ length: FIELD.rows }).flatMap((_, r) =>

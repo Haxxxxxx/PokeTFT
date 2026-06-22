@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/game/net/authStore";
 import { useAppStore } from "@/game/store/appStore";
 import { getHistory, rankOf, START_RATING, type GameResult } from "@/game/net/users";
+import { useT } from "@/lib/i18n";
 import { Crown, Swords, ChevronRight } from "lucide-react";
 
 /** Launcher profile tile — avatar, name, a couple of headline stats, and a tap-through
  *  to the full profile/history. Thin premium styling. */
 export function ProfileTile() {
+  const t = useT();
   const user = useAuth((s) => s.user);
   const profile = useAuth((s) => s.profile);
   const setProfileOpen = useAppStore((s) => s.setProfileOpen);
@@ -55,13 +57,13 @@ export function ProfileTile() {
               {rank.label}<span className="text-slate-500 font-semibold">· {rank.lp} LP</span>
             </div>
           ); })()}
-          <div className="text-[10px] text-slate-500 flex items-center gap-1">View profile <ChevronRight size={11} className="group-hover:translate-x-0.5 transition-transform" /></div>
+          <div className="text-[10px] text-slate-500 flex items-center gap-1">{t.pt_view} <ChevronRight size={11} className="group-hover:translate-x-0.5 transition-transform" /></div>
         </div>
       </div>
       <div className="grid grid-cols-3 gap-2 mt-3.5">
-        <Stat icon={<Swords size={13} />} label="Games" value={games} color="#cbd5e1" />
-        <Stat icon={<Crown size={13} />} label="Wins" value={wins} color="#fbbf24" />
-        <Stat icon={<ChevronRight size={13} />} label="Best" value={best ? `#${best}` : "—"} color="#34d399" />
+        <Stat icon={<Swords size={13} />} label={t.pt_games} value={games} color="#cbd5e1" />
+        <Stat icon={<Crown size={13} />} label={t.pt_wins} value={wins} color="#fbbf24" />
+        <Stat icon={<ChevronRight size={13} />} label={t.pt_best} value={best ? `#${best}` : "—"} color="#34d399" />
       </div>
     </button>
   );
