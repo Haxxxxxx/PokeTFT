@@ -181,7 +181,7 @@ export function ProfileScreen() {
                           <span className="text-[12px] font-bold text-slate-200 truncate">
                             {g.place === 1 ? tr("Victory", "Victoire") : tr(`Placed ${g.place} of ${g.players}`, `${g.place}ᵉ sur ${g.players}`)}
                           </span>
-                          {g.mode && g.mode !== "standard" && (() => { const gm = getMode(g.mode); return (
+                          {g.mode && (() => { const gm = getMode(g.mode); return (
                             <span className="shrink-0 text-[8px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ color: gm.color, background: `${gm.color}1f` }}>{lang === "fr" ? gm.nameFr : gm.name}</span>
                           ); })()}
                         </div>
@@ -255,7 +255,7 @@ function MatchDetail({ game, lang, onClose }: { game: GameResult; lang: string; 
               {game.place === 1 ? tr("Victory", "Victoire") : tr(`Placed ${game.place} of ${game.players}`, `${game.place}ᵉ sur ${game.players}`)}
             </div>
             <div className="text-[11px] text-slate-500 truncate">
-              {game.mode && game.mode !== "standard" && <span className="font-bold" style={{ color: getMode(game.mode).color }}>{(lang === "fr" ? getMode(game.mode).nameFr : getMode(game.mode).name)} · </span>}
+              {game.mode && <span className="font-bold" style={{ color: getMode(game.mode).color }}>{(lang === "fr" ? getMode(game.mode).nameFr : getMode(game.mode).name)} · </span>}
               {regions || "—"}{typeof game.ts === "number" ? ` · ${new Date(game.ts).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}
             </div>
           </div>
