@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { useGame } from "@/game/store/gameStore";
 import { useUi } from "@/game/store/uiStore";
+import { useAppStore } from "@/game/store/appStore";
 import { MEGA_STONE } from "@/game/data/mega";
 import { ITEM_POOL, RARITY_COLOR, isEmblem } from "@/game/data/itemPool";
 import { Hammer, Sparkles, BookOpen } from "lucide-react";
@@ -18,9 +19,11 @@ const ITEM_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
  *  board/bench mon to equip it. */
 function ItemButton({ id, n, selected, onClick }: { id: string; n: number; selected: boolean; onClick: () => void }) {
   const t = useT();
+  const lang = useAppStore((s) => s.settings.language);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `equip-${id}`, data: { itemId: id } });
   const isMega = id === MEGA_STONE;
   const def = ITEM_BY_ID[id];
+  const name = isMega ? t.it_mega_stone : (lang === "fr" ? def?.nameFr : def?.name) ?? id;
   const rarityColor = isMega ? "#c084fc" : def ? RARITY_COLOR[def.rarity] : "#475569";
   return (
     <button
@@ -31,10 +34,10 @@ function ItemButton({ id, n, selected, onClick }: { id: string; n: number; selec
       style={{ borderColor: selected ? "#f0abfc" : rarityColor, opacity: isDragging ? 0.4 : 1 }}
       className={`relative flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-left transition-all min-w-0 cursor-grab active:cursor-grabbing touch-none
         ${selected ? "bg-fuchsia-500/15 ring-1 ring-fuchsia-400/70" : "bg-slate-900 hover:bg-slate-800"}`}
-      title={isMega ? t.it_mega_stone : def?.name ?? id}
+      title={name}
     >
       <span className="text-base shrink-0">{isMega ? <MegaIcon size={18} /> : <ItemGlyph id={id} size={16} />}</span>
-      <span className="text-[10px] font-semibold text-slate-200 truncate flex-1">{isMega ? t.it_mega_stone : def?.name ?? id}</span>
+      <span className="text-[10px] font-semibold text-slate-200 truncate flex-1">{name}</span>
       {n > 1 && <span className="text-[9px] font-bold text-slate-400 shrink-0">×{n}</span>}
     </button>
   );
