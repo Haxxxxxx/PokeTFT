@@ -156,6 +156,11 @@ export type Dict = {
   // Item / mega tooltips
   it_mega_stone: string; it_held_item: string; it_held_items: string; it_reforge_t: string; it_forge_t: string; it_collect: string;
   ud_play_cry: string; ud_mega_effect: string; ud_mega_at_start: string;
+  a_close: string;
+  tp_synergies: string; tp_place_mons: string; tp_cap_only: string; tp_cap_rest: string;
+  uc_mega_ready: string; uc_click_details: string; ud_unequip: string;
+  fr_added: string; fr_failed: string; fr_net_err: string; fr_you: string; fr_spectate_t: string;
+  net_rival: string;
 };
 
 export const FR: Dict = {
@@ -295,6 +300,11 @@ export const FR: Dict = {
   r_augments: "Augmentations",
   it_mega_stone: "Méga-Gemme", it_held_item: "Objet tenu", it_held_items: "Objets tenus", it_reforge_t: "Reforger en un autre objet aléatoire de la même classe", it_forge_t: "Forger cet objet en un Emblème de trait aléatoire", it_collect: "Ramasser l'objet",
   ud_play_cry: "▶ cri", ud_mega_effect: "À tenir sur un mon Méga-capable → il Méga-évolue au début du combat.", ud_mega_at_start: "Méga-évolue au début du combat.",
+  a_close: "Fermer",
+  tp_synergies: "Synergies", tp_place_mons: "Placez des mons pour activer les traits.", tp_cap_only: "Seulement", tp_cap_rest: "dans cette région — palier suivant inatteignable",
+  uc_mega_ready: "Méga prêt", uc_click_details: "cliquer pour détails", ud_unequip: "Déséquiper (retour à l'inventaire)",
+  fr_added: "Ajouté", fr_failed: "Échec", fr_net_err: "Erreur réseau — réessayez", fr_you: "vous :", fr_spectate_t: "Observer cette partie (lecture seule)",
+  net_rival: "Rival",
 };
 
 export const EN: Dict = {
@@ -434,6 +444,11 @@ export const EN: Dict = {
   r_augments: "Augments",
   it_mega_stone: "Mega Stone", it_held_item: "Held item", it_held_items: "Held items", it_reforge_t: "Reforge into a random different item of the same class", it_forge_t: "Forge this item into a random trait Emblem", it_collect: "Collect item",
   ud_play_cry: "▶ cry", ud_mega_effect: "Holds on a Mega-capable mon → it Mega Evolves at combat start.", ud_mega_at_start: "Mega Evolves at combat start.",
+  a_close: "Close",
+  tp_synergies: "Synergies", tp_place_mons: "Place mons to activate traits.", tp_cap_only: "Only", tp_cap_rest: "in this region — can't reach the next tier",
+  uc_mega_ready: "Mega ready", uc_click_details: "click for details", ud_unequip: "Unequip (back to inventory)",
+  fr_added: "Added", fr_failed: "Failed", fr_net_err: "Network error — try again", fr_you: "you:", fr_spectate_t: "Spectate this game (read-only)",
+  net_rival: "Rival",
 };
 
 export function useT(): Dict {

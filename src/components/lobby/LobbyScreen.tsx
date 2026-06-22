@@ -444,7 +444,7 @@ export function LobbyScreen() {
           <aside className={`absolute inset-y-0 right-0 w-full max-w-[480px] panel border-l border-white/[0.08] shadow-2xl shadow-black/50 overflow-y-auto transition-transform duration-300 ease-out ${showRules ? "translate-x-0" : "translate-x-full"}`}>
             <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-[var(--panel-bg,rgba(10,12,20,0.92))] backdrop-blur border-b border-white/[0.06]">
               <h2 className="inline-flex items-center gap-2 text-[12px] font-extrabold uppercase tracking-[0.2em] gild-text"><Settings size={14} /> {t.l_rules}</h2>
-              <button onClick={() => setShowRules(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-300 hover:bg-white/[0.06] transition-colors"><X size={18} /></button>
+              <button onClick={() => setShowRules(false)} aria-label={t.a_close} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-300 hover:bg-white/[0.06] transition-colors"><X size={18} /></button>
             </div>
             <div className="p-5">
               <GameRulesPanel isHost={isHost} showMode={false} />

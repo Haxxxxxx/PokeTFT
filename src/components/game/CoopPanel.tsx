@@ -84,7 +84,7 @@ export function CoopPanel({ code, myUid, partner, lang }: {
                         <img src={spriteUrl(def.dex[u.star - 1])} alt="" width={26} height={26} style={{ imageRendering: "pixelated" }} />
                         <div className="min-w-0 flex-1">
                           <div className="text-[11px] font-bold text-slate-200 truncate">{def.stageNames[u.star - 1]}</div>
-                          <div className="text-[9px] text-amber-300/80">{"★".repeat(u.star)}{u.items?.length ? ` · ${u.items.length} item` : ""}</div>
+                          <div className="text-[9px] text-amber-300/80">{"★".repeat(u.star)}{u.items?.length ? ` · ${u.items.length} ${fr ? "objet" : "item"}${u.items.length > 1 ? "s" : ""}` : ""}</div>
                         </div>
                         <button disabled={!partner.alive} onClick={() => giveUnit(u.iid)} title={fr ? "Envoyer" : "Send"}
                           className="shrink-0 w-7 h-7 rounded-md bg-emerald-900/40 hover:bg-emerald-700 border border-emerald-600/50 text-emerald-200 flex items-center justify-center disabled:opacity-30">

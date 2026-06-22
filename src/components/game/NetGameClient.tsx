@@ -523,7 +523,7 @@ export function NetGameClient() {
     if (mine.length) {
       lastFightRef.current = mine;
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (!myCombat.pve) setLastFight({ mine, theirs, oppName: myCombat.oppName ?? "Rival" });
+      if (!myCombat.pve) setLastFight({ mine, theirs, oppName: myCombat.oppName ?? t.net_rival });
     }
   }, [combatResult, myCombat?.flip]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1025,7 +1025,7 @@ export function NetGameClient() {
               <>
                 {spectating && (
                   <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-400/40 text-[11px] font-bold text-amber-300">
-                    <Eye size={13} /> {spectateP?.name ?? "Rival"}
+                    <Eye size={13} /> {spectateP?.name ?? t.net_rival}
                   </span>
                 )}
                 {/* Economy cluster — one cohesive segmented gauge for the viewed player. */}
@@ -1187,7 +1187,7 @@ export function NetGameClient() {
                 </div>
                 <div className="relative flex-1 min-h-0 flex items-center justify-center">
                   {phase === "combat" && spectateCombatResult ? (
-                    <CombatStage result={spectateCombatResult} flip={!!spectateCombat?.flip} authWon={spectateCombat?.won} opponentName={spectateCombat?.oppName ?? "Rival"} autoResolve inline syncStart={meta.deadline - COMBAT_MS} syncWindowMs={COMBAT_MS} onResolve={() => {}} />
+                    <CombatStage result={spectateCombatResult} flip={!!spectateCombat?.flip} authWon={spectateCombat?.won} opponentName={spectateCombat?.oppName ?? t.net_rival} autoResolve inline syncStart={meta.deadline - COMBAT_MS} syncWindowMs={COMBAT_MS} onResolve={() => {}} />
                   ) : (
                     <Board units={spectateUnits ?? []} interactive={false} />
                   )}
@@ -1215,7 +1215,7 @@ export function NetGameClient() {
                     authWon={myCombat?.won}
                     hpLost={myCombat?.dmg}
                     suppressRecap={!!(inspect || inspectedItem)}
-                    opponentName={myCombat?.oppName ?? "Rival"}
+                    opponentName={myCombat?.oppName ?? t.net_rival}
                     pve={!!myCombat?.pve}
                     autoResolve
                     inline

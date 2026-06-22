@@ -32,12 +32,12 @@ export function FriendsPanel() {
     if (!name.trim()) return;
     try {
       const res = await addFriendByName(name);
-      setMsg(res.ok ? `Added ${name.trim()}` : res.error ?? "Failed");
+      setMsg(res.ok ? `${t.fr_added} ${name.trim()}` : res.error ?? t.fr_failed);
       if (res.ok) setName("");
     } catch {
       // A network/permission failure must surface as a message, not an unhandled
       // rejection that could leave the panel in a broken state.
-      setMsg("Network error — try again");
+      setMsg(t.fr_net_err);
     }
     if (msgTimer.current) clearTimeout(msgTimer.current);
     msgTimer.current = setTimeout(() => setMsg(null), 2500);
@@ -47,7 +47,7 @@ export function FriendsPanel() {
     <div className="panel w-full flex flex-col gap-3 rounded-xl p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">{t.fr_title}</h2>
-        {profile?.username && <span className="text-[11px] text-slate-500">you: <span className="text-amber-300 font-semibold">{profile.username}</span></span>}
+        {profile?.username && <span className="text-[11px] text-slate-500">{t.fr_you} <span className="text-amber-300 font-semibold">{profile.username}</span></span>}
       </div>
 
       {isGuest ? (
@@ -88,7 +88,7 @@ export function FriendsPanel() {
                     {/* Join only lands in a not-yet-started lobby; Watch attaches as a
                         read-only spectator to an in-progress game. */}
                     <button onClick={() => join(f.currentGame!, profile?.username ?? "Player")} className="px-2 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-[10px] font-bold text-white">{t.fr_join}</button>
-                    <button onClick={() => spectate(f.currentGame!, f.uid)} title="Spectate this game (read-only)" className="px-2 py-1 rounded-md bg-violet-600 hover:bg-violet-500 text-[10px] font-bold text-white">{t.fr_watch}</button>
+                    <button onClick={() => spectate(f.currentGame!, f.uid)} title={t.fr_spectate_t} className="px-2 py-1 rounded-md bg-violet-600 hover:bg-violet-500 text-[10px] font-bold text-white">{t.fr_watch}</button>
                   </>
                 )}
                 <button onClick={() => unfriend(f.uid)} title={t.fr_remove} className="text-slate-600 hover:text-rose-400 text-sm opacity-0 group-hover:opacity-100">×</button>
