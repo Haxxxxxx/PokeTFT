@@ -219,6 +219,14 @@ export function generatePlayerLikeBoard(stage: number, round: number, difficulty
   return buildBotBoard(stage, round, tier, seed, allowedIds, enabledItems, opponentBoard, brain, statBuff);
 }
 
+/** The shop LEVEL a bot is effectively playing at this round — the good-player curve capped by
+ *  the tier's offset (same value buildBotBoard uses for board size). Lets the host sync a bot's
+ *  level to its public node so the scoreboard shows the real level instead of a stale "1". */
+export function botBoardLevel(stage: number, round: number, difficulty: BotLevel | undefined): number {
+  const tier: TierName = difficulty === "nightmare" ? "ultimate" : (difficulty && difficulty in TIER_PLAY ? (difficulty as TierName) : "medium");
+  return Math.max(1, Math.min(10, realisticLevel(stage, round) + TIER_PLAY[tier].lvlOff));
+}
+
 /** Adaptive "learning" signals fed into a bot's draft — all OPTIONAL and host-supplied, so
  *  the generator stays a pure function of its inputs (determinism intact; clients replay the
  *  persisted board). None of these grant stats — they only make the bot DRAFT smarter:

@@ -450,7 +450,7 @@ export function NetGameClient() {
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
       const g = useGame.getState();
-      syncBoard(room.code, myUid, g.units, g.exportSave(), g.level, g.augments);
+      syncBoard(room.code, myUid, g.units, g.exportSave(), g.level, g.augments, g.gold);
       // Snapshot my board for this cumulative round (last edit wins) for the Clone-bot ghost.
       if (meta) ghostSnaps.current[cumulativeRound(meta.stage, meta.round)] = serializeBoard(g.units);
     }, 250);
@@ -877,9 +877,16 @@ export function NetGameClient() {
   const spectating = !!spectate && spectate !== myUid && !!players[spectate];
   const spectateP = spectating ? players[spectate!] : undefined;
   const spectateUnits = spectating ? asBoard(spectateP?.board) : null;
-  // Only the on-board units are public — a rival's BENCH is hidden information
-  // (it lives in their private econ snapshot now), so spectating never reveals it.
-  const spectateBench: UnitInstance[] = [];
+  // Bench is now PUBLIC (lobby chose full transparency), so spectating shows the rival's bench.
+  // Bench units carry pos === null, so normalise without asBoard's pos filter.
+  const spectateBench: UnitInstance[] = (() => {
+    if (!spectating) return [];
+    const raw = spectateP?.bench;
+    const arr = Array.isArray(raw) ? raw : raw ? Object.values(raw) : [];
+    return (arr as UnitInstance[])
+      .filter((u) => u && hasDef(u.defId))
+      .map((u) => ({ ...u, items: (Array.isArray(u.items) ? u.items : Object.values((u.items ?? {}) as Record<string, string>)).filter(Boolean) }));
+  })();
 
   // Forward-looking timeline: the current stage + the next two, each round
   // tagged with its kind (PvE / carousel / PvP) and overlaid with past results.
@@ -935,7 +942,7 @@ export function NetGameClient() {
         {/* Round tracker (TFT-style): an icon per round — Sword=PvP, Leaf=PvE, Gift=
             carousel — grouped by stage. The current round glows; past PvP rounds
             colour win/loss and stay clickable for a recap. */}
-        <div className="gilded relative flex items-center gap-3 px-3 py-1.5 rounded-lg">
+        <div className="gilded relative z-20 flex items-center gap-3 px-3 py-1.5 rounded-lg">
           {/* Current stage/round recap, pinned beside the round tracker. */}
           <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/[0.06]">
             <span className="text-[8px] uppercase tracking-[0.15em] text-slate-400/70 leading-none">{t.net_stage}</span>
@@ -1003,23 +1010,41 @@ export function NetGameClient() {
 
         {/* Top HUD bar: stat chips, then the phase/timer segment + controls.
             (The stage badge lives next to the timeline above.) */}
-        <div className="gilded flex items-center gap-2 flex-wrap px-3 py-2 rounded-xl">
-          {isSpectator ? (
-            <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-400/40 text-[11px] font-bold text-amber-300">
-              <Eye size={13} /> {t.net_spectate_badge}
-            </span>
-          ) : (
-            <>
-              <StatChip label={t.net_hp} accent="#ff6b6b" value={Math.max(0, me?.hp ?? 0)} />
-              <StatChip label={t.net_gold} accent="#fbbf24" value={<span className="inline-flex items-center gap-1"><CoinIcon size={13} />{gold}</span>} />
-              <StatChip label={t.net_interest} accent="#fcd34d" value={`+${interest(gold)}`} />
-              <StatChip label={t.net_streak} accent={streak >= 0 ? "#34d399" : "#f87171"} value={`${streak >= 0 ? "W" : "L"}${Math.abs(streak)}`} sub={`+${streakGold(streak)}`}
-                title={lang === "fr"
-                  ? "Or de série (victoires OU défaites d'affilée) : 2–3 → +1, 4 → +2, 5+ → +3 or par tour."
-                  : "Streak gold (a run of wins OR losses): 2–3 → +1, 4 → +2, 5+ → +3 gold per round."} />
-            </>
-          )}
-          <StatChip label={t.net_alive(aliveCount).replace(/[0-9]+\s*/, "")} accent="#cbd5e1" value={aliveCount} />
+        <div className="relative z-30 gilded flex items-center gap-2.5 px-3.5 py-2 rounded-xl">
+          {(() => {
+            // The HUD economy reflects whoever's board you're looking at: a scouted rival → their
+            // now-public econ (lobby chose full transparency); else your own live numbers.
+            const tgt = spectating ? spectateP : (isSpectator ? undefined : me);
+            if (!tgt) {
+              return (
+                <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-400/40 text-[11px] font-bold text-amber-300">
+                  <Eye size={13} /> {t.net_spectate_badge}
+                </span>
+              );
+            }
+            const g = spectating ? (spectateP?.gold ?? 0) : gold;
+            const stk = spectating ? (spectateP?.streak ?? 0) : streak;
+            return (
+              <>
+                {spectating && (
+                  <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-400/40 text-[11px] font-bold text-amber-300">
+                    <Eye size={13} /> {spectateP?.name ?? "Rival"}
+                  </span>
+                )}
+                {/* Economy cluster — one cohesive segmented gauge for the viewed player. */}
+                <div className="flex items-stretch rounded-lg bg-black/30 border border-white/[0.07] overflow-hidden divide-x divide-white/[0.06] shrink-0">
+                  <StatCell label={t.net_hp} accent="#ff6b6b" value={Math.max(0, tgt.hp ?? 0)} />
+                  <StatCell label={t.net_gold} accent="#fbbf24" icon={<CoinIcon size={12} />} value={g} />
+                  <StatCell label={t.net_interest} accent="#fcd34d" value={`+${interest(g)}`} />
+                  <StatCell label={t.net_streak} accent={stk >= 0 ? "#34d399" : "#f87171"} value={`${stk >= 0 ? "W" : "L"}${Math.abs(stk)}`} sub={`+${streakGold(stk)}`}
+                    title={lang === "fr"
+                      ? "Or de série (victoires OU défaites d'affilée) : 2–3 → +1, 4 → +2, 5+ → +3 or par tour."
+                      : "Streak gold (a run of wins OR losses): 2–3 → +1, 4 → +2, 5+ → +3 gold per round."} />
+                  <StatCell label={t.net_alive(aliveCount).replace(/[0-9]+\s*/, "")} accent="#cbd5e1" value={aliveCount} />
+                </div>
+              </>
+            );
+          })()}
           {phase === "planning" && (() => {
             // Deterministic pairing → show who you're about to fight this round.
             const opp = room && myUid ? predictOpponent(room, myUid) : null;
@@ -1231,9 +1256,10 @@ export function NetGameClient() {
           </div>
         </div>
 
-        {/* Bottom bar: board controls + bench (centred), then the shop. Spectators
-            have no board/economy of their own, so the whole bar is hidden for them. */}
-        {!isSpectator && <div className="flex flex-col items-center gap-2">
+        {/* Bottom bar: board controls + bench (centred), then the shop. Hidden for dedicated
+            spectators (no econ) AND while scouting a rival (it's all YOUR controls — the centre
+            shows the rival's board + bench instead, so your shop/bench would just be noise). */}
+        {!isSpectator && !spectating && <div className="flex flex-col items-center gap-2">
           <div className="flex items-stretch gap-2">
             {/* Board capacity (placed / cap) + one-click auto-fill from the bench. */}
             {(() => {
@@ -1863,6 +1889,19 @@ function PhaseTimer({ phase, phaseLabel, deadline, totalMs, resolvingLabel }: { 
       {resolving
         ? <div className="h-1.5 w-full rounded-full bg-slate-800/80 overflow-hidden"><div className="h-full w-1/3 rounded-full bg-amber-400 loading-sweep" /></div>
         : <SmoothBar deadline={deadline} totalMs={totalMs} combat={phase === "combat"} />}
+    </div>
+  );
+}
+
+/** A cell in the grouped economy strip — label over value, sharing the strip's hairline frame
+ *  + dividers so the whole cluster reads as one designed gauge. */
+function StatCell({ label, value, accent, sub, icon, title }: { label: string; value: ReactNode; accent?: string; sub?: string; icon?: ReactNode; title?: string }) {
+  return (
+    <div title={title} className="flex flex-col justify-center px-3 py-1 hover:bg-white/[0.03] transition-colors">
+      <span className="text-[8px] uppercase tracking-wide text-slate-500 leading-none">{label}</span>
+      <span className="mt-1 text-[15px] font-bold leading-none inline-flex items-center gap-1 tabular-nums" style={{ color: accent }}>
+        {icon}{value}{sub && <span className="text-[9px] font-semibold text-slate-400">{sub}</span>}
+      </span>
     </div>
   );
 }
