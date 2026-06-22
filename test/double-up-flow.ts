@@ -170,9 +170,10 @@ async function run() {
   assert(room.players.p2.place === room.players.p3.place && (room.players.p2.place ?? 0) > 1, "team-1 partners share a worse placement");
   assert(room.teams?.[0]?.alive === true && room.teams?.[1]?.alive === false, "team 0 alive, team 1 dead");
 
-  // 4) Server-authoritative rating (PR-B shadow): every human got a results/{uid} row and its
-  // delta matches the shared client formula. 4-human lobby → total 4, 3 human opponents, 0 bots.
-  console.log("\nServer rating shadow (results/{uid}):");
+  // 4) Server-authoritative rating (PR-C): every human has a results/{uid} row (the real write
+  // path — rating + leaderboard + history also applied). Delta matches the formula.
+  // 4-human lobby → total 4, 3 human opponents, 0 bots.
+  console.log("\nServer rating results (results/{uid}):");
   const results = (getPath(store, `games/${CODE}/results`) ?? {}) as Record<string, { place: number; players: number; humans: number; bots: number; delta: number }>;
   for (const uid of ["p0", "p1", "p2", "p3"]) {
     const r = results[uid];

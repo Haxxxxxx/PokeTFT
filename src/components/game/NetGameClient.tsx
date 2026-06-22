@@ -5,7 +5,7 @@ import { DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSen
 import { useGame, BENCH_SIZE, PENSION_COST, PENSION_ROUNDS, resolveBenchSlots } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
-import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, concede, markCarouselPicked, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS } from "@/game/net/match";
+import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, markCarouselPicked, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS } from "@/game/net/match";
 import { simulate, type FrameUnit } from "@/game/engine/combat";
 import { getDef, spriteUrl, hasDef, archetypeOf } from "@/game/data/mons";
 import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, modeTeamBuff, modeSignatureAugment, getMode, pickMonoType, isDoubleUp } from "@/game/data/gameModes";
@@ -18,10 +18,11 @@ import { enemyToField } from "@/game/engine/hex";
 import { ItemGlyph, AugmentGlyph } from "./ItemGlyph";
 import { AugmentsBar } from "./AugmentsBar";
 import { CoopPanel } from "./CoopPanel";
-import { finishCarouselEarly } from "@/game/net/serverGame";
+import { finishCarouselEarly, callConcede } from "@/game/net/serverGame";
 import { subscribeTransfers } from "@/game/net/coop";
-import { recordGameResult, applyRankedResult, rankOf, recordUltimateBotWin, weightedRatingDelta, type RankedResult } from "@/game/net/users";
-import { computeTraits } from "@/game/engine/synergies";
+import { rankOf, recordUltimateBotWin, type RankedResult } from "@/game/net/users";
+import { ref as dbRef, onValue } from "firebase/database";
+import { db } from "@/game/net/firebase";
 import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords, RefreshCw, BarChart3 } from "lucide-react";
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR, teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID, tailoredAugmentPicks } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
@@ -236,7 +237,7 @@ export function NetGameClient() {
   // pick (the `<=` count gate alone can leave it open when you're behind a slot).
   const [pickedSlot, setPickedSlot] = useState<number | null>(null);
   const [spectate, setSpectate] = useState<string | null>(null);
-  // LP outcome of this ranked game — shown on the end screen once applyRankedResult resolves.
+  // LP outcome of this ranked game — populated from games/{code}/results/{uid} via server write.
   const [rankResult, setRankResult] = useState<RankedResult | null>(null);
   // Toggle for the "last fight" damage recap, reviewable during planning (both teams).
   const [showRecap, setShowRecap] = useState(false);
@@ -675,9 +676,8 @@ export function NetGameClient() {
   // Play victory/defeat sound when the game ends. Computed inline (the `iWon`
   // const is derived after the early-return guard, so it isn't in scope here).
   const prevPhase = useRef<string | null>(null);
-  // The game code we've already recorded a result for — so each match records exactly ONCE
-  // (history is idempotent by code, but applyRankedResult APPLIES the LP delta, so it must not
-  // run twice). Reset when a fresh match begins.
+  // The game code we've already fired SFX/ghost-save for — exactly once per match.
+  // Reset when a fresh match begins.
   const recordedRef = useRef<string | null>(null);
   useEffect(() => {
     // Spectators have no stake in the game — never save a ghost, record history, or apply LP.
@@ -698,23 +698,10 @@ export function NetGameClient() {
       const lastOneStanding = meP?.place === 1 || meta?.winnerUid === myUid || wonByTeam;
       if (lastOneStanding) sfx.victory(); else sfx.defeat();
       saveGhost(myUid, ghostSnaps.current, room?.rules?.generations).catch(() => {});
-      setRankResult(null); // clear any prior game's LP until this one's applyRankedResult resolves
+      setRankResult(null); // clear prior game LP; server result arrives via results/{uid} listener
       const place = meP?.place ?? (lastOneStanding ? 1 : Object.values(ps).filter((p) => !p.isBot).length);
-      const total = Object.values(ps).length;
-      const finalBoard = useGame.getState().units.filter((u) => u.pos !== null);
-      const team = finalBoard.map((u) => ({ d: u.defId, s: u.star }));
-      const traits = computeTraits(finalBoard).filter((tr) => tr.tier > 0).map((tr) => ({ k: tr.key, t: tr.tier }));
       const all = Object.values(ps);
-      const humanOpp = all.filter((p) => !p.isBot && p.uid !== myUid).length;
-      const botOpp = all.filter((p) => p.isBot).length;
-      const lp = weightedRatingDelta(place, all.length, humanOpp, botOpp);
-      recordGameResult(myUid, code, {
-        place, players: total, regions: room.rules?.generations ?? [1],
-        won: place === 1 || meta?.winnerUid === myUid, team, traits, lp, mode: room.rules?.mode ?? "standard",
-      }).catch(() => {});
-      applyRankedResult(myUid, place, all.length, meP?.name ?? "Player", meP?.photoURL, { humans: humanOpp, bots: botOpp }).then(setRankResult).catch(() => {});
-      // Hidden progression: a WIN against a lobby that held an ultimate/nightmare bot advances the
-      // nightmare unlock.
+      // Hidden progression: a WIN against a lobby that held an ultimate/nightmare bot.
       const won = place === 1 || meta?.winnerUid === myUid;
       const hadTopBot = all.some((p) => p.isBot && (p.botDifficulty === "ultimate" || p.botDifficulty === "nightmare"));
       if (won && hadTopBot) recordUltimateBotWin(myUid).catch(() => {});
@@ -722,6 +709,20 @@ export function NetGameClient() {
     prevPhase.current = phase ?? null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, myUid ? room?.players?.[myUid]?.place : null, myUid ? room?.players?.[myUid]?.alive : null]);
+
+  // Subscribe to the server-written LP result. The server writes games/{code}/results/{uid}
+  // via applyRatingFor when a player's final place is decided — this listener delivers it to
+  // the end screen without the client touching any write path.
+  const serverResultCode = room?.code;
+  useEffect(() => {
+    if (!serverResultCode || !myUid) return;
+    const unsub = onValue(dbRef(db(), `games/${serverResultCode}/results/${myUid}`), (snap) => {
+      if (!snap.exists()) return;
+      const r = snap.val() as { delta: number; rating: number; prevRating: number };
+      setRankResult({ delta: r.delta, rating: r.rating, prevRating: r.prevRating });
+    });
+    return unsub;
+  }, [serverResultCode, myUid]);
 
   const [confirmLeave, setConfirmLeave] = useState(false);
   // Stage-up announce — flash a "Stage N" banner whenever the stage increments.
@@ -769,31 +770,12 @@ export function NetGameClient() {
   const iWon = gameOver && (me?.place === 1 || (!!meta?.winnerUid && meta.winnerUid === myUid) || (meta?.winnerTeam != null && me?.teamId === meta.winnerTeam));
 
   const inMatch = phase === "planning" || phase === "combat" || phase === "carousel";
-  // Forfeit: take the worst currently-alive placement, record the result, then leave.
+  // Forfeit: server picks the worst-alive placement, writes elimination + LP, then we leave.
   const doConcede = async () => {
-    const ps = room.players ?? {};
-    const place = Object.values(ps).filter((p) => p.alive).length;
-    // Claim the once-per-match record guard up front so the placement-watcher effect doesn't
-    // ALSO record/apply-LP for this game (we record it manually here before leaving).
     if (recordedRef.current === room.code) { leave(); return; }
     recordedRef.current = room.code;
     try {
-      await concede(room.code, myUid, place);
-      const finalBoard = useGame.getState().units.filter((u) => u.pos !== null);
-      // Forfeit at the worst currently-alive placement (over the whole lobby); LP swing is
-      // weighted so a bot-heavy practice game moves the rating less than a real lobby.
-      const all = Object.values(ps);
-      const humanOpp = all.filter((p) => !p.isBot && p.uid !== myUid).length;
-      const botOpp = all.filter((p) => p.isBot).length;
-      const lp = weightedRatingDelta(place, all.length, humanOpp, botOpp);
-      recordGameResult(myUid, room.code, {
-        place, players: Object.values(ps).length, regions: room.rules?.generations ?? [1], won: false,
-        team: finalBoard.map((u) => ({ d: u.defId, s: u.star })),
-        traits: computeTraits(finalBoard).filter((tr) => tr.tier > 0).map((tr) => ({ k: tr.key, t: tr.tier })),
-        lp,
-        mode: room.rules?.mode ?? "standard",
-      });
-      applyRankedResult(myUid, place, all.length, me?.name ?? "Player", me?.photoURL, { humans: humanOpp, bots: botOpp }).catch(() => {});
+      await callConcede(room.code);
     } catch { /* best-effort */ }
     leave();
   };
