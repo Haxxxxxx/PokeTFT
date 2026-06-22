@@ -465,13 +465,19 @@ export const useRoom = create<RoomState>((setState, getState) => ({
     const code = window.sessionStorage.getItem(ROOM_KEY);
     if (!code) return;
     setState({ reconnecting: true });
+    // Watchdog: if re-attach hasn't completed in 10s (dead auth, hung RTDB read on a bad link),
+    // give up gracefully instead of freezing on the splash forever.
+    const watchdog = setTimeout(() => {
+      if (getState().reconnecting) { forgetRoom(); setState({ reconnecting: false, status: "idle" }); }
+    }, 10_000);
     try {
       const uid = await ensureAuth();
       const snap = await get(roomRef(code));
-      if (!snap.exists() || !isValidRoom(snap.val())) { forgetRoom(); setState({ reconnecting: false }); return; }
+      if (!snap.exists() || !isValidRoom(snap.val())) { clearTimeout(watchdog); forgetRoom(); setState({ reconnecting: false }); return; }
       const data = snap.val() as Room;
       if (!data.players?.[uid]) {
         // We're no longer in this room (removed, or it moved on) — drop it.
+        clearTimeout(watchdog);
         forgetRoom();
         setState({ reconnecting: false });
         return;
@@ -479,9 +485,11 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       await update(ref(db(), `games/${code}/players/${uid}`), { connected: true });
       subscribe(code, uid, setState);
       onDisconnect(ref(db(), `games/${code}/players/${uid}/connected`)).set(false);
+      clearTimeout(watchdog);
       setState({ code, myUid: uid, status: "connected", reconnecting: false });
       setCurrentGame(uid, code);
     } catch {
+      clearTimeout(watchdog);
       forgetRoom();
       setState({ reconnecting: false });
     }
@@ -591,7 +599,14 @@ function subscribeRoomNode(code: string, setState: (p: Partial<RoomState>) => vo
       return;
     }
     const val = snap.val();
-    if (!val || typeof val !== "object" || !val.meta) return; // ignore malformed snapshots
+    // A node with no `meta` is a dead orphan (e.g. a join that raced a room deletion wrote a
+    // player but no room) — treat it exactly like a deleted room so the client falls back to the
+    // browser instead of hanging on a blank/stuck screen. (pruneStale deletes these server-side.)
+    if (!val || typeof val !== "object" || !val.meta) {
+      lastSig = null;
+      setState({ room: null, liveRoom: null });
+      return;
+    }
     const next: Room = {
       code,
       meta: val.meta,
