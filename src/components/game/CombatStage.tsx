@@ -292,6 +292,8 @@ export function CombatStage({
             const hpFrac = lerp(u.hpFrac, bu.hpFrac, frac);
             const manaFrac = lerp(u.manaFrac, bu.manaFrac, frac);
             const attackEv = a.events.find((e) => e.kind === "attack" && e.from === u.id);
+            const castEv = a.events.find((e) => e.kind === "cast" && e.from === u.id);
+            const castColor = castEv && castEv.kind === "cast" ? (TYPE_COLOR[castEv.moveType] ?? "#a78bfa") : null;
             const hitThisFrame = recentHit.has(u.id);
             // Lunge toward the thing we're hitting.
             let lunge = { dx: 0, dy: 0 };
@@ -315,6 +317,7 @@ export function CombatStage({
                 manaFrac={manaFrac}
                 lunge={lunge}
                 flash={hitThisFrame ? `${fi}-${u.id}` : null}
+                cast={castColor}
                 faceLeft={(facing.get(u.id) ?? u.c) < u.c}
               />
             );
@@ -520,10 +523,10 @@ const HexGrid = memo(function HexGrid() {
 });
 
 function CombatUnit({
-  unit, x, y, hpFrac, manaFrac, lunge, flash, faceLeft,
+  unit, x, y, hpFrac, manaFrac, lunge, flash, cast, faceLeft,
 }: {
   unit: FrameUnit; x: number; y: number; hpFrac: number; manaFrac: number;
-  lunge: { dx: number; dy: number }; flash: string | null; faceLeft: boolean;
+  lunge: { dx: number; dy: number }; flash: string | null; cast: string | null; faceLeft: boolean;
 }) {
   const ally = unit.team === "ally";
   const ring = unit.mega ? "#f0abfc" : ally ? "#34d399" : "#fb7185";
@@ -534,12 +537,13 @@ function CombatUnit({
   const low = hpFrac <= 0.25;
   const hpBar = ally ? (low ? "#16a34a" : "#34d399") : (low ? "#dc2626" : "#fb7185");
   const lunging = lunge.dx !== 0 || lunge.dy !== 0; // mid-attack → thrust scale for impact
+  const castScale = cast ? 1.16 : lunging ? 1.08 : 1; // cast wind-up pops bigger than an attack
   // The sprite is the star: nearly planning-board size (78px) with team identity from a soft
   // back-glow + the feet ring rather than a hard disc, so it reads as a Pokémon, not a token.
   return (
     <div
       className="absolute"
-      style={{ left: x - 41, top: y - 57, width: 82, transform: `translate(${lunge.dx}px, ${lunge.dy}px) scale(${lunging ? 1.08 : 1})`, transition: "transform 80ms ease-out" }}
+      style={{ left: x - 41, top: y - 57, width: 82, transform: `translate(${lunge.dx}px, ${lunge.dy}px) scale(${castScale})`, transition: "transform 80ms ease-out" }}
     >
       {/* HP bar — team-coloured (green ally / red enemy), glossy fill, crisp dark frame. */}
       <div className={`h-[7px] w-full rounded-[3px] bg-black/80 overflow-hidden mb-[3px] ${low ? "animate-pulse" : ""}`} style={{ outline: "1px solid rgba(0,0,0,0.55)" }}>
@@ -554,6 +558,10 @@ function CombatUnit({
       <div className="relative mx-auto flex items-end justify-center" style={{ width: 78, height: 78 }}>
         {/* Soft team aura behind the mon (stronger for mega) — replaces the hard ring disc. */}
         <span className="absolute inset-0 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle at 50% 60%, ${ring}${unit.mega ? "55" : "2e"}, transparent 66%)` }} />
+        {/* Cast wind-up: a charging aura + an expanding ring in the move's colour, telegraphing
+            the ability the instant before it fires. */}
+        {cast && <span className="absolute inset-0 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle, ${cast}88, transparent 62%)` }} />}
+        {cast && <span className="absolute inset-[-7px] rounded-full pointer-events-none combat-cast" style={{ border: `3px solid ${cast}`, boxShadow: `0 0 18px 3px ${cast}` }} />}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={spriteUrl(unit.dex)}
@@ -561,7 +569,7 @@ function CombatUnit({
           width={78}
           height={78}
           className="relative drop-shadow-[0_4px_5px_rgba(0,0,0,0.6)]"
-          style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none", filter: unit.disabled ? "brightness(1.25) saturate(0.4) drop-shadow(0 0 7px #7dd3fc)" : unit.burning ? "saturate(1.45) drop-shadow(0 0 7px #f97316)" : `drop-shadow(0 0 6px ${ring}88)` }}
+          style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none", filter: cast ? `brightness(1.3) drop-shadow(0 0 11px ${cast})` : unit.disabled ? "brightness(1.25) saturate(0.4) drop-shadow(0 0 7px #7dd3fc)" : unit.burning ? "saturate(1.45) drop-shadow(0 0 7px #f97316)" : `drop-shadow(0 0 6px ${ring}88)` }}
           draggable={false}
         />
         {flash && <span key={flash} className="absolute inset-0 combat-hitflash" style={{ background: "radial-gradient(circle, #fff, #ffffff00 70%)" }} />}
@@ -591,9 +599,21 @@ function Corpse({ unit }: { unit: FrameUnit }) {
 
 function DamageNumber({ x, y, dmg, crit, sup }: { x: number; y: number; dmg: number; crit?: boolean; sup?: boolean }) {
   const color = crit ? "#fde047" : sup ? "#fb923c" : "#fff";
+  const size = crit ? 25 : sup ? 18 : 13;
+  const glow = crit
+    ? "0 0 9px rgba(253,224,71,0.95), 0 1px 3px #000"
+    : sup ? "0 0 7px rgba(251,146,60,0.85), 0 1px 3px #000" : "0 1px 3px #000";
+  // Deterministic horizontal spread so a flurry of numbers on one target fans out instead of
+  // stacking into an unreadable blob.
+  const jx = ((dmg * 53) % 36) - 18;
   return (
-    <div className="absolute pointer-events-none font-extrabold combat-float" style={{ left: x, top: y - 18, color, fontSize: crit ? 18 : sup ? 15 : 12, textShadow: "0 1px 3px #000" }}>
-      {dmg}{crit ? "!" : sup ? "▲" : ""}
+    <div className="absolute pointer-events-none combat-float" style={{ left: x + jx, top: y - 18 }}>
+      <span
+        className={`block font-extrabold leading-none ${crit || sup ? "dmg-pop" : ""}`}
+        style={{ color, fontSize: size, textShadow: glow, WebkitTextStroke: crit ? "0.6px rgba(0,0,0,0.45)" : undefined }}
+      >
+        {dmg}{crit ? "!" : sup ? "▲" : ""}
+      </span>
     </div>
   );
 }
