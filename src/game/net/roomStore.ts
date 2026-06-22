@@ -11,7 +11,7 @@ import type { UnitInstance } from "../types";
 
 export type RoomPhase = "lobby" | "planning" | "combat" | "carousel" | "over";
 
-export type BotDifficulty = "easy" | "medium" | "hard" | "expert" | "ultimate" | "clone";
+export type BotDifficulty = "easy" | "medium" | "hard" | "expert" | "ultimate" | "clone" | "nightmare";
 
 export type RoomPlayer = {
   uid: string;
@@ -24,6 +24,10 @@ export type RoomPlayer = {
   /** AI bot players are filled by the host and driven by the match controller. */
   isBot?: boolean;
   botDifficulty?: BotDifficulty;
+  /** Nightmare tier only: the flat stat scale this bot fights at (the gated cheat). Decided
+   *  once when the bot is added (ramps with the host's ultimate-win count) and persisted so
+   *  the host, clients and Functions all bake the identical buff into the replayed board. */
+  botStatBuff?: number;
   /** Live game state (synced during the match). */
   hp: number;
   level: number;
@@ -203,8 +207,9 @@ type RoomState = {
   updateMe: (patch: Partial<RoomPlayer>) => void;
   setMeta: (patch: Partial<RoomMeta>) => void;
   setRules: (patch: Partial<RoomRules>) => void;
-  /** Host: add an AI bot to a free slot. */
-  addBot: (difficulty: BotDifficulty) => void;
+  /** Host: add an AI bot to a free slot. `opts` lets the caller override the name and bake a
+   *  nightmare stat buff (the hidden boss tier) onto the bot. */
+  addBot: (difficulty: BotDifficulty, opts?: { statBuff?: number; name?: string }) => void;
   /** Host: remove a player or bot from the lobby. */
   removePlayer: (uid: string) => void;
   /** Re-attach to the room saved in this tab (after a page refresh). */
@@ -399,17 +404,21 @@ export const useRoom = create<RoomState>((setState, getState) => ({
 
   setReady: (ready) => getState().updateMe({ ready }),
 
-  addBot: (difficulty) => {
+  addBot: (difficulty, opts) => {
     const { code, room } = getState();
     if (!code || !room) return;
     const count = Object.values(room.players ?? {}).filter((p) => p.connected).length;
     if (count >= (room.rules?.maxPlayers ?? 8)) return;
     const id = "bot-" + Math.random().toString(36).slice(2, 8);
-    update(ref(db(), `games/${code}/players/${id}`), {
-      uid: id, name: difficulty === "clone" ? "Clone" : `AI ${difficulty}`, isHost: false, connected: true, ready: true,
+    const name = opts?.name ?? (difficulty === "clone" ? "Clone" : difficulty === "nightmare" ? "AI 💀" : `AI ${difficulty}`);
+    const node: Record<string, unknown> = {
+      uid: id, name, isHost: false, connected: true, ready: true,
       isBot: true, botDifficulty: difficulty,
       hp: room.rules?.startingHp ?? 100, level: 1, alive: true, place: null, streak: 0,
-    }).catch(onWriteErr);
+    };
+    // Nightmare carries a baked-in stat buff (the gated cheat); persisted so the sim replays it.
+    if (difficulty === "nightmare" && opts?.statBuff) node.botStatBuff = opts.statBuff;
+    update(ref(db(), `games/${code}/players/${id}`), node).catch(onWriteErr);
   },
 
   removePlayer: (uid) => {

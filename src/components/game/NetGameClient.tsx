@@ -20,7 +20,7 @@ import { AugmentsBar } from "./AugmentsBar";
 import { CoopPanel } from "./CoopPanel";
 import { finishCarouselEarly } from "@/game/net/serverGame";
 import { subscribeTransfers } from "@/game/net/coop";
-import { recordGameResult, applyRankedResult, rankOf, type RankedResult } from "@/game/net/users";
+import { recordGameResult, applyRankedResult, rankOf, recordUltimateBotWin, type RankedResult } from "@/game/net/users";
 import { computeTraits } from "@/game/engine/synergies";
 import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords, RefreshCw } from "lucide-react";
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR, teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID, tailoredAugmentPicks } from "@/game/data/augments";
@@ -704,6 +704,12 @@ export function NetGameClient() {
         const humanOpp = all.filter((p) => !p.isBot && p.uid !== myUid).length;
         const botOpp = all.filter((p) => p.isBot).length;
         applyRankedResult(myUid, place, all.length, meP?.name ?? "Player", meP?.photoURL, { humans: humanOpp, bots: botOpp }).then(setRankResult).catch(() => {});
+        // Hidden progression: a WIN against a lobby that held an ultimate (or nightmare) bot
+        // advances the nightmare unlock — once past the threshold, ultimate bots start being
+        // silently replaced by the nightmare boss tier in future lobbies.
+        const won = place === 1 || meta?.winnerUid === myUid;
+        const hadTopBot = all.some((p) => p.isBot && (p.botDifficulty === "ultimate" || p.botDifficulty === "nightmare"));
+        if (won && hadTopBot) recordUltimateBotWin(myUid).catch(() => {});
       }
     }
     prevPhase.current = phase ?? null;
@@ -1050,16 +1056,17 @@ export function NetGameClient() {
             <div className="flex flex-col gap-1">
               {ladder.map((p, i) => {
                 const dex = asBoard(p.board)[0] ? getDef(asBoard(p.board)[0].defId).dex[asBoard(p.board)[0].star - 1] : null;
+                const isNm = p.botDifficulty === "nightmare";
                 return (
                   <div
                     key={p.uid}
                     onClick={() => setSpectate(isSpectator ? p.uid : (p.uid === myUid ? null : (spectate === p.uid ? null : p.uid)))}
                     title={p.uid === myUid && !isSpectator ? "Your board" : `View ${p.name}'s board`}
-                    className={`flex items-center gap-2 px-1.5 py-1 rounded-lg cursor-pointer hover:bg-slate-700/50 ${p.uid === myUid ? "bg-slate-700/70 ring-1 ring-sky-500/50" : ""} ${spectate === p.uid ? "ring-1 ring-amber-400/70 bg-amber-500/10" : ""} ${!p.alive ? "opacity-40" : ""}`}
+                    className={`flex items-center gap-2 px-1.5 py-1 rounded-lg cursor-pointer hover:bg-slate-700/50 ${p.uid === myUid ? "bg-slate-700/70 ring-1 ring-sky-500/50" : ""} ${spectate === p.uid ? "ring-1 ring-amber-400/70 bg-amber-500/10" : ""} ${isNm && p.alive ? "ring-1 ring-rose-600/50 bg-rose-950/20" : ""} ${!p.alive ? "opacity-40" : ""}`}
                   >
                     <span className="w-4 text-[10px] text-slate-500 font-bold text-center">{p.place ?? i + 1}</span>
-                    <span className="w-7 h-7 rounded-md bg-black/40 border border-slate-700 flex items-center justify-center shrink-0 overflow-hidden">
-                      {p.photoURL ? (
+                    <span className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 overflow-hidden ${isNm ? "bg-rose-950/60 border border-rose-600/70 shadow-[0_0_10px_-2px_rgba(225,29,72,0.8)]" : "bg-black/40 border border-slate-700"}`}>
+                      {isNm ? <span className="text-[13px] leading-none">💀</span> : p.photoURL ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={p.photoURL} alt="" width={24} height={24} style={{ imageRendering: "pixelated" }} />
                       ) : dex ? (
@@ -1069,7 +1076,7 @@ export function NetGameClient() {
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className="flex items-center gap-1.5">
-                        <span className={`block text-[11px] font-semibold truncate ${p.uid === myUid ? "text-amber-300" : "text-slate-200"}`}>
+                        <span className={`block text-[11px] font-semibold truncate ${isNm ? "text-rose-300" : p.uid === myUid ? "text-amber-300" : "text-slate-200"}`}>
                           {p.name}{!p.connected && t.net_offline}
                         </span>
                         {/* Scouting: rivals' levels are public (TFT-style). */}

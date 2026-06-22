@@ -9,7 +9,7 @@ import { EMBLEM_TRAIT } from "../data/items";
 import { canMega, MEGA_STONE } from "../data/mega";
 import { makeRng, weightedPick, randInt, type Rng } from "./rng";
 
-export type BotLevel = "easy" | "medium" | "hard" | "expert" | "ultimate" | "clone";
+export type BotLevel = "easy" | "medium" | "hard" | "expert" | "ultimate" | "clone" | "nightmare";
 
 const BY_COST: Record<Cost, string[]> = (() => {
   const m = { 1: [], 2: [], 3: [], 4: [], 5: [] } as Record<Cost, string[]>;
@@ -211,9 +211,12 @@ export function generateBoard(level: number, count: number, seed: number, allowe
  *  many synergies it activates, how it concentrates upgrades/items, and how hard it counters
  *  the opponent's types. `opponentBoard` (the human it's about to fight) lets it adapt.
  *  Deterministic per seed (host-generated + persisted; clients just replay it). */
-export function generatePlayerLikeBoard(stage: number, round: number, difficulty: BotLevel | undefined, seed: number, allowedIds?: string[], enabledItems?: string[], opponentBoard?: UnitInstance[], brain?: BotBrain): UnitInstance[] {
-  const tier: TierName = difficulty && difficulty in TIER_PLAY ? (difficulty as TierName) : "medium";
-  return buildBotBoard(stage, round, tier, seed, allowedIds, enabledItems, opponentBoard, brain);
+export function generatePlayerLikeBoard(stage: number, round: number, difficulty: BotLevel | undefined, seed: number, allowedIds?: string[], enabledItems?: string[], opponentBoard?: UnitInstance[], brain?: BotBrain, statBuff?: number): UnitInstance[] {
+  // "nightmare" is the ONLY tier that cheats: it plays at ultimate skill AND carries a flat
+  // stat buff (statBuff, applied as statScale). It's gated behind a hidden progression (>10
+  // ultimate wins) and never offered as a normal difficulty — a creeping boss, not fair play.
+  const tier: TierName = difficulty === "nightmare" ? "ultimate" : (difficulty && difficulty in TIER_PLAY ? (difficulty as TierName) : "medium");
+  return buildBotBoard(stage, round, tier, seed, allowedIds, enabledItems, opponentBoard, brain, statBuff);
 }
 
 /** Adaptive "learning" signals fed into a bot's draft — all OPTIONAL and host-supplied, so
@@ -294,7 +297,7 @@ export function generateExpertBoard(stage: number, round: number, seed: number, 
  *  achievable star/item economy. Tier changes how WELL it plays; `opponentBoard` lets the
  *  skilled tiers COUNTER-DRAFT — committing to synergies whose types are super-effective
  *  against the opponent's spread. Deterministic per seed. */
-function buildBotBoard(stage: number, round: number, tier: TierName, seed: number, allowedIds?: string[], enabledItems?: string[], opponentBoard?: UnitInstance[], brain?: BotBrain): UnitInstance[] {
+function buildBotBoard(stage: number, round: number, tier: TierName, seed: number, allowedIds?: string[], enabledItems?: string[], opponentBoard?: UnitInstance[], brain?: BotBrain, statBuff?: number): UnitInstance[] {
   const rng: Rng = makeRng(seed >>> 0);
   const cfg = TIER_PLAY[tier];
   const byCost = byCostFrom(allowedIds);
@@ -556,6 +559,11 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
       if (target) { target.items = [...(target.items ?? []), emblemId]; emblemPlaced.add(target.iid); }
     }
   }
+
+  // NIGHTMARE stat buff (the gated cheat): scale every unit's stats up. Baked into the
+  // persisted board as statScale, so combat (which multiplies by statScale) and the client
+  // replay both apply it identically. Only ever non-1 for the nightmare tier.
+  if (statBuff && statBuff !== 1) for (const u of board) u.statScale = (u.statScale ?? 1) * statBuff;
 
   return board;
 }

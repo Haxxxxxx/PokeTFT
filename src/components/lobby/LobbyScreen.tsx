@@ -8,15 +8,22 @@ import { beginMatch, addInvitePlaceholder } from "@/game/net/match";
 import { kickoffServerGame } from "@/game/net/serverGame";
 import { useAuth } from "@/game/net/authStore";
 import { useAppStore } from "@/game/store/appStore";
-import { sendInvite } from "@/game/net/users";
+import { sendInvite, nightmareParams } from "@/game/net/users";
+import type { BotDifficulty } from "@/game/net/roomStore";
 import { PokeballIcon } from "@/components/game/icons";
-import { Settings, Swords, UserPlus } from "lucide-react";
+import { Settings, Swords, UserPlus, X, Bot, Dna } from "lucide-react";
 import { enterFullscreen } from "@/lib/fullscreen";
 import { GameRulesPanel } from "./GameRulesPanel";
 import { unitsForGenerations } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 
 const GEN_NAMES = ["", "Kanto", "Johto", "Hoenn", "Sinnoh", "Unova", "Kalos", "Alola", "Galar", "Paldea"];
+
+/** Coin-flip for the silent nightmare swap. Module-scope so the randomness lives outside React's
+ *  render (it only ever runs from the add-bot click handler). */
+function rollChance(p: number): boolean {
+  return Math.random() < p;
+}
 
 export function LobbyScreen() {
   const t = useT();
@@ -102,9 +109,36 @@ export function LobbyScreen() {
   const poolCount = unitsForGenerations(gens).length;
   const items = room.rules?.itemsEnabled ?? [];
 
-  const Portrait = ({ name, photo, ready, isBot }: { name?: string; photo?: string | null; ready?: boolean; isBot?: boolean }) => (
-    <div className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center text-xl font-extrabold overflow-hidden shrink-0 transition-all ${isBot ? "bg-violet-950/50 border-violet-600 text-violet-300" : ready ? "bg-slate-800 border-emerald-500/70 shadow-[0_0_18px_-4px_rgba(16,185,129,0.7)] text-emerald-200" : "bg-slate-800 border-slate-600 text-slate-300"}`}>
-      {isBot ? "AI" : photo
+  // The escalating AI difficulty ladder — one cohesive segmented control, accent warming with
+  // threat. (Nightmare is NOT here: it's the hidden boss tier that silently replaces ultimate.)
+  const DIFFS: { id: BotDifficulty; label: string; accent: string }[] = [
+    { id: "easy",     label: t.p_diff_easy,     accent: "text-emerald-300" },
+    { id: "medium",   label: t.p_diff_medium,   accent: "text-sky-300" },
+    { id: "hard",     label: t.p_diff_hard,     accent: "text-violet-300" },
+    { id: "expert",   label: t.p_diff_expert,   accent: "text-amber-300" },
+    { id: "ultimate", label: t.p_diff_ultimate, accent: "text-rose-300" },
+  ];
+  const diffLabel = (d?: BotDifficulty): string =>
+    d === "nightmare" ? "?????" :
+    d === "clone" ? "Clone" :
+    d === "easy" ? t.p_diff_easy : d === "medium" ? t.p_diff_medium : d === "hard" ? t.p_diff_hard :
+    d === "expert" ? t.p_diff_expert : d === "ultimate" ? t.p_diff_ultimate : (d ?? "");
+
+  // Hidden progression: once the host has banked enough ultimate-bot wins, each "ultimate" they
+  // add has a ramping chance to spawn as a nightmare instead — no UI tell, just a creeping dread.
+  const nm = nightmareParams(myProfile?.ultimateBotWins ?? 0);
+  const addOpponent = (d: BotDifficulty) => {
+    if (d === "ultimate" && nm.unlocked && rollChance(nm.replaceChance)) addBot("nightmare", { statBuff: nm.statBuff });
+    else addBot(d);
+  };
+
+  const Portrait = ({ name, photo, ready, isBot, nightmare }: { name?: string; photo?: string | null; ready?: boolean; isBot?: boolean; nightmare?: boolean }) => (
+    <div className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center text-xl font-extrabold overflow-hidden shrink-0 transition-all ${
+      nightmare ? "bg-rose-950/70 border-rose-600 text-rose-300 shadow-[0_0_22px_-2px_rgba(225,29,72,0.85)] animate-pulse"
+      : isBot ? "bg-violet-950/50 border-violet-600 text-violet-300"
+      : ready ? "bg-slate-800 border-emerald-500/70 shadow-[0_0_18px_-4px_rgba(16,185,129,0.7)] text-emerald-200"
+      : "bg-slate-800 border-slate-600 text-slate-300"}`}>
+      {nightmare ? "💀" : isBot ? <Bot size={26} /> : photo
         // eslint-disable-next-line @next/next/no-img-element
         ? <img src={photo} alt="" width={56} height={56} style={{ imageRendering: "pixelated" }} />
         : (name || "?").slice(0, 1).toUpperCase()}
@@ -148,13 +182,13 @@ export function LobbyScreen() {
             {players.map((p) => (
               <div key={p.uid} className="relative flex flex-col items-center gap-1.5 w-20">
                 {isHost && p.isBot && <button onClick={() => removePlayer(p.uid)} className="absolute -top-1.5 -right-0.5 z-10 w-5 h-5 rounded-full bg-slate-800 border border-slate-600 text-slate-400 hover:text-rose-400 text-xs leading-none">×</button>}
-                <Portrait name={p.name} photo={p.photoURL} ready={p.ready} isBot={p.isBot} />
+                <Portrait name={p.name} photo={p.photoURL} ready={p.ready} isBot={p.isBot} nightmare={p.botDifficulty === "nightmare"} />
                 <span className="text-xs font-bold text-slate-200 truncate max-w-full text-center">{p.name}</span>
                 <div className="flex flex-wrap gap-0.5 justify-center">
                   {p.isHost && <span className="text-[8px] font-bold uppercase bg-amber-500 text-black rounded px-1 leading-tight">{t.l_net_host}</span>}
                   {p.uid === myUid && <span className="text-[8px] font-bold uppercase bg-sky-600 text-white rounded px-1 leading-tight">{t.l_net_you}</span>}
                 </div>
-                <span className={`text-[10px] font-semibold ${p.ready ? "text-emerald-400" : "text-slate-500"}`}>{p.isBot ? p.botDifficulty : p.ready ? t.l_net_ready_up : t.l_net_not_ready}</span>
+                <span className={`text-[10px] font-semibold capitalize ${p.botDifficulty === "nightmare" ? "text-rose-400 tracking-[0.15em]" : p.isBot ? "text-violet-300/80" : p.ready ? "text-emerald-400" : "text-slate-500"}`}>{p.isBot ? diffLabel(p.botDifficulty) : p.ready ? t.l_net_ready_up : t.l_net_not_ready}</span>
               </div>
             ))}
             {/* Pending invites — placeholder slots until the friend accepts. */}
@@ -178,22 +212,33 @@ export function LobbyScreen() {
             ))}
           </div>
 
-          {/* Host: add AI */}
+          {/* Host: add AI — an escalating difficulty ladder + the Clone special. */}
           {isHost && openSlots > 0 && (
-            <div className="flex flex-col items-center gap-2 mt-5 pt-4 border-t border-slate-800">
-              <div className="flex items-center justify-center gap-2 flex-wrap">
-                <span className="text-[10px] uppercase tracking-wide text-slate-500">{t.l_net_add_ai}</span>
-                {(["easy", "medium", "hard", "expert", "ultimate"] as const).map((d) => (
-                  <button key={d} data-testid={`add-bot-${d}`} onClick={() => addBot(d)} className={`px-3 py-1.5 rounded-md border text-[11px] font-bold capitalize transition-colors ${d === "ultimate" ? "bg-rose-900/40 hover:bg-rose-700 border-rose-500/60 text-rose-200" : d === "expert" ? "bg-amber-900/40 hover:bg-amber-700 border-amber-600/60 text-amber-200" : "bg-violet-900/50 hover:bg-violet-700 border-violet-700 text-violet-200"}`}>
-                    {d === "easy" ? t.p_diff_easy : d === "medium" ? t.p_diff_medium : d === "hard" ? t.p_diff_hard : d === "expert" ? t.p_diff_expert : t.p_diff_ultimate}
+            <div className="flex flex-col items-center gap-3 mt-6 pt-5 border-t border-white/[0.06]">
+              <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] text-slate-500 font-bold"><Bot size={12} /> {t.l_net_add_ai}</span>
+              {/* Segmented difficulty ladder — equal-width tiers, accent warming with threat. */}
+              <div className="flex items-stretch gap-1 p-1 rounded-xl bg-slate-950/50 border border-white/[0.06]">
+                {DIFFS.map((d, i) => (
+                  <button
+                    key={d.id}
+                    data-testid={`add-bot-${d.id}`}
+                    onClick={() => addOpponent(d.id)}
+                    title={`${d.label}${d.id === "ultimate" ? " — counter-drafts your board" : ""}`}
+                    className={`group relative px-3 sm:px-3.5 py-2 rounded-lg text-[11px] font-extrabold transition-all hover:bg-white/[0.06] ${d.accent}`}
+                  >
+                    {/* threat dots: easy=1 … ultimate=5 */}
+                    <span className="flex gap-0.5 justify-center mb-1 opacity-70 group-hover:opacity-100">
+                      {Array.from({ length: i + 1 }).map((_, k) => <span key={k} className="w-1 h-1 rounded-full bg-current" />)}
+                    </span>
+                    {d.label}
                   </button>
                 ))}
               </div>
               {/* Clone bot — replays YOUR last game, round by round. */}
               <button data-testid="add-bot-clone" onClick={() => addBot("clone")}
                 title={lang === "fr" ? "Un clone qui rejoue TA dernière partie, tour par tour" : "A clone that replays YOUR last game, round by round"}
-                className="px-3 py-1.5 rounded-md border text-[11px] font-bold transition-colors bg-sky-900/40 hover:bg-sky-700 border-sky-500/60 text-sky-200 inline-flex items-center gap-1.5">
-                <span>🧬</span> {lang === "fr" ? "Clone (ta dernière partie)" : "Clone (your last game)"}
+                className="px-3.5 py-2 rounded-lg border text-[11px] font-bold transition-colors bg-sky-950/40 hover:bg-sky-800/60 border-sky-600/40 text-sky-200 inline-flex items-center gap-1.5">
+                <Dna size={13} /> {lang === "fr" ? "Clone (ta dernière partie)" : "Clone (your last game)"}
               </button>
             </div>
           )}
@@ -262,16 +307,20 @@ export function LobbyScreen() {
         )}
       </main>
 
-      {/* Rules modal (host) */}
-      {showRules && isHost && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setShowRules(false)}>
-          <div className="panel w-full max-w-[760px] max-h-[86vh] overflow-y-auto rounded-2xl p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/[0.06]">
-              <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-300">{t.l_rules}</h2>
-              <button onClick={() => setShowRules(false)} className="text-slate-500 hover:text-amber-300 text-xl leading-none">×</button>
+      {/* Rules drawer (host) — slides in from the right; the lobby stays visible behind. Kept
+          mounted so the slide animates; pointer-events gated so it never blocks when closed. */}
+      {isHost && (
+        <div className={`fixed inset-0 z-50 ${showRules ? "" : "pointer-events-none"}`} aria-hidden={!showRules}>
+          <div onClick={() => setShowRules(false)} className={`absolute inset-0 bg-black/60 backdrop-blur-[2px] transition-opacity duration-300 ${showRules ? "opacity-100" : "opacity-0"}`} />
+          <aside className={`absolute inset-y-0 right-0 w-full max-w-[480px] panel border-l border-white/[0.08] shadow-2xl shadow-black/50 overflow-y-auto transition-transform duration-300 ease-out ${showRules ? "translate-x-0" : "translate-x-full"}`}>
+            <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-[var(--panel-bg,rgba(10,12,20,0.92))] backdrop-blur border-b border-white/[0.06]">
+              <h2 className="inline-flex items-center gap-2 text-[12px] font-extrabold uppercase tracking-[0.2em] gild-text"><Settings size={14} /> {t.l_rules}</h2>
+              <button onClick={() => setShowRules(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-300 hover:bg-white/[0.06] transition-colors"><X size={18} /></button>
             </div>
-            <GameRulesPanel isHost={isHost} />
-          </div>
+            <div className="p-5">
+              <GameRulesPanel isHost={isHost} />
+            </div>
+          </aside>
         </div>
       )}
     </div>

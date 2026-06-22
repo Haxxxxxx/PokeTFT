@@ -45,7 +45,7 @@ function rosterFor(room: Room): string[] {
 /** A bot's board for a round, scaled by stage progress and difficulty. The "expert"/
  *  "ultimate" tiers draft synergies + items and COUNTER-DRAFT vs `opponentBoard` (the human
  *  they're about to fight); a "clone" replays the host's last game (ghost). */
-function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string, allowed: string[], enabledItems?: string[], ghost?: Room["ghost"], opponentBoard?: UnitInstance[], brain?: BotBrain): UnitInstance[] {
+function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string, allowed: string[], enabledItems?: string[], ghost?: Room["ghost"], opponentBoard?: UnitInstance[], brain?: BotBrain, statBuff?: number): UnitInstance[] {
   const cr = cumulativeRound(stage, round);
   // Clone bot: field the host's last-game board for this cumulative round. Falls back to a
   // tough synergy board on the host's first-ever game (no ghost yet).
@@ -56,8 +56,10 @@ function botBoard(stage: number, round: number, difficulty: BotDifficulty | unde
   }
   let seed = 0;
   for (let i = 0; i < salt.length; i++) seed = (seed * 31 + salt.charCodeAt(i)) >>> 0;
-  // Economy-realistic: a board a real player could actually build at this round.
-  return generatePlayerLikeBoard(stage, round, difficulty, seed + cr, allowed, enabledItems, opponentBoard, brain);
+  // Economy-realistic: a board a real player could actually build at this round. The optional
+  // statBuff (nightmare tier only) bakes a stat scale into the board — persisted, so the client
+  // replay applies the identical buff.
+  return generatePlayerLikeBoard(stage, round, difficulty, seed + cr, allowed, enabledItems, opponentBoard, brain, statBuff);
 }
 
 /** All adaptive-learning state the host loads once per combat and feeds to the bots. */
@@ -454,7 +456,9 @@ function buildCombat(room: Room, brainCtx?: BrainCtx): { combat: Record<string, 
     };
     // Adaptive difficulty: the effective tier rubber-bands to how the lobby's best human is doing.
     const effDiff = adaptiveDifficulty(p.botDifficulty, room);
-    const b = botBoard(stage, room.meta.round, effDiff, p.uid, allowed, room.rules?.itemsEnabled, room.ghost, oppBoard, brain);
+    // Nightmare bots carry a flat stat buff (the gated cheat), baked per-bot at lobby time.
+    const statBuff = p.botDifficulty === "nightmare" ? (p.botStatBuff ?? 1.15) : undefined;
+    const b = botBoard(stage, room.meta.round, effDiff, p.uid, allowed, room.rules?.itemsEnabled, room.ghost, oppBoard, brain, statBuff);
     // Augments — bots get the same buff a player picks (tailored to their board), so they're
     // not fighting under-powered. Folded into teamBuffFor via the player's `augments` field.
     const aCount = botAugmentCount(stage, effDiff);

@@ -49,6 +49,7 @@ export type Dict = {
   p_diff_hard: string;
   p_diff_expert: string;
   p_diff_ultimate: string;
+  p_diff_nightmare: string;
   // Top bar (offline GameClient)
   // NetGameClient HUD
   net_stage: string;
@@ -179,6 +180,7 @@ export const FR: Dict = {
   p_diff_hard: "Difficile",
   p_diff_expert: "Expert",
   p_diff_ultimate: "Ultime",
+  p_diff_nightmare: "Cauchemar",
   net_stage: "Stage",
   net_hp: "PV",
   net_gold: "Or",
@@ -304,6 +306,7 @@ export const EN: Dict = {
   p_diff_hard: "Hard",
   p_diff_expert: "Expert",
   p_diff_ultimate: "Ultimate",
+  p_diff_nightmare: "Nightmare",
   net_stage: "Stage",
   net_hp: "HP",
   net_gold: "Gold",
