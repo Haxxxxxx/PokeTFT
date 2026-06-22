@@ -868,15 +868,16 @@ export const UNITS: UnitDef[] = [
 // generated) only when that unit doesn't already define its own typesByStar. Index 0 = ★,
 // 1 = ★★, 2 = ★★★.
 const TYPE_SHIFTS: Record<string, PokeType[][]> = {
-  magikarp: [["water"], ["water"], ["water", "flying"]],                 // → Gyarados (Flying)
-  onix:     [["rock", "ground"], ["rock", "ground"], ["steel", "ground"]], // → Steelix (Steel)
+  magikarp: [["water"], ["water", "flying"], ["water", "flying"]],       // Gyarados (at ★★, 2-stage) gains Flying
+  // (Onix is a standalone unit here — dex [95,95,95], never evolves — so it stays Rock/Ground;
+  //  Steelix is its own buyable unit. No shift.)
   bagon:    [["dragon"], ["dragon"], ["dragon", "flying"]],              // → Salamence (Flying)
   swablu:   [["normal", "flying"], ["dragon", "flying"], ["dragon", "flying"]], // → Altaria (Dragon)
   azurill:  [["normal", "fairy"], ["water", "fairy"], ["water", "fairy"]], // → Marill (Water)
   trapinch: [["ground"], ["ground", "dragon"], ["ground", "dragon"]],    // → Vibrava/Flygon (Dragon)
   seel:     [["water"], ["water", "ice"], ["water", "ice"]],             // → Dewgong (Ice)
   shellder: [["water"], ["water", "ice"], ["water", "ice"]],             // → Cloyster (Ice)
-  staryu:   [["water"], ["water"], ["water", "psychic"]],                // → Starmie (Psychic)
+  staryu:   [["water"], ["water", "psychic"], ["water", "psychic"]],     // Starmie (at ★★, 2-stage) gains Psychic
   scatterbug: [["bug"], ["bug"], ["bug", "flying"]],                     // → Vivillon (Flying)
   fletchling: [["normal", "flying"], ["fire", "flying"], ["fire", "flying"]], // → Talonflame (Fire)
   charcadet: [["fire"], ["fire", "ghost"], ["fire", "ghost"]],           // → Armarouge/Ceruledge
