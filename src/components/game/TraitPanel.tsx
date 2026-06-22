@@ -85,9 +85,17 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
           return (
             <div
               key={t.key}
+              role="button"
+              tabIndex={0}
+              aria-expanded={hover?.key === t.key}
+              aria-describedby={hover?.key === t.key ? `trait-tip-${t.key}` : undefined}
               onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); openHover(t.key, r.top, r.right + 8); }}
               onMouseLeave={scheduleClose}
-              className={`flex items-center gap-2 px-2 py-1 rounded-md cursor-help shrink-0 ${active ? "bg-slate-800" : "bg-slate-900/40 opacity-60"}`}
+              // Keyboard parity: focusing a row opens the same tooltip a hover would; Escape dismisses it.
+              onFocus={(e) => { const r = e.currentTarget.getBoundingClientRect(); openHover(t.key, r.top, r.right + 8); }}
+              onBlur={scheduleClose}
+              onKeyDown={(e) => { if (e.key === "Escape" && hover?.key === t.key) { cancelClose(); setHover(null); } }}
+              className={`flex items-center gap-2 px-2 py-1 rounded-md cursor-help shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 ${active ? "bg-slate-800" : "bg-slate-900/40 opacity-60"}`}
             >
               <span
                 style={{ background: active ? color : "transparent", borderColor: color, boxShadow: active ? `0 0 6px -1px ${color}` : "none" }}
@@ -122,7 +130,7 @@ function TraitTooltip({ t, top, left, members, board, onEnter, onLeave }: { t: T
   // always know who you're looking at (the sprites alone read as tiny silhouettes).
   const [hoverMon, setHoverMon] = useState<{ name: string; cost: number } | null>(null);
   return (
-    <div onMouseEnter={onEnter} onMouseLeave={onLeave} style={{ position: "fixed", top, left, borderColor: color }} className="z-[80] w-[260px] p-3 rounded-lg border bg-[#0d1426] text-slate-100 shadow-2xl">
+    <div id={`trait-tip-${t.key}`} role="tooltip" onMouseEnter={onEnter} onMouseLeave={onLeave} style={{ position: "fixed", top, left, borderColor: color }} className="z-[80] w-[260px] p-3 rounded-lg border bg-[#0d1426] text-slate-100 shadow-2xl">
       <div className="flex items-center gap-2 mb-1.5">
         <span style={{ borderColor: color }} className="w-5 h-5 rounded border flex items-center justify-center"><TraitGlyph traitKey={t.key} size={12} /></span>
         <span className="font-bold text-sm">{t.label}</span>
