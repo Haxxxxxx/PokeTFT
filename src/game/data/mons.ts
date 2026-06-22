@@ -4,9 +4,12 @@ import { GEN_DEX_RANGES } from "./generations";
 import { GENERATED } from "./mons.generated";
 import { TRAITS_BY_KEY } from "./traits";
 
-/** Sprite URL from national dex id (PokéAPI's public sprite repo). */
+/** Sprite URL from national dex id. Served from our OWN origin (public/sprites/, mirrored from
+ *  PokéAPI) instead of raw.githubusercontent.com — same-origin, cached-forever, no third-party
+ *  rate-limits or regional blocks (the old host was unreliable on weak/slow clients).
+ *  Regenerate after adding mons: scripts/mirror-sprites.sh. */
 export function spriteUrl(dex: number): string {
-  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${dex}.png`;
+  return `/sprites/${dex}.png`;
 }
 
 // Stat presets scaled by cost (~x1.8 per star, melee baseline).
