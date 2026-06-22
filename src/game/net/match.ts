@@ -8,6 +8,7 @@ import { hasDef } from "../data/mons";
 import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem, modeLootScale, isDoubleUp, assignTeams, getMode } from "../data/gameModes";
 import { loadGhost, ghostBoardForRound } from "./ghost";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
+import { weightedRatingDelta } from "../rating";
 import { MEGA_STONE } from "../data/mega";
 import { COMPONENT_IDS, EMBLEM_IDS, SPATULA_ID } from "../data/items";
 import { teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID, pickBotAugments } from "../data/augments";
@@ -156,6 +157,21 @@ function teamBuffFor(p: RoomPlayer | undefined, room: Room) {
  *  with their last board — no free dodge. */
 function alivePlayers(room: Room): RoomPlayer[] {
   return Object.values(room.players ?? {}).filter((p) => p.alive);
+}
+
+/** Server-authoritative ranked result for one human at the moment their `place` is decided.
+ *  PR-B (shadow): stashed under games/{code}/results/{uid} for QA comparison against the
+ *  client-applied delta — it does NOT yet mutate rating/leaderboard (the client still owns
+ *  those until PR-C). Returns null for bots (no rating). Mirrors the client's exact inputs:
+ *  total = every player in the lobby, opponents weighted by how human the lobby was. */
+function shadowRatingResult(room: Room, uid: string, place: number): { place: number; players: number; humans: number; bots: number; delta: number } | null {
+  const p = room.players?.[uid];
+  if (!p || p.isBot) return null;
+  const players = Object.values(room.players ?? {});
+  const total = players.length;
+  const humans = players.filter((q) => !q.isBot && q.uid !== uid).length;
+  const bots = players.filter((q) => q.isBot).length;
+  return { place, players: total, humans, bots, delta: weightedRatingDelta(place, total, humans, bots) };
 }
 
 /** Host: start the match — reset every player and open round 1 planning. */
@@ -760,14 +776,19 @@ export async function endCombat(code: string, room: Room): Promise<void> {
     // out duplicate medals. Lowest HP gets the worst remaining place.
     const deadByHp = [...dead].sort((a, b) => (room.players[a]?.hp ?? 0) - (room.players[b]?.hp ?? 0));
     deadByHp.forEach((uid, i) => {
+      const place = surviving.length + dead.length - i;
       u[`players/${uid}/alive`] = false;
-      u[`players/${uid}/place`] = surviving.length + dead.length - i;
+      u[`players/${uid}/place`] = place;
+      const shadow = shadowRatingResult(room, uid, place); // PR-B: server-computed LP (shadow only)
+      if (shadow) u[`results/${uid}`] = shadow;
     });
 
     if (surviving.length <= 1) {
       if (surviving.length === 1) {
         u[`players/${surviving[0]}/place`] = 1;
         u["meta/winnerUid"] = surviving[0]; // authoritative — every client reads this
+        const shadow = shadowRatingResult(room, surviving[0], 1); // PR-B: winner's LP (shadow only)
+        if (shadow) u[`results/${surviving[0]}`] = shadow;
       }
       u["meta/phase"] = "over";
     } else {
@@ -848,6 +869,8 @@ async function resolveDoubleUpCombat(code: string, room: Room, combat: Record<st
     for (const uid of teams[t].members ?? []) {
       u[`players/${uid}/alive`] = false;
       u[`players/${uid}/place`] = place;
+      const shadow = shadowRatingResult(room, uid, place); // PR-B: server LP (shadow only)
+      if (shadow) u[`results/${uid}`] = shadow;
     }
   });
 
@@ -858,7 +881,11 @@ async function resolveDoubleUpCombat(code: string, room: Room, combat: Record<st
       u["meta/winnerTeam"] = wt;
       // winnerUid stays single for compatibility (the end screen reads place===1 too).
       u["meta/winnerUid"] = (teams[wt].members ?? [])[0] ?? null;
-      for (const uid of teams[wt].members ?? []) u[`players/${uid}/place`] = 1;
+      for (const uid of teams[wt].members ?? []) {
+        u[`players/${uid}/place`] = 1;
+        const shadow = shadowRatingResult(room, uid, 1); // PR-B: winning-team LP (shadow only)
+        if (shadow) u[`results/${uid}`] = shadow;
+      }
     }
     u["meta/phase"] = "over";
   } else {
@@ -959,7 +986,12 @@ export async function maybeClaimHost(code: string, room: Room, myUid: string): P
       const survivors = Object.values(room.players ?? {})
         .filter((p) => p.place == null)
         .sort((a, b) => (b.alive ? 1 : 0) - (a.alive ? 1 : 0) || (b.hp ?? 0) - (a.hp ?? 0));
-      survivors.forEach((p, i) => { u[`players/${p.uid}/place`] = i + 1; u[`players/${p.uid}/alive`] = false; });
+      survivors.forEach((p, i) => {
+        u[`players/${p.uid}/place`] = i + 1;
+        u[`players/${p.uid}/alive`] = false;
+        const shadow = shadowRatingResult(room, p.uid, i + 1); // PR-B: abandon-path LP (shadow only)
+        if (shadow) u[`results/${p.uid}`] = shadow;
+      });
       if (survivors[0]) u["meta/winnerUid"] = survivors[0].uid; // place-1 = authoritative winner
       await dbAdapter().update(gamePath(code), u).catch(() => {});
     }
