@@ -150,10 +150,13 @@ export function ShopBar() {
                 else { sfx.buy(); playCry(def.dex[0]); }
               }}
               disabled={!affordable}
-              style={{ boxShadow: own ? `inset 0 0 0 1.5px ${color}` : undefined }}
-              className={`group relative flex-1 self-stretch min-h-[148px] overflow-hidden rounded-lg border border-slate-700/60 bg-slate-900 hover:brightness-125 disabled:opacity-50
+              style={{ borderColor: `${color}aa`, boxShadow: own ? `inset 0 0 0 1.5px ${color}` : undefined }}
+              className={`group relative flex-1 self-stretch min-h-[148px] overflow-hidden rounded-lg border hover:brightness-125 disabled:opacity-50
                 transition ${oneFromStar ? "ring-2 ring-amber-300/80 ring-inset" : ""}`}
             >
+              {/* Cost-coloured card body (TFT-style): the WHOLE card carries the rarity tint —
+                  a vertical wash from the cost colour at the bottom up into the dark top. */}
+              <span className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(180deg, #0b1020 0%, ${color}1f 60%, ${color}3d 100%)` }} />
               {/* Sprite as the card "art" on the right (TFT-style). */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -166,9 +169,7 @@ export function ShopBar() {
                 draggable={false}
               />
               {/* Left-to-right legibility scrim so the traits/name read over the art. */}
-              <span className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(90deg, rgba(9,13,24,0.96) 32%, rgba(9,13,24,0.55) 62%, rgba(9,13,24,0.05) 100%)" }} />
-              {/* Rarity bar across the top (cost colour). */}
-              <span className="absolute top-0 inset-x-0 h-[3px]" style={{ background: color }} />
+              <span className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(90deg, rgba(9,13,24,0.92) 30%, rgba(9,13,24,0.45) 60%, rgba(9,13,24,0) 100%)" }} />
 
               {/* Info button, top-right. */}
               <span

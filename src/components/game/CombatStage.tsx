@@ -6,7 +6,7 @@ import { useT } from "@/lib/i18n";
 import { sfx } from "@/lib/audio";
 import { hexToPixel, fieldPixelSize, hexDistance, FIELD, TILE, HEX_CLIP } from "@/game/engine/hex";
 import { TYPE_COLOR } from "@/game/ui";
-import { SnowIcon } from "./icons";
+import { SnowIcon, SwordIcon, ShieldIcon } from "./icons";
 import { Leaf, BarChart3 } from "lucide-react";
 import { serverNow } from "@/game/net/serverTime";
 import type { CombatResult, FrameUnit, CombatEvent } from "@/game/engine/combat";
@@ -38,12 +38,6 @@ const SIM_DT = 1 / 16;
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const easeOut = (t: number) => 1 - (1 - t) * (1 - t);
-
-function hpColor(f: number): string {
-  if (f > 0.5) return "#34d399";
-  if (f > 0.25) return "#fbbf24";
-  return "#f87171";
-}
 
 export function CombatStage({
   result: rawResult,
@@ -159,6 +153,13 @@ export function CombatStage({
   // local sim only when not provided) — so "you win/lose" always matches the HP
   // the host applied, even if a board edge-case made the local replay diverge.
   const won = authWon ?? (result.winner === "ally");
+
+  // Post-combat tally — your team's total damage dealt / taken this fight, for the result beat.
+  const tally = useMemo(() => {
+    let dealt = 0, taken = 0;
+    for (const u of frames[last]?.units ?? []) if (u.team === "ally") { dealt += u.dmgDealt; taken += u.dmgTaken; }
+    return { dealt: Math.round(dealt), taken: Math.round(taken) };
+  }, [frames, last]);
 
   // Tamper/desync detection: the client independently re-ran the SAME
   // deterministic sim from the host's frozen boards, so a disagreement between
@@ -300,7 +301,8 @@ export function CombatStage({
                 const tp = hexToPixel({ c: tgt.c, r: tgt.r }, TILE_W, TILE_H);
                 const dx = tp.x - x, dy = tp.y - y;
                 const m = Math.hypot(dx, dy) || 1;
-                lunge = { dx: (dx / m) * 7, dy: (dy / m) * 7 };
+                lunge = { dx: (dx / m) * 13, dy: (dy / m) * 13 }; // a punchier step into the target
+
               }
             }
             return (
@@ -419,6 +421,13 @@ export function CombatStage({
                 <span className="text-xs text-emerald-300/70 font-semibold">· {t.cs_no_dmg}</span>
               )}
             </div>
+            {/* Damage recap beat — what your team dealt vs took this fight. */}
+            <div className="flex items-center gap-2.5 text-[11px] font-bold">
+              <span className="inline-flex items-center gap-1 text-rose-300"><SwordIcon size={11} />{tally.dealt}</span>
+              <span className="text-slate-600">·</span>
+              <span className="inline-flex items-center gap-1 text-sky-300"><ShieldIcon size={11} />{tally.taken}</span>
+              {result.survivors > 0 && <><span className="text-slate-600">·</span><span className="text-slate-400">{result.survivors} left</span></>}
+            </div>
             {autoResolve ? (
               <span className="text-xs text-slate-500">…</span>
             ) : (
@@ -520,42 +529,47 @@ function CombatUnit({
   const ally = unit.team === "ally";
   const ring = unit.mega ? "#f0abfc" : ally ? "#34d399" : "#fb7185";
   const flip = ally ? faceLeft : !faceLeft; // mons face their target
-  // The sprite is the star: bigger (60px) and forward, with team identity carried by a soft
+  const manaFull = manaFrac >= 0.999; // full mana → about to cast: telegraph it
+  // HP bar is TEAM-coloured (green = yours, red = enemy) so you instantly read whose mon is
+  // whose mid-fight; width still shows remaining health, and it dims/pulses when critical.
+  const low = hpFrac <= 0.25;
+  const hpBar = ally ? (low ? "#16a34a" : "#34d399") : (low ? "#dc2626" : "#fb7185");
+  // The sprite is the star: nearly planning-board size (78px) with team identity from a soft
   // back-glow + the feet ring rather than a hard disc, so it reads as a Pokémon, not a token.
   return (
     <div
       className="absolute"
-      style={{ left: x - 34, top: y - 52, width: 68, transform: `translate(${lunge.dx}px, ${lunge.dy}px)`, transition: "transform 90ms ease-out" }}
+      style={{ left: x - 41, top: y - 57, width: 82, transform: `translate(${lunge.dx}px, ${lunge.dy}px)`, transition: "transform 80ms ease-out" }}
     >
-      {/* HP bar */}
-      <div className="h-[7px] w-full rounded-full bg-black/75 overflow-hidden mb-[3px]" style={{ outline: `1px solid ${ring}55` }}>
-        <div className="h-full rounded-full transition-[width] duration-100" style={{ width: `${hpFrac * 100}%`, background: hpColor(hpFrac) }} />
+      {/* HP bar — team-coloured (green ally / red enemy), glossy fill, crisp dark frame. */}
+      <div className={`h-[7px] w-full rounded-[3px] bg-black/80 overflow-hidden mb-[3px] ${low ? "animate-pulse" : ""}`} style={{ outline: "1px solid rgba(0,0,0,0.55)" }}>
+        <div className="h-full rounded-[3px] transition-[width] duration-100" style={{ width: `${hpFrac * 100}%`, background: hpBar, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 2px rgba(0,0,0,0.28)" }} />
       </div>
-      {/* mana bar */}
-      <div className="h-[4px] w-[88%] mx-auto rounded-full bg-black/70 overflow-hidden mb-1">
-        <div className="h-full bg-sky-400" style={{ width: `${manaFrac * 100}%` }} />
+      {/* Mana bar — glows + pulses when full (a cast is coming). */}
+      <div className={`h-[4px] w-[85%] mx-auto rounded-full bg-black/70 overflow-hidden mb-1 ${manaFull ? "animate-pulse" : ""}`} style={manaFull ? { boxShadow: "0 0 7px 1px #38bdf8dd" } : undefined}>
+        <div className="h-full transition-[width] duration-100" style={{ width: `${manaFrac * 100}%`, background: manaFull ? "#bae6fd" : "#38bdf8" }} />
       </div>
       {/* Grounding "feet" ellipse — team-coloured, sits under the sprite. */}
-      <span className="absolute left-1/2 -translate-x-1/2 rounded-[50%] pointer-events-none" style={{ bottom: -2, width: 48, height: 13, background: `radial-gradient(ellipse at center, ${ring}77, transparent 72%)` }} />
-      <div className="relative mx-auto flex items-end justify-center" style={{ width: 64, height: 60 }}>
+      <span className="absolute left-1/2 -translate-x-1/2 rounded-[50%] pointer-events-none" style={{ bottom: -2, width: 60, height: 15, background: `radial-gradient(ellipse at center, ${ring}77, transparent 72%)` }} />
+      <div className="relative mx-auto flex items-end justify-center" style={{ width: 78, height: 78 }}>
         {/* Soft team aura behind the mon (stronger for mega) — replaces the hard ring disc. */}
-        <span className="absolute inset-0 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle at 50% 60%, ${ring}${unit.mega ? "55" : "2e"}, transparent 68%)` }} />
+        <span className="absolute inset-0 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle at 50% 60%, ${ring}${unit.mega ? "55" : "2e"}, transparent 66%)` }} />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={spriteUrl(unit.dex)}
           alt=""
-          width={60}
-          height={60}
-          className="relative drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)]"
-          style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none", filter: unit.disabled ? "brightness(1.25) saturate(0.4) drop-shadow(0 0 6px #7dd3fc)" : unit.burning ? "saturate(1.45) drop-shadow(0 0 6px #f97316)" : `drop-shadow(0 0 5px ${ring}88)` }}
+          width={78}
+          height={78}
+          className="relative drop-shadow-[0_4px_5px_rgba(0,0,0,0.6)]"
+          style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none", filter: unit.disabled ? "brightness(1.25) saturate(0.4) drop-shadow(0 0 7px #7dd3fc)" : unit.burning ? "saturate(1.45) drop-shadow(0 0 7px #f97316)" : `drop-shadow(0 0 6px ${ring}88)` }}
           draggable={false}
         />
         {flash && <span key={flash} className="absolute inset-0 combat-hitflash" style={{ background: "radial-gradient(circle, #fff, #ffffff00 70%)" }} />}
         {unit.mega && (
-          <span className="absolute -top-1 -right-0.5 text-[8px] font-bold bg-fuchsia-500 text-black rounded px-0.5 leading-tight shadow">M</span>
+          <span className="absolute top-0 -right-1 text-[9px] font-bold bg-fuchsia-500 text-black rounded px-0.5 leading-tight shadow">M</span>
         )}
-        {unit.disabled && <span className="absolute -top-1 -left-1 text-sky-300 drop-shadow"><SnowIcon size={13} /></span>}
-        {unit.burning && !unit.disabled && <span className="absolute -top-0.5 -left-0.5 w-2.5 h-2.5 rounded-full bg-orange-500 shadow-[0_0_6px_2px_rgba(249,115,22,0.7)]" />}
+        {unit.disabled && <span className="absolute top-0 -left-1 text-sky-300 drop-shadow"><SnowIcon size={14} /></span>}
+        {unit.burning && !unit.disabled && <span className="absolute top-0.5 -left-0.5 w-3 h-3 rounded-full bg-orange-500 shadow-[0_0_6px_2px_rgba(249,115,22,0.7)]" />}
       </div>
     </div>
   );
@@ -588,13 +602,20 @@ function DamageNumber({ x, y, dmg, crit, sup }: { x: number; y: number; dmg: num
  *  A super-effective hit (eff>1) flares brighter. */
 function AbilityFx({ x, y, tx, ty, moveType, shape, eff }: { x: number; y: number; tx: number; ty: number; moveType: PokeType; shape: "single" | "splash" | "line"; eff: number }) {
   const color = TYPE_COLOR[moveType] ?? "#a78bfa";
-  const boost = eff > 1 ? 1.25 : 1;
+  const sup = eff > 1;        // super-effective → a bigger, brighter, double-ring hit
+  const boost = sup ? 1.5 : 1;
+  // Super-effective flare: a second, wider shockwave ring + a white core, so type advantage
+  // reads instantly during the fight.
+  const supRing = sup ? (
+    <span className="absolute pointer-events-none rounded-full combat-cast" style={{ left: tx - 52, top: ty - 52, width: 104, height: 104, border: `2px solid ${color}`, opacity: 0.7 }} />
+  ) : null;
   if (shape === "splash") {
     const s = 64 * boost;
     return (
       <>
-        <span className="absolute pointer-events-none rounded-full combat-cast" style={{ left: tx - s / 2, top: ty - s / 2, width: s, height: s, border: `3px solid ${color}` }} />
-        <span className="absolute pointer-events-none rounded-full combat-burst" style={{ left: tx - 22, top: ty - 22, width: 44, height: 44, background: `radial-gradient(circle, ${color}, ${color}00 70%)` }} />
+        {supRing}
+        <span className="absolute pointer-events-none rounded-full combat-cast" style={{ left: tx - s / 2, top: ty - s / 2, width: s, height: s, border: `${sup ? 4 : 3}px solid ${color}`, boxShadow: sup ? `0 0 18px 3px ${color}` : undefined }} />
+        <span className="absolute pointer-events-none rounded-full combat-burst" style={{ left: tx - 26, top: ty - 26, width: 52, height: 52, background: `radial-gradient(circle, ${sup ? "#fff" : color}, ${color}00 70%)` }} />
       </>
     );
   }
