@@ -22,7 +22,7 @@ import { finishCarouselEarly } from "@/game/net/serverGame";
 import { subscribeTransfers } from "@/game/net/coop";
 import { recordGameResult, applyRankedResult, rankOf, recordUltimateBotWin, weightedRatingDelta, type RankedResult } from "@/game/net/users";
 import { computeTraits } from "@/game/engine/synergies";
-import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords, RefreshCw } from "lucide-react";
+import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords, RefreshCw, BarChart3 } from "lucide-react";
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR, teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID, tailoredAugmentPicks } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
 import { useUi } from "@/game/store/uiStore";
@@ -238,6 +238,8 @@ export function NetGameClient() {
   const [spectate, setSpectate] = useState<string | null>(null);
   // LP outcome of this ranked game — shown on the end screen once applyRankedResult resolves.
   const [rankResult, setRankResult] = useState<RankedResult | null>(null);
+  // Toggle for the "last fight" damage recap, reviewable during planning (both teams).
+  const [showRecap, setShowRecap] = useState(false);
   // Carousel/augment: hide the choice cards (revealing the live board behind the
   // overlay) and toggle them back. Resets whenever a new pick screen opens.
   const [revealBoard, setRevealBoard] = useState(false);
@@ -509,13 +511,20 @@ export function NetGameClient() {
   // Remember my LAST fight's units (with cumulative damage/tank/heal) so the end screen can
   // crown an MVP. My side is "ally" normally, "enemy" when the pairing flipped me.
   const lastFightRef = useRef<FrameUnit[] | null>(null);
+  // Both teams' final-frame stats, kept so the recap is reviewable DURING planning (and shows
+  // the enemy team too, not just yours).
+  const lastFightBothRef = useRef<{ mine: FrameUnit[]; theirs: FrameUnit[]; oppName: string } | null>(null);
   useEffect(() => {
     if (!combatResult?.frames?.length || !myCombat) return;
     const myTeam = myCombat.flip ? "enemy" : "ally";
     const last = combatResult.frames[combatResult.frames.length - 1];
     const mine = last.units.filter((u) => u.team === myTeam);
-    if (mine.length) lastFightRef.current = mine;
-  }, [combatResult, myCombat?.flip]);
+    const theirs = last.units.filter((u) => u.team !== myTeam);
+    if (mine.length) {
+      lastFightRef.current = mine;
+      if (!myCombat.pve) lastFightBothRef.current = { mine, theirs, oppName: myCombat.oppName ?? "Rival" };
+    }
+  }, [combatResult, myCombat?.flip]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Live replay of the rival I'm spectating (from the host's frozen boards).
   const spectateCombat = spectate && spectate !== myUid ? room?.combat?.[spectate] : undefined;
@@ -1040,6 +1049,13 @@ export function NetGameClient() {
 
           {isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1 shrink-0">{t.net_host_badge}</span>}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Last-fight recap — reviewable while planning (your team + the enemy's). */}
+            {phase === "planning" && !isSpectator && lastFightBothRef.current && (
+              <button onClick={() => setShowRecap((s) => !s)} title={lang === "fr" ? "Récap du dernier combat" : "Last fight recap"}
+                className={`px-2.5 py-1.5 rounded-md border text-xs font-bold inline-flex items-center gap-1.5 transition-colors ${showRecap ? "bg-amber-500/90 text-black border-amber-400" : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"}`}>
+                <BarChart3 size={13} /> {lang === "fr" ? "Récap" : "Recap"}
+              </button>
+            )}
             <OptionsMenu />
             <FullscreenButton />
             <button onClick={onLeaveClick} className="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.net_leave}</button>
@@ -1555,6 +1571,9 @@ export function NetGameClient() {
         );
       })()}
 
+      {showRecap && phase === "planning" && lastFightBothRef.current && (
+        <FightRecap data={lastFightBothRef.current} lang={lang} onClose={() => setShowRecap(false)} />
+      )}
       {booting && <BootVeil
         label={lang === "fr" ? "Connexion au serveur…" : "Connecting to the arena…"}
         sub={`${connectedHumans}/${humanPlayers.length} ${lang === "fr" ? "dresseurs prêts" : "trainers ready"}`}
@@ -1566,6 +1585,63 @@ export function NetGameClient() {
 
 /** Pokéball boot veil shown briefly at match start while sprites load + the room
  *  syncs, so the first frame everyone sees is fully loaded and in lockstep. */
+/** Last-fight damage recap, reviewable during planning. Toggle between YOUR team and the enemy
+ *  team, and between damage dealt / tanked / healed — a floating panel over the board. */
+const RECAP_METRICS = [
+  { key: "dmgDealt", label: "DMG", color: "#fb7185" },
+  { key: "dmgTaken", label: "TANK", color: "#38bdf8" },
+  { key: "healed", label: "HEAL", color: "#34d399" },
+] as const;
+function FightRecap({ data, lang, onClose }: { data: { mine: FrameUnit[]; theirs: FrameUnit[]; oppName: string }; lang: string; onClose: () => void }) {
+  const [side, setSide] = useState<"mine" | "theirs">("mine");
+  const [metric, setMetric] = useState<(typeof RECAP_METRICS)[number]["key"]>("dmgDealt");
+  const active = RECAP_METRICS.find((m) => m.key === metric)!;
+  const val = (u: FrameUnit) => u[metric] as number;
+  const units = (side === "mine" ? data.mine : data.theirs).filter((u) => (u.dmgDealt + u.dmgTaken + u.healed) > 0);
+  const max = Math.max(1, ...units.map(val));
+  const sorted = [...units].sort((a, b) => val(b) - val(a)).slice(0, 8);
+  return (
+    <div className="fixed z-40 bottom-24 right-4 w-[260px] gilded rounded-xl p-3 shadow-2xl shadow-black/50">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] uppercase tracking-wide text-amber-200/60 font-bold">{lang === "fr" ? "Dernier combat" : "Last fight"}</span>
+        <button onClick={onClose} className="text-slate-500 hover:text-slate-200 text-xs leading-none">✕</button>
+      </div>
+      {/* Team toggle: yours vs the rival you fought. */}
+      <div className="flex gap-1 mb-1.5">
+        {([["mine", lang === "fr" ? "Vous" : "You"], ["theirs", data.oppName]] as const).map(([k, lbl]) => (
+          <button key={k} onClick={() => setSide(k)}
+            className={`flex-1 text-[10px] font-bold py-1 rounded-md border truncate transition-colors ${side === k ? "bg-slate-200 text-slate-900 border-transparent" : "bg-black/30 border-white/[0.06] text-slate-400 hover:text-slate-200"}`}>
+            {lbl}
+          </button>
+        ))}
+      </div>
+      {/* Metric tabs. */}
+      <div className="flex gap-1 mb-2">
+        {RECAP_METRICS.map((m) => (
+          <button key={m.key} onClick={() => setMetric(m.key)}
+            style={metric === m.key ? { background: m.color, color: "#0b1020" } : undefined}
+            className={`flex-1 text-[10px] font-extrabold py-1 rounded-md border transition-colors ${metric === m.key ? "border-transparent" : "bg-black/30 border-white/[0.06] text-slate-400 hover:text-slate-200"}`}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-col gap-1">
+        {sorted.length === 0 && <div className="text-[10px] text-slate-600 text-center py-2">—</div>}
+        {sorted.map((u) => (
+          <div key={u.id} className={`flex items-center gap-1.5 ${u.alive ? "" : "opacity-50"}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={spriteUrl(u.dex)} alt="" width={20} height={20} style={{ imageRendering: "pixelated" }} />
+            <div className="flex-1 h-2 rounded-full bg-slate-800 overflow-hidden min-w-0">
+              <div className="h-full rounded-full" style={{ width: `${(val(u) / max) * 100}%`, background: active.color }} />
+            </div>
+            <span className="w-10 text-right text-[10px] tabular-nums font-semibold text-slate-300">{Math.round(val(u))}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function BootVeil({ label, sub, progress }: { label: string; sub?: string; progress: number }) {
   const pct = Math.round(Math.max(0, Math.min(1, progress)) * 100);
   return (
