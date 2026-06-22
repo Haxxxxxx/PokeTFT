@@ -223,6 +223,8 @@ export type GameResult = {
   traits?: { k: string; t: number }[];
   /** LP (rating) gained (+) or lost (−) for this game — same weighted delta applyRankedResult applied. */
   lp?: number;
+  /** Game-mode id this match was played in (standard, monotype, mega-madness, region-1, …). */
+  mode?: string;
 };
 
 /** Record (or idempotently overwrite) a finished game's result for this player. */
