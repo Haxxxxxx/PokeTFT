@@ -96,7 +96,7 @@ export async function ensureProfile(uid: string, seed: { username?: string; phot
     createdAt: serverTimestamp(),
     currentGame: null,
   };
-  await set(usersRef(uid), profile);
+  await update(usersRef(uid), profile);
   if (seed.username) await set(nameIndexRef(seed.username.toLowerCase()), uid).catch(() => {});
   return { uid, ...profile } as UserProfile;
 }
