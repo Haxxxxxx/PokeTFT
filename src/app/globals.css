@@ -261,6 +261,11 @@ body {
     scroll-behavior: auto !important;
   }
   .hero-float, .animate-pulse, .animate-spin { animation: none !important; }
+  /* Damage numbers carry information, not just motion. The blanket rule above collapses
+     their float animation to its end state (opacity 0) — which would hide them. Pin them
+     visible and static instead, so they stay readable for the lifetime of their mount. */
+  .combat-float { opacity: 1 !important; transform: none !important; }
+  .dmg-pop { transform: none !important; }
   /* Drop the GPU-expensive glass blur entirely for reduced-motion users (a good proxy for
      low-end/older hardware) — the panels keep their fill, just without the per-frame composite. */
   .gilded, .panel, .panel-hero, [class*="backdrop-blur"] { backdrop-filter: none !important; }
