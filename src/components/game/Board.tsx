@@ -79,7 +79,7 @@ export function Board({ units, interactive = true }: { units?: UnitInstance[]; i
 
   return (
     <div
-      className="relative rounded-2xl border border-slate-700/50"
+      className="relative rounded-xl border border-slate-700/50"
       style={{
         width: w + 28,
         height: h + 28,
@@ -90,7 +90,7 @@ export function Board({ units, interactive = true }: { units?: UnitInstance[]; i
     >
       <div className="absolute" style={{ left: 14, top: 14, width: w, height: h }}>
         {/* Enemy half cue — your opponent's army drops in here for combat. */}
-        <span className="absolute left-1/2 -translate-x-1/2 top-1 text-[9px] font-bold uppercase tracking-[0.25em] text-rose-300/30 pointer-events-none">
+        <span className="absolute left-1/2 -translate-x-1/2 top-1 text-[9px] font-bold uppercase tracking-[0.18em] text-rose-300/30 pointer-events-none">
           Enemy
         </span>
         <div className="absolute pointer-events-none" style={{ left: 0, top: splitY, width: w, height: 1, background: "linear-gradient(90deg, transparent, rgba(148,163,184,0.28), transparent)" }} />

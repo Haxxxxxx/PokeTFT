@@ -868,18 +868,56 @@ export const UNITS: UnitDef[] = [
 // generated) only when that unit doesn't already define its own typesByStar. Index 0 = ★,
 // 1 = ★★, 2 = ★★★.
 const TYPE_SHIFTS: Record<string, PokeType[][]> = {
-  magikarp: [["water"], ["water"], ["water", "flying"]],                 // → Gyarados (Flying)
-  onix:     [["rock", "ground"], ["rock", "ground"], ["steel", "ground"]], // → Steelix (Steel)
+  magikarp: [["water"], ["water", "flying"], ["water", "flying"]],       // Gyarados (at ★★, 2-stage) gains Flying
+  // (Onix is a standalone unit here — dex [95,95,95], never evolves — so it stays Rock/Ground;
+  //  Steelix is its own buyable unit. No shift.)
   bagon:    [["dragon"], ["dragon"], ["dragon", "flying"]],              // → Salamence (Flying)
   swablu:   [["normal", "flying"], ["dragon", "flying"], ["dragon", "flying"]], // → Altaria (Dragon)
   azurill:  [["normal", "fairy"], ["water", "fairy"], ["water", "fairy"]], // → Marill (Water)
   trapinch: [["ground"], ["ground", "dragon"], ["ground", "dragon"]],    // → Vibrava/Flygon (Dragon)
   seel:     [["water"], ["water", "ice"], ["water", "ice"]],             // → Dewgong (Ice)
   shellder: [["water"], ["water", "ice"], ["water", "ice"]],             // → Cloyster (Ice)
-  staryu:   [["water"], ["water"], ["water", "psychic"]],                // → Starmie (Psychic)
+  staryu:   [["water"], ["water", "psychic"], ["water", "psychic"]],     // Starmie (at ★★, 2-stage) gains Psychic
   scatterbug: [["bug"], ["bug"], ["bug", "flying"]],                     // → Vivillon (Flying)
   fletchling: [["normal", "flying"], ["fire", "flying"], ["fire", "flying"]], // → Talonflame (Fire)
   charcadet: [["fire"], ["fire", "ghost"], ["fire", "ghost"]],           // → Armarouge/Ceruledge
+  // ── Gen 1 ──
+  poliwag:  [["water"], ["water"], ["water", "fighting"]],               // → Poliwrath (Fighting)
+  horsea:   [["water"], ["water"], ["water", "dragon"]],                 // → Kingdra (Dragon)
+  // ── Gen 2 ── (tyranitar is the buyable id for the Larvitar line)
+  tyranitar: [["rock", "ground"], ["rock", "ground"], ["rock", "dark"]], // Larvitar/Pupitar Ground → Tyranitar Dark
+  togepi:   [["fairy"], ["fairy", "flying"], ["fairy", "flying"]],       // Togetic/Togekiss gain Flying
+  scyther:  [["bug", "flying"], ["bug", "steel"], ["bug", "steel"]],     // → Scizor (Steel)
+  // Salamence line: the buyable id is `salamence`, not `bagon` (which owns no roster slot).
+  salamence: [["dragon"], ["dragon"], ["dragon", "flying"]],             // Bagon/Shelgon Dragon → Salamence Flying
+  // ── Gen 3 ── (nuzleaf is the buyable id for the Seedot line)
+  nuzleaf:  [["grass"], ["grass", "dark"], ["grass", "dark"]],           // Seedot Grass → Nuzleaf/Shiftry Dark
+  shroomish:[["grass"], ["grass", "fighting"], ["grass", "fighting"]],   // → Breloom (Fighting)
+  surskit:  [["bug", "water"], ["bug", "flying"], ["bug", "flying"]],    // → Masquerain (Flying)
+  cacnea:   [["grass"], ["grass", "dark"], ["grass", "dark"]],           // → Cacturne (Dark)
+  corphish: [["water"], ["water", "dark"], ["water", "dark"]],           // → Crawdaunt (Dark)
+  // flygon is the buyable id for the Trapinch line (Trapinch is pure Ground; Vibrava/Flygon gain Dragon)
+  flygon:   [["ground"], ["ground", "dragon"], ["ground", "dragon"]],
+  // ── Gen 4 ──
+  riolu:    [["fighting"], ["fighting", "steel"], ["fighting", "steel"]],// → Lucario (Steel)
+  // ── Gen 5 ──
+  tympole:  [["water"], ["water", "ground"], ["water", "ground"]],       // Palpitoad/Seismitoad gain Ground
+  // ── Gen 6 ──
+  froakie:  [["water"], ["water"], ["water", "dark"]],                   // → Greninja (Dark)
+  // ── Gen 7 (Alola starters) ──
+  rowlet:   [["grass", "flying"], ["grass", "flying"], ["grass", "ghost"]], // → Decidueye (Ghost)
+  litten:   [["fire"], ["fire"], ["fire", "dark"]],                      // → Incineroar (Dark)
+  popplio:  [["water"], ["water"], ["water", "fairy"]],                  // → Primarina (Fairy)
+  grubbin:  [["bug"], ["bug", "electric"], ["bug", "electric"]],         // Charjabug/Vikavolt gain Electric
+  // ── Gen 8 (Galar) ──
+  rookidee: [["flying"], ["flying"], ["flying", "steel"]],               // → Corviknight (Steel)
+  blipbug:  [["bug"], ["bug", "psychic"], ["bug", "psychic"]],           // Dottler/Orbeetle gain Psychic
+  hatenna:  [["psychic"], ["psychic"], ["psychic", "fairy"]],           // → Hatterene (Fairy)
+  // ── Gen 9 (Paldea starters + more) ──
+  sprigatito:[["grass"], ["grass"], ["grass", "dark"]],                  // → Meowscarada (Dark)
+  fuecoco:  [["fire"], ["fire"], ["fire", "ghost"]],                     // → Skeledirge (Ghost)
+  quaxly:   [["water"], ["water"], ["water", "fighting"]],               // → Quaquaval (Fighting)
+  pawmi:    [["electric"], ["electric", "fighting"], ["electric", "fighting"]], // Pawmo/Pawmot gain Fighting
 };
 for (const u of UNITS) {
   const shift = TYPE_SHIFTS[u.id];

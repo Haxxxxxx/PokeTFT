@@ -116,8 +116,11 @@ function TraitTooltip({ t, top, left, members, board, onEnter, onLeave }: { t: T
   const desc = TRAITS_BY_KEY[t.key]?.description ?? "";
   const onBoard = new Set(board.map((u) => u.defId));
   const ownedCount = members.filter((d) => onBoard.has(d.id)).length;
+  // The mon the cursor is on inside the roster grid → its name shows in a reserved line so you
+  // always know who you're looking at (the sprites alone read as tiny silhouettes).
+  const [hoverMon, setHoverMon] = useState<{ name: string; cost: number } | null>(null);
   return (
-    <div onMouseEnter={onEnter} onMouseLeave={onLeave} style={{ position: "fixed", top, left, borderColor: color }} className="z-[80] w-[240px] p-3 rounded-lg border bg-[#0d1426] text-slate-100 shadow-2xl">
+    <div onMouseEnter={onEnter} onMouseLeave={onLeave} style={{ position: "fixed", top, left, borderColor: color }} className="z-[80] w-[260px] p-3 rounded-lg border bg-[#0d1426] text-slate-100 shadow-2xl">
       <div className="flex items-center gap-2 mb-1.5">
         <span style={{ borderColor: color }} className="w-5 h-5 rounded border flex items-center justify-center"><TraitGlyph traitKey={t.key} size={12} /></span>
         <span className="font-bold text-sm">{t.label}</span>
@@ -143,16 +146,29 @@ function TraitTooltip({ t, top, left, members, board, onEnter, onLeave }: { t: T
       </div>
       {members.length > 0 && (
         <div className="mt-2.5 pt-2 border-t border-slate-700/60">
-          <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">
-            <span style={{ color }} className="font-bold">{ownedCount}</span> / {members.length} mons
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <span className="text-[10px] uppercase tracking-wide text-slate-500">
+              <span style={{ color }} className="font-bold">{ownedCount}</span> / {members.length} mons
+            </span>
+            {/* Reserved line: the hovered mon's name + cost, so silhouettes are identifiable. */}
+            <span className="text-[11px] font-semibold truncate min-w-0" style={{ color: hoverMon ? COST_COLOR[hoverMon.cost as keyof typeof COST_COLOR] : undefined }}>
+              {hoverMon ? `${hoverMon.name} · ${hoverMon.cost}g` : <span className="text-slate-600 font-normal">{"—"}</span>}
+            </span>
           </div>
-          <div className="flex flex-wrap gap-1 max-h-[160px] overflow-y-auto">
+          <div className="flex flex-wrap gap-1.5 max-h-[180px] overflow-y-auto">
             {members.map((d) => {
               const owned = onBoard.has(d.id);
               return (
-                <span key={d.id} title={`${d.name} · ${d.cost}g`} style={{ borderColor: COST_COLOR[d.cost] }} className={`relative w-7 h-7 rounded-md border bg-black/40 flex items-center justify-center overflow-hidden ${owned ? "" : "opacity-45 grayscale"}`}>
+                <span
+                  key={d.id}
+                  title={`${d.name} · ${d.cost}g`}
+                  onMouseEnter={() => setHoverMon({ name: d.name, cost: d.cost })}
+                  onMouseLeave={() => setHoverMon((h) => (h?.name === d.name ? null : h))}
+                  style={{ borderColor: COST_COLOR[d.cost] }}
+                  className={`relative w-10 h-10 rounded-md border bg-black/40 flex items-center justify-center overflow-hidden transition-transform hover:scale-110 hover:z-10 ${owned ? "" : "opacity-45 grayscale"}`}
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={spriteUrl(d.dex[0])} alt={d.name} width={24} height={24} style={{ imageRendering: "pixelated" }} draggable={false} />
+                  <img src={spriteUrl(d.dex[0])} alt={d.name} width={36} height={36} style={{ imageRendering: "pixelated" }} draggable={false} />
                   {owned && <span className="absolute inset-x-0 bottom-0 h-[2px]" style={{ background: color }} />}
                 </span>
               );

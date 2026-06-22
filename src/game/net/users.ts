@@ -17,7 +17,31 @@ export type UserProfile = {
   friends?: Record<string, boolean>;
   /** Ranked rating (Elo-like; starts at START_RATING). */
   rating?: number;
+  /** Hidden progression: number of games WON that contained an ultimate (or nightmare) bot.
+   *  Once this passes NIGHTMARE_UNLOCK, ultimate bots start being silently replaced by the
+   *  nightmare boss tier (more wins → more nightmares, harsher buff). */
+  ultimateBotWins?: number;
 };
+
+/** Wins-with-an-ultimate-bot needed before the nightmare tier starts creeping in. */
+export const NIGHTMARE_UNLOCK = 10;
+
+/** Given a player's ultimate-bot win count, the chance an added ultimate bot is silently
+ *  swapped for a nightmare, and the stat buff that nightmare fights at. Both ramp slowly past
+ *  the unlock so the dread builds over many games rather than flipping on at once. */
+export function nightmareParams(wins: number): { unlocked: boolean; replaceChance: number; statBuff: number } {
+  const over = Math.max(0, (wins ?? 0) - NIGHTMARE_UNLOCK);
+  return {
+    unlocked: (wins ?? 0) > NIGHTMARE_UNLOCK,
+    replaceChance: Math.min(0.85, over * 0.07),   // 7% per win over → caps at 85% (some stay ultimate)
+    statBuff: 1.12 + Math.min(0.18, over * 0.01), // +12% at first → up to +30% deep in the nightmare
+  };
+}
+
+/** Bump the ultimate-bot win counter by one (called after a won game that had such a bot). */
+export async function recordUltimateBotWin(uid: string): Promise<void> {
+  await runTransaction(ref(db(), `users/${uid}/ultimateBotWins`), (cur) => (typeof cur === "number" ? cur : 0) + 1).catch(() => {});
+}
 
 /** Everyone starts here; placement nudges it up/down each game. (Silver II) */
 export const START_RATING = 1000;
@@ -197,6 +221,8 @@ export type GameResult = {
   team?: { d: string; s: number }[];
   /** Active traits at the end — k=key, t=tier. */
   traits?: { k: string; t: number }[];
+  /** LP (rating) gained (+) or lost (−) for this game — same weighted delta applyRankedResult applied. */
+  lp?: number;
 };
 
 /** Record (or idempotently overwrite) a finished game's result for this player. */

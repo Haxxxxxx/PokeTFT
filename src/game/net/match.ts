@@ -45,7 +45,7 @@ function rosterFor(room: Room): string[] {
 /** A bot's board for a round, scaled by stage progress and difficulty. The "expert"/
  *  "ultimate" tiers draft synergies + items and COUNTER-DRAFT vs `opponentBoard` (the human
  *  they're about to fight); a "clone" replays the host's last game (ghost). */
-function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string, allowed: string[], enabledItems?: string[], ghost?: Room["ghost"], opponentBoard?: UnitInstance[], brain?: BotBrain): UnitInstance[] {
+function botBoard(stage: number, round: number, difficulty: BotDifficulty | undefined, salt: string, allowed: string[], enabledItems?: string[], ghost?: Room["ghost"], opponentBoard?: UnitInstance[], brain?: BotBrain, statBuff?: number): UnitInstance[] {
   const cr = cumulativeRound(stage, round);
   // Clone bot: field the host's last-game board for this cumulative round. Falls back to a
   // tough synergy board on the host's first-ever game (no ghost yet).
@@ -56,8 +56,10 @@ function botBoard(stage: number, round: number, difficulty: BotDifficulty | unde
   }
   let seed = 0;
   for (let i = 0; i < salt.length; i++) seed = (seed * 31 + salt.charCodeAt(i)) >>> 0;
-  // Economy-realistic: a board a real player could actually build at this round.
-  return generatePlayerLikeBoard(stage, round, difficulty, seed + cr, allowed, enabledItems, opponentBoard, brain);
+  // Economy-realistic: a board a real player could actually build at this round. The optional
+  // statBuff (nightmare tier only) bakes a stat scale into the board — persisted, so the client
+  // replay applies the identical buff.
+  return generatePlayerLikeBoard(stage, round, difficulty, seed + cr, allowed, enabledItems, opponentBoard, brain, statBuff);
 }
 
 /** All adaptive-learning state the host loads once per combat and feeds to the bots. */
@@ -178,7 +180,15 @@ export async function beginMatch(code: string, room: Room): Promise<void> {
   // Double Up: pair every participant (humans + bots) into deterministic teams of 2,
   // each sharing ONE HP pool. Same uid→team mapping on host + clients (sorted uids).
   const doubleUp = isDoubleUp(room.rules);
-  const teamOf = doubleUp ? assignTeams(Object.values(room.players ?? {}).filter((p) => p.connected).map((p) => p.uid)) : {};
+  // Prefer the teams the host arranged in the lobby (each player's teamId). Only fall back to a
+  // fresh deterministic pairing if they're missing or unbalanced (a team with >2 members).
+  const conn = Object.values(room.players ?? {}).filter((p) => p.connected);
+  const lobbyTeamsValid = doubleUp && conn.length > 0
+    && conn.every((p) => typeof p.teamId === "number" && p.teamId >= 0 && p.teamId <= 3)
+    && (() => { const c: Record<number, number> = {}; for (const p of conn) c[p.teamId!] = (c[p.teamId!] ?? 0) + 1; return Object.values(c).every((n) => n <= 2); })();
+  const teamOf = !doubleUp ? {}
+    : lobbyTeamsValid ? Object.fromEntries(conn.map((p) => [p.uid, p.teamId as number]))
+    : assignTeams(conn.map((p) => p.uid));
   const teamMembers: Record<number, string[]> = {};
   for (const p of Object.values(room.players ?? {})) {
     if (!p.connected) continue;
@@ -454,7 +464,9 @@ function buildCombat(room: Room, brainCtx?: BrainCtx): { combat: Record<string, 
     };
     // Adaptive difficulty: the effective tier rubber-bands to how the lobby's best human is doing.
     const effDiff = adaptiveDifficulty(p.botDifficulty, room);
-    const b = botBoard(stage, room.meta.round, effDiff, p.uid, allowed, room.rules?.itemsEnabled, room.ghost, oppBoard, brain);
+    // Nightmare bots carry a flat stat buff (the gated cheat), baked per-bot at lobby time.
+    const statBuff = p.botDifficulty === "nightmare" ? (p.botStatBuff ?? 1.15) : undefined;
+    const b = botBoard(stage, room.meta.round, effDiff, p.uid, allowed, room.rules?.itemsEnabled, room.ghost, oppBoard, brain, statBuff);
     // Augments — bots get the same buff a player picks (tailored to their board), so they're
     // not fighting under-powered. Folded into teamBuffFor via the player's `augments` field.
     const aCount = botAugmentCount(stage, effDiff);

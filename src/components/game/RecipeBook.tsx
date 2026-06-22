@@ -32,11 +32,11 @@ export function RecipeBook({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
-        className="gilded rounded-2xl p-4 w-full max-w-2xl max-h-[85vh] overflow-y-auto"
+        className="gilded rounded-xl p-4 w-full max-w-2xl max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs uppercase tracking-widest text-amber-200/80 font-bold">
+          <h2 className="text-xs uppercase tracking-wide text-amber-200/80 font-bold">
             {fr ? "Recettes d'objets" : "Item Recipes"}
           </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-200" title={fr ? "Fermer" : "Close"}>
@@ -65,7 +65,7 @@ export function RecipeBook({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Results: base + partner = result. */}
-        <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-2">
+        <p className="text-[10px] uppercase tracking-wide text-slate-500 font-bold mb-2">
           {fr ? `${name(base)} fabrique` : `${name(base)} builds`}
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">

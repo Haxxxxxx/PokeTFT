@@ -1,22 +1,49 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRoom } from "@/game/net/roomStore";
 import { usePreLobby } from "@/game/store/preLobbyStore";
-import { getMode } from "@/game/data/gameModes";
+import { getMode, isDoubleUp } from "@/game/data/gameModes";
 import { beginMatch, addInvitePlaceholder } from "@/game/net/match";
 import { kickoffServerGame } from "@/game/net/serverGame";
 import { useAuth } from "@/game/net/authStore";
 import { useAppStore } from "@/game/store/appStore";
-import { sendInvite } from "@/game/net/users";
+import { sendInvite, nightmareParams } from "@/game/net/users";
+import type { BotDifficulty, RoomPlayer } from "@/game/net/roomStore";
+import { DndContext, type DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors, useDraggable, useDroppable } from "@dnd-kit/core";
 import { PokeballIcon } from "@/components/game/icons";
-import { Settings, Swords, UserPlus } from "lucide-react";
+import { Settings, Swords, UserPlus, X, Bot, Dna } from "lucide-react";
 import { enterFullscreen } from "@/lib/fullscreen";
 import { GameRulesPanel } from "./GameRulesPanel";
+import { ModeSelect } from "./ModeSelect";
 import { unitsForGenerations } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 
 const GEN_NAMES = ["", "Kanto", "Johto", "Hoenn", "Sinnoh", "Unova", "Kalos", "Alola", "Galar", "Paldea"];
+
+/** Coin-flip for the silent nightmare swap. Module-scope so the randomness lives outside React's
+ *  render (it only ever runs from the add-bot click handler). */
+function rollChance(p: number): boolean {
+  return Math.random() < p;
+}
+
+/** Draggable wrapper for a Double Up player tile (stable module-scope component so the dnd
+ *  hooks keep a steady identity across renders). Disabled tiles render plainly. */
+function DraggableTile({ id, disabled, children }: { id: string; disabled?: boolean; children: ReactNode }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id, disabled });
+  return (
+    <div ref={setNodeRef} {...(disabled ? {} : listeners)} {...attributes}
+      className={`touch-none ${disabled ? "" : "cursor-grab active:cursor-grabbing"} ${isDragging ? "opacity-40" : ""}`}>
+      {children}
+    </div>
+  );
+}
+
+/** Droppable team card — render-prop exposes `isOver` so the card can highlight on hover. */
+function DroppableTeam({ id, children }: { id: string; children: (over: boolean) => ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return <div ref={setNodeRef}>{children(isOver)}</div>;
+}
 
 export function LobbyScreen() {
   const t = useT();
@@ -26,6 +53,7 @@ export function LobbyScreen() {
   const setRules = useRoom((s) => s.setRules);
   const addBot = useRoom((s) => s.addBot);
   const removePlayer = useRoom((s) => s.removePlayer);
+  const setPlayerTeam = useRoom((s) => s.setPlayerTeam);
   const leave = useRoom((s) => s.leave);
   const publishLobby = useRoom((s) => s.publishLobby);
   const removeLobby = useRoom((s) => s.removeLobby);
@@ -37,7 +65,15 @@ export function LobbyScreen() {
   const lang = useAppStore((s) => s.settings.language);
   const [showRules, setShowRules] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  // 2-step lobby: the host first picks a game mode (Step 1), then lands in the party lobby
+  // (Step 2). Joiners skip Step 1 entirely — the host already set the mode.
+  const [step, setStep] = useState<"mode" | "lobby">("mode");
   const [invited, setInvited] = useState<Record<string, boolean>>({});
+  // Drag sensors for Double Up team assignment (a small move threshold so taps still click).
+  const teamSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
+  );
   const [startError, setStartError] = useState<string | null>(null);
   // Auto-clear the start error so a transient failure message doesn't linger after the
   // host fixes the lobby and the next attempt is fine.
@@ -64,6 +100,20 @@ export function LobbyScreen() {
     setRules({ startingHp: preRules.startingHp, generations: preRules.generations, itemsEnabled: preRules.itemsEnabled, draftPoolSize: preRules.draftPoolSize, maxPlayers: preRules.maxPlayers, augmentsEnabled: preRules.augmentsEnabled, serverDriven: preRules.serverDriven, isPrivate: preRules.isPrivate, mode: preRules.mode });
   }, [isHost, room, setRules, preRules.startingHp, preRules.generations, preRules.itemsEnabled, preRules.draftPoolSize, preRules.maxPlayers, preRules.augmentsEnabled, preRules.serverDriven, preRules.isPrivate, preRules.mode]);
 
+  // Double Up: the host keeps every connected player on a team (0..3, two per team), filling
+  // the lowest open team for anyone unassigned. Idempotent — only writes when a slot is missing.
+  useEffect(() => {
+    if (!room || !isHost || !isDoubleUp(room.rules)) return;
+    const conn = Object.values(room.players ?? {}).filter((p) => p.connected);
+    const counts = [0, 0, 0, 0];
+    for (const p of conn) if (typeof p.teamId === "number" && p.teamId >= 0 && p.teamId <= 3) counts[p.teamId]++;
+    for (const p of conn) {
+      if (typeof p.teamId === "number" && p.teamId >= 0 && p.teamId <= 3) continue;
+      const t = counts.findIndex((c) => c < 2);
+      if (t >= 0) { counts[t]++; setPlayerTeam(p.uid, t); }
+    }
+  }, [room, isHost, setPlayerTeam]);
+
   const roomGenKey = (room?.rules?.generations ?? [1]).join(",");
   const roomItemKey = (room?.rules?.itemsEnabled ?? []).join(",");
   const roomHp = room?.rules?.startingHp;
@@ -82,6 +132,9 @@ export function LobbyScreen() {
   }, [isHost, room, setPreRules, roomHp, roomGenKey, roomItemKey, room?.rules?.draftPoolSize, room?.rules?.maxPlayers, room?.rules?.augmentsEnabled, room?.rules?.isPrivate, room?.rules?.mode]);
 
   if (!room) return null;
+
+  // Step 1 — mode selection (host only). Joiners go straight to the party lobby.
+  if (isHost && step === "mode") return <ModeSelect isHost={isHost} onContinue={() => setStep("lobby")} />;
 
   const players = Object.values(room.players ?? {})
     .filter((p) => p.connected)
@@ -102,9 +155,60 @@ export function LobbyScreen() {
   const poolCount = unitsForGenerations(gens).length;
   const items = room.rules?.itemsEnabled ?? [];
 
-  const Portrait = ({ name, photo, ready, isBot }: { name?: string; photo?: string | null; ready?: boolean; isBot?: boolean }) => (
-    <div className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center text-xl font-extrabold overflow-hidden shrink-0 transition-all ${isBot ? "bg-violet-950/50 border-violet-600 text-violet-300" : ready ? "bg-slate-800 border-emerald-500/70 shadow-[0_0_18px_-4px_rgba(16,185,129,0.7)] text-emerald-200" : "bg-slate-800 border-slate-600 text-slate-300"}`}>
-      {isBot ? "AI" : photo
+  // Double Up: 4 teams of 2 — group connected players by teamId so the lobby shows who's paired.
+  const doubleUp = isDoubleUp(room.rules);
+  const TEAM_COLORS = ["#fbbf24", "#34d399", "#60a5fa", "#f472b6"];
+  const teams: RoomPlayer[][] = [[], [], [], []];
+  if (doubleUp) for (const p of players) { const tid = typeof p.teamId === "number" ? p.teamId : -1; if (tid >= 0 && tid <= 3) teams[tid].push(p); }
+  // Drag a player onto a team: drop into an open seat, or (host only) swap with a member if the
+  // team is full. A non-host may only drag THEMSELVES and only into a seat that's free — they
+  // can't rewrite another player's team (the DB rules enforce this too).
+  const onTeamDragEnd = (e: DragEndEvent) => {
+    const uid = String(e.active.id);
+    const over = e.over ? String(e.over.id) : "";
+    if (!over.startsWith("team-")) return;
+    const target = Number(over.slice(5));
+    const p = room.players?.[uid];
+    if (!p || !(isHost || uid === myUid)) return;
+    const cur = typeof p.teamId === "number" ? p.teamId : -1;
+    if (cur === target) return;
+    if (teams[target].length < 2) { setPlayerTeam(uid, target); return; }
+    // Target full → swap (host only, and only when the dragged player has a seat to give back).
+    if (!isHost || cur < 0) return;
+    const other = teams[target].find((m) => m.uid !== uid);
+    if (other) { setPlayerTeam(uid, target); setPlayerTeam(other.uid, cur); }
+  };
+
+  // The escalating AI difficulty ladder — one cohesive segmented control, accent warming with
+  // threat. (Nightmare is NOT here: it's the hidden boss tier that silently replaces ultimate.)
+  const DIFFS: { id: BotDifficulty; label: string; accent: string }[] = [
+    { id: "easy",     label: t.p_diff_easy,     accent: "text-emerald-300" },
+    { id: "medium",   label: t.p_diff_medium,   accent: "text-sky-300" },
+    { id: "hard",     label: t.p_diff_hard,     accent: "text-violet-300" },
+    { id: "expert",   label: t.p_diff_expert,   accent: "text-amber-300" },
+    { id: "ultimate", label: t.p_diff_ultimate, accent: "text-rose-300" },
+  ];
+  const diffLabel = (d?: BotDifficulty): string =>
+    d === "nightmare" ? "?????" :
+    d === "clone" ? "Clone" :
+    d === "easy" ? t.p_diff_easy : d === "medium" ? t.p_diff_medium : d === "hard" ? t.p_diff_hard :
+    d === "expert" ? t.p_diff_expert : d === "ultimate" ? t.p_diff_ultimate : (d ?? "");
+
+  // Hidden progression: once the host has banked enough ultimate-bot wins, each "ultimate" they
+  // add has a ramping chance to spawn as a nightmare instead — no UI tell, just a creeping dread.
+  const nm = nightmareParams(myProfile?.ultimateBotWins ?? 0);
+  const addOpponent = (d: BotDifficulty) => {
+    if (d === "ultimate" && nm.unlocked && rollChance(nm.replaceChance)) addBot("nightmare", { statBuff: nm.statBuff });
+    else addBot(d);
+  };
+
+  const Portrait = ({ name, photo, ready, isBot, nightmare }: { name?: string; photo?: string | null; ready?: boolean; isBot?: boolean; nightmare?: boolean }) => (
+    <div className={`w-16 h-16 rounded-xl border flex items-center justify-center text-xl font-bold overflow-hidden shrink-0 transition-all ${
+      nightmare ? "bg-rose-950/60 border-rose-600/70 text-rose-300 animate-pulse"
+      : isBot ? "bg-violet-950/40 border-violet-600/50 text-violet-300"
+      : ready ? "bg-slate-800/80 border-emerald-500/60 text-emerald-200"
+      : "bg-slate-800/60 border-white/10 text-slate-300"}`}>
+      {nightmare ? "💀" : isBot ? <Bot size={26} /> : photo
         // eslint-disable-next-line @next/next/no-img-element
         ? <img src={photo} alt="" width={56} height={56} style={{ imageRendering: "pixelated" }} />
         : (name || "?").slice(0, 1).toUpperCase()}
@@ -125,9 +229,16 @@ export function LobbyScreen() {
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {(() => {
             const gm = getMode(room.rules?.mode);
-            if (gm.id === "standard") return null;
-            return <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full border text-[11px] font-extrabold"
-              style={{ borderColor: `${gm.color}66`, color: gm.color, background: `${gm.color}14` }}>{lang === "fr" ? gm.nameFr : gm.name}</span>;
+            // Mode badge — clickable for the host to jump back to Step 1 and change it.
+            const badge = (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-extrabold"
+                style={{ borderColor: `${gm.color}66`, color: gm.color, background: `${gm.color}14` }}>
+                {lang === "fr" ? gm.nameFr : gm.name}{isHost && <Settings size={11} className="opacity-70" />}
+              </span>
+            );
+            return isHost
+              ? <button onClick={() => setStep("mode")} title={lang === "fr" ? "Changer de mode" : "Change mode"} className="transition-transform hover:scale-[1.03]">{badge}</button>
+              : gm.id === "standard" ? null : <span className="hidden sm:inline-flex">{badge}</span>;
           })()}
           <button onClick={leave} className="px-2.5 sm:px-3 py-2 rounded-lg bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.l_net_leave}</button>
         </div>
@@ -135,7 +246,7 @@ export function LobbyScreen() {
 
       {/* Party stage */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center gap-7 p-4 sm:p-8 overflow-y-auto">
-        <div className="panel w-full max-w-[680px] rounded-2xl p-5 sm:p-7">
+        <div className="panel w-full max-w-[680px] rounded-xl p-5 sm:p-7">
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className="text-base font-extrabold gild-text leading-none">{lang === "fr" ? "Salon" : "Lobby"}</h2>
@@ -143,57 +254,120 @@ export function LobbyScreen() {
             </div>
             <span className="text-[12px] font-extrabold px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.07] text-slate-200 tabular-nums">{players.length + pendingInvites.length}/{maxPlayers}</span>
           </div>
-          {/* Party portrait row (wraps responsively) */}
-          <div className="flex flex-wrap items-start justify-center gap-3 sm:gap-4">
-            {players.map((p) => (
-              <div key={p.uid} className="relative flex flex-col items-center gap-1.5 w-20">
+          {/* PlayerTile — one party member (portrait + name + badges + status). */}
+          {(() => {
+            const PlayerTile = ({ p, extra }: { p: RoomPlayer; extra?: ReactNode }) => (
+              <div className="relative flex flex-col items-center gap-1.5 w-20">
                 {isHost && p.isBot && <button onClick={() => removePlayer(p.uid)} className="absolute -top-1.5 -right-0.5 z-10 w-5 h-5 rounded-full bg-slate-800 border border-slate-600 text-slate-400 hover:text-rose-400 text-xs leading-none">×</button>}
-                <Portrait name={p.name} photo={p.photoURL} ready={p.ready} isBot={p.isBot} />
+                {extra}
+                <Portrait name={p.name} photo={p.photoURL} ready={p.ready} isBot={p.isBot} nightmare={p.botDifficulty === "nightmare"} />
                 <span className="text-xs font-bold text-slate-200 truncate max-w-full text-center">{p.name}</span>
                 <div className="flex flex-wrap gap-0.5 justify-center">
                   {p.isHost && <span className="text-[8px] font-bold uppercase bg-amber-500 text-black rounded px-1 leading-tight">{t.l_net_host}</span>}
                   {p.uid === myUid && <span className="text-[8px] font-bold uppercase bg-sky-600 text-white rounded px-1 leading-tight">{t.l_net_you}</span>}
                 </div>
-                <span className={`text-[10px] font-semibold ${p.ready ? "text-emerald-400" : "text-slate-500"}`}>{p.isBot ? p.botDifficulty : p.ready ? t.l_net_ready_up : t.l_net_not_ready}</span>
+                <span className={`text-[10px] font-semibold capitalize ${p.botDifficulty === "nightmare" ? "text-rose-400 tracking-[0.15em]" : p.isBot ? "text-violet-300/80" : p.ready ? "text-emerald-400" : "text-slate-500"}`}>{p.isBot ? diffLabel(p.botDifficulty) : p.ready ? t.l_net_ready_up : t.l_net_not_ready}</span>
               </div>
-            ))}
-            {/* Pending invites — placeholder slots until the friend accepts. */}
-            {pendingInvites.map((p) => (
-              <div key={`inv-${p.uid}`} className="flex flex-col items-center gap-1.5 w-20">
-                <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-amber-500/40 bg-amber-500/[0.04] flex items-center justify-center overflow-hidden shrink-0 animate-pulse">
+            );
+            const EmptySeat = () => (
+              <div className="flex flex-col items-center gap-1.5 w-20">
+                <div className="w-16 h-16 rounded-xl border border-dashed border-white/10 flex items-center justify-center text-slate-700 text-2xl">+</div>
+                <span className="text-[10px] text-slate-600">{t.l_net_open_slot}</span>
+              </div>
+            );
+            const PendingTile = ({ p }: { p: { uid: string; username?: string; photoURL?: string | null } }) => (
+              <div className="flex flex-col items-center gap-1.5 w-20">
+                <div className="w-16 h-16 rounded-xl border border-dashed border-amber-500/40 bg-amber-500/[0.04] flex items-center justify-center overflow-hidden shrink-0 animate-pulse">
                   {p.photoURL
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={p.photoURL} alt="" width={44} height={44} style={{ imageRendering: "pixelated", opacity: 0.5 }} />
-                    : <span className="text-lg font-extrabold text-amber-300/50">{(p.username || "?").slice(0, 1).toUpperCase()}</span>}
+                    : <span className="text-lg font-bold text-amber-300/50">{(p.username || "?").slice(0, 1).toUpperCase()}</span>}
                 </div>
                 <span className="text-xs font-bold text-slate-400 truncate max-w-full text-center">{p.username}</span>
                 <span className="text-[10px] font-semibold text-amber-400/80">{lang === "fr" ? "Invité…" : "Invited…"}</span>
               </div>
-            ))}
-            {Array.from({ length: openSlots }).map((_, i) => (
-              <div key={`o-${i}`} className="flex flex-col items-center gap-1.5 w-20">
-                <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-slate-700/70 flex items-center justify-center text-slate-700 text-2xl">+</div>
-                <span className="text-[10px] text-slate-600">{t.l_net_open_slot}</span>
-              </div>
-            ))}
-          </div>
+            );
 
-          {/* Host: add AI */}
+            // Double Up: 4 team cards of 2 so you see exactly who plays with who. Drag a tile
+            // onto a team to re-pair (drop into a free seat, or swap with a member if full).
+            if (doubleUp) {
+              return (
+                <DndContext sensors={teamSensors} onDragEnd={onTeamDragEnd}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {teams.map((members, ti) => {
+                      const color = TEAM_COLORS[ti];
+                      return (
+                        <DroppableTeam key={ti} id={`team-${ti}`}>
+                          {(over) => (
+                            <div className="rounded-xl border p-3 transition-colors" style={{ borderColor: over ? color : `${color}40`, background: over ? `${color}22` : `${color}0c` }}>
+                              <div className="flex items-center justify-between mb-2.5">
+                                <span className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color }}>{lang === "fr" ? "Équipe" : "Team"} {ti + 1}</span>
+                                <span className="text-[10px] tabular-nums font-bold" style={{ color: `${color}bb` }}>{members.length}/2</span>
+                              </div>
+                              <div className="flex items-start justify-center gap-3 min-h-[88px]">
+                                {[0, 1].map((slot) => {
+                                  const p = members[slot];
+                                  if (!p) return <EmptySeat key={slot} />;
+                                  return (
+                                    <DraggableTile key={p.uid} id={p.uid} disabled={!(isHost || p.uid === myUid)}>
+                                      <PlayerTile p={p} />
+                                    </DraggableTile>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </DroppableTeam>
+                      );
+                    })}
+                    {pendingInvites.length > 0 && (
+                      <div className="sm:col-span-2 flex flex-wrap items-start justify-center gap-3 pt-1">
+                        {pendingInvites.map((p) => <PendingTile key={`inv-${p.uid}`} p={p} />)}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-center text-[10px] text-slate-600 mt-2">{lang === "fr" ? "Glissez un joueur sur une équipe pour le déplacer" : "Drag a player onto a team to re-pair"}</p>
+                </DndContext>
+              );
+            }
+
+            // Standard / FFA: a single wrapping party row.
+            return (
+              <div className="flex flex-wrap items-start justify-center gap-3 sm:gap-4">
+                {players.map((p) => <PlayerTile key={p.uid} p={p} />)}
+                {pendingInvites.map((p) => <PendingTile key={`inv-${p.uid}`} p={p} />)}
+                {Array.from({ length: openSlots }).map((_, i) => <EmptySeat key={`o-${i}`} />)}
+              </div>
+            );
+          })()}
+
+          {/* Host: add AI — an escalating difficulty ladder + the Clone special. */}
           {isHost && openSlots > 0 && (
-            <div className="flex flex-col items-center gap-2 mt-5 pt-4 border-t border-slate-800">
-              <div className="flex items-center justify-center gap-2 flex-wrap">
-                <span className="text-[10px] uppercase tracking-wide text-slate-500">{t.l_net_add_ai}</span>
-                {(["easy", "medium", "hard", "expert", "ultimate"] as const).map((d) => (
-                  <button key={d} data-testid={`add-bot-${d}`} onClick={() => addBot(d)} className={`px-3 py-1.5 rounded-md border text-[11px] font-bold capitalize transition-colors ${d === "ultimate" ? "bg-rose-900/40 hover:bg-rose-700 border-rose-500/60 text-rose-200" : d === "expert" ? "bg-amber-900/40 hover:bg-amber-700 border-amber-600/60 text-amber-200" : "bg-violet-900/50 hover:bg-violet-700 border-violet-700 text-violet-200"}`}>
-                    {d === "easy" ? t.p_diff_easy : d === "medium" ? t.p_diff_medium : d === "hard" ? t.p_diff_hard : d === "expert" ? t.p_diff_expert : t.p_diff_ultimate}
+            <div className="flex flex-col items-center gap-3 mt-6 pt-5 border-t border-white/[0.06]">
+              <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] text-slate-500 font-bold"><Bot size={12} /> {t.l_net_add_ai}</span>
+              {/* Segmented difficulty ladder — equal-width tiers, accent warming with threat. */}
+              <div className="flex items-stretch gap-1 p-1 rounded-xl bg-slate-950/50 border border-white/[0.06]">
+                {DIFFS.map((d, i) => (
+                  <button
+                    key={d.id}
+                    data-testid={`add-bot-${d.id}`}
+                    onClick={() => addOpponent(d.id)}
+                    title={`${d.label}${d.id === "ultimate" ? " — counter-drafts your board" : ""}`}
+                    className={`group relative px-3 sm:px-3.5 py-2 rounded-lg text-[11px] font-extrabold transition-all hover:bg-white/[0.06] ${d.accent}`}
+                  >
+                    {/* threat dots: easy=1 … ultimate=5 */}
+                    <span className="flex gap-0.5 justify-center mb-1 opacity-70 group-hover:opacity-100">
+                      {Array.from({ length: i + 1 }).map((_, k) => <span key={k} className="w-1 h-1 rounded-full bg-current" />)}
+                    </span>
+                    {d.label}
                   </button>
                 ))}
               </div>
               {/* Clone bot — replays YOUR last game, round by round. */}
               <button data-testid="add-bot-clone" onClick={() => addBot("clone")}
                 title={lang === "fr" ? "Un clone qui rejoue TA dernière partie, tour par tour" : "A clone that replays YOUR last game, round by round"}
-                className="px-3 py-1.5 rounded-md border text-[11px] font-bold transition-colors bg-sky-900/40 hover:bg-sky-700 border-sky-500/60 text-sky-200 inline-flex items-center gap-1.5">
-                <span>🧬</span> {lang === "fr" ? "Clone (ta dernière partie)" : "Clone (your last game)"}
+                className="px-3.5 py-2 rounded-lg border text-[11px] font-bold transition-colors bg-sky-950/40 hover:bg-sky-800/60 border-sky-600/40 text-sky-200 inline-flex items-center gap-1.5">
+                <Dna size={13} /> {lang === "fr" ? "Clone (ta dernière partie)" : "Clone (your last game)"}
               </button>
             </div>
           )}
@@ -241,7 +415,7 @@ export function LobbyScreen() {
         {/* Start / ready */}
         {!isHost ? (
           <button onClick={() => setReady(!me?.ready)}
-            className={`w-full max-w-md py-4 rounded-2xl font-extrabold text-base tracking-wide transition-all ${me?.ready ? "bg-slate-700 hover:bg-slate-600 text-slate-200" : "bg-gradient-to-b from-emerald-500 to-emerald-600 hover:from-emerald-400 text-white shadow-lg shadow-emerald-500/20"}`}>
+            className={`w-full max-w-md py-3.5 rounded-xl font-bold text-[15px] tracking-wide transition-colors border ${me?.ready ? "bg-white/[0.03] border-white/10 text-slate-300 hover:bg-white/[0.06]" : "bg-emerald-500 border-emerald-400/50 text-white hover:bg-emerald-400"}`}>
             {me?.ready ? t.l_net_not_ready : t.l_net_ready_up}
           </button>
         ) : (
@@ -253,7 +427,7 @@ export function LobbyScreen() {
                 .then(() => kickoffServerGame(room.code)) // every game is server-driven (#110)
                 .catch((e) => { console.error("[beginMatch]", e); setStartError(lang === "fr" ? "Échec du lancement. Réessaie." : "Couldn't start the match. Try again."); });
             }}
-              className="w-full py-4 rounded-2xl font-extrabold text-base tracking-wide transition-all bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black shadow-lg shadow-amber-500/20 disabled:opacity-30 disabled:shadow-none disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500">
+              className="btn-primary w-full py-3.5 rounded-xl font-bold text-[15px] tracking-wide disabled:cursor-not-allowed">
               <span className="inline-flex items-center justify-center gap-2"><Swords size={18} /> {t.l_net_start}</span>
             </button>
             {!canStart && <p className="text-xs text-slate-600">{t.l_net_wait_ready}</p>}
@@ -262,16 +436,20 @@ export function LobbyScreen() {
         )}
       </main>
 
-      {/* Rules modal (host) */}
-      {showRules && isHost && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setShowRules(false)}>
-          <div className="panel w-full max-w-[760px] max-h-[86vh] overflow-y-auto rounded-2xl p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/[0.06]">
-              <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-300">{t.l_rules}</h2>
-              <button onClick={() => setShowRules(false)} className="text-slate-500 hover:text-amber-300 text-xl leading-none">×</button>
+      {/* Rules drawer (host) — slides in from the right; the lobby stays visible behind. Kept
+          mounted so the slide animates; pointer-events gated so it never blocks when closed. */}
+      {isHost && (
+        <div className={`fixed inset-0 z-50 ${showRules ? "" : "pointer-events-none"}`} aria-hidden={!showRules}>
+          <div onClick={() => setShowRules(false)} className={`absolute inset-0 bg-black/60 backdrop-blur-[2px] transition-opacity duration-300 ${showRules ? "opacity-100" : "opacity-0"}`} />
+          <aside className={`absolute inset-y-0 right-0 w-full max-w-[480px] panel border-l border-white/[0.08] shadow-2xl shadow-black/50 overflow-y-auto transition-transform duration-300 ease-out ${showRules ? "translate-x-0" : "translate-x-full"}`}>
+            <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-[var(--panel-bg,rgba(10,12,20,0.92))] backdrop-blur border-b border-white/[0.06]">
+              <h2 className="inline-flex items-center gap-2 text-[12px] font-extrabold uppercase tracking-[0.2em] gild-text"><Settings size={14} /> {t.l_rules}</h2>
+              <button onClick={() => setShowRules(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-300 hover:bg-white/[0.06] transition-colors"><X size={18} /></button>
             </div>
-            <GameRulesPanel isHost={isHost} />
-          </div>
+            <div className="p-5">
+              <GameRulesPanel isHost={isHost} showMode={false} />
+            </div>
+          </aside>
         </div>
       )}
     </div>

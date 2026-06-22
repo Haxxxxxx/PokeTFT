@@ -152,7 +152,7 @@ export function WelcomeScreen() {
       <div className="flex-1 w-full max-w-[940px] mx-auto flex flex-col lg:flex-row gap-5 p-4 sm:p-6 items-stretch">
         {/* Hero / play */}
         <main className="flex-1 flex flex-col min-h-[420px]">
-          <div className="panel-hero flex-1 flex flex-col justify-center items-center gap-7 rounded-2xl p-8 relative overflow-hidden">
+          <div className="panel-hero flex-1 flex flex-col justify-center items-center gap-7 rounded-xl p-8 relative overflow-hidden">
             {/* Decorative floating mons */}
             <div className="absolute inset-0 pointer-events-none select-none">
               {heroMons.map((m, i) => (
@@ -217,7 +217,7 @@ export function WelcomeScreen() {
         <aside className="w-full lg:w-72 shrink-0 flex flex-col gap-4">
           <ProfileTile />
           <FriendsPanel />
-          <div className="panel rounded-2xl p-4">
+          <div className="panel rounded-xl p-4">
             <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-3 border-b border-white/[0.06] pb-2.5">{t.s_title}</h2>
             <AppSettingsPanel />
           </div>

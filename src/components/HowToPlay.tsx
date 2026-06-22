@@ -61,7 +61,7 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="w-full max-w-[460px] rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-[460px] rounded-xl border border-slate-700 bg-slate-900 overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* Hero with sprite + accent glow */}
         <div className="relative flex items-center justify-center pt-9 pb-6" style={{ background: `radial-gradient(80% 100% at 50% 0%, ${s.accent}22, transparent 70%)` }}>
           <button onClick={onClose} className="absolute top-3 right-4 text-slate-500 hover:text-slate-300 text-xl leading-none">×</button>

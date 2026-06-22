@@ -20,9 +20,9 @@ import { AugmentsBar } from "./AugmentsBar";
 import { CoopPanel } from "./CoopPanel";
 import { finishCarouselEarly } from "@/game/net/serverGame";
 import { subscribeTransfers } from "@/game/net/coop";
-import { recordGameResult, applyRankedResult, rankOf, type RankedResult } from "@/game/net/users";
+import { recordGameResult, applyRankedResult, rankOf, recordUltimateBotWin, weightedRatingDelta, type RankedResult } from "@/game/net/users";
 import { computeTraits } from "@/game/engine/synergies";
-import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords, RefreshCw } from "lucide-react";
+import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords, RefreshCw, BarChart3 } from "lucide-react";
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR, teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID, tailoredAugmentPicks } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
 import { useUi } from "@/game/store/uiStore";
@@ -238,6 +238,8 @@ export function NetGameClient() {
   const [spectate, setSpectate] = useState<string | null>(null);
   // LP outcome of this ranked game — shown on the end screen once applyRankedResult resolves.
   const [rankResult, setRankResult] = useState<RankedResult | null>(null);
+  // Toggle for the "last fight" damage recap, reviewable during planning (both teams).
+  const [showRecap, setShowRecap] = useState(false);
   // Carousel/augment: hide the choice cards (revealing the live board behind the
   // overlay) and toggle them back. Resets whenever a new pick screen opens.
   const [revealBoard, setRevealBoard] = useState(false);
@@ -509,13 +511,20 @@ export function NetGameClient() {
   // Remember my LAST fight's units (with cumulative damage/tank/heal) so the end screen can
   // crown an MVP. My side is "ally" normally, "enemy" when the pairing flipped me.
   const lastFightRef = useRef<FrameUnit[] | null>(null);
+  // Both teams' final-frame stats, kept so the recap is reviewable DURING planning (and shows
+  // the enemy team too, not just yours).
+  const lastFightBothRef = useRef<{ mine: FrameUnit[]; theirs: FrameUnit[]; oppName: string } | null>(null);
   useEffect(() => {
     if (!combatResult?.frames?.length || !myCombat) return;
     const myTeam = myCombat.flip ? "enemy" : "ally";
     const last = combatResult.frames[combatResult.frames.length - 1];
     const mine = last.units.filter((u) => u.team === myTeam);
-    if (mine.length) lastFightRef.current = mine;
-  }, [combatResult, myCombat?.flip]);
+    const theirs = last.units.filter((u) => u.team !== myTeam);
+    if (mine.length) {
+      lastFightRef.current = mine;
+      if (!myCombat.pve) lastFightBothRef.current = { mine, theirs, oppName: myCombat.oppName ?? "Rival" };
+    }
+  }, [combatResult, myCombat?.flip]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Live replay of the rival I'm spectating (from the host's frozen boards).
   const spectateCombat = spectate && spectate !== myUid ? room?.combat?.[spectate] : undefined;
@@ -689,6 +698,14 @@ export function NetGameClient() {
         const finalBoard = useGame.getState().units.filter((u) => u.pos !== null);
         const team = finalBoard.map((u) => ({ d: u.defId, s: u.star }));
         const traits = computeTraits(finalBoard).filter((tr) => tr.tier > 0).map((tr) => ({ k: tr.key, t: tr.tier }));
+        // Ranked: placement is over the WHOLE lobby (bots are real opponents on the board),
+        // but the LP swing is weighted by how human the lobby was — bots count for less, so
+        // practice still nudges your rating without being worth a full game (see weightedRatingDelta).
+        const all = Object.values(ps);
+        const humanOpp = all.filter((p) => !p.isBot && p.uid !== myUid).length;
+        const botOpp = all.filter((p) => p.isBot).length;
+        // Same pure delta applyRankedResult applies → store it so history shows LP per game.
+        const lp = weightedRatingDelta(place, all.length, humanOpp, botOpp);
         recordGameResult(myUid, room.code, {
           place,
           players: total,
@@ -696,14 +713,15 @@ export function NetGameClient() {
           won: place === 1 || meta?.winnerUid === myUid,
           team,
           traits,
+          lp,
         }).catch(() => {});
-        // Ranked: placement is over the WHOLE lobby (bots are real opponents on the board),
-        // but the LP swing is weighted by how human the lobby was — bots count for less, so
-        // practice still nudges your rating without being worth a full game (see weightedRatingDelta).
-        const all = Object.values(ps);
-        const humanOpp = all.filter((p) => !p.isBot && p.uid !== myUid).length;
-        const botOpp = all.filter((p) => p.isBot).length;
         applyRankedResult(myUid, place, all.length, meP?.name ?? "Player", meP?.photoURL, { humans: humanOpp, bots: botOpp }).then(setRankResult).catch(() => {});
+        // Hidden progression: a WIN against a lobby that held an ultimate (or nightmare) bot
+        // advances the nightmare unlock — once past the threshold, ultimate bots start being
+        // silently replaced by the nightmare boss tier in future lobbies.
+        const won = place === 1 || meta?.winnerUid === myUid;
+        const hadTopBot = all.some((p) => p.isBot && (p.botDifficulty === "ultimate" || p.botDifficulty === "nightmare"));
+        if (won && hadTopBot) recordUltimateBotWin(myUid).catch(() => {});
       }
     }
     prevPhase.current = phase ?? null;
@@ -763,16 +781,18 @@ export function NetGameClient() {
     try {
       await concede(room.code, myUid, place);
       const finalBoard = useGame.getState().units.filter((u) => u.pos !== null);
-      recordGameResult(myUid, room.code, {
-        place, players: Object.values(ps).length, regions: room.rules?.generations ?? [1], won: false,
-        team: finalBoard.map((u) => ({ d: u.defId, s: u.star })),
-        traits: computeTraits(finalBoard).filter((tr) => tr.tier > 0).map((tr) => ({ k: tr.key, t: tr.tier })),
-      });
       // Forfeit at the worst currently-alive placement (over the whole lobby); LP swing is
       // weighted so a bot-heavy practice game moves the rating less than a real lobby.
       const all = Object.values(ps);
       const humanOpp = all.filter((p) => !p.isBot && p.uid !== myUid).length;
       const botOpp = all.filter((p) => p.isBot).length;
+      const lp = weightedRatingDelta(place, all.length, humanOpp, botOpp);
+      recordGameResult(myUid, room.code, {
+        place, players: Object.values(ps).length, regions: room.rules?.generations ?? [1], won: false,
+        team: finalBoard.map((u) => ({ d: u.defId, s: u.star })),
+        traits: computeTraits(finalBoard).filter((tr) => tr.tier > 0).map((tr) => ({ k: tr.key, t: tr.tier })),
+        lp,
+      });
       applyRankedResult(myUid, place, all.length, me?.name ?? "Player", me?.photoURL, { humans: humanOpp, bots: botOpp }).catch(() => {});
     } catch { /* best-effort */ }
     leave();
@@ -879,7 +899,7 @@ export function NetGameClient() {
       {/* Concede / forfeit confirm */}
       {confirmLeave && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setConfirmLeave(false)}>
-          <div className="gilded gilded-strong w-full max-w-sm rounded-2xl p-5 flex flex-col gap-3" onClick={(e) => e.stopPropagation()}>
+          <div className="gilded gilded-strong w-full max-w-sm rounded-xl p-5 flex flex-col gap-3" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-extrabold text-rose-300">{lang === "fr" ? "Abandonner la partie ?" : "Forfeit the match?"}</h3>
             <p className="text-[12px] text-slate-400">{lang === "fr" ? "Vous serez éliminé à la dernière place restante et la partie sera enregistrée comme une défaite." : "You'll be eliminated at the worst remaining place and the game is recorded as a loss."}</p>
             <div className="flex gap-2 mt-1">
@@ -914,9 +934,9 @@ export function NetGameClient() {
             colour win/loss and stay clickable for a recap. */}
         <div className="gilded relative flex items-center gap-3 px-3 py-1.5 rounded-lg">
           {/* Current stage/round recap, pinned beside the round tracker. */}
-          <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/30 border border-[var(--panel-edge)]">
-            <span className="text-[8px] uppercase tracking-[0.15em] text-amber-300/70 leading-none">{t.net_stage}</span>
-            <span className="text-base font-extrabold tabular-nums gild-text leading-none">{meta.stage}-{meta.round}</span>
+          <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/[0.06]">
+            <span className="text-[8px] uppercase tracking-[0.15em] text-slate-400/70 leading-none">{t.net_stage}</span>
+            <span className="text-base font-bold tabular-nums gild-text leading-none">{meta.stage}-{meta.round}</span>
           </div>
           <div className="flex-1 flex items-center justify-center gap-1 overflow-x-auto">
             {schedule.map(({ stage, round, kind }) => {
@@ -980,9 +1000,9 @@ export function NetGameClient() {
 
         {/* Top HUD bar: stat chips, then the phase/timer segment + controls.
             (The stage badge lives next to the timeline above.) */}
-        <div className="gilded flex items-center gap-2.5 flex-wrap px-3.5 py-2.5 rounded-xl">
+        <div className="gilded flex items-center gap-2 flex-wrap px-3 py-2 rounded-xl">
           {isSpectator ? (
-            <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-400/40 text-[11px] font-extrabold text-amber-300">
+            <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-400/40 text-[11px] font-bold text-amber-300">
               <Eye size={13} /> {t.net_spectate_badge}
             </span>
           ) : (
@@ -1011,8 +1031,8 @@ export function NetGameClient() {
             if (gm.id === "standard") return null;
             const mono = gm.flags?.monoType ? pickMonoType(room.rules?.generations ?? [1], codeSeed(room.code)) : null;
             return (
-              <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-extrabold"
-                style={{ borderColor: `${gm.color}66`, color: gm.color, background: `${gm.color}14` }}
+              <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-bold"
+                style={{ borderColor: `${gm.color}55`, color: gm.color, background: `${gm.color}12` }}
                 title={lang === "fr" ? gm.descFr : gm.desc}>
                 {lang === "fr" ? gm.nameFr : gm.name}{mono ? ` · ${mono}` : ""}
               </span>
@@ -1029,6 +1049,13 @@ export function NetGameClient() {
 
           {isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1 shrink-0">{t.net_host_badge}</span>}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Last-fight recap — reviewable while planning (your team + the enemy's). */}
+            {phase === "planning" && !isSpectator && lastFightBothRef.current && (
+              <button onClick={() => setShowRecap((s) => !s)} title={lang === "fr" ? "Récap du dernier combat" : "Last fight recap"}
+                className={`px-2.5 py-1.5 rounded-md border text-xs font-bold inline-flex items-center gap-1.5 transition-colors ${showRecap ? "bg-amber-500/90 text-black border-amber-400" : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"}`}>
+                <BarChart3 size={13} /> {lang === "fr" ? "Récap" : "Recap"}
+              </button>
+            )}
             <OptionsMenu />
             <FullscreenButton />
             <button onClick={onLeaveClick} className="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.net_leave}</button>
@@ -1050,16 +1077,17 @@ export function NetGameClient() {
             <div className="flex flex-col gap-1">
               {ladder.map((p, i) => {
                 const dex = asBoard(p.board)[0] ? getDef(asBoard(p.board)[0].defId).dex[asBoard(p.board)[0].star - 1] : null;
+                const isNm = p.botDifficulty === "nightmare";
                 return (
                   <div
                     key={p.uid}
                     onClick={() => setSpectate(isSpectator ? p.uid : (p.uid === myUid ? null : (spectate === p.uid ? null : p.uid)))}
                     title={p.uid === myUid && !isSpectator ? "Your board" : `View ${p.name}'s board`}
-                    className={`flex items-center gap-2 px-1.5 py-1 rounded-lg cursor-pointer hover:bg-slate-700/50 ${p.uid === myUid ? "bg-slate-700/70 ring-1 ring-sky-500/50" : ""} ${spectate === p.uid ? "ring-1 ring-amber-400/70 bg-amber-500/10" : ""} ${!p.alive ? "opacity-40" : ""}`}
+                    className={`flex items-center gap-2 px-1.5 py-1 rounded-lg cursor-pointer hover:bg-slate-700/50 ${p.uid === myUid ? "bg-slate-700/70 ring-1 ring-sky-500/50" : ""} ${spectate === p.uid ? "ring-1 ring-amber-400/70 bg-amber-500/10" : ""} ${isNm && p.alive ? "ring-1 ring-rose-600/50 bg-rose-950/20" : ""} ${!p.alive ? "opacity-40" : ""}`}
                   >
                     <span className="w-4 text-[10px] text-slate-500 font-bold text-center">{p.place ?? i + 1}</span>
-                    <span className="w-7 h-7 rounded-md bg-black/40 border border-slate-700 flex items-center justify-center shrink-0 overflow-hidden">
-                      {p.photoURL ? (
+                    <span className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 overflow-hidden ${isNm ? "bg-rose-950/60 border border-rose-600/70 shadow-[0_0_10px_-2px_rgba(225,29,72,0.8)]" : "bg-black/40 border border-slate-700"}`}>
+                      {isNm ? <span className="text-[13px] leading-none">💀</span> : p.photoURL ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={p.photoURL} alt="" width={24} height={24} style={{ imageRendering: "pixelated" }} />
                       ) : dex ? (
@@ -1069,7 +1097,7 @@ export function NetGameClient() {
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className="flex items-center gap-1.5">
-                        <span className={`block text-[11px] font-semibold truncate ${p.uid === myUid ? "text-amber-300" : "text-slate-200"}`}>
+                        <span className={`block text-[11px] font-semibold truncate ${isNm ? "text-rose-300" : p.uid === myUid ? "text-amber-300" : "text-slate-200"}`}>
                           {p.name}{!p.connected && t.net_offline}
                         </span>
                         {/* Scouting: rivals' levels are public (TFT-style). */}
@@ -1449,7 +1477,7 @@ export function NetGameClient() {
                   <span className="absolute -top-1.5 -left-1.5 text-sm">⭐</span>
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[9px] uppercase tracking-widest text-amber-200/70 font-bold">{lang === "fr" ? "MVP du dernier combat" : "Last-fight MVP"}</div>
+                  <div className="text-[9px] uppercase tracking-wide text-amber-200/70 font-bold">{lang === "fr" ? "MVP du dernier combat" : "Last-fight MVP"}</div>
                   <div className="text-sm font-extrabold text-amber-200 truncate">{mvp.name}</div>
                   <div className="flex items-center gap-2.5 mt-0.5 text-[10px] font-bold">
                     <span className="text-rose-300" title={lang === "fr" ? "Dégâts" : "Damage"}>⚔ {fmt(mvp.dmgDealt)}</span>
@@ -1543,6 +1571,9 @@ export function NetGameClient() {
         );
       })()}
 
+      {showRecap && phase === "planning" && lastFightBothRef.current && (
+        <FightRecap data={lastFightBothRef.current} lang={lang} onClose={() => setShowRecap(false)} />
+      )}
       {booting && <BootVeil
         label={lang === "fr" ? "Connexion au serveur…" : "Connecting to the arena…"}
         sub={`${connectedHumans}/${humanPlayers.length} ${lang === "fr" ? "dresseurs prêts" : "trainers ready"}`}
@@ -1554,6 +1585,63 @@ export function NetGameClient() {
 
 /** Pokéball boot veil shown briefly at match start while sprites load + the room
  *  syncs, so the first frame everyone sees is fully loaded and in lockstep. */
+/** Last-fight damage recap, reviewable during planning. Toggle between YOUR team and the enemy
+ *  team, and between damage dealt / tanked / healed — a floating panel over the board. */
+const RECAP_METRICS = [
+  { key: "dmgDealt", label: "DMG", color: "#fb7185" },
+  { key: "dmgTaken", label: "TANK", color: "#38bdf8" },
+  { key: "healed", label: "HEAL", color: "#34d399" },
+] as const;
+function FightRecap({ data, lang, onClose }: { data: { mine: FrameUnit[]; theirs: FrameUnit[]; oppName: string }; lang: string; onClose: () => void }) {
+  const [side, setSide] = useState<"mine" | "theirs">("mine");
+  const [metric, setMetric] = useState<(typeof RECAP_METRICS)[number]["key"]>("dmgDealt");
+  const active = RECAP_METRICS.find((m) => m.key === metric)!;
+  const val = (u: FrameUnit) => u[metric] as number;
+  const units = (side === "mine" ? data.mine : data.theirs).filter((u) => (u.dmgDealt + u.dmgTaken + u.healed) > 0);
+  const max = Math.max(1, ...units.map(val));
+  const sorted = [...units].sort((a, b) => val(b) - val(a)).slice(0, 8);
+  return (
+    <div className="fixed z-40 bottom-24 right-4 w-[260px] gilded rounded-xl p-3 shadow-2xl shadow-black/50">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] uppercase tracking-wide text-amber-200/60 font-bold">{lang === "fr" ? "Dernier combat" : "Last fight"}</span>
+        <button onClick={onClose} className="text-slate-500 hover:text-slate-200 text-xs leading-none">✕</button>
+      </div>
+      {/* Team toggle: yours vs the rival you fought. */}
+      <div className="flex gap-1 mb-1.5">
+        {([["mine", lang === "fr" ? "Vous" : "You"], ["theirs", data.oppName]] as const).map(([k, lbl]) => (
+          <button key={k} onClick={() => setSide(k)}
+            className={`flex-1 text-[10px] font-bold py-1 rounded-md border truncate transition-colors ${side === k ? "bg-slate-200 text-slate-900 border-transparent" : "bg-black/30 border-white/[0.06] text-slate-400 hover:text-slate-200"}`}>
+            {lbl}
+          </button>
+        ))}
+      </div>
+      {/* Metric tabs. */}
+      <div className="flex gap-1 mb-2">
+        {RECAP_METRICS.map((m) => (
+          <button key={m.key} onClick={() => setMetric(m.key)}
+            style={metric === m.key ? { background: m.color, color: "#0b1020" } : undefined}
+            className={`flex-1 text-[10px] font-extrabold py-1 rounded-md border transition-colors ${metric === m.key ? "border-transparent" : "bg-black/30 border-white/[0.06] text-slate-400 hover:text-slate-200"}`}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-col gap-1">
+        {sorted.length === 0 && <div className="text-[10px] text-slate-600 text-center py-2">—</div>}
+        {sorted.map((u) => (
+          <div key={u.id} className={`flex items-center gap-1.5 ${u.alive ? "" : "opacity-50"}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={spriteUrl(u.dex)} alt="" width={20} height={20} style={{ imageRendering: "pixelated" }} />
+            <div className="flex-1 h-2 rounded-full bg-slate-800 overflow-hidden min-w-0">
+              <div className="h-full rounded-full" style={{ width: `${(val(u) / max) * 100}%`, background: active.color }} />
+            </div>
+            <span className="w-10 text-right text-[10px] tabular-nums font-semibold text-slate-300">{Math.round(val(u))}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function BootVeil({ label, sub, progress }: { label: string; sub?: string; progress: number }) {
   const pct = Math.round(Math.max(0, Math.min(1, progress)) * 100);
   return (
@@ -1761,7 +1849,7 @@ function PhaseTimer({ phase, phaseLabel, deadline, totalMs, resolvingLabel }: { 
   return (
     <div className="flex-1 min-w-[220px] flex flex-col gap-1 px-2">
       <div className="flex justify-between items-baseline">
-        <span className={`text-xs font-extrabold uppercase tracking-wide ${resolving ? "text-amber-300 animate-pulse" : phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{resolving ? resolvingLabel : phaseLabel}</span>
+        <span className={`text-xs font-bold uppercase tracking-wide ${resolving ? "text-amber-300 animate-pulse" : phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{resolving ? resolvingLabel : phaseLabel}</span>
         <span className="text-sm font-bold tabular-nums text-slate-200">
           {resolving
             ? <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-amber-400/25 border-t-amber-400 animate-spin align-middle" />
@@ -1777,10 +1865,10 @@ function PhaseTimer({ phase, phaseLabel, deadline, totalMs, resolvingLabel }: { 
 
 function StatChip({ label, value, accent, sub, title }: { label: string; value: ReactNode; accent?: string; sub?: string; title?: string }) {
   return (
-    <div title={title} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/25 border border-[var(--panel-edge)] shadow-[inset_0_1px_0_rgba(231,198,107,0.06)] shrink-0">
-      <span className="text-[9px] uppercase tracking-wider text-amber-200/55 leading-none">{label}</span>
-      <span className="text-base font-extrabold leading-none inline-flex items-baseline gap-1" style={{ color: accent }}>
-        {value}{sub && <span className="text-[10px] font-bold text-slate-400">{sub}</span>}
+    <div title={title} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] shrink-0">
+      <span className="text-[9px] uppercase tracking-wide text-slate-400/70 leading-none">{label}</span>
+      <span className="text-[15px] font-bold leading-none inline-flex items-baseline gap-1" style={{ color: accent }}>
+        {value}{sub && <span className="text-[10px] font-semibold text-slate-400">{sub}</span>}
       </span>
     </div>
   );

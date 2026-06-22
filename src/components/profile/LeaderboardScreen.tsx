@@ -41,7 +41,7 @@ export function LeaderboardScreen() {
           </button>
         </div>
 
-        <div className="panel rounded-2xl p-3">
+        <div className="panel rounded-xl p-3">
           {failed ? (
             <div className="py-8 flex flex-col items-center gap-3">
               <p className="text-[12px] text-rose-400 text-center">{tr("Couldn't load the leaderboard.", "Échec du chargement du classement.")}</p>

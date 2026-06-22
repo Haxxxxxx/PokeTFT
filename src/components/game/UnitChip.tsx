@@ -72,14 +72,17 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
 
   const ring = megaReady ? "#f0abfc" : color;
   const title = megaReady ? `${def.stageNames[unit.star - 1]} · Mega ready` : `${def.stageNames[unit.star - 1]} · click for details`;
+  // Fill the token: the mon is the point, so let the sprite take nearly the whole cell (the
+  // hex token has no border to clear; the square chip leaves room for its 2px frame).
+  const spriteSize = shape === "hex" ? size - 2 : size - 6;
   const sprite = (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={spriteUrl(dex)}
       alt={def.name}
-      width={size - 8}
-      height={size - 8}
-      className="image-render-pixel pointer-events-none"
+      width={spriteSize}
+      height={spriteSize}
+      className="image-render-pixel pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
       style={{ imageRendering: "pixelated" }}
       draggable={false}
     />
@@ -101,7 +104,7 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
       >
         <div
           className="absolute inset-0 flex items-center justify-center"
-          style={{ clipPath: HEX_CLIP, background: "rgba(15,23,42,0.85)", boxShadow: `inset 0 0 0 2px ${ring}, inset 0 0 10px ${ring}55` }}
+          style={{ clipPath: HEX_CLIP, background: "rgba(13,20,38,0.66)", boxShadow: `inset 0 0 0 1.5px ${ring}, inset 0 0 6px ${ring}33` }}
         >
           {sprite}
         </div>
