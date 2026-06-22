@@ -122,29 +122,28 @@ function SellZone() {
 /** Pokémon Pension (Day Care): drop a ★ mon in to train it into a ★★ over a few
  *  rounds, then collect it. One slot; costs gold; the mon is away while training. */
 function PensionZone() {
-  const lang = useAppStore((s) => s.settings.language);
   const pension = useGame((s) => s.pension);
   const collect = useGame((s) => s.collectPension);
   const { setNodeRef, isOver } = useDroppable({ id: "pension" });
+  const t = useT();
   const ready = !!pension && pension.roundsLeft <= 0;
-  const title = lang === "fr" ? "Pension" : "Day Care";
   if (!pension) {
     return (
       <div
         ref={setNodeRef}
-        title={lang === "fr" ? `Glissez un ★ pour élever une copie (${PENSION_COST} or, ${PENSION_ROUNDS} tours)` : `Drag a ★ mon to breed a copy of it (${PENSION_COST} gold, ${PENSION_ROUNDS} rounds)`}
+        title={t.net_pension_title(PENSION_COST, PENSION_ROUNDS)}
         className={`w-[120px] shrink-0 flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed transition-all
           ${isOver ? "border-emerald-400 bg-emerald-500/25 text-emerald-100 scale-[1.03]" : "border-[var(--panel-edge)] bg-black/25 text-amber-200/55 hover:border-emerald-700/60 hover:text-emerald-300/80"}`}
       >
         <span className={`leading-none ${isOver ? "scale-125" : ""}`}><PawIcon size={22} /></span>
-        <span className="text-[9px] font-extrabold uppercase tracking-wider text-center leading-tight px-1">{title}</span>
+        <span className="text-[9px] font-extrabold uppercase tracking-wider text-center leading-tight px-1">{t.net_pension}</span>
       </div>
     );
   }
   const def = getDef(pension.defId);
   return (
     <div className="gilded w-[120px] shrink-0 flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5">
-      <span className="text-[8px] uppercase tracking-wider text-amber-200/55 leading-none">{title}</span>
+      <span className="text-[8px] uppercase tracking-wider text-amber-200/55 leading-none">{t.net_pension}</span>
       <div className="relative">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={spriteUrl(def.dex[0])} alt={def.name} width={44} height={44} style={{ imageRendering: "pixelated" }} className={ready ? "" : "opacity-80"} draggable={false} />
@@ -152,10 +151,10 @@ function PensionZone() {
       </div>
       {ready ? (
         <button onClick={collect} className="px-2 py-0.5 rounded-md bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-extrabold leading-none">
-          {lang === "fr" ? "Récupérer +1" : "Collect +1"}
+          {t.net_pension_collect}
         </button>
       ) : (
-        <span className="text-[9px] font-bold text-amber-200/70 leading-none">{lang === "fr" ? `${pension.roundsLeft} tour${pension.roundsLeft > 1 ? "s" : ""}` : `${pension.roundsLeft} round${pension.roundsLeft > 1 ? "s" : ""}`}</span>
+        <span className="text-[9px] font-bold text-amber-200/70 leading-none">{t.net_pension_rounds(pension.roundsLeft)}</span>
       )}
     </div>
   );
@@ -747,9 +746,9 @@ export function NetGameClient() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 app-bg text-center px-6">
         <div className="w-8 h-8 rounded-full border-2 border-amber-400/40 border-t-amber-400 animate-spin" />
-        <p className="text-sm text-slate-400">{lang === "fr" ? "Reconnexion à la partie…" : "Reconnecting to your game…"}</p>
+        <p className="text-sm text-slate-400">{t.net_reconnecting}</p>
         <button onClick={leave} className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-300">
-          {lang === "fr" ? "Retour à l'accueil" : "Back to home"}
+          {t.net_back_home}
         </button>
       </div>
     );
@@ -810,7 +809,7 @@ export function NetGameClient() {
         unit = resolveBenchSlots(g.units)[Number(target.slice("bench-".length))] ?? undefined;
       }
       if (unit && itemId === MEGA_STONE && !canMega(unit.defId)) {
-        useUi.getState().pushToast(lang === "fr" ? "Ce Pokémon ne peut pas Méga-Évoluer" : "This Pokémon can't Mega Evolve");
+        useUi.getState().pushToast(t.net_no_mega);
       } else if (unit) {
         equipItem(unit.iid, itemId);
       }
@@ -889,11 +888,11 @@ export function NetGameClient() {
       {confirmLeave && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setConfirmLeave(false)}>
           <div className="gilded gilded-strong w-full max-w-sm rounded-xl p-5 flex flex-col gap-3" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-extrabold text-rose-300">{lang === "fr" ? "Abandonner la partie ?" : "Forfeit the match?"}</h3>
-            <p className="text-[12px] text-slate-400">{lang === "fr" ? "Vous serez éliminé à la dernière place restante et la partie sera enregistrée comme une défaite." : "You'll be eliminated at the worst remaining place and the game is recorded as a loss."}</p>
+            <h3 className="text-base font-extrabold text-rose-300">{t.net_forfeit_title}</h3>
+            <p className="text-[12px] text-slate-400">{t.net_forfeit_body}</p>
             <div className="flex gap-2 mt-1">
-              <button onClick={() => { setConfirmLeave(false); doConcede(); }} className="flex-1 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-sm font-bold">{lang === "fr" ? "Abandonner" : "Forfeit"}</button>
-              <button onClick={() => setConfirmLeave(false)} className="px-5 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-sm font-bold">{lang === "fr" ? "Annuler" : "Cancel"}</button>
+              <button onClick={() => { setConfirmLeave(false); doConcede(); }} className="flex-1 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-sm font-bold">{t.net_forfeit_confirm}</button>
+              <button onClick={() => setConfirmLeave(false)} className="px-5 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-sm font-bold">{t.net_forfeit_cancel}</button>
             </div>
           </div>
         </div>
@@ -902,13 +901,13 @@ export function NetGameClient() {
       {stageBanner != null && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
           <div className="stage-banner text-center">
-            <div className="text-[11px] font-extrabold uppercase tracking-[0.4em] text-amber-300/80 mb-1">{lang === "fr" ? "Manche" : "Stage"}</div>
+            <div className="text-[11px] font-extrabold uppercase tracking-[0.4em] text-amber-300/80 mb-1">{t.net_stage_banner}</div>
             <div className="text-6xl font-black gild-text drop-shadow-[0_4px_30px_rgba(212,175,55,0.4)]">{stageBanner}</div>
             <div className="text-xs text-slate-400 mt-2 tracking-wide">
-              {stageBanner <= 2 ? (lang === "fr" ? "Le début de partie" : "The early game")
-                : stageBanner === 3 ? (lang === "fr" ? "Le milieu de partie commence" : "The midgame begins")
-                : stageBanner === 4 ? (lang === "fr" ? "Pic de puissance" : "Powerspike")
-                : (lang === "fr" ? "Fin de partie" : "Endgame")}
+              {stageBanner <= 2 ? t.net_stage_early
+                : stageBanner === 3 ? t.net_stage_mid
+                : stageBanner === 4 ? t.net_stage_powerspike
+                : t.net_stage_endgame}
             </div>
           </div>
         </div>
@@ -979,7 +978,7 @@ export function NetGameClient() {
                     : null}
                   <span className="text-[11px] font-bold text-slate-200">{r.oppName}</span>
                 </span>
-                <span className={`text-[11px] font-extrabold ${r.won ? "text-emerald-300" : "text-rose-300"}`}>{r.won ? (lang === "fr" ? "Victoire" : "Win") : (lang === "fr" ? "Défaite" : "Loss")}</span>
+                <span className={`text-[11px] font-extrabold ${r.won ? "text-emerald-300" : "text-rose-300"}`}>{r.won ? t.net_round_win : t.net_round_loss}</span>
                 {!r.won && r.dmg > 0 && <span className="text-[10px] text-rose-300/80">−{r.dmg} PV</span>}
                 <button onClick={() => { setRecapKey(null); setSpectate(null); }} className="text-slate-500 hover:text-slate-200 text-xs leading-none">✕</button>
               </div>
@@ -1016,9 +1015,7 @@ export function NetGameClient() {
                   <StatCell label={t.net_gold} accent="#fbbf24" icon={<CoinIcon size={12} />} value={g} />
                   <StatCell label={t.net_interest} accent="#fcd34d" value={`+${interest(g)}`} />
                   <StatCell label={t.net_streak} accent={stk >= 0 ? "#34d399" : "#f87171"} value={`${stk >= 0 ? "W" : "L"}${Math.abs(stk)}`} sub={`+${streakGold(stk)}`}
-                    title={lang === "fr"
-                      ? "Or de série (victoires OU défaites d'affilée) : 2–3 → +1, 4 → +2, 5+ → +3 or par tour."
-                      : "Streak gold (a run of wins OR losses): 2–3 → +1, 4 → +2, 5+ → +3 gold per round."} />
+                    title={t.net_streak_title} />
                   <StatCell label={t.net_alive(aliveCount).replace(/[0-9]+\s*/, "")} accent="#cbd5e1" value={aliveCount} />
                 </div>
               </>
@@ -1028,9 +1025,9 @@ export function NetGameClient() {
             // Deterministic pairing → show who you're about to fight this round.
             const opp = room && myUid ? predictOpponent(room, myUid) : null;
             if (!opp) return null;
-            return <StatChip label={lang === "fr" ? "Prochain" : "Next"} accent="#f0abfc"
-              value={<span className="text-sm font-bold">{opp.pve ? (lang === "fr" ? "Sauvages" : "Wild") : `vs ${opp.name}`}{opp.ghost ? (lang === "fr" ? " (clone)" : " (copy)") : ""}</span>}
-              title={opp.ghost ? (lang === "fr" ? "Combat fantôme (copie d'un adversaire)" : "Ghost fight (a copy of a rival)") : undefined} />;
+            return <StatChip label={t.net_next_opp} accent="#f0abfc"
+              value={<span className="text-sm font-bold">{opp.pve ? t.net_wild : `vs ${opp.name}`}{opp.ghost ? t.net_ghost_suffix : ""}</span>}
+              title={opp.ghost ? t.net_ghost_title : undefined} />;
           })()}
 
           {(() => {
@@ -1052,7 +1049,7 @@ export function NetGameClient() {
 
           {/* Phase + timer — isolated so it ticks on its own without re-rendering
               the whole game tree every 250ms (the old global tick caused jank). */}
-          <PhaseTimer phase={phase} phaseLabel={phaseLabel} deadline={meta.deadline} totalMs={phase === "combat" ? COMBAT_MS : PLAN_MS} resolvingLabel={lang === "fr" ? "Résolution…" : "Resolving…"} />
+          <PhaseTimer phase={phase} phaseLabel={phaseLabel} deadline={meta.deadline} totalMs={phase === "combat" ? COMBAT_MS : PLAN_MS} resolvingLabel={t.net_resolving} />
 
           {isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1 shrink-0">{t.net_host_badge}</span>}
           <div className="flex items-center gap-2 shrink-0">
@@ -1089,7 +1086,7 @@ export function NetGameClient() {
                   <div
                     key={p.uid}
                     onClick={() => setSpectate(isSpectator ? p.uid : (p.uid === myUid ? null : (spectate === p.uid ? null : p.uid)))}
-                    title={p.uid === myUid && !isSpectator ? t.net_your_board : `View ${p.name}'s board`}
+                    title={p.uid === myUid && !isSpectator ? t.net_your_board : t.net_view_board(p.name)}
                     className={`flex items-center gap-2 px-1.5 py-1 rounded-lg cursor-pointer hover:bg-slate-700/50 ${p.uid === myUid ? "bg-slate-700/70 ring-1 ring-sky-500/50" : ""} ${spectate === p.uid ? "ring-1 ring-amber-400/70 bg-amber-500/10" : ""} ${isNm && p.alive ? "ring-1 ring-rose-600/50 bg-rose-950/20" : ""} ${!p.alive ? "opacity-40" : ""}`}
                   >
                     <span className="w-4 text-[10px] text-slate-500 font-bold text-center">{p.place ?? i + 1}</span>
@@ -1108,7 +1105,7 @@ export function NetGameClient() {
                           {p.name}{!p.connected && t.net_offline}
                         </span>
                         {/* Scouting: rivals' levels are public (TFT-style). */}
-                        <span className="shrink-0 text-[8px] font-bold px-1 rounded bg-slate-700/80 text-slate-300 leading-tight tabular-nums">Lv{p.level ?? 1}</span>
+                        <span className="shrink-0 text-[8px] font-bold px-1 rounded bg-slate-700/80 text-slate-300 leading-tight tabular-nums">{t.net_lv}{p.level ?? 1}</span>
                       </span>
                       <span className="flex items-center gap-1">
                         <span className="flex-1 h-1.5 rounded-full bg-slate-700 overflow-hidden">
@@ -1141,7 +1138,7 @@ export function NetGameClient() {
                 return (
                   <span
                     key={i}
-                    title={`${threshold} ${lang === "fr" ? "or" : "gold"}`}
+                    title={`${threshold} ${t.net_gold_label}`}
                     className={`w-11 h-11 rounded-xl border-2 flex items-center justify-center transition-all ${filled ? "bg-amber-400/25 border-amber-400/80 text-amber-300 shadow-[0_0_12px_-2px_rgba(251,191,36,0.75)]" : "bg-slate-800/40 border-slate-700/50 text-slate-700"}`}
                   >
                     <CoinIcon size={24} />
@@ -1149,7 +1146,7 @@ export function NetGameClient() {
                 );
               })}
             </div>
-            <span className="text-[8px] font-bold uppercase tracking-wide text-amber-200/45 mt-0.5 text-center leading-tight">{lang === "fr" ? "Intérêt" : "Interest"}</span>
+            <span className="text-[8px] font-bold uppercase tracking-wide text-amber-200/45 mt-0.5 text-center leading-tight">{t.net_interest_label}</span>
             </>}
           </div>
 
@@ -1177,7 +1174,7 @@ export function NetGameClient() {
                 {/* Rival's bench */}
                 <div className="flex gap-1.5 p-2 rounded-xl border border-slate-700/60 bg-slate-900/50 min-h-[64px] flex-wrap justify-center shrink-0">
                   {spectateBench.length === 0
-                    ? <span className="text-[11px] text-slate-600 self-center">Empty bench</span>
+                    ? <span className="text-[11px] text-slate-600 self-center">{t.net_bench_empty}</span>
                     : spectateBench.map((u) => <UnitChip key={u.iid} unit={u} size={52} interactive={false} />)}
                 </div>
               </div>
@@ -1248,7 +1245,7 @@ export function NetGameClient() {
               const full = boardCount >= cap;
               return (
                 <div className="gilded flex flex-col justify-center gap-1 px-2.5 py-1.5 rounded-xl shrink-0">
-                  <div className="text-[9px] uppercase tracking-wider text-amber-200/55 text-center leading-none">{lang === "fr" ? "Plateau" : "Board"}</div>
+                  <div className="text-[9px] uppercase tracking-wider text-amber-200/55 text-center leading-none">{t.net_board_label}</div>
                   <div className="text-center text-base font-extrabold tabular-nums leading-none">
                     <span className={full ? "text-emerald-300" : "text-amber-300"}>{boardCount}</span>
                     <span className="text-slate-600">/{cap}</span>
@@ -1256,10 +1253,10 @@ export function NetGameClient() {
                   <button
                     onClick={fillBoard}
                     disabled={phase !== "planning" || benchCount === 0 || full}
-                    title={lang === "fr" ? "Remplir le plateau depuis le banc" : "Fill the board from the bench"}
+                    title={t.net_board_fill_title}
                     className="px-2 py-1 rounded-md bg-emerald-700/80 hover:bg-emerald-600 disabled:opacity-30 text-[10px] font-bold text-white leading-none"
                   >
-                    {lang === "fr" ? "Remplir" : "Fill"}
+                    {t.net_board_fill}
                   </button>
                 </div>
               );
@@ -1280,10 +1277,10 @@ export function NetGameClient() {
               float over the shop. */}
           {phase === "planning" && me?.alive && (
             <div className="flex items-center gap-2 opacity-80">
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">{lang === "fr" ? "Raccourcis" : "Keys"}</span>
-              <Kbd k="R" label={lang === "fr" ? "Reroll" : "Reroll"} />
+              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">{t.net_keys_label}</span>
+              <Kbd k="R" label={t.sh_reroll} />
               <Kbd k="L" label="XP" />
-              <Kbd k="S" label={lang === "fr" ? "Vendre" : "Sell"} />
+              <Kbd k="S" label={t.net_key_sell} />
             </div>
           )}
         </div>}
@@ -1314,7 +1311,7 @@ export function NetGameClient() {
               style={{ pointerEvents: "auto" }}
               className="absolute top-4 right-4 z-10 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-200 shadow-lg"
             >
-              <Eye size={13} className="inline align-text-bottom mr-1" />{revealBoard ? (lang === "fr" ? "Afficher les choix" : "Show choices") : (lang === "fr" ? "Voir mon plateau" : "Hide & view board")}
+              <Eye size={13} className="inline align-text-bottom mr-1" />{revealBoard ? t.net_show_choices : t.net_hide_view_board}
             </button>
             {!revealBoard && (
             // min-h-full centers when there's room, scrolls instead of clipping on a short viewport.
@@ -1322,7 +1319,7 @@ export function NetGameClient() {
             <div className="celebrate-pop flex flex-col items-center">
               <div className="flex items-center gap-2.5 mb-1">
                 <span><Sparkles size={24} /></span>
-                <h2 className="text-2xl font-extrabold text-amber-300 tracking-tight">{lang === "fr" ? "Carrousel" : "Carousel"}</h2>
+                <h2 className="text-2xl font-extrabold text-amber-300 tracking-tight">{t.net_carousel_title}</h2>
               </div>
               {(() => {
                 // Comeback cue: mirrors the server's below-median-HP reward boost so the
@@ -1331,7 +1328,7 @@ export function NetGameClient() {
                 const median = hps.length ? hps[Math.floor((hps.length - 1) / 2)] : 100;
                 return hps.length > 1 && (me?.hp ?? 100) < median ? (
                   <span className="mb-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/40 text-[10px] font-bold text-emerald-300">
-                    <Sparkles size={10} /> {lang === "fr" ? "Bonus de remontée" : "Comeback bonus"}
+                    <Sparkles size={10} /> {t.net_carousel_comeback}
                   </span>
                 ) : null;
               })()}
@@ -1340,21 +1337,21 @@ export function NetGameClient() {
                 // soon as everyone has chosen).
                 const waiting = Object.values(room.players ?? {}).filter((p) => !p.isBot && p.connected && p.alive && p.carouselPicked !== key).length;
                 return waiting > 0
-                  ? (lang === "fr" ? `Choisi — en attente de ${waiting} dresseur${waiting > 1 ? "s" : ""}…` : `Picked — waiting for ${waiting} trainer${waiting > 1 ? "s" : ""}…`)
-                  : (lang === "fr" ? "Choisi — en attente du tour…" : "Picked — waiting for the round…");
-              })() : (lang === "fr" ? "Choisis une récompense gratuite." : "Pick one free reward.")}</p>
+                  ? t.net_carousel_picked_waiting(waiting)
+                  : t.net_carousel_picked_round;
+              })() : t.net_carousel_pick_free}</p>
               <div className="text-[11px] tabular-nums font-bold text-amber-200/70 mt-0.5 mb-5"><Countdown deadline={meta.deadline} />s</div>
             {!picked && (() => {
               // A unit pick needs a free bench slot; items/Mega go to the inventory.
               // Block (don't silently swallow) unit picks when the bench is full so
               // the player knows to sell a unit first instead of losing the reward.
               const benchFull = units.filter((u) => u.pos === null).length >= BENCH_SIZE;
-              const fullNote = lang === "fr" ? "Banc plein" : "Bench full";
+              const fullNote = t.net_bench_full;
               return (
               <div className="flex gap-3 justify-center items-start">
                 {opts.map((pick, i) => {
                   const onPick = () => { if (pickLatch.current === `c-${key}`) return; pickLatch.current = `c-${key}`; netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); };
-                  if (pick === MEGA_STONE) return <CarouselCard key={i} onClick={onPick} color="#f0abfc" name={t.it_mega_stone} sub={lang === "fr" ? "Méga-Évolution" : "Mega Evolve"} art={<span className="text-fuchsia-300"><MegaIcon size={56} /></span>} />;
+                  if (pick === MEGA_STONE) return <CarouselCard key={i} onClick={onPick} color="#f0abfc" name={t.it_mega_stone} sub={t.net_carousel_mega_sub} art={<span className="text-fuchsia-300"><MegaIcon size={56} /></span>} />;
                   const item = ITEM_DEF_BY_ID[pick];
                   if (item) return <CarouselCard key={i} onClick={onPick} color={RARITY_COLOR[item.rarity] ?? "#fbbf24"} name={lang === "fr" ? item.nameFr : item.name} sub={lang === "fr" ? item.textFr : item.text} art={<span style={{ color: RARITY_COLOR[item.rarity] ?? "#fbbf24" }}><ItemGlyph id={item.id} size={46} /></span>} />;
                   const def = getDef(pick);
@@ -1397,7 +1394,7 @@ export function NetGameClient() {
             style={{ pointerEvents: "auto" }}
             className="absolute top-4 right-4 z-10 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-200 shadow-lg"
           >
-            <Eye size={13} className="inline align-text-bottom mr-1" />{revealBoard ? (lang === "fr" ? "Afficher les choix" : "Show choices") : (lang === "fr" ? "Voir mon plateau" : "Hide & view board")}
+            <Eye size={13} className="inline align-text-bottom mr-1" />{revealBoard ? t.net_show_choices : t.net_hide_view_board}
           </button>
           {!revealBoard && (
           // min-h-full centers the choices when there's room, but lets them scroll
@@ -1408,7 +1405,7 @@ export function NetGameClient() {
               <span><Sparkles size={24} /></span>
               <h2 className="text-2xl font-extrabold text-violet-300 tracking-tight">Augment {augSlotNow! + 1}/3</h2>
             </div>
-            <p className="text-xs text-slate-300/80 mb-5">{lang === "fr" ? "Choisis un bonus permanent." : "Pick one permanent boost."}</p>
+            <p className="text-xs text-slate-300/80 mb-5">{t.net_augment_pick_one}</p>
             <div className="flex gap-3 flex-wrap justify-center max-w-[640px]">
             {augOptions.map((a) => (
               <OrnateAugmentCard
@@ -1430,9 +1427,9 @@ export function NetGameClient() {
               className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-900/50 hover:bg-violet-700 border border-violet-500/50 text-violet-100 text-[12px] font-bold disabled:opacity-35 disabled:cursor-not-allowed transition-colors"
             >
               <RefreshCw size={14} />
-              {lang === "fr" ? "Relancer" : "Reroll"}
+              {t.net_augment_reroll}
               {augRerollCost === 0
-                ? <span className="text-[10px] text-emerald-300 font-extrabold uppercase">{lang === "fr" ? "Gratuit" : "Free"}</span>
+                ? <span className="text-[10px] text-emerald-300 font-extrabold uppercase">{t.net_augment_free}</span>
                 : <span className="inline-flex items-center gap-0.5 text-amber-300"><CoinIcon size={11} />{augRerollCost}</span>}
             </button>
           </div>
@@ -1464,7 +1461,7 @@ export function NetGameClient() {
             {iWon && <TrophyIcon size={52} />}
             <div className="text-4xl font-extrabold">{iWon ? t.net_victory : t.net_gameover}</div>
             {meta?.endedByHost
-              ? <div className="text-sm font-semibold text-rose-300">{lang === "fr" ? "L'hôte a quitté — partie terminée." : "The host left — game ended."}</div>
+              ? <div className="text-sm font-semibold text-rose-300">{t.net_host_left}</div>
               : <div className="text-sm text-slate-400">{t.net_placed(me?.place ?? 1)}</div>}
           </div>
 
@@ -1485,12 +1482,12 @@ export function NetGameClient() {
                   <span className="absolute -top-1.5 -left-1.5 text-sm">⭐</span>
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[9px] uppercase tracking-wide text-amber-200/70 font-bold">{lang === "fr" ? "MVP du dernier combat" : "Last-fight MVP"}</div>
+                  <div className="text-[9px] uppercase tracking-wide text-amber-200/70 font-bold">{t.net_mvp_label}</div>
                   <div className="text-sm font-extrabold text-amber-200 truncate">{mvp.name}</div>
                   <div className="flex items-center gap-2.5 mt-0.5 text-[10px] font-bold">
-                    <span className="text-rose-300" title={lang === "fr" ? "Dégâts" : "Damage"}>⚔ {fmt(mvp.dmgDealt)}</span>
-                    {topTank && topTank.dmgTaken > 0 && <span className="text-sky-300" title={lang === "fr" ? "Encaissé" : "Tanked"}>🛡 {fmt(topTank.dmgTaken)} ({topTank.name.split(" ")[0]})</span>}
-                    {topHeal && topHeal.healed > 0 && <span className="text-emerald-300" title={lang === "fr" ? "Soins" : "Healed"}>✚ {fmt(topHeal.healed)}</span>}
+                    <span className="text-rose-300" title={t.net_mvp_damage}>⚔ {fmt(mvp.dmgDealt)}</span>
+                    {topTank && topTank.dmgTaken > 0 && <span className="text-sky-300" title={t.net_mvp_tanked}>🛡 {fmt(topTank.dmgTaken)} ({topTank.name.split(" ")[0]})</span>}
+                    {topHeal && topHeal.healed > 0 && <span className="text-emerald-300" title={t.net_mvp_healed}>✚ {fmt(topHeal.healed)}</span>}
                   </div>
                 </div>
               </div>
@@ -1513,7 +1510,7 @@ export function NetGameClient() {
                   <span className="text-slate-500 tabular-nums">{after.apex ? `${after.lp} LP` : `${after.lp}/${after.lpMax}`}</span>
                   {moved && (
                     <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${up ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"}`}>
-                      {up ? (lang === "fr" ? "Promu" : "Promoted") : (lang === "fr" ? "Rétrogradé" : "Demoted")}
+                      {up ? t.net_rank_promoted : t.net_rank_demoted}
                     </span>
                   )}
                 </span>
@@ -1544,7 +1541,7 @@ export function NetGameClient() {
                       <div className={`text-sm font-bold truncate ${first ? "text-amber-300" : isMe ? "text-sky-300" : "text-slate-200"}`}>{p.name}</div>
                       <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
                         <span>{Math.max(0, p.hp)} HP</span>
-                        {doubleUp && p.teamId != null && <span className="px-1 rounded bg-emerald-900/50 border border-emerald-600/40 text-emerald-300 font-bold">{lang === "fr" ? "Éq." : "Team"} {p.teamId + 1}</span>}
+                        {doubleUp && p.teamId != null && <span className="px-1 rounded bg-emerald-900/50 border border-emerald-600/40 text-emerald-300 font-bold">{t.net_team_label} {p.teamId + 1}</span>}
                       </div>
                     </div>
                     <div className="flex-1 flex flex-wrap gap-0.5 justify-end items-center">
@@ -1571,7 +1568,7 @@ export function NetGameClient() {
             {isHost ? (
               <button onClick={() => returnToLobby(room.code, room)} className="px-6 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold shadow-lg">{t.net_play_again}</button>
             ) : (
-              <span className="px-6 py-2.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-400 text-sm font-semibold">{lang === "fr" ? "En attente de l'hôte…" : "Waiting for host…"}</span>
+              <span className="px-6 py-2.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-400 text-sm font-semibold">{t.net_waiting_host}</span>
             )}
             <button onClick={leave} className="px-6 py-2.5 rounded-lg bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-slate-200 text-sm font-bold">{t.net_quit}</button>
           </div>
@@ -1580,11 +1577,11 @@ export function NetGameClient() {
       })()}
 
       {showRecap && phase === "planning" && lastFight && (
-        <FightRecap data={lastFight} lang={lang} onClose={() => setShowRecap(false)} />
+        <FightRecap data={lastFight} onClose={() => setShowRecap(false)} />
       )}
       {booting && <BootVeil
-        label={lang === "fr" ? "Connexion au serveur…" : "Connecting to the arena…"}
-        sub={`${connectedHumans}/${humanPlayers.length} ${lang === "fr" ? "dresseurs prêts" : "trainers ready"}`}
+        label={t.net_boot_connecting}
+        sub={t.net_boot_trainers(connectedHumans, humanPlayers.length)}
         progress={humanPlayers.length ? connectedHumans / humanPlayers.length : 1}
       />}
     </DndContext>
@@ -1600,7 +1597,8 @@ const RECAP_METRICS = [
   { key: "dmgTaken", label: "TANK", color: "#38bdf8" },
   { key: "healed", label: "HEAL", color: "#34d399" },
 ] as const;
-function FightRecap({ data, lang, onClose }: { data: { mine: FrameUnit[]; theirs: FrameUnit[]; oppName: string }; lang: string; onClose: () => void }) {
+function FightRecap({ data, onClose }: { data: { mine: FrameUnit[]; theirs: FrameUnit[]; oppName: string }; onClose: () => void }) {
+  const t = useT();
   const [side, setSide] = useState<"mine" | "theirs">("mine");
   const [metric, setMetric] = useState<(typeof RECAP_METRICS)[number]["key"]>("dmgDealt");
   const active = RECAP_METRICS.find((m) => m.key === metric)!;
@@ -1611,12 +1609,12 @@ function FightRecap({ data, lang, onClose }: { data: { mine: FrameUnit[]; theirs
   return (
     <div className="fixed z-40 bottom-24 right-4 w-[260px] gilded rounded-xl p-3 shadow-2xl shadow-black/50">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] uppercase tracking-wide text-amber-200/60 font-bold">{lang === "fr" ? "Dernier combat" : "Last fight"}</span>
+        <span className="text-[10px] uppercase tracking-wide text-amber-200/60 font-bold">{t.net_fight_last}</span>
         <button onClick={onClose} className="text-slate-500 hover:text-slate-200 text-xs leading-none">✕</button>
       </div>
       {/* Team toggle: yours vs the rival you fought. */}
       <div className="flex gap-1 mb-1.5">
-        {([["mine", lang === "fr" ? "Vous" : "You"], ["theirs", data.oppName]] as const).map(([k, lbl]) => (
+        {([["mine", t.net_fight_you], ["theirs", data.oppName]] as const).map(([k, lbl]) => (
           <button key={k} onClick={() => setSide(k)}
             className={`flex-1 text-[10px] font-bold py-1 rounded-md border truncate transition-colors ${side === k ? "bg-slate-200 text-slate-900 border-transparent" : "bg-black/30 border-white/[0.06] text-slate-400 hover:text-slate-200"}`}>
             {lbl}
