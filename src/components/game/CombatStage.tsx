@@ -330,19 +330,18 @@ export function CombatStage({
             const pa = hexToPixel({ c: from.c, r: from.r }, TILE_W, TILE_H);
             const pb = hexToPixel({ c: to.c, r: to.r }, TILE_W, TILE_H);
             const t = easeOut(frac);
-            const size = 8;
+            // A glowing energy bolt: an elongated streak aimed along its flight path + a bright
+            // core, instead of a flat white dot.
+            const cx = lerp(pa.x, pb.x, t), cy = lerp(pa.y, pb.y, t);
+            const ang = (Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180) / Math.PI;
             return (
               <div
                 key={`p-${fi}-${k}`}
-                className="absolute rounded-full pointer-events-none"
-                style={{
-                  left: lerp(pa.x, pb.x, t) - size / 2,
-                  top: lerp(pa.y, pb.y, t) - size / 2,
-                  width: size, height: size,
-                  background: "#e2e8f0",
-                  boxShadow: "0 0 8px 2px #e2e8f0",
-                }}
-              />
+                className="absolute pointer-events-none"
+                style={{ left: cx, top: cy, transform: `translate(-50%, -50%) rotate(${ang}deg)` }}
+              >
+                <span className="block rounded-full" style={{ width: 22, height: 5, background: "linear-gradient(90deg, rgba(254,240,138,0) 0%, #fde68a 60%, #fff 100%)", boxShadow: "0 0 10px 2px #fde68acc" }} />
+              </div>
             );
           })}
 
@@ -534,12 +533,13 @@ function CombatUnit({
   // whose mid-fight; width still shows remaining health, and it dims/pulses when critical.
   const low = hpFrac <= 0.25;
   const hpBar = ally ? (low ? "#16a34a" : "#34d399") : (low ? "#dc2626" : "#fb7185");
+  const lunging = lunge.dx !== 0 || lunge.dy !== 0; // mid-attack → thrust scale for impact
   // The sprite is the star: nearly planning-board size (78px) with team identity from a soft
   // back-glow + the feet ring rather than a hard disc, so it reads as a Pokémon, not a token.
   return (
     <div
       className="absolute"
-      style={{ left: x - 41, top: y - 57, width: 82, transform: `translate(${lunge.dx}px, ${lunge.dy}px)`, transition: "transform 80ms ease-out" }}
+      style={{ left: x - 41, top: y - 57, width: 82, transform: `translate(${lunge.dx}px, ${lunge.dy}px) scale(${lunging ? 1.08 : 1})`, transition: "transform 80ms ease-out" }}
     >
       {/* HP bar — team-coloured (green ally / red enemy), glossy fill, crisp dark frame. */}
       <div className={`h-[7px] w-full rounded-[3px] bg-black/80 overflow-hidden mb-[3px] ${low ? "animate-pulse" : ""}`} style={{ outline: "1px solid rgba(0,0,0,0.55)" }}>
@@ -578,10 +578,14 @@ function CombatUnit({
 function Corpse({ unit }: { unit: FrameUnit }) {
   const p = hexToPixel({ c: unit.c, r: unit.r }, TILE_W, TILE_H);
   return (
-    <div key={unit.id} className="absolute pointer-events-none combat-die" style={{ left: p.x - 23, top: p.y - 23 }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={spriteUrl(unit.dex)} alt="" width={46} height={46} style={{ imageRendering: "pixelated", filter: "grayscale(1) brightness(0.6)" }} draggable={false} />
-    </div>
+    <>
+      {/* One-shot dissipation puff at the moment of death (plays once on mount). */}
+      <span className="absolute pointer-events-none rounded-full combat-burst" style={{ left: p.x - 26, top: p.y - 26, width: 52, height: 52, background: "radial-gradient(circle, rgba(226,232,240,0.55), rgba(148,163,184,0) 70%)" }} />
+      <div key={unit.id} className="absolute pointer-events-none combat-die" style={{ left: p.x - 23, top: p.y - 23 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={spriteUrl(unit.dex)} alt="" width={46} height={46} style={{ imageRendering: "pixelated", filter: "grayscale(1) brightness(0.6)" }} draggable={false} />
+      </div>
+    </>
   );
 }
 
