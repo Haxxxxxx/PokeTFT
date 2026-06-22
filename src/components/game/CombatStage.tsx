@@ -3,6 +3,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
+import { usePrefersReducedMotion } from "@/lib/useReducedMotion";
 import { sfx } from "@/lib/audio";
 import { hexToPixel, fieldPixelSize, hexDistance, FIELD, TILE, HEX_CLIP } from "@/game/engine/hex";
 import { TYPE_COLOR } from "@/game/ui";
@@ -87,6 +88,7 @@ export function CombatStage({
   const last = frames.length - 1;
   const clockDriven = syncStart != null && syncWindowMs != null;
   const t = useT();
+  const reducedMotion = usePrefersReducedMotion();
   const [idx, setIdx] = useState(0);
   const [finished, setFinished] = useState(false);
   const [recapOpen, setRecapOpen] = useState(true);
@@ -330,6 +332,7 @@ export function CombatStage({
             const to = aMap.get(e.to);
             if (!from || !to) return null;
             if (hexDistance({ c: from.c, r: from.r }, { c: to.c, r: to.r }) <= 1) return null; // melee, no projectile
+            if (reducedMotion) return null; // flying bolt is JS-driven motion CSS can't suppress — skip it; the hit + damage number still convey the attack
             const pa = hexToPixel({ c: from.c, r: from.r }, TILE_W, TILE_H);
             const pb = hexToPixel({ c: to.c, r: to.r }, TILE_W, TILE_H);
             const t = easeOut(frac);
