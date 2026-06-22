@@ -115,12 +115,16 @@ type TierName = "easy" | "medium" | "hard" | "expert" | "ultimate";
  *  concentrates star-ups + items, when it Mega-evolves, and how hard it COUNTERS the
  *  opponent's types (`counter`, 0 = doesn't read the foe → 1 = drafts a full type counter).
  *  This is the whole difficulty ladder, smoothly graded from beginner to flawless. */
-const TIER_PLAY: Record<TierName, { lvlOff: number; themes: number; starMult: number; itemRate: number; megaStage: number; counter: number; smart: boolean; emblem: boolean }> = {
-  easy:     { lvlOff: -2, themes: 0, starMult: 0.4,  itemRate: 0,    megaStage: 99, counter: 0,   smart: false, emblem: false }, // a beginner: small board, no synergy/items
-  medium:   { lvlOff: -1, themes: 1, starMult: 0.7,  itemRate: 0.2,  megaStage: 6,  counter: 0,   smart: false, emblem: false }, // casual: one loose synergy
-  hard:     { lvlOff: -1, themes: 1, starMult: 0.85, itemRate: 0.5,  megaStage: 5,  counter: 0.4, smart: true,  emblem: false }, // solid: a real synergy + items, light counter
-  expert:   { lvlOff: 0,  themes: 2, starMult: 1.0,  itemRate: 0.8,  megaStage: 4,  counter: 0.8, smart: true,  emblem: false }, // strong: two synergies, counters you
-  ultimate: { lvlOff: 0,  themes: 3, starMult: 1.1,  itemRate: 1.0,  megaStage: 3,  counter: 1.0, smart: true,  emblem: true  }, // flawless: triple synergy, full counter + an emblem splash
+// `bigCarry` = the stage from which this tier may field ONE 2★ 4-cost carry (and, ultimate
+// only, a 2★ 5-cost two stages later). A real player rolls a 2★ 4-cost carry by mid/late game,
+// so this is legitimate earned power — the main fair reason a top board out-trades you — never
+// a stat cheat (it's a legal star level on a legal unit). 0 = never (the weak tiers).
+const TIER_PLAY: Record<TierName, { lvlOff: number; themes: number; starMult: number; itemRate: number; megaStage: number; counter: number; smart: boolean; emblem: boolean; bigCarry: number }> = {
+  easy:     { lvlOff: -2, themes: 0, starMult: 0.4,  itemRate: 0,    megaStage: 99, counter: 0,   smart: false, emblem: false, bigCarry: 0 }, // a beginner: small board, no synergy/items
+  medium:   { lvlOff: -1, themes: 1, starMult: 0.75, itemRate: 0.2,  megaStage: 6,  counter: 0,   smart: false, emblem: false, bigCarry: 0 }, // casual: one loose synergy
+  hard:     { lvlOff: -1, themes: 1, starMult: 0.9,  itemRate: 0.5,  megaStage: 5,  counter: 0.4, smart: true,  emblem: false, bigCarry: 7 }, // solid: a real synergy + items, light counter
+  expert:   { lvlOff: 0,  themes: 2, starMult: 1.0,  itemRate: 0.8,  megaStage: 4,  counter: 0.8, smart: true,  emblem: false, bigCarry: 6 }, // strong: two synergies, counters you, a 2★ 4-cost carry
+  ultimate: { lvlOff: 0,  themes: 3, starMult: 1.15, itemRate: 1.0,  megaStage: 3,  counter: 1.0, smart: true,  emblem: true,  bigCarry: 5 }, // flawless: triple synergy, full counter, emblem + 2★ 4/5-cost carries
 };
 
 /** A board's physical-vs-special damage lean (for tailoring augments + items to it). */
@@ -285,8 +289,8 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
   // skilled bots fielded half-1★ boards that hit like wet noodles. Steeper now, but still
   // capped below a flawless board and applied ONLY to ≤3-cost (2★) / ≤2-cost (3★) — a 4/5-cost
   // never auto-stars, so this stays inside legitimate economy. starMult sets the tier spread.
-  const twoStarChance = Math.min(0.9, Math.max(0, (stage - 1) * 0.18)) * cfg.starMult;
-  const threeStarChance = stage >= 4 ? Math.min(0.3, (stage - 3) * 0.08) * cfg.starMult : 0;
+  const twoStarChance = Math.min(0.92, Math.max(0, (stage - 1) * 0.2)) * cfg.starMult;
+  const threeStarChance = stage >= 4 ? Math.min(0.35, (stage - 3) * 0.1) * cfg.starMult : 0;
 
   // Only a unit the bot's level can actually ROLL is legal (SHOP_ODDS[cost] > 0).
   const legalCost = (id: string) => odds[getDef(id).cost - 1] > 0;
@@ -327,13 +331,19 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
 
   const chosen: string[] = [];
   const taken = new Set<string>();
+  // Reserve slots for the late-game high-cost ANCHOR carries (top tiers) so the cheapest-first
+  // synergy draft doesn't consume the whole board and leave no room for a 4/5-cost carry — the
+  // gap that made bot late boards all-cheap-units. The anchor step (after deepen) fills these.
+  const anchorSlots = (cfg.bigCarry > 0 && stage >= cfg.bigCarry ? 1 : 0)
+    + (tier === "ultimate" && stage >= cfg.bigCarry + 2 ? 1 : 0);
+  const themeCap = Math.max(1, size - anchorSlots);
   // Per-theme unit budget: the primary synergy gets the lion's share, secondary less, the
   // rest minimal — then each is snapped DOWN to a real breakpoint so the trait ACTIVATES.
   const themeBudget = (i: number) => (i === 0 ? Math.ceil(size * 0.6) : i === 1 ? Math.ceil(size * 0.4) : 2);
-  for (let ti = 0; ti < themeList.length && chosen.length < size; ti++) {
+  for (let ti = 0; ti < themeList.length && chosen.length < themeCap; ti++) {
     const theme = themeList[ti];
     const avail = (typeUnits.get(theme) ?? []).filter((id) => !taken.has(id) && legalCost(id));
-    const cap = Math.min(themeBudget(ti), avail.length, size - chosen.length);
+    const cap = Math.min(themeBudget(ti), avail.length, themeCap - chosen.length);
     const bps = TRAITS_BY_KEY[theme]?.breakpoints ?? [];
     let target = 0; for (const bp of bps) if (bp <= cap) target = bp; // largest breakpoint that fits
     if (!target) {
@@ -345,7 +355,7 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
     }
     // Draft the cheapest theme carriers (what a player rolls first), with light variety.
     const cheap = [...avail].sort((a, b) => getDef(a).cost - getDef(b).cost);
-    for (let k = 0; k < target && chosen.length < size; k++) {
+    for (let k = 0; k < target && chosen.length < themeCap; k++) {
       const floorCost = getDef(cheap.find((id) => !taken.has(id))!).cost;
       const band = cheap.filter((id) => !taken.has(id) && getDef(id).cost <= floorCost + 1);
       // Mega Madness: within the affordable band, reach for mega-capable carriers first.
@@ -368,7 +378,7 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
       const avail = (typeUnits.get(theme) ?? [])
         .filter((id) => !taken.has(id) && legalCost(id))
         .sort((a, b) => getDef(a).cost - getDef(b).cost);
-      for (let c = curr; c < next && chosen.length < size; c++) {
+      for (let c = curr; c < next && chosen.length < themeCap; c++) {
         const pick = avail.find((id) => !taken.has(id));
         if (!pick) break;
         chosen.push(pick); taken.add(pick);
@@ -376,8 +386,27 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
     }
   }
 
-  // Fill remaining slots with real-shop rolls (cost by SHOP_ODDS), preferring theme units.
   const themes = new Set(themeList);
+  // ANCHOR CARRIES (top tiers, late game): a strong player builds AROUND a high-cost carry —
+  // they roll for a 4-cost carry by stage ~6 and a 5-cost by ~7. The cheapest-first synergy
+  // draft above never reaches for those, so the bot used to field ~0 high-cost units. Draft the
+  // best legal, on-theme-if-possible CARRY (non-tank) of each cost into the reserved slots; the
+  // star-up block below then 2★s it. Still legit: only costs the bot's level can actually roll.
+  const anchorCarry = (cost: Cost) => {
+    if (chosen.length >= size) return;
+    const pool = (byCost[cost] ?? []).filter((id) => !taken.has(id) && legalCost(id));
+    if (!pool.length) return;
+    const onTheme = pool.filter((id) => getDef(id).types.some((ty) => themes.has(ty)));
+    const tier1 = onTheme.length ? onTheme : pool;
+    const carries = tier1.filter((id) => !isTank(id));   // a carry, not another tank
+    const from = carries.length ? carries : tier1;
+    const pick = from[randInt(rng, from.length)];
+    chosen.push(pick); taken.add(pick);
+  };
+  if (cfg.bigCarry > 0 && stage >= cfg.bigCarry) anchorCarry(4 as Cost);
+  if (tier === "ultimate" && stage >= cfg.bigCarry + 2) anchorCarry(5 as Cost);
+
+  // Fill remaining slots with real-shop rolls (cost by SHOP_ODDS), preferring theme units.
   let fillGuard = 0;
   while (chosen.length < size && fillGuard++ < 200) {
     let cost = (weightedPick(rng, odds) + 1) as Cost;
@@ -407,9 +436,12 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
     const row = ROW_ORDER[Math.floor(i / COL_ORDER.length) % ROW_ORDER.length];
     return { iid: `x${seed}_${i}`, defId, star, pos: [col, row] as [number, number], items: [] as string[] };
   });
-  // Skilled tiers position like a thoughtful player: tanks front-centre, carries to the back
-  // corners (anti-splash). Lower tiers keep the naive center-out layout above.
-  if (cfg.smart) placeSmart(board);
+  // Position like a thoughtful player who KNOWS each card's range: melee/tanks front-centre,
+  // RANGED carries to the back corners (anti-splash, out of melee reach). Applied to every tier
+  // EXCEPT easy — a true beginner mispositions, but no "real" tier should ever leave a ranged
+  // carry stranded in the front line (the front/rear confusion). Difficulty for the lower tiers
+  // comes from fewer synergies/items/stars, not from fielding a nonsensically-arranged board.
+  if (tier !== "easy") placeSmart(board);
 
   // Concentrate the rolled star-ups onto the best CARRIES (a good player upgrades their
   // damage dealers first). This re-allocates the SAME number of 2★/3★ (no extra — stays
@@ -423,6 +455,20 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
     for (let i = 0; i < threes && i < c2.length; i++) c2[i].star = 3;
     const c3 = board.filter((u) => getDef(u.defId).cost <= 3 && u.star < 3).sort((a, b) => prio(b) - prio(a));
     for (let i = 0; i < twos && i < c3.length; i++) c3[i].star = 2;
+  }
+
+  // Late-game carry power (top tiers only): the SINGLE biggest legit lever. A strong player
+  // 2★s their 4-cost carry by mid/late game (you roll for it), and the very best land a 2★
+  // 5-cost — so the top tiers do exactly that, ONE of each (the 5-cost only for ultimate, two
+  // stages later). This is achievable economy, not a stat cheat (a legal star on a legal unit),
+  // and it's the main fair reason a top board out-trades a still-developing player — closing the
+  // "bots field 1★ high-cost carries that hit like wet noodles" gap. Prefers a non-tank carry.
+  if (cfg.bigCarry > 0 && board.length) {
+    const carryFirst = (cost: Cost) => board
+      .filter((u) => getDef(u.defId).cost === cost && u.star < 2)
+      .sort((a, b) => Number(isTank(a.defId)) - Number(isTank(b.defId)))[0];
+    if (stage >= cfg.bigCarry) { const c = carryFirst(4); if (c) c.star = 2; }
+    if (tier === "ultimate" && stage >= cfg.bigCarry + 2) { const c = carryFirst(5); if (c) c.star = 2; }
   }
 
   // Items: a REALISTIC count — a player nets ~1 completed item per stage from carousels +
