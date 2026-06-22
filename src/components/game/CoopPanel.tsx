@@ -58,7 +58,7 @@ export function CoopPanel({ code, myUid, partner, lang }: {
 
             {/* Send gold */}
             <div className="mb-2.5">
-              <div className="text-[9px] uppercase tracking-widest text-emerald-200/60 font-bold mb-1.5">{fr ? "Envoyer de l'or" : "Send gold"}</div>
+              <div className="text-[9px] uppercase tracking-wide text-emerald-200/60 font-bold mb-1.5">{fr ? "Envoyer de l'or" : "Send gold"}</div>
               <div className="flex gap-1.5">
                 {[1, 5, 10].map((n) => (
                   <button key={n} disabled={gold < n || !partner.alive} onClick={() => giveGold(n)}
@@ -71,7 +71,7 @@ export function CoopPanel({ code, myUid, partner, lang }: {
 
             {/* Send a bench unit */}
             <div>
-              <div className="text-[9px] uppercase tracking-widest text-emerald-200/60 font-bold mb-1.5">{fr ? "Envoyer une unité (banc)" : "Send a bench unit"}</div>
+              <div className="text-[9px] uppercase tracking-wide text-emerald-200/60 font-bold mb-1.5">{fr ? "Envoyer une unité (banc)" : "Send a bench unit"}</div>
               {bench.length === 0 ? (
                 <p className="text-[10px] text-slate-500">{fr ? "Banc vide." : "Bench is empty."}</p>
               ) : (

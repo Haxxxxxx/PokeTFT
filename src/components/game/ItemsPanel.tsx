@@ -65,7 +65,7 @@ export function ItemsPanel() {
   return (
     <div data-inspectable className="gilded rounded-xl p-3">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-[10px] uppercase tracking-widest text-amber-200/60 font-bold">{t.sh_items_title}</h2>
+        <h2 className="text-[10px] uppercase tracking-wide text-amber-200/60 font-bold">{t.sh_items_title}</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setRecipesOpen(true)}

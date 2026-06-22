@@ -1456,7 +1456,7 @@ export function NetGameClient() {
                   <span className="absolute -top-1.5 -left-1.5 text-sm">⭐</span>
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[9px] uppercase tracking-widest text-amber-200/70 font-bold">{lang === "fr" ? "MVP du dernier combat" : "Last-fight MVP"}</div>
+                  <div className="text-[9px] uppercase tracking-wide text-amber-200/70 font-bold">{lang === "fr" ? "MVP du dernier combat" : "Last-fight MVP"}</div>
                   <div className="text-sm font-extrabold text-amber-200 truncate">{mvp.name}</div>
                   <div className="flex items-center gap-2.5 mt-0.5 text-[10px] font-bold">
                     <span className="text-rose-300" title={lang === "fr" ? "Dégâts" : "Damage"}>⚔ {fmt(mvp.dmgDealt)}</span>

@@ -250,7 +250,7 @@ export function CombatStage({
       {/* Pre-fight stare-down bar — fills 0→full over PREFIGHT_MS, then the fight rolls. */}
       {preview < 1 && !finished && (
         <div className="flex flex-col items-center gap-1 mt-0.5 w-[240px]">
-          <span className="text-[10px] font-extrabold uppercase tracking-[0.25em] text-amber-200/80 animate-pulse">{t.cs_get_ready}</span>
+          <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-amber-200/80 animate-pulse">{t.cs_get_ready}</span>
           <div className="h-1.5 w-full rounded-full bg-black/50 overflow-hidden" style={{ outline: "1px solid rgba(212,175,55,0.3)" }}>
             <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-300" style={{ width: `${preview * 100}%`, transition: "width 80ms linear" }} />
           </div>

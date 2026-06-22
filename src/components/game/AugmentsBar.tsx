@@ -80,7 +80,7 @@ export function AugmentsBar({ augments, lang }: { augments: string[]; lang: stri
 
             {tags.length > 0 && (
               <div className="mt-2.5 pt-2.5 border-t border-white/[0.06]">
-                <div className="text-[9px] uppercase tracking-widest text-violet-200/60 font-bold mb-1.5">{fr ? "Bonus d'équipe actif" : "Active team buff"}</div>
+                <div className="text-[9px] uppercase tracking-wide text-violet-200/60 font-bold mb-1.5">{fr ? "Bonus d'équipe actif" : "Active team buff"}</div>
                 <div className="flex flex-wrap gap-1">
                   {tags.map((tag, i) => (
                     <span key={i} style={{ color: tag.color, borderColor: `${tag.color}44` }} className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-black/20">{tag.label}</span>

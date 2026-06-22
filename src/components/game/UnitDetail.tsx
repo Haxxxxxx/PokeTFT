@@ -137,7 +137,7 @@ function Card() {
 
   return (
     <div
-      style={{ borderColor: `${color}aa`, boxShadow: `0 10px 40px -12px ${color}44` }}
+      style={{ borderColor: `${color}66`, boxShadow: `0 12px 36px -20px rgba(0,0,0,0.85)` }}
       className="rounded-xl border bg-[#0d1426] text-slate-100 overflow-hidden"
     >
       {/* Header */}
@@ -193,7 +193,7 @@ function Card() {
       {/* Ability */}
       <div className="p-3">
         <div className="flex items-center gap-2 mb-1.5">
-          <span className="text-[10px] uppercase tracking-widest text-slate-500">{t.ud_ability}</span>
+          <span className="text-[10px] uppercase tracking-wide text-slate-500">{t.ud_ability}</span>
           <Badge color={TYPE_COLOR[def.move.type]} text={traitLabel(def.move.type)} solid />
           <span className="ml-auto text-[10px] text-slate-400">{t.ud_mana_label} {s.maxMana}</span>
         </div>
