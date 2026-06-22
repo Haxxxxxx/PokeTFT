@@ -4,9 +4,11 @@ import { useAppStore } from "@/game/store/appStore";
 
 // ── Pokémon cry (PokeAPI CDN) ────────────────────────────────────────────────
 
-/** Returns the cry URL for a national dex number. */
+/** Cry URL for a national dex number — served same-origin from public/cries/ (mirrored from
+ *  PokéAPI), cached forever, no third-party flakiness. A missing cry just fails to silence.
+ *  Regenerate after adding mons: scripts/mirror-sprites.sh. */
 function cryUrl(dexId: number): string {
-  return `https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/${dexId}.ogg`;
+  return `/cries/${dexId}.ogg`;
 }
 
 const cryCache = new Map<number, HTMLAudioElement>();
