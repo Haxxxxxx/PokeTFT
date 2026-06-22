@@ -5,6 +5,7 @@ import { getDef, spriteUrl } from "@/game/data/mons";
 import { COST_COLOR } from "@/game/ui";
 import { useUi } from "@/game/store/uiStore";
 import { useGame } from "@/game/store/gameStore";
+import { useT } from "@/lib/i18n";
 import { MEGA_STONE, canMega, isMegaActive } from "@/game/data/mega";
 import { HEX_CLIP } from "@/game/engine/hex";
 import { StarIcon, MegaIcon } from "./icons";
@@ -13,11 +14,12 @@ import type { UnitInstance } from "@/game/types";
 
 /** Small icons of the items a unit is holding, pinned to the token corner. */
 function ItemPips({ items, megaReady }: { items: string[]; megaReady: boolean }) {
+  const t = useT();
   if (items.length === 0) return null;
   return (
     <div className="absolute bottom-0.5 right-0.5 flex gap-px pointer-events-none">
       {items.map((id, i) => id === MEGA_STONE ? (
-        <span key={i} className={megaReady ? "text-fuchsia-300" : "text-slate-400"} title="Mega Stone"><MegaIcon size={11} /></span>
+        <span key={i} className={megaReady ? "text-fuchsia-300" : "text-slate-400"} title={t.it_mega_stone}><MegaIcon size={11} /></span>
       ) : (
         <span key={i} className="text-slate-200 drop-shadow" title={id}><ItemGlyph id={id} size={10} /></span>
       ))}

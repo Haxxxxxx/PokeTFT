@@ -17,6 +17,7 @@ const ITEM_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 /** A draggable inventory item. Click opens its details (consult); drag it onto a
  *  board/bench mon to equip it. */
 function ItemButton({ id, n, selected, onClick }: { id: string; n: number; selected: boolean; onClick: () => void }) {
+  const t = useT();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `equip-${id}`, data: { itemId: id } });
   const isMega = id === MEGA_STONE;
   const def = ITEM_BY_ID[id];
@@ -30,10 +31,10 @@ function ItemButton({ id, n, selected, onClick }: { id: string; n: number; selec
       style={{ borderColor: selected ? "#f0abfc" : rarityColor, opacity: isDragging ? 0.4 : 1 }}
       className={`relative flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-left transition-all min-w-0 cursor-grab active:cursor-grabbing touch-none
         ${selected ? "bg-fuchsia-500/15 ring-1 ring-fuchsia-400/70" : "bg-slate-900 hover:bg-slate-800"}`}
-      title={isMega ? "Mega Stone" : def?.name ?? id}
+      title={isMega ? t.it_mega_stone : def?.name ?? id}
     >
       <span className="text-base shrink-0">{isMega ? <MegaIcon size={18} /> : <ItemGlyph id={id} size={16} />}</span>
-      <span className="text-[10px] font-semibold text-slate-200 truncate flex-1">{isMega ? "Mega Stone" : def?.name ?? id}</span>
+      <span className="text-[10px] font-semibold text-slate-200 truncate flex-1">{isMega ? t.it_mega_stone : def?.name ?? id}</span>
       {n > 1 && <span className="text-[9px] font-bold text-slate-400 shrink-0">×{n}</span>}
     </button>
   );
@@ -101,7 +102,7 @@ export function ItemsPanel() {
               <button
                 onClick={() => reforgeItem(inspectedItem)}
                 className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-amber-900/50 border border-slate-700 text-[10px] font-bold text-amber-200"
-                title="Reforge into a random different item of the same class"
+                title={t.it_reforge_t}
               >
                 <Hammer size={12} /> {t.it_reforge}
               </button>
@@ -109,7 +110,7 @@ export function ItemsPanel() {
                 <button
                   onClick={() => forgeEmblem(inspectedItem)}
                   className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-fuchsia-900/50 border border-slate-700 text-[10px] font-bold text-fuchsia-200"
-                  title="Forge this item into a random trait Emblem"
+                  title={t.it_forge_t}
                 >
                   <Sparkles size={12} /> {t.it_forge_emblem}
                 </button>

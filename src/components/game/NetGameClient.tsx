@@ -1372,7 +1372,7 @@ export function NetGameClient() {
               <div className="flex gap-3 justify-center items-start">
                 {opts.map((pick, i) => {
                   const onPick = () => { if (pickLatch.current === `c-${key}`) return; pickLatch.current = `c-${key}`; netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); };
-                  if (pick === MEGA_STONE) return <CarouselCard key={i} onClick={onPick} color="#f0abfc" name="Mega Stone" sub={lang === "fr" ? "Méga-Évolution" : "Mega Evolve"} art={<span className="text-fuchsia-300"><MegaIcon size={56} /></span>} />;
+                  if (pick === MEGA_STONE) return <CarouselCard key={i} onClick={onPick} color="#f0abfc" name={t.it_mega_stone} sub={lang === "fr" ? "Méga-Évolution" : "Mega Evolve"} art={<span className="text-fuchsia-300"><MegaIcon size={56} /></span>} />;
                   const item = ITEM_DEF_BY_ID[pick];
                   if (item) return <CarouselCard key={i} onClick={onPick} color={RARITY_COLOR[item.rarity] ?? "#fbbf24"} name={lang === "fr" ? item.nameFr : item.name} sub={lang === "fr" ? item.textFr : item.text} art={<span style={{ color: RARITY_COLOR[item.rarity] ?? "#fbbf24" }}><ItemGlyph id={item.id} size={46} /></span>} />;
                   const def = getDef(pick);
