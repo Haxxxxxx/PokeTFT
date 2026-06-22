@@ -10,6 +10,7 @@ import { useAuth } from "@/game/net/authStore";
 import { useAppStore } from "@/game/store/appStore";
 import { sendInvite, nightmareParams } from "@/game/net/users";
 import type { BotDifficulty, RoomPlayer } from "@/game/net/roomStore";
+import { DndContext, type DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors, useDraggable, useDroppable } from "@dnd-kit/core";
 import { PokeballIcon } from "@/components/game/icons";
 import { Settings, Swords, UserPlus, X, Bot, Dna } from "lucide-react";
 import { enterFullscreen } from "@/lib/fullscreen";
@@ -24,6 +25,24 @@ const GEN_NAMES = ["", "Kanto", "Johto", "Hoenn", "Sinnoh", "Unova", "Kalos", "A
  *  render (it only ever runs from the add-bot click handler). */
 function rollChance(p: number): boolean {
   return Math.random() < p;
+}
+
+/** Draggable wrapper for a Double Up player tile (stable module-scope component so the dnd
+ *  hooks keep a steady identity across renders). Disabled tiles render plainly. */
+function DraggableTile({ id, disabled, children }: { id: string; disabled?: boolean; children: ReactNode }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id, disabled });
+  return (
+    <div ref={setNodeRef} {...(disabled ? {} : listeners)} {...attributes}
+      className={`touch-none ${disabled ? "" : "cursor-grab active:cursor-grabbing"} ${isDragging ? "opacity-40" : ""}`}>
+      {children}
+    </div>
+  );
+}
+
+/** Droppable team card — render-prop exposes `isOver` so the card can highlight on hover. */
+function DroppableTeam({ id, children }: { id: string; children: (over: boolean) => ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return <div ref={setNodeRef}>{children(isOver)}</div>;
 }
 
 export function LobbyScreen() {
@@ -50,6 +69,11 @@ export function LobbyScreen() {
   // (Step 2). Joiners skip Step 1 entirely — the host already set the mode.
   const [step, setStep] = useState<"mode" | "lobby">("mode");
   const [invited, setInvited] = useState<Record<string, boolean>>({});
+  // Drag sensors for Double Up team assignment (a small move threshold so taps still click).
+  const teamSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
+  );
   const [startError, setStartError] = useState<string | null>(null);
   // Auto-clear the start error so a transient failure message doesn't linger after the
   // host fixes the lobby and the next attempt is fine.
@@ -136,9 +160,23 @@ export function LobbyScreen() {
   const TEAM_COLORS = ["#fbbf24", "#34d399", "#60a5fa", "#f472b6"];
   const teams: RoomPlayer[][] = [[], [], [], []];
   if (doubleUp) for (const p of players) { const tid = typeof p.teamId === "number" ? p.teamId : -1; if (tid >= 0 && tid <= 3) teams[tid].push(p); }
-  // Move a player to the next team that has an open seat (host control).
-  const moveToNextTeam = (uid: string, cur: number) => {
-    for (let k = 1; k <= 3; k++) { const tnext = (cur + k) % 4; if (teams[tnext].length < 2) { setPlayerTeam(uid, tnext); return; } }
+  // Drag a player onto a team: drop into an open seat, or (host only) swap with a member if the
+  // team is full. A non-host may only drag THEMSELVES and only into a seat that's free — they
+  // can't rewrite another player's team (the DB rules enforce this too).
+  const onTeamDragEnd = (e: DragEndEvent) => {
+    const uid = String(e.active.id);
+    const over = e.over ? String(e.over.id) : "";
+    if (!over.startsWith("team-")) return;
+    const target = Number(over.slice(5));
+    const p = room.players?.[uid];
+    if (!p || !(isHost || uid === myUid)) return;
+    const cur = typeof p.teamId === "number" ? p.teamId : -1;
+    if (cur === target) return;
+    if (teams[target].length < 2) { setPlayerTeam(uid, target); return; }
+    // Target full → swap (host only, and only when the dragged player has a seat to give back).
+    if (!isHost || cur < 0) return;
+    const other = teams[target].find((m) => m.uid !== uid);
+    if (other) { setPlayerTeam(uid, target); setPlayerTeam(other.uid, cur); }
   };
 
   // The escalating AI difficulty ladder — one cohesive segmented control, accent warming with
@@ -250,37 +288,46 @@ export function LobbyScreen() {
               </div>
             );
 
-            // Double Up: 4 team cards of 2 so you see exactly who plays with who.
+            // Double Up: 4 team cards of 2 so you see exactly who plays with who. Drag a tile
+            // onto a team to re-pair (drop into a free seat, or swap with a member if full).
             if (doubleUp) {
-              const canMove = teams.filter((tm) => tm.length < 2).length > 0;
               return (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {teams.map((members, ti) => {
-                    const color = TEAM_COLORS[ti];
-                    return (
-                      <div key={ti} className="rounded-xl border p-3" style={{ borderColor: `${color}40`, background: `${color}0c` }}>
-                        <div className="flex items-center justify-between mb-2.5">
-                          <span className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color }}>{lang === "fr" ? "Équipe" : "Team"} {ti + 1}</span>
-                          <span className="text-[10px] tabular-nums font-bold" style={{ color: `${color}bb` }}>{members.length}/2</span>
-                        </div>
-                        <div className="flex items-start justify-center gap-3">
-                          {[0, 1].map((slot) => {
-                            const p = members[slot];
-                            if (!p) return <EmptySeat key={slot} />;
-                            return <PlayerTile key={p.uid} p={p} extra={isHost && canMove
-                              ? <button onClick={() => moveToNextTeam(p.uid, ti)} title={lang === "fr" ? "Changer d'équipe" : "Move team"} className="absolute -top-1.5 -left-0.5 z-10 w-5 h-5 rounded-full bg-slate-800 border border-slate-600 text-slate-400 hover:text-sky-300 text-[11px] leading-none">⇄</button>
-                              : undefined} />;
-                          })}
-                        </div>
+                <DndContext sensors={teamSensors} onDragEnd={onTeamDragEnd}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {teams.map((members, ti) => {
+                      const color = TEAM_COLORS[ti];
+                      return (
+                        <DroppableTeam key={ti} id={`team-${ti}`}>
+                          {(over) => (
+                            <div className="rounded-xl border p-3 transition-colors" style={{ borderColor: over ? color : `${color}40`, background: over ? `${color}22` : `${color}0c` }}>
+                              <div className="flex items-center justify-between mb-2.5">
+                                <span className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color }}>{lang === "fr" ? "Équipe" : "Team"} {ti + 1}</span>
+                                <span className="text-[10px] tabular-nums font-bold" style={{ color: `${color}bb` }}>{members.length}/2</span>
+                              </div>
+                              <div className="flex items-start justify-center gap-3 min-h-[88px]">
+                                {[0, 1].map((slot) => {
+                                  const p = members[slot];
+                                  if (!p) return <EmptySeat key={slot} />;
+                                  return (
+                                    <DraggableTile key={p.uid} id={p.uid} disabled={!(isHost || p.uid === myUid)}>
+                                      <PlayerTile p={p} />
+                                    </DraggableTile>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </DroppableTeam>
+                      );
+                    })}
+                    {pendingInvites.length > 0 && (
+                      <div className="sm:col-span-2 flex flex-wrap items-start justify-center gap-3 pt-1">
+                        {pendingInvites.map((p) => <PendingTile key={`inv-${p.uid}`} p={p} />)}
                       </div>
-                    );
-                  })}
-                  {pendingInvites.length > 0 && (
-                    <div className="sm:col-span-2 flex flex-wrap items-start justify-center gap-3 pt-1">
-                      {pendingInvites.map((p) => <PendingTile key={`inv-${p.uid}`} p={p} />)}
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                  <p className="text-center text-[10px] text-slate-600 mt-2">{lang === "fr" ? "Glissez un joueur sur une équipe pour le déplacer" : "Drag a player onto a team to re-pair"}</p>
+                </DndContext>
               );
             }
 
