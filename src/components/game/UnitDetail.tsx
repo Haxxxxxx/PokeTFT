@@ -56,8 +56,8 @@ function ItemCard({ id }: { id: string }) {
   const setInspectedItem = useUi((s) => s.setInspectedItem);
   const isMega = id === MEGA_STONE;
   const def = ITEM_DEF[id];
-  const name = isMega ? "Mega Stone" : (lang === "fr" ? def?.nameFr : def?.name) ?? id;
-  const effect = isMega ? "Holds on a Mega-capable mon → it Mega Evolves at combat start." : (lang === "fr" ? def?.textFr : def?.text) ?? "";
+  const name = isMega ? t.it_mega_stone : (lang === "fr" ? def?.nameFr : def?.name) ?? id;
+  const effect = isMega ? t.ud_mega_effect : (lang === "fr" ? def?.textFr : def?.text) ?? "";
   const color = isMega ? "#c084fc" : def ? RARITY_COLOR[def.rarity] : "#a78bfa";
   return (
     <div style={{ borderColor: `${color}aa`, boxShadow: `0 10px 40px -12px ${color}44` }} className="rounded-xl border bg-[#0d1426] text-slate-100 overflow-hidden">
@@ -67,7 +67,7 @@ function ItemCard({ id }: { id: string }) {
         </div>
         <div className="flex-1 min-w-0">
           <h2 className="text-base font-bold tracking-tight">{name}</h2>
-          <span className="text-[10px] uppercase tracking-wide" style={{ color }}>{isMega ? "Mega Stone" : "Held item"}</span>
+          <span className="text-[10px] uppercase tracking-wide" style={{ color }}>{isMega ? t.it_mega_stone : t.it_held_item}</span>
         </div>
         <button onClick={() => setInspectedItem(null)} aria-label="Close" className="text-slate-500 hover:text-white shrink-0"><CloseIcon size={16} /></button>
       </div>
@@ -200,7 +200,7 @@ function Card() {
         <h3
           className="font-bold text-sky-300 text-sm cursor-pointer hover:text-sky-200 transition-colors"
           onClick={() => playCry(def.dex[i])}
-          title="▶ cri"
+          title={t.ud_play_cry}
         >
           {def.move.name}
         </h3>
@@ -278,6 +278,7 @@ const ITEM_DEF = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 
 /** The inspected unit's held items, with effect text and an unequip button. */
 function HeldItems({ iid }: { iid?: string }) {
+  const t = useT();
   const unit = useGame((s) => (iid ? s.units.find((u) => u.iid === iid) : undefined));
   const unequipItem = useGame((s) => s.unequipItem);
   const lang = useAppStore((s) => s.settings.language);
@@ -285,7 +286,7 @@ function HeldItems({ iid }: { iid?: string }) {
   if (!iid || !unit || items.length === 0) return null;
   return (
     <div className="mx-3 mb-3">
-      <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">Held items · {items.length}/3</div>
+      <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">{t.it_held_items} · {items.length}/3</div>
       <div className="flex flex-col gap-1.5">
         {items.map((id, i) => {
           const isMega = id === MEGA_STONE;
@@ -294,8 +295,8 @@ function HeldItems({ iid }: { iid?: string }) {
             <div key={i} className="flex items-center gap-2 p-2 rounded-lg border border-slate-700/60 bg-slate-800/40">
               <span className="text-lg shrink-0">{isMega ? <MegaIcon size={18} /> : <ItemGlyph id={id} size={16} />}</span>
               <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-bold text-slate-200">{isMega ? "Mega Stone" : (lang === "fr" ? def?.nameFr : def?.name) ?? id}</div>
-                <div className="text-[10px] text-slate-400 leading-snug">{isMega ? "Mega Evolves at combat start." : (lang === "fr" ? def?.textFr : def?.text) ?? ""}</div>
+                <div className="text-[11px] font-bold text-slate-200">{isMega ? t.it_mega_stone : (lang === "fr" ? def?.nameFr : def?.name) ?? id}</div>
+                <div className="text-[10px] text-slate-400 leading-snug">{isMega ? t.ud_mega_at_start : (lang === "fr" ? def?.textFr : def?.text) ?? ""}</div>
               </div>
               <button
                 onClick={() => unequipItem(unit.iid, id)}

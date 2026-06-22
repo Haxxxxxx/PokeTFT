@@ -153,6 +153,9 @@ export type Dict = {
   // In-game misc
   net_enemy: string; net_recap: string; net_recap_title: string; net_fullscreen: string; net_exit_fullscreen: string; net_your_board: string;
   r_augments: string;
+  // Item / mega tooltips
+  it_mega_stone: string; it_held_item: string; it_held_items: string; it_reforge_t: string; it_forge_t: string; it_collect: string;
+  ud_play_cry: string; ud_mega_effect: string; ud_mega_at_start: string;
 };
 
 export const FR: Dict = {
@@ -290,6 +293,8 @@ export const FR: Dict = {
   o_options: "Options", o_volume: "Volume", o_sound: "Son", o_language: "Langue", o_muted: "Coupé", o_on: "Activé", o_off: "Désactivé",
   net_enemy: "Ennemi", net_recap: "Récap", net_recap_title: "Récap du dernier combat", net_fullscreen: "Plein écran", net_exit_fullscreen: "Quitter le plein écran", net_your_board: "Ton plateau",
   r_augments: "Augmentations",
+  it_mega_stone: "Méga-Gemme", it_held_item: "Objet tenu", it_held_items: "Objets tenus", it_reforge_t: "Reforger en un autre objet aléatoire de la même classe", it_forge_t: "Forger cet objet en un Emblème de trait aléatoire", it_collect: "Ramasser l'objet",
+  ud_play_cry: "▶ cri", ud_mega_effect: "À tenir sur un mon Méga-capable → il Méga-évolue au début du combat.", ud_mega_at_start: "Méga-évolue au début du combat.",
 };
 
 export const EN: Dict = {
@@ -427,6 +432,8 @@ export const EN: Dict = {
   o_options: "Options", o_volume: "Volume", o_sound: "Sound", o_language: "Language", o_muted: "Muted", o_on: "On", o_off: "Off",
   net_enemy: "Enemy", net_recap: "Recap", net_recap_title: "Last fight recap", net_fullscreen: "Enter fullscreen", net_exit_fullscreen: "Exit fullscreen", net_your_board: "Your board",
   r_augments: "Augments",
+  it_mega_stone: "Mega Stone", it_held_item: "Held item", it_held_items: "Held items", it_reforge_t: "Reforge into a random different item of the same class", it_forge_t: "Forge this item into a random trait Emblem", it_collect: "Collect item",
+  ud_play_cry: "▶ cry", ud_mega_effect: "Holds on a Mega-capable mon → it Mega Evolves at combat start.", ud_mega_at_start: "Mega Evolves at combat start.",
 };
 
 export function useT(): Dict {

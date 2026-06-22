@@ -111,7 +111,7 @@ function BoardBase({ units, interactive = true }: { units?: UnitInstance[]; inte
             <button
               key={d.id}
               onClick={() => collectDrop(d.id)}
-              title="Collect item"
+              title={t.it_collect}
               className="absolute z-20 flex items-center justify-center rounded-full bg-amber-400/90 hover:bg-amber-300 text-black shadow-[0_0_14px_4px_rgba(251,191,36,0.5)] animate-bounce"
               style={{ left: x - 16, top: y - 16, width: 32, height: 32 }}
             >
