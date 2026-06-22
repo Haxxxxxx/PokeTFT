@@ -675,60 +675,53 @@ export function NetGameClient() {
   // Play victory/defeat sound when the game ends. Computed inline (the `iWon`
   // const is derived after the early-return guard, so it isn't in scope here).
   const prevPhase = useRef<string | null>(null);
+  // The game code we've already recorded a result for — so each match records exactly ONCE
+  // (history is idempotent by code, but applyRankedResult APPLIES the LP delta, so it must not
+  // run twice). Reset when a fresh match begins.
+  const recordedRef = useRef<string | null>(null);
   useEffect(() => {
-    // Spectators have no stake in the game — never save a ghost, record history, or
-    // apply ranked LP from a match they're only watching.
+    // Spectators have no stake in the game — never save a ghost, record history, or apply LP.
     if (isSpectator) { prevPhase.current = phase ?? null; return; }
-    if (phase === "over" && prevPhase.current !== "over") {
-      const ps = room?.players ?? {};
-      // Win detection works for FFA and Double Up alike: place 1 (both partners get it),
-      // the authoritative winnerUid, or — in Double Up — my team being the winning team.
-      const meP0 = myUid ? ps[myUid] : undefined;
-      const wonByTeam = meta?.winnerTeam != null && meP0?.teamId === meta.winnerTeam;
-      const lastOneStanding = meP0?.place === 1 || meta?.winnerUid === myUid || wonByTeam;
+    const ps = room?.players ?? {};
+    const meP = myUid ? ps[myUid] : undefined;
+    const code = room?.code;
+    // Fresh match (lobby, or a new planning round before I have a placement) → arm recording again.
+    if (phase === "lobby" || (phase === "planning" && meP?.place == null && meP?.alive)) recordedRef.current = null;
+
+    // Record the instant MY result is DECIDED — I got a placement (eliminated OR won) or the whole
+    // game is over — NOT only at the global "over". Otherwise being knocked out in a solo-vs-bots
+    // game and leaving before the bots finish would never log the game or its LP (the bug).
+    const meDecided = phase === "over" || meP?.place != null;
+    if (myUid && code && meDecided && recordedRef.current !== code) {
+      recordedRef.current = code;
+      const wonByTeam = meta?.winnerTeam != null && meP?.teamId === meta.winnerTeam;
+      const lastOneStanding = meP?.place === 1 || meta?.winnerUid === myUid || wonByTeam;
       if (lastOneStanding) sfx.victory(); else sfx.defeat();
-      // Save this game's per-round boards as my ghost so a future Clone bot can replay it.
-      if (myUid) saveGhost(myUid, ghostSnaps.current, room?.rules?.generations).catch(() => {});
+      saveGhost(myUid, ghostSnaps.current, room?.rules?.generations).catch(() => {});
       setRankResult(null); // clear any prior game's LP until this one's applyRankedResult resolves
-      // Record this finished game in the player's history (idempotent by room code).
-      if (myUid && room?.code) {
-        const meP = ps[myUid];
-        const place = meP?.place ?? (lastOneStanding ? 1 : Object.values(ps).filter((p) => !p.isBot).length);
-        const total = Object.values(ps).length;
-        // Snapshot the final board + active traits for the history recap.
-        const finalBoard = useGame.getState().units.filter((u) => u.pos !== null);
-        const team = finalBoard.map((u) => ({ d: u.defId, s: u.star }));
-        const traits = computeTraits(finalBoard).filter((tr) => tr.tier > 0).map((tr) => ({ k: tr.key, t: tr.tier }));
-        // Ranked: placement is over the WHOLE lobby (bots are real opponents on the board),
-        // but the LP swing is weighted by how human the lobby was — bots count for less, so
-        // practice still nudges your rating without being worth a full game (see weightedRatingDelta).
-        const all = Object.values(ps);
-        const humanOpp = all.filter((p) => !p.isBot && p.uid !== myUid).length;
-        const botOpp = all.filter((p) => p.isBot).length;
-        // Same pure delta applyRankedResult applies → store it so history shows LP per game.
-        const lp = weightedRatingDelta(place, all.length, humanOpp, botOpp);
-        recordGameResult(myUid, room.code, {
-          place,
-          players: total,
-          regions: room.rules?.generations ?? [1],
-          won: place === 1 || meta?.winnerUid === myUid,
-          team,
-          traits,
-          lp,
-          mode: room.rules?.mode ?? "standard",
-        }).catch(() => {});
-        applyRankedResult(myUid, place, all.length, meP?.name ?? "Player", meP?.photoURL, { humans: humanOpp, bots: botOpp }).then(setRankResult).catch(() => {});
-        // Hidden progression: a WIN against a lobby that held an ultimate (or nightmare) bot
-        // advances the nightmare unlock — once past the threshold, ultimate bots start being
-        // silently replaced by the nightmare boss tier in future lobbies.
-        const won = place === 1 || meta?.winnerUid === myUid;
-        const hadTopBot = all.some((p) => p.isBot && (p.botDifficulty === "ultimate" || p.botDifficulty === "nightmare"));
-        if (won && hadTopBot) recordUltimateBotWin(myUid).catch(() => {});
-      }
+      const place = meP?.place ?? (lastOneStanding ? 1 : Object.values(ps).filter((p) => !p.isBot).length);
+      const total = Object.values(ps).length;
+      const finalBoard = useGame.getState().units.filter((u) => u.pos !== null);
+      const team = finalBoard.map((u) => ({ d: u.defId, s: u.star }));
+      const traits = computeTraits(finalBoard).filter((tr) => tr.tier > 0).map((tr) => ({ k: tr.key, t: tr.tier }));
+      const all = Object.values(ps);
+      const humanOpp = all.filter((p) => !p.isBot && p.uid !== myUid).length;
+      const botOpp = all.filter((p) => p.isBot).length;
+      const lp = weightedRatingDelta(place, all.length, humanOpp, botOpp);
+      recordGameResult(myUid, code, {
+        place, players: total, regions: room.rules?.generations ?? [1],
+        won: place === 1 || meta?.winnerUid === myUid, team, traits, lp, mode: room.rules?.mode ?? "standard",
+      }).catch(() => {});
+      applyRankedResult(myUid, place, all.length, meP?.name ?? "Player", meP?.photoURL, { humans: humanOpp, bots: botOpp }).then(setRankResult).catch(() => {});
+      // Hidden progression: a WIN against a lobby that held an ultimate/nightmare bot advances the
+      // nightmare unlock.
+      const won = place === 1 || meta?.winnerUid === myUid;
+      const hadTopBot = all.some((p) => p.isBot && (p.botDifficulty === "ultimate" || p.botDifficulty === "nightmare"));
+      if (won && hadTopBot) recordUltimateBotWin(myUid).catch(() => {});
     }
     prevPhase.current = phase ?? null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, myUid ? room?.players?.[myUid]?.place : null, myUid ? room?.players?.[myUid]?.alive : null]);
 
   const [confirmLeave, setConfirmLeave] = useState(false);
   // Stage-up announce — flash a "Stage N" banner whenever the stage increments.
@@ -780,6 +773,10 @@ export function NetGameClient() {
   const doConcede = async () => {
     const ps = room.players ?? {};
     const place = Object.values(ps).filter((p) => p.alive).length;
+    // Claim the once-per-match record guard up front so the placement-watcher effect doesn't
+    // ALSO record/apply-LP for this game (we record it manually here before leaving).
+    if (recordedRef.current === room.code) { leave(); return; }
+    recordedRef.current = room.code;
     try {
       await concede(room.code, myUid, place);
       const finalBoard = useGame.getState().units.filter((u) => u.pos !== null);
