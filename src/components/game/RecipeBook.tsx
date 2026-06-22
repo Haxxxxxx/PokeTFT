@@ -77,13 +77,13 @@ export function RecipeBook({ onClose }: { onClose: () => void }) {
               <span style={{ color: color(base) }} className="shrink-0"><ItemGlyph id={base} size={14} /></span>
               <span className="text-slate-500 text-xs shrink-0">+</span>
               <span style={{ color: color(partner) }} className="shrink-0"><ItemGlyph id={partner} size={14} /></span>
-              <span className="text-[10px] text-slate-400 truncate min-w-0">{name(partner)}</span>
-              <span className="text-slate-500 text-xs shrink-0 ml-auto">=</span>
+              <span className="text-[10px] text-slate-400 truncate flex-1 min-w-0" title={name(partner)}>{name(partner)}</span>
+              <span className="text-slate-500 text-xs shrink-0">=</span>
               <span style={{ color: color(result) }} className="shrink-0">
                 <ItemGlyph id={result} size={16} />
               </span>
               <span
-                className="text-[11px] font-semibold truncate min-w-0 max-w-[7rem]"
+                className="text-[11px] font-semibold truncate flex-[2] min-w-0"
                 style={{ color: isEmblem(result) ? "#e9d5ff" : "#e2e8f0" }}
                 title={name(result)}
               >
