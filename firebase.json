@@ -43,6 +43,13 @@
         "headers": [
           { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
         ]
+      },
+      {
+        "comment": "Mirrored Pokémon cries (audio) — content-stable, cache forever. Replaced flaky raw.githubusercontent.com loads.",
+        "source": "/cries/**",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        ]
       }
     ]
   }
