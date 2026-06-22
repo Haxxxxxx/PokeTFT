@@ -17,15 +17,19 @@
     "users": {
       "$uid": {
         ".read": "auth != null",
-        ".write": "auth != null && $uid === auth.uid",
-        "username":      { ".validate": "newData.isString() && newData.val().length <= 16" },
-        "rating":         { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 30000" },
-        "ultimateBotWins":{ ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+        "username":        { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length <= 16" },
+        "usernameLower":   { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length <= 16" },
+        "photoURL":        { ".write": "auth != null && $uid === auth.uid" },
+        "online":          { ".write": "auth != null && $uid === auth.uid" },
+        "currentGame":     { ".write": "auth != null && $uid === auth.uid" },
+        "createdAt":       { ".write": "auth != null && $uid === auth.uid && !data.exists()" },
+        "ultimateBotWins": { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+        "rating":          { ".write": false },
+        "history":         { ".write": false },
         "typeAff": {
           ".write": "auth != null",
           "$type": { ".validate": "newData.isNumber() && newData.val() >= 0" }
         },
-        "usernameLower": { ".validate": "newData.isString() && newData.val().length <= 16" },
         "friends": {
           "$fid": { ".write": "auth != null && ($uid === auth.uid || $fid === auth.uid)" }
         },
@@ -46,9 +50,7 @@
       ".read": "auth != null",
       ".indexOn": ["rating"],
       "$uid": {
-        ".write": "auth != null && $uid === auth.uid",
-        "rating":   { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 30000" },
-        "username": { ".validate": "newData.isString() && newData.val().length <= 16" }
+        ".write": false
       }
     },
     "priv": {
