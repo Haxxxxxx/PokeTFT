@@ -5,53 +5,68 @@ import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "fireb
 import { auth } from "@/game/net/firebase";
 
 /**
- * Native sign-in bridge. The desktop/mobile shell opens THIS page in the system
- * browser (Google blocks OAuth inside embedded webviews). Here — a real browser —
- * the normal Google redirect works; we then bounce the credential back into the
- * app via the `poketft://auth#...` deep link, which finishes with
- * signInWithCredential(). See src-tauri/src/lib.rs + game/net/authStore.ts.
+ * Native sign-in bridge. The desktop/mobile shell opens THIS url in the system
+ * browser (Google blocks OAuth inside embedded webviews). It immediately hands
+ * off to the real Google sign-in via signInWithRedirect — so the user lands
+ * straight on accounts.google.com — then, on return, bounces the credential
+ * back into the app via the poketft://auth deep link (finished by
+ * signInWithCredential in authStore.init).
  */
+function startGoogle() {
+  return signInWithRedirect(auth(), new GoogleAuthProvider());
+}
+
 export default function NativeAuthBridge() {
-  const [status, setStatus] = useState("Connecting to Google…");
-  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
+      // Are we RETURNING from Google? If so, bounce the credential into the app.
       try {
         const result = await getRedirectResult(auth());
-        if (!result) {
-          // First load: kick off the real-browser Google redirect.
-          await signInWithRedirect(auth(), new GoogleAuthProvider());
-          return;
+        if (cancelled) return;
+        if (result) {
+          const cred = GoogleAuthProvider.credentialFromResult(result);
+          if (cred?.idToken) {
+            const params = new URLSearchParams();
+            params.set("id_token", cred.idToken);
+            if (cred.accessToken) params.set("access_token", cred.accessToken);
+            window.location.href = `poketft://auth#${params.toString()}`;
+            return;
+          }
         }
-        const cred = GoogleAuthProvider.credentialFromResult(result);
-        if (!cred?.idToken) throw new Error("No Google credential was returned.");
-        const params = new URLSearchParams();
-        params.set("id_token", cred.idToken);
-        if (cred.accessToken) params.set("access_token", cred.accessToken);
-        setStatus("Returning to PokéTFT…");
-        setDone(true);
-        // Hand the credential to the app via the custom scheme.
-        window.location.href = `poketft://auth#${params.toString()}`;
+      } catch {
+        // ignore — fall through and (re)start the Google redirect
+      }
+      // OUTBOUND: go straight to the Google account chooser.
+      try {
+        if (!cancelled) await startGoogle();
       } catch (e) {
-        setStatus("Sign-in failed: " + ((e as Error)?.message ?? "unknown error"));
-        setDone(true);
+        if (!cancelled) setError((e as Error)?.message ?? "Couldn't reach Google sign-in.");
       }
     })();
+    return () => { cancelled = true; };
   }, []);
 
   return (
     <main style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#020617", color: "#e2e8f0", fontFamily: "system-ui, sans-serif", padding: 24 }}>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, textAlign: "center", maxWidth: 360 }}>
-        {!done && (
-          <div style={{ width: 34, height: 34, borderRadius: "50%", border: "3px solid rgba(251,191,36,0.25)", borderTopColor: "#fbbf24", animation: "spin 0.8s linear infinite" }} />
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center", maxWidth: 360 }}>
+        {!error ? (
+          <>
+            <div style={{ width: 34, height: 34, borderRadius: "50%", border: "3px solid rgba(251,191,36,0.25)", borderTopColor: "#fbbf24", animation: "spin 0.8s linear infinite" }} />
+            <div style={{ fontSize: 14, color: "#fbbf24", fontWeight: 700 }}>Redirecting to Google…</div>
+          </>
+        ) : (
+          <div style={{ fontSize: 13, color: "#fca5a5" }}>{error}</div>
         )}
-        <div style={{ fontSize: 14, color: "#fbbf24", fontWeight: 700 }}>{status}</div>
-        {done && (
-          <div style={{ fontSize: 12, color: "#94a3b8" }}>
-            If PokéTFT didn’t reopen automatically, switch back to the app. You can close this tab.
-          </div>
-        )}
+        {/* Manual fallback in case the auto-redirect is ever blocked. */}
+        <button
+          onClick={() => startGoogle().catch((e) => setError((e as Error)?.message ?? "Sign-in failed."))}
+          style={{ marginTop: 4, padding: "10px 18px", borderRadius: 10, background: "#fbbf24", color: "#0a0e1a", fontWeight: 800, fontSize: 14, border: "none", cursor: "pointer" }}
+        >
+          Continue with Google
+        </button>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     </main>
