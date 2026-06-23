@@ -23,6 +23,11 @@
         "destination": "/native-auth.html"
       },
       {
+        "comment": "Same: serve the static download/landing page instead of the SPA catch-all.",
+        "source": "/download",
+        "destination": "/download.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

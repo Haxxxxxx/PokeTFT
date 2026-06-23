@@ -76,7 +76,7 @@ export default function NativeAuthBridge() {
     }
   };
 
-  const wrap = { minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "radial-gradient(120% 120% at 50% 0%, #0b1120 0%, #020617 60%)", color: "#e2e8f0", fontFamily: "system-ui, -apple-system, sans-serif", padding: 24 } as const;
+  const wrap = { minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0a0e1a", color: "#e2e8f0", fontFamily: "system-ui, -apple-system, sans-serif", padding: 24 } as const;
   const card = { display: "flex", flexDirection: "column", alignItems: "center", gap: 18, textAlign: "center", maxWidth: 360, width: "100%", padding: "40px 32px", borderRadius: 20, background: "rgba(15,23,42,0.55)", border: "1px solid rgba(251,191,36,0.14)", boxShadow: "0 30px 80px -30px rgba(0,0,0,0.8)" } as const;
   const btn = { padding: "13px 26px", borderRadius: 12, background: "linear-gradient(180deg,#fbbf24,#f59e0b)", color: "#0a0e1a", fontWeight: 800, fontSize: 15, border: "none", cursor: "pointer", boxShadow: "0 8px 24px -8px rgba(251,191,36,0.5)" } as const;
 

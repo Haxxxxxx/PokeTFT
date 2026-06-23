@@ -55,7 +55,25 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "PokéTFT ${{ github.ref_name }}"
-          releaseBody: "Native desktop builds. The app loads the live hosted game, so gameplay updates ship via the web deploy."
-          releaseDraft: true
+          releaseBody: "Native desktop builds. The app loads the live hosted game, so gameplay updates ship via the web deploy. The landing page (poketft-arena.web.app/download) links to the stable-named assets below."
+          releaseDraft: false   # published so /download links resolve
           prerelease: false
           args: ${{ matrix.args }}
+
+      # Upload a STABLE-named copy so poketft-arena.web.app/download links never
+      # break across versions (PokeTFT-Setup.exe / PokeTFT.dmg).
+      - name: Upload stable-named asset
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.platform }}" = "windows-latest" ]; then
+            src=$(ls src-tauri/target/release/bundle/nsis/*-setup.exe | head -1)
+            cp "$src" "PokeTFT-Setup.exe"
+            gh release upload "${{ github.ref_name }}" "PokeTFT-Setup.exe" --clobber
+          else
+            src=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
+            cp "$src" "PokeTFT.dmg"
+            gh release upload "${{ github.ref_name }}" "PokeTFT.dmg" --clobber
+          fi
