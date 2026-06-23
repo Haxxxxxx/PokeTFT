@@ -30,6 +30,7 @@
           ".write": "auth != null && $uid === auth.uid",
           "$type": { ".validate": "newData.isNumber() && newData.val() >= 0" }
         },
+        "ghost": { ".write": "auth != null && $uid === auth.uid" },
         "friends": {
           "$fid": { ".write": "auth != null && ($uid === auth.uid || $fid === auth.uid)" }
         },
@@ -37,7 +38,8 @@
           "$code": {
             ".write": "auth != null && (root.child('users').child($uid).child('friends').child(auth.uid).exists() || (!newData.exists() && $uid === auth.uid))"
           }
-        }
+        },
+        "$other": { ".write": false }
       }
     },
     "usernames": {

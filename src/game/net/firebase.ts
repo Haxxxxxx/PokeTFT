@@ -43,41 +43,31 @@ export function auth(): Auth {
   return authInstance;
 }
 
-function randomId(): string {
-  return "u-" + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
-}
-
-/** Per-tab fallback id (sessionStorage) when Anonymous Auth isn't available. */
-function fallbackId(): string {
-  if (typeof window === "undefined") return "srv-" + randomId();
-  let id = window.sessionStorage.getItem("poketft_uid");
-  if (!id) {
-    id = randomId();
-    window.sessionStorage.setItem("poketft_uid", id);
-  }
-  return id;
-}
-
 /**
  * Resolve this player's identity for room operations. If the user is already
  * signed in (Google / email account, or a prior guest session), use that uid.
- * Otherwise sign in anonymously as a guest. Falls back to a per-tab id only if
- * anonymous auth is unavailable.
+ * Otherwise sign in anonymously as a guest.
+ *
+ * NOTE: there is deliberately NO local "fallback id" anymore. The RTDB rules are
+ * auth-locked (`auth != null`), so a synthetic id can't write anything — limping
+ * on with one only produced a silently-frozen game (every write rejected). We
+ * surface a real error instead; every caller (roomStore) wraps this in try/catch
+ * and shows the message.
  */
 export async function ensureAuth(): Promise<string> {
-  if (typeof window === "undefined") return "srv-" + randomId();
+  if (typeof window === "undefined") throw new Error("auth unavailable outside the browser");
   const a = auth();
   if (a.currentUser) return a.currentUser.uid;
   try {
-    // Cap anonymous sign-in: on a flaky/slow connection it can hang indefinitely, freezing
-    // create/join/reconnect. After 5s, fall back to a per-tab id so the UI never stalls on auth.
+    // Cap anonymous sign-in: on a flaky/slow connection it can hang indefinitely,
+    // freezing create/join/reconnect. After 8s, reject so the UI can show a retry.
     const cred = await Promise.race([
       signInAnonymously(a),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("auth-timeout")), 5000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("auth-timeout")), 8000)),
     ]);
     return cred.user.uid;
   } catch (e) {
-    console.warn("[auth] anonymous sign-in unavailable/slow, using fallback id:", (e as Error)?.message);
-    return fallbackId();
+    console.error("[auth] sign-in failed:", (e as Error)?.message);
+    throw new Error("Couldn't sign in — check your connection and try again.");
   }
 }
