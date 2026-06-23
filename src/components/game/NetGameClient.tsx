@@ -28,23 +28,11 @@ import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR, teamBuffForAugments, combine
 import { useAppStore } from "@/game/store/appStore";
 import { useUi } from "@/game/store/uiStore";
 import { makeRng, hashStr } from "@/game/engine/rng";
+import { itemsArray, normalizeUnit } from "@/game/net/rtdb-utils";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import { MegaIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
 
-// RTDB drops null values + empty arrays, so a synced unit can come back missing
-// `pos` (bench units) or `items`. Restore both invariants at the boundary.
-/** RTDB strips empty arrays and turns sparse ones into index-keyed objects, so a
- *  unit's `items` can come back as undefined or {0:"x"}. Coerce to a dense array
- *  (and default pos) — otherwise `for (const id of items)` in the sim throws. */
-function itemsArray(v: unknown): string[] {
-  if (Array.isArray(v)) return v.filter(Boolean);
-  if (v && typeof v === "object") return Object.values(v as Record<string, string>).filter(Boolean);
-  return [];
-}
-function normUnit(u: UnitInstance): UnitInstance {
-  return { ...u, pos: u.pos ?? null, items: itemsArray(u.items) };
-}
 
 const ITEM_DEF_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 
@@ -64,7 +52,7 @@ const MAX_SCALE = 1.5;
 
 function asUnits(u: unknown): UnitInstance[] {
   if (!u) return [];
-  return (Array.isArray(u) ? u : Object.values(u as Record<string, UnitInstance>)).map(normUnit);
+  return (Array.isArray(u) ? u : Object.values(u as Record<string, UnitInstance>)).map(normalizeUnit);
 }
 import { Board } from "./Board";
 import { Bench } from "./Bench";
@@ -84,7 +72,7 @@ function asBoard(b: unknown): UnitInstance[] {
   if (!b) return [];
   const arr = Array.isArray(b) ? b : Object.values(b as Record<string, UnitInstance>);
   // Mirror match.ts board(): drop unknown-def units so the client sim matches the host.
-  return (arr as UnitInstance[]).filter((u) => u && u.pos && hasDef(u.defId)).map(normUnit);
+  return (arr as UnitInstance[]).filter((u) => u && u.pos && hasDef(u.defId)).map(normalizeUnit);
 }
 
 /** Cheap, stable signature of a frozen board for memo deps — changes whenever the
@@ -855,7 +843,7 @@ export function NetGameClient() {
     const arr = Array.isArray(raw) ? raw : raw ? Object.values(raw) : [];
     return (arr as UnitInstance[])
       .filter((u) => u && hasDef(u.defId))
-      .map((u) => ({ ...u, items: (Array.isArray(u.items) ? u.items : Object.values((u.items ?? {}) as Record<string, string>)).filter(Boolean) }));
+      .map((u) => ({ ...u, items: itemsArray(u.items) }));
   })();
 
   // Forward-looking timeline: the current stage + the next two, each round

@@ -5,6 +5,7 @@ import { makeRng, hashStr } from "../engine/rng";
 import { generatePlayerLikeBoard, generateCreepBoard, generateBossBoard, pickCarouselOptions, boardProfileOf, botBoardLevel, type BotBrain } from "../engine/enemy";
 import { type CompStats, type TypeAffinity, metaWeights, counterAffinity, accrueComp, accrueAffinity, rememberLoss, activeTraitKeys } from "../engine/botBrain";
 import { hasDef } from "../data/mons";
+import { itemsArray } from "./rtdb-utils";
 import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem, modeLootScale, isDoubleUp, assignTeams, getMode } from "../data/gameModes";
 import { loadGhost, ghostBoardForRound } from "./ghost";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
@@ -131,12 +132,11 @@ function board(p: RoomPlayer | undefined): UnitInstance[] {
   // enforces the cap with the player's true level; the public players/level is
   // no longer synced (it lives in the private save), so capping by it would
   // wrongly truncate a legit board to 1 unit. The synced board is the source.
+  // Coerce items via the shared itemsArray() — the client's normalizeUnit() uses
+  // the identical helper, so boardSeed matches and combat replay never desyncs.
   return (arr as UnitInstance[])
     .filter((u) => u && u.pos && hasDef(u.defId))
-    // Coerce items to a dense, falsy-free array EXACTLY like the client's normUnit
-    // (itemsArray → .filter(Boolean)). If the host kept a null item the client dropped,
-    // boardSeed would differ → host/client roll different crits → replay desync.
-    .map((u) => ({ ...u, items: (Array.isArray(u.items) ? u.items : Object.values((u.items ?? {}) as Record<string, string>)).filter(Boolean) }));
+    .map((u) => ({ ...u, items: itemsArray(u.items) }));
 }
 
 /** A player's team-wide combat buff: their (public) combat augments folded with the
@@ -176,7 +176,10 @@ function buildHistoryRow(room: Room, uid: string, place: number, total: number, 
  *  end screen can read the LP outcome without touching the write path. */
 export async function applyRatingFor(code: string, room: Room, uid: string, place: number): Promise<void> {
   const p = room.players?.[uid];
-  if (!p || p.isBot) return;
+  // Skip genuine bots. Key off the unforgeable "bot-" uid prefix (assigned in
+  // roomStore) — NOT the player-writable `isBot` field, which a human could set
+  // on their own node to dodge an LP loss before elimination.
+  if (!p || uid.startsWith("bot-")) return;
   // Idempotency: claim per-player once. Abort if already applied (retry-safe).
   const claim = await dbAdapter().transaction<boolean>(`games/${code}/rated/${uid}`, (cur) => (cur ? undefined : true));
   if (!claim.committed) return;

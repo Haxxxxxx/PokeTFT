@@ -23,7 +23,7 @@
         "online":          { ".write": "auth != null && $uid === auth.uid" },
         "currentGame":     { ".write": "auth != null && $uid === auth.uid" },
         "createdAt":       { ".write": "auth != null && $uid === auth.uid && !data.exists()" },
-        "ultimateBotWins": { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+        "ultimateBotWins": { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000 && (!data.exists() || newData.val() === data.val() + 1)" },
         "rating":          { ".write": false },
         "history":         { ".write": false },
         "typeAff": {
