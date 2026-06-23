@@ -35,7 +35,9 @@ export default function NativeAuthBridge() {
             if (cred.accessToken) p.set("access_token", cred.accessToken);
             setReturned(true);
             // Hand the credential to the app's loopback → it signs in + focuses.
-            window.location.href = `http://localhost:${cb}/?${p.toString()}`;
+            // Use 127.0.0.1 (not "localhost", which can resolve to IPv6 [::1] while
+            // the loopback server listens on IPv4 → connection refused).
+            window.location.href = `http://127.0.0.1:${cb}/?${p.toString()}`;
             return;
           }
         }

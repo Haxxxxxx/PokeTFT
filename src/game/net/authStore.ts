@@ -10,7 +10,7 @@ import {
 } from "firebase/auth";
 import { ref, remove } from "firebase/database";
 import { auth, db } from "./firebase";
-import { isNativeShell } from "./nativeShell";
+import { isNativeShell, openNativeGoogleSignIn } from "./nativeShell";
 import {
   ensureProfile, setUsername as setUsernameRT, setPhoto as setPhotoRT, addFriend as addFriendRT,
   removeFriend as removeFriendRT, findUserByUsername, trackPresence, subscribeFriends,
@@ -134,15 +134,15 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   signInGoogle: async () => {
     set({ busy: true, error: null, notice: null });
-    const provider = new GoogleAuthProvider();
-    // App shell: the embedded webview can't open a popup, so go STRAIGHT to the
-    // full-page redirect — the webview navigates to the Google portal exactly like
-    // the website does. onAuthStateChanged picks up the result when we return.
+    // App shell: open Google in the user's DEFAULT browser (where they're already
+    // signed into Google → one-click account pick), not the session-less webview.
+    // Rust intercepts the sentinel, runs the loopback, and signs the app in on return.
     if (isNativeShell()) {
-      try { await signInWithRedirect(auth(), provider); }
-      catch (e) { set({ error: authErr(e), busy: false }); }
+      openNativeGoogleSignIn();
+      set({ busy: false, notice: "Continue with Google in your browser — this app will sign in automatically." });
       return;
     }
+    const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth(), provider);
     } catch (e) {
