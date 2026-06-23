@@ -212,6 +212,7 @@ export type Dict = {
   net_hide_view_board: string;
   // NetGameClient — augment overlay
   net_augment_pick_one: string;
+  net_augment_slot: (n: number) => string;
   net_augment_reroll: string;
   net_augment_free: string;
   // NetGameClient — game-over screen
@@ -421,6 +422,7 @@ export const FR: Dict = {
   net_show_choices: "Afficher les choix",
   net_hide_view_board: "Voir mon plateau",
   net_augment_pick_one: "Choisis un bonus permanent.",
+  net_augment_slot: (n) => `Augmentation ${n}/3`,
   net_augment_reroll: "Relancer",
   net_augment_free: "Gratuit",
   net_host_left: "L'hôte a quitté — partie terminée.",
@@ -624,6 +626,7 @@ export const EN: Dict = {
   net_show_choices: "Show choices",
   net_hide_view_board: "Hide & view board",
   net_augment_pick_one: "Pick one permanent boost.",
+  net_augment_slot: (n) => `Augment ${n}/3`,
   net_augment_reroll: "Reroll",
   net_augment_free: "Free",
   net_host_left: "The host left — game ended.",

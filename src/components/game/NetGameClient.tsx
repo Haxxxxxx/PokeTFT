@@ -150,6 +150,9 @@ function ShopSellDrop({ children }: { children: ReactNode }) {
   );
 }
 
+/** Gold cost of an augment reroll after the first (free) one per slot. */
+const AUG_REROLL_COST = 2;
+
 export function NetGameClient() {
   const room = useRoom((s) => s.room);
   const myUid = useRoom((s) => s.myUid);
@@ -558,8 +561,7 @@ export function NetGameClient() {
     return picks;
   }, [augSlotNow, myUid, room?.rules?.mode, augReroll]);
 
-  // Reroll the augment offer: first per slot is free, then 2 gold (button disabled if broke).
-  const AUG_REROLL_COST = 2;
+  // Reroll the augment offer: first per slot is free, then AUG_REROLL_COST gold (button disabled if broke).
   const augRerollCost = augReroll === 0 ? 0 : AUG_REROLL_COST;
   const rerollAugments = () => {
     if (augRerollCost > 0) {
@@ -1383,7 +1385,7 @@ export function NetGameClient() {
           <div className="celebrate-pop flex flex-col items-center">
             <div className="flex items-center gap-2.5 mb-1">
               <span><Sparkles size={24} /></span>
-              <h2 className="text-2xl font-extrabold text-violet-300 tracking-tight">Augment {augSlotNow! + 1}/3</h2>
+              <h2 className="text-2xl font-extrabold text-violet-300 tracking-tight">{t.net_augment_slot(augSlotNow! + 1)}</h2>
             </div>
             <p className="text-xs text-slate-300/80 mb-5">{t.net_augment_pick_one}</p>
             <div className="flex gap-3 flex-wrap justify-center max-w-[640px]">
