@@ -1,13 +1,30 @@
+use std::sync::{Arc, Mutex};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 
 const HOSTED: &str = "https://poketft-arena.web.app";
 
-// A small page shown in the browser tab after the credential is handed off — the
-// app focuses itself, so this is just a courtesy.
-const DONE_HTML: &str = r#"<!doctype html><html><head><meta charset="utf-8"><title>PokéTFT</title>
-<style>html,body{height:100%;margin:0;background:#020617;color:#fbbf24;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center}</style>
-</head><body><div style="text-align:center"><div style="font-size:28px">✅</div><div style="font-weight:800;margin-top:8px">Signed in — back to PokéTFT.</div><div style="color:#94a3b8;font-size:13px;margin-top:6px">You can close this tab.</div></div></body></html>"#;
+// Branded page shown in the browser tab once the credential is handed off — a
+// spinning-less Pokéball + wordmark matching the in-app bridge. Auto-closes.
+const DONE_HTML: &str = r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><title>PokéTFT</title>
+<style>
+  html,body{height:100%;margin:0;background:radial-gradient(120% 120% at 50% 0%,#0b1120,#020617 60%);color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center}
+  .card{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:40px 34px;border-radius:20px;background:rgba(15,23,42,.55);border:1px solid rgba(251,191,36,.14);box-shadow:0 30px 80px -30px rgba(0,0,0,.8)}
+  .ball{position:relative;width:54px;height:54px}
+  .ball .b{position:absolute;inset:0;border-radius:50%;background:linear-gradient(#ef4444 0 50%,#f8fafc 50% 100%);border:3px solid #0a0e1a}
+  .ball .band{position:absolute;top:calc(50% - 2px);left:0;right:0;height:4px;background:#0a0e1a}
+  .ball .c{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:#f8fafc;border:3px solid #0a0e1a}
+  .title{font-size:20px;font-weight:800}
+  .gild{background:linear-gradient(180deg,#fde68a,#d4af37);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-size:13px;color:#94a3b8;line-height:1.5}
+</style></head>
+<body><div class="card">
+  <div class="ball"><span class="b"></span><span class="band"></span><span class="c"></span></div>
+  <div class="title">Signed in to Poké<span class="gild">TFT</span></div>
+  <div class="sub">You're all set — switch back to the app.<br>This tab will close automatically.</div>
+</div>
+<script>setTimeout(function(){window.close()},1400)</script>
+</body></html>"#;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -23,10 +40,10 @@ pub fn run() {
         )?;
       }
 
-      // Build the main window in Rust so we can:
-      //  (a) flag the shell to the (remotely-loaded) page via an init script, and
-      //  (b) intercept the sentinel the page navigates to when the user clicks
-      //      "Sign in with Google" (Google blocks OAuth inside embedded webviews).
+      // Build the main window in Rust so we can (a) flag the shell to the
+      // remotely-loaded page via an init script, and (b) intercept the sentinel
+      // the page navigates to when the user clicks Google (which Google blocks
+      // inside an embedded webview).
       let app_handle = app.handle().clone();
       WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
         .title("PokéTFT")
@@ -38,12 +55,12 @@ pub fn run() {
           if !url.as_str().contains("/__native-google") {
             return true;
           }
-          // Seamless Google sign-in:
-          //  1. start a localhost loopback server,
-          //  2. open the system browser to the bridge page (passing the port),
-          //  3. the browser hands the credential back to localhost → we sign the
-          //     app in and bring it to front. No deep link / custom-scheme prompt.
+          // Seamless Google sign-in: start a localhost loopback, open the system
+          // browser to the bridge, and on the credential callback sign the app in,
+          // focus it, and SHUT THE SERVER DOWN (no lingering localhost listener).
           let cb_handle = app_handle.clone();
+          let port_cell: Arc<Mutex<Option<u16>>> = Arc::new(Mutex::new(None));
+          let port_cb = port_cell.clone();
           let started = tauri_plugin_oauth::start_with_config(
             tauri_plugin_oauth::OauthConfig { ports: None, response: Some(DONE_HTML.into()) },
             move |redirect_url| {
@@ -52,9 +69,13 @@ pub fn run() {
                 let _ = win.eval(&format!("window.__poketftNativeAuth && window.__poketftNativeAuth({arg})"));
                 let _ = win.set_focus();
               }
+              if let Some(p) = *port_cb.lock().unwrap() {
+                let _ = tauri_plugin_oauth::cancel(p);
+              }
             },
           );
           if let Ok(port) = started {
+            *port_cell.lock().unwrap() = Some(port);
             let _ = app_handle
               .opener()
               .open_url(format!("{HOSTED}/native-auth?cb={port}"), None::<&str>);
