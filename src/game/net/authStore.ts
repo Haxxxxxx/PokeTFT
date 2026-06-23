@@ -89,10 +89,18 @@ export const useAuth = create<AuthState>((set, get) => ({
     if (typeof window !== "undefined") {
       (window as unknown as { __poketftNativeAuth?: (url: string) => void }).__poketftNativeAuth = async (url: string) => {
         try {
-          const hash = url.includes("#") ? url.slice(url.indexOf("#") + 1) : "";
-          const p = new URLSearchParams(hash);
-          const idToken = p.get("id_token");
-          const accessToken = p.get("access_token") ?? undefined;
+          let idToken: string | null = null;
+          let accessToken: string | undefined;
+          try {
+            const u = new URL(url);
+            idToken = u.searchParams.get("id_token");
+            accessToken = u.searchParams.get("access_token") ?? undefined;
+            if (!idToken && u.hash) {
+              const h = new URLSearchParams(u.hash.replace(/^#/, ""));
+              idToken = h.get("id_token");
+              accessToken = h.get("access_token") ?? undefined;
+            }
+          } catch { /* not a parseable URL */ }
           if (!idToken) { set({ error: "Sign-in returned no credential." }); return; }
           set({ busy: true, error: null, notice: null });
           await signInWithCredential(auth(), GoogleAuthProvider.credential(idToken, accessToken));
