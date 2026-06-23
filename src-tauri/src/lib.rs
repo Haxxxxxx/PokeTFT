@@ -8,7 +8,7 @@ const HOSTED: &str = "https://poketft-arena.web.app";
 // spinning-less Pokéball + wordmark matching the in-app bridge. Auto-closes.
 const DONE_HTML: &str = r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><title>PokéTFT</title>
 <style>
-  html,body{height:100%;margin:0;background:radial-gradient(120% 120% at 50% 0%,#0b1120,#020617 60%);color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center}
+  html,body{height:100%;margin:0;background:#0a0e1a;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center}
   .card{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:40px 34px;border-radius:20px;background:rgba(15,23,42,.55);border:1px solid rgba(251,191,36,.14);box-shadow:0 30px 80px -30px rgba(0,0,0,.8)}
   .ball{position:relative;width:54px;height:54px}
   .ball .b{position:absolute;inset:0;border-radius:50%;background:linear-gradient(#ef4444 0 50%,#f8fafc 50% 100%);border:3px solid #0a0e1a}
