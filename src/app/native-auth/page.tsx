@@ -6,63 +6,72 @@ import { auth } from "@/game/net/firebase";
 
 /**
  * Native sign-in bridge — opened in the user's DEFAULT browser by the app shell.
- * Gets the Google credential (popup, with a redirect fallback), then hands it to
- * the app's loopback at 127.0.0.1:<cb>, which signs the app in. The loopback +
- * app side are verified working; this page just has to reliably reach it WITH a
- * credential.
+ * Auto-fires signInWithRedirect on landing (no button) so the user goes straight
+ * to Google. On return, hands the credential to the app's loopback (127.0.0.1:cb).
+ * If the redirect-return can't read the result (cross-domain storage), falls back
+ * to a one-tap popup so it never dead-ends.
  */
 function cbPort(): string | null {
   return new URLSearchParams(window.location.search).get("cb");
 }
-
 function handoff(cb: string, result: UserCredential): boolean {
   const cred = GoogleAuthProvider.credentialFromResult(result);
   if (!cred?.idToken) return false;
   const p = new URLSearchParams();
   p.set("id_token", cred.idToken);
   if (cred.accessToken) p.set("access_token", cred.accessToken);
-  // Navigation to localhost is proven to reach the app's loopback server.
   window.location.href = `http://127.0.0.1:${cb}/?${p.toString()}`;
   return true;
 }
 
-export default function NativeAuthBridge() {
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
+const ATTEMPT_KEY = "poketft_auth_redirected";
 
-  // Catch the case where the popup fell back to a full-page redirect.
+export default function NativeAuthBridge() {
+  const [needsButton, setNeedsButton] = useState(false);
+  const [status, setStatus] = useState("Connecting to Google…");
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     (async () => {
+      const cb = cbPort();
+      if (!cb) { setError("Missing app callback port — reopen sign-in from the app."); setStatus(""); return; }
+      // Returning from Google?
       try {
         const result = await getRedirectResult(auth());
-        const cb = cbPort();
-        if (result && cb) {
+        if (result) {
+          sessionStorage.removeItem(ATTEMPT_KEY);
           setStatus("Signing you into PokéTFT…");
-          if (handoff(cb, result)) { setDone(true); return; }
+          if (handoff(cb, result)) return;
         }
-      } catch { /* ignore; user will use the button */ }
+      } catch { /* storage blocked — fall through to the popup fallback */ }
+
+      // We've already redirected once and came back with nothing → the redirect
+      // return is blocked. Offer the popup (captures the credential in-page).
+      if (sessionStorage.getItem(ATTEMPT_KEY)) {
+        sessionStorage.removeItem(ATTEMPT_KEY);
+        setNeedsButton(true); setStatus("");
+        return;
+      }
+      // First landing → go straight to Google, no button.
+      sessionStorage.setItem(ATTEMPT_KEY, "1");
+      try {
+        await signInWithRedirect(auth(), new GoogleAuthProvider());
+      } catch (e) {
+        setNeedsButton(true); setStatus("");
+        setError((e as Error)?.message ?? null);
+      }
     })();
   }, []);
 
-  const go = async () => {
-    setError(null);
+  const goPopup = async () => {
     const cb = cbPort();
-    if (!cb) { setError("Missing app callback port — reopen sign-in from the app."); return; }
-    setStatus("Opening Google…");
+    if (!cb) { setError("Missing app callback port."); return; }
+    setError(null); setStatus("Opening Google…");
     try {
       const result = await signInWithPopup(auth(), new GoogleAuthProvider());
       setStatus("Signing you into PokéTFT…");
-      if (handoff(cb, result)) { setDone(true); return; }
-      throw new Error("No Google credential was returned.");
+      if (!handoff(cb, result)) throw new Error("No Google credential was returned.");
     } catch (e) {
-      const code = (e as { code?: string })?.code ?? "";
-      // Popup blocked → full-page redirect; getRedirectResult (above) finishes on return.
-      if (code.includes("popup-blocked") || code.includes("operation-not-supported") || code.includes("cancelled-popup-request")) {
-        setStatus("Redirecting to Google…");
-        try { await signInWithRedirect(auth(), new GoogleAuthProvider()); return; }
-        catch (e2) { setError((e2 as Error)?.message ?? "Sign-in failed."); setStatus(""); return; }
-      }
       setError((e as Error)?.message ?? "Sign-in failed."); setStatus("");
     }
   };
@@ -75,10 +84,14 @@ export default function NativeAuthBridge() {
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center", maxWidth: 380 }}>
         <div style={{ fontSize: 26 }}>🔴</div>
         <div style={{ fontSize: 18, fontWeight: 800, color: "#fbbf24" }}>Sign in to PokéTFT</div>
-        {!done && <button style={btn} onClick={go}>Continue with Google</button>}
+        {!needsButton ? (
+          <div style={{ width: 30, height: 30, borderRadius: "50%", border: "3px solid rgba(251,191,36,0.25)", borderTopColor: "#fbbf24", animation: "spin 0.8s linear infinite" }} />
+        ) : (
+          <button style={btn} onClick={goPopup}>Continue with Google</button>
+        )}
         {status && <div style={{ fontSize: 13, color: "#94a3b8" }}>{status}</div>}
-        {done && <div style={{ fontSize: 12, color: "#94a3b8" }}>Switch back to PokéTFT — you’re signed in. You can close this tab.</div>}
         {error && <div style={{ fontSize: 13, color: "#fca5a5" }}>{error}</div>}
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     </main>
   );
