@@ -1,7 +1,7 @@
 import { dbAdapter } from "./db-adapter";
 import { serverNow } from "./serverTime";
 import { simulate } from "../engine/combat";
-import { makeRng } from "../engine/rng";
+import { makeRng, hashStr } from "../engine/rng";
 import { generatePlayerLikeBoard, generateCreepBoard, generateBossBoard, pickCarouselOptions, boardProfileOf, botBoardLevel, type BotBrain } from "../engine/enemy";
 import { type CompStats, type TypeAffinity, metaWeights, counterAffinity, accrueComp, accrueAffinity, rememberLoss, activeTraitKeys } from "../engine/botBrain";
 import { hasDef } from "../data/mons";
@@ -26,15 +26,6 @@ type Updates = Record<string, unknown>;
 
 function gamePath(code: string): string {
   return `games/${code}`;
-}
-
-/** FNV-1a string hash → 32-bit uint. Used to fold stable identifiers (game code,
- *  uid) into deterministic-but-varied seeds. */
-function hashStr(s: string | undefined): number {
-  let h = 2166136261 >>> 0;
-  const str = s ?? "";
-  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return h >>> 0;
 }
 
 /** The roster (unit ids) in play this game — the selected generations, randomly
@@ -935,10 +926,6 @@ async function resolveDoubleUpCombat(code: string, room: Room, combat: Record<st
   await Promise.all(ratingJobs.map(({ uid, place }) => applyRatingFor(code, room, uid, place).catch(() => {})));
 }
 
-/** End screen → rematch: send the whole room back to the pre-game lobby. Resets
- *  every player's match state (the next start re-rolls fresh) and clears the
- *  finished game. Any player may trigger it — everyone returns to the lobby
- *  together the moment the shared phase flips. */
 /** Show an invited friend as a pending placeholder slot in the lobby until they join. */
 export async function addInvitePlaceholder(code: string, uid: string, username: string, photoURL?: string | null): Promise<void> {
   await dbAdapter().update(`games/${code}/invited/${uid}`, { username, photoURL: photoURL ?? null });

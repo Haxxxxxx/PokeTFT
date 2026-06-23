@@ -5,7 +5,7 @@ import { DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSen
 import { useGame, BENCH_SIZE, PENSION_COST, PENSION_ROUNDS, resolveBenchSlots } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
-import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, markCarouselPicked, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS } from "@/game/net/match";
+import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, returnToLobby, markCarouselPicked, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS, CAROUSEL_MS } from "@/game/net/match";
 import { simulate, type FrameUnit } from "@/game/engine/combat";
 import { getDef, spriteUrl, hasDef, archetypeOf } from "@/game/data/mons";
 import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, modeTeamBuff, modeSignatureAugment, getMode, pickMonoType, isDoubleUp } from "@/game/data/gameModes";
@@ -27,7 +27,7 @@ import { Trash2, Eye, Sparkles, Maximize, Minimize, AlertTriangle, Swords, Refre
 import { AUGMENTS, augmentSlot, AUGMENT_TIER_COLOR, teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID, tailoredAugmentPicks } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
 import { useUi } from "@/game/store/uiStore";
-import { makeRng } from "@/game/engine/rng";
+import { makeRng, hashStr } from "@/game/engine/rng";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import { MegaIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
@@ -85,14 +85,6 @@ function asBoard(b: unknown): UnitInstance[] {
   const arr = Array.isArray(b) ? b : Object.values(b as Record<string, UnitInstance>);
   // Mirror match.ts board(): drop unknown-def units so the client sim matches the host.
   return (arr as UnitInstance[]).filter((u) => u && u.pos && hasDef(u.defId)).map(normUnit);
-}
-
-/** FNV-1a hash of the room code → a numeric seed for the per-game roster draw,
- *  matching match.ts's hashStr so the local pool equals the host's. */
-function codeSeed(code: string): number {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < code.length; i++) { h ^= code.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return h >>> 0;
 }
 
 /** Cheap, stable signature of a frozen board for memo deps — changes whenever the
@@ -391,7 +383,7 @@ export function NetGameClient() {
     // Same roster the host uses (selected gens, drawn to the draft size, seeded by
     // the room code) — so the shop pool always respects the lobby's region/draft
     // rules, on a fresh start AND on a reconnect/restore.
-    const roster = () => rosterForRoom(room.rules, codeSeed(room.code));
+    const roster = () => rosterForRoom(room.rules, hashStr(room.code));
     const enabledItems = room.rules?.itemsEnabled;
 
     // FIRST LOAD — hydrate local econ as soon as the priv snapshot resolves, in ANY
@@ -1033,7 +1025,7 @@ export function NetGameClient() {
           {(() => {
             const gm = getMode(room.rules?.mode);
             if (gm.id === "standard") return null;
-            const mono = gm.flags?.monoType ? pickMonoType(room.rules?.generations ?? [1], codeSeed(room.code)) : null;
+            const mono = gm.flags?.monoType ? pickMonoType(room.rules?.generations ?? [1], hashStr(room.code)) : null;
             return (
               <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-bold"
                 style={{ borderColor: `${gm.color}55`, color: gm.color, background: `${gm.color}12` }}
@@ -1049,7 +1041,7 @@ export function NetGameClient() {
 
           {/* Phase + timer — isolated so it ticks on its own without re-rendering
               the whole game tree every 250ms (the old global tick caused jank). */}
-          <PhaseTimer phase={phase} phaseLabel={phaseLabel} deadline={meta.deadline} totalMs={phase === "combat" ? COMBAT_MS : PLAN_MS} resolvingLabel={t.net_resolving} />
+          <PhaseTimer phase={phase} phaseLabel={phaseLabel} deadline={meta.deadline} totalMs={phase === "combat" ? COMBAT_MS : phase === "carousel" ? CAROUSEL_MS : PLAN_MS} resolvingLabel={t.net_resolving} />
 
           {isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1 shrink-0">{t.net_host_badge}</span>}
           <div className="flex items-center gap-2 shrink-0">

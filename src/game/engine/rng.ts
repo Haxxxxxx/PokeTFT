@@ -12,6 +12,17 @@ export function makeRng(seed: number): Rng {
   };
 }
 
+/** FNV-1a string hash → 32-bit uint. Folds stable identifiers (game code, uid)
+ *  into deterministic-but-varied seeds. Single source of truth — the host
+ *  (match.ts) and every client must hash identically or the shared roster/
+ *  carousel draw desyncs. */
+export function hashStr(s: string | undefined): number {
+  let h = 2166136261 >>> 0;
+  const str = s ?? "";
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
 export function randInt(rng: Rng, maxExclusive: number): number {
   return Math.floor(rng() * maxExclusive);
 }

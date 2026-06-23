@@ -19,7 +19,7 @@
         ".read": "auth != null",
         "username":        { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length <= 16" },
         "usernameLower":   { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length <= 16" },
-        "photoURL":        { ".write": "auth != null && $uid === auth.uid" },
+        "photoURL":        { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length <= 512" },
         "online":          { ".write": "auth != null && $uid === auth.uid" },
         "currentGame":     { ".write": "auth != null && $uid === auth.uid" },
         "createdAt":       { ".write": "auth != null && $uid === auth.uid && !data.exists()" },
@@ -27,7 +27,7 @@
         "rating":          { ".write": false },
         "history":         { ".write": false },
         "typeAff": {
-          ".write": "auth != null",
+          ".write": "auth != null && $uid === auth.uid",
           "$type": { ".validate": "newData.isNumber() && newData.val() >= 0" }
         },
         "friends": {

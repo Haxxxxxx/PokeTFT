@@ -123,10 +123,14 @@ export const runTransition = onTaskDispatched(
 
 /** Client calls this once after starting a server-driven match to bootstrap the loop. */
 export const kickoff = onCall({ region: REGION }, async (req) => {
+  if (!req.auth) throw new HttpsError("unauthenticated", "sign in required");
   const code = String(req.data?.code ?? "");
   if (!code) throw new HttpsError("invalid-argument", "code required");
   const room = await freshRoom(code);
   if (!room?.meta?.serverDriven) throw new HttpsError("failed-precondition", "game is not server-driven");
+  // Only a real participant may bootstrap the loop — a stranger guessing the code can't.
+  const p = room.players?.[req.auth.uid];
+  if (!p || p.isBot) throw new HttpsError("permission-denied", "not a player in this game");
   await scheduleNext(code, room.meta.deadline);
   return { ok: true };
 });
@@ -135,10 +139,14 @@ export const kickoff = onCall({ region: REGION }, async (req) => {
  *  to end the round early instead of waiting out the timer. Brings the deadline to now
  *  and fires the transition immediately. */
 export const finishEarly = onCall({ region: REGION }, async (req) => {
+  if (!req.auth) throw new HttpsError("unauthenticated", "sign in required");
   const code = String(req.data?.code ?? "");
   if (!code) throw new HttpsError("invalid-argument", "code required");
   const room = await freshRoom(code);
   if (!room?.meta?.serverDriven || room.meta.phase !== "carousel") return { ok: false };
+  // Only a real participant may cut the carousel short — not a stranger who guessed the code.
+  const p = room.players?.[req.auth.uid];
+  if (!p || p.isBot) throw new HttpsError("permission-denied", "not a player in this game");
   const now = Date.now();
   await adb.ref(`games/${code}/meta`).update({ deadline: now });
   await scheduleNext(code, now); // fireAt clamps to now+100 → resolves right away
