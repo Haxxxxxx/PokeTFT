@@ -1,0 +1,21 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "remote-auth",
+  "description": "Let the hosted PokéTFT page open the system browser for the Google sign-in bridge.",
+  "windows": ["main"],
+  "remote": {
+    "urls": [
+      "https://poketft-arena.web.app",
+      "https://poketft-arena.firebaseapp.com"
+    ]
+  },
+  "permissions": [
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://poketft-arena.web.app/*" },
+        { "url": "https://poketft-arena.firebaseapp.com/*" }
+      ]
+    }
+  ]
+}

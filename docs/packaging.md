@@ -55,18 +55,31 @@ npm run tauri:android        # → src-tauri/gen/android/app/build/outputs/apk/
 
 A release `.apk` must be signed before distribution (Play Store or sideload).
 
-## ⚠️ Known caveat — Google sign-in in a webview
+## Google sign-in in the shell — system-browser bridge
 
-The app offers Google sign-in (`signInWithPopup`). Google **blocks OAuth inside
-embedded webviews** (`disallowed_useragent`), which is what Tauri/Android
-WebView are. So in the wrapped apps:
+Google blocks OAuth inside embedded webviews, so the shell does **not** sign in
+in-app. Instead it bounces through the real browser via a `poketft://` deep link:
 
-- ✅ Anonymous (guest) and email/password sign-in work normally.
-- ❌ Google sign-in will likely fail in-app.
+1. In the shell, the "Sign in with Google" button calls
+   `window.__TAURI__.opener.openUrl(".../native-auth")` → opens the **system
+   browser** (`isNativeShell()` in `src/game/net/nativeShell.ts`).
+2. The browser page `/native-auth` (`src/app/native-auth/page.tsx`) runs the
+   normal Google redirect — works fine in a real browser — and redirects to
+   `poketft://auth#id_token=...&access_token=...`.
+3. Rust (`src-tauri/src/lib.rs`, `deep_link().on_open_url`) evals that URL into
+   the webview, calling `window.__poketftNativeAuth(...)`.
+4. The app finishes with `signInWithCredential(...)` (`authStore.init`).
 
-Fix options (future): open Google OAuth in the system browser via a deep-link
-round-trip (tauri `opener` plugin + a custom URL scheme), or hide the Google
-button when running inside the shell.
+Wiring: `tauri.conf.json` registers the `poketft` scheme + `withGlobalTauri`;
+`capabilities/remote-auth.json` lets the hosted origin call `opener:open-url`.
+
+### ⚠️ Deep-link registration requirements (for testing)
+
+- **macOS:** the scheme only resolves for a **bundled app installed in
+  `/Applications`**. Drag `PokéTFT.app` there before testing the bridge.
+- **Android:** the intent filter is registered by the installed APK — just
+  install and run.
+- Anonymous (guest) + email/password sign-in work everywhere regardless.
 
 ## Icons
 

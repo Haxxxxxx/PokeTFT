@@ -10,6 +10,7 @@
     "beforeBuildCommand": ""
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "PokéTFT",
@@ -23,6 +24,19 @@
     ],
     "security": {
       "csp": null
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["poketft"]
+      },
+      "mobile": [
+        {
+          "scheme": ["poketft"],
+          "appLink": false
+        }
+      ]
     }
   },
   "bundle": {

@@ -3,12 +3,14 @@
 import { create } from "zustand";
 import {
   onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+  signInWithCredential,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
   sendPasswordResetEmail, deleteUser,
   signOut as fbSignOut, type User,
 } from "firebase/auth";
 import { ref, remove } from "firebase/database";
 import { auth, db } from "./firebase";
+import { isNativeShell, openInSystemBrowser, HOSTED_ORIGIN } from "./nativeShell";
 import {
   ensureProfile, setUsername as setUsernameRT, setPhoto as setPhotoRT, addFriend as addFriendRT,
   removeFriend as removeFriendRT, findUserByUsername, trackPresence, subscribeFriends,
@@ -81,6 +83,23 @@ export const useAuth = create<AuthState>((set, get) => ({
     // surface only the failure case (e.g. Google rejects an embedded-webview UA) so the
     // user sees why instead of a silent no-op.
     getRedirectResult(auth()).catch((e) => set({ error: authErr(e) }));
+    // Native shell bridge: the Rust deep-link handler calls this with the
+    // poketft://auth#id_token=...&access_token=... URL after the system-browser
+    // Google sign-in. Finish by signing into Firebase with that credential.
+    if (typeof window !== "undefined") {
+      (window as unknown as { __poketftNativeAuth?: (url: string) => void }).__poketftNativeAuth = async (url: string) => {
+        try {
+          const hash = url.includes("#") ? url.slice(url.indexOf("#") + 1) : "";
+          const p = new URLSearchParams(hash);
+          const idToken = p.get("id_token");
+          const accessToken = p.get("access_token") ?? undefined;
+          if (!idToken) { set({ error: "Sign-in returned no credential." }); return; }
+          set({ busy: true, error: null, notice: null });
+          await signInWithCredential(auth(), GoogleAuthProvider.credential(idToken, accessToken));
+          set({ busy: false });
+        } catch (e) { set({ error: authErr(e), busy: false }); }
+      };
+    }
     onAuthStateChanged(auth(), async (u) => {
       if (friendsUnsub) { friendsUnsub(); friendsUnsub = null; }
       if (!u) {
@@ -106,7 +125,19 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 
   signInGoogle: async () => {
-    set({ busy: true, error: null });
+    set({ busy: true, error: null, notice: null });
+    // Desktop/mobile shell: Google blocks OAuth inside the embedded webview, so
+    // bounce to the system browser. The credential returns via the poketft://
+    // deep link → __poketftNativeAuth (registered in init).
+    if (isNativeShell()) {
+      try {
+        await openInSystemBrowser(`${HOSTED_ORIGIN}/native-auth`);
+        set({ busy: false, notice: "Finish signing in with Google in your browser…" });
+      } catch (e) {
+        set({ error: authErr(e), busy: false });
+      }
+      return;
+    }
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth(), provider);
