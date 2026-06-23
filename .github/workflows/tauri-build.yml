@@ -1,0 +1,61 @@
+name: Build desktop apps
+
+# Builds the Tauri thin-shell into a Windows .exe and a macOS .dmg, then
+# publishes them to a GitHub Release. The shell just loads poketft-arena.web.app,
+# so the heavy game itself still updates via `firebase deploy` — this only
+# rebuilds the native wrapper (rare).
+#
+# Trigger by pushing a tag like `app-v0.1.0`, or run manually from the Actions tab.
+on:
+  push:
+    tags:
+      - "app-v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      contents: write # create the release + upload binaries
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest      # Apple-silicon + Intel via universal target
+            args: "--target universal-apple-darwin"
+          - platform: windows-latest    # produces the .exe / .msi installers
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+
+      # Installs @tauri-apps/cli (the only dep the shell build needs). The heavy
+      # web deps install too but are never compiled — beforeBuildCommand is empty.
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Build + release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "PokéTFT ${{ github.ref_name }}"
+          releaseBody: "Native desktop builds. The app loads the live hosted game, so gameplay updates ship via the web deploy."
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
