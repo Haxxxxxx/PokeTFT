@@ -76,23 +76,32 @@ export default function NativeAuthBridge() {
     }
   };
 
-  const wrap = { minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#020617", color: "#e2e8f0", fontFamily: "system-ui, sans-serif", padding: 24 } as const;
-  const btn = { padding: "14px 26px", borderRadius: 12, background: "#fbbf24", color: "#0a0e1a", fontWeight: 800, fontSize: 16, border: "none", cursor: "pointer" } as const;
+  const wrap = { minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "radial-gradient(120% 120% at 50% 0%, #0b1120 0%, #020617 60%)", color: "#e2e8f0", fontFamily: "system-ui, -apple-system, sans-serif", padding: 24 } as const;
+  const card = { display: "flex", flexDirection: "column", alignItems: "center", gap: 18, textAlign: "center", maxWidth: 360, width: "100%", padding: "40px 32px", borderRadius: 20, background: "rgba(15,23,42,0.55)", border: "1px solid rgba(251,191,36,0.14)", boxShadow: "0 30px 80px -30px rgba(0,0,0,0.8)" } as const;
+  const btn = { padding: "13px 26px", borderRadius: 12, background: "linear-gradient(180deg,#fbbf24,#f59e0b)", color: "#0a0e1a", fontWeight: 800, fontSize: 15, border: "none", cursor: "pointer", boxShadow: "0 8px 24px -8px rgba(251,191,36,0.5)" } as const;
 
   return (
     <main style={wrap}>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center", maxWidth: 380 }}>
-        <div style={{ fontSize: 26 }}>🔴</div>
-        <div style={{ fontSize: 18, fontWeight: 800, color: "#fbbf24" }}>Sign in to PokéTFT</div>
-        {!needsButton ? (
-          <div style={{ width: 30, height: 30, borderRadius: "50%", border: "3px solid rgba(251,191,36,0.25)", borderTopColor: "#fbbf24", animation: "spin 0.8s linear infinite" }} />
-        ) : (
-          <button style={btn} onClick={goPopup}>Continue with Google</button>
-        )}
-        {status && <div style={{ fontSize: 13, color: "#94a3b8" }}>{status}</div>}
-        {error && <div style={{ fontSize: 13, color: "#fca5a5" }}>{error}</div>}
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div style={card}>
+        {/* Spinning Pokéball */}
+        <div style={{ position: "relative", width: 56, height: 56, animation: needsButton ? "none" : "spin 1s linear infinite" }}>
+          <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "linear-gradient(#ef4444 0 50%, #f8fafc 50% 100%)", border: "3px solid #0a0e1a", boxShadow: "0 6px 18px -6px rgba(239,68,68,0.6)" }} />
+          <div style={{ position: "absolute", top: "calc(50% - 2px)", left: 0, right: 0, height: 4, background: "#0a0e1a" }} />
+          <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 18, height: 18, borderRadius: "50%", background: "#f8fafc", border: "3px solid #0a0e1a" }} />
+        </div>
+
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.01em" }}>
+            Poké<span style={{ background: "linear-gradient(180deg,#fde68a,#d4af37)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>TFT</span>
+          </div>
+          <div style={{ fontSize: 12.5, color: "#64748b", marginTop: 4 }}>Signing in with Google</div>
+        </div>
+
+        {needsButton && <button style={btn} onClick={goPopup}>Continue with Google</button>}
+        {status && !needsButton && <div style={{ fontSize: 12.5, color: "#94a3b8" }}>{status}</div>}
+        {error && <div style={{ fontSize: 12.5, color: "#fca5a5", lineHeight: 1.5 }}>{error}</div>}
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </main>
   );
 }
