@@ -2,13 +2,15 @@
 
 import { create } from "zustand";
 import {
-  onAuthStateChanged, GoogleAuthProvider, signInWithPopup,
+  onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+  signInWithCredential,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
   sendPasswordResetEmail, deleteUser,
   signOut as fbSignOut, type User,
 } from "firebase/auth";
 import { ref, remove } from "firebase/database";
 import { auth, db } from "./firebase";
+import { isNativeShell, openNativeGoogleSignIn } from "./nativeShell";
 import {
   ensureProfile, setUsername as setUsernameRT, setPhoto as setPhotoRT, addFriend as addFriendRT,
   removeFriend as removeFriendRT, findUserByUsername, trackPresence, subscribeFriends,
@@ -77,6 +79,35 @@ export const useAuth = create<AuthState>((set, get) => ({
   init: () => {
     if (inited) return;
     inited = true;
+    // If we returned from a redirect sign-in, success flows through onAuthStateChanged;
+    // surface only the failure case (e.g. Google rejects an embedded-webview UA) so the
+    // user sees why instead of a silent no-op.
+    getRedirectResult(auth()).catch((e) => set({ error: authErr(e) }));
+    // Native shell bridge: the Rust deep-link handler calls this with the
+    // poketft://auth#id_token=...&access_token=... URL after the system-browser
+    // Google sign-in. Finish by signing into Firebase with that credential.
+    if (typeof window !== "undefined") {
+      (window as unknown as { __poketftNativeAuth?: (url: string) => void }).__poketftNativeAuth = async (url: string) => {
+        try {
+          let idToken: string | null = null;
+          let accessToken: string | undefined;
+          try {
+            const u = new URL(url);
+            idToken = u.searchParams.get("id_token");
+            accessToken = u.searchParams.get("access_token") ?? undefined;
+            if (!idToken && u.hash) {
+              const h = new URLSearchParams(u.hash.replace(/^#/, ""));
+              idToken = h.get("id_token");
+              accessToken = h.get("access_token") ?? undefined;
+            }
+          } catch { /* not a parseable URL */ }
+          if (!idToken) { set({ error: "Sign-in returned no credential." }); return; }
+          set({ busy: true, error: null, notice: null });
+          await signInWithCredential(auth(), GoogleAuthProvider.credential(idToken, accessToken));
+          set({ busy: false });
+        } catch (e) { set({ error: authErr(e), busy: false }); }
+      };
+    }
     onAuthStateChanged(auth(), async (u) => {
       if (friendsUnsub) { friendsUnsub(); friendsUnsub = null; }
       if (!u) {
@@ -102,10 +133,30 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 
   signInGoogle: async () => {
-    set({ busy: true, error: null });
-    try { await signInWithPopup(auth(), new GoogleAuthProvider()); }
-    catch (e) { set({ error: authErr(e) }); }
-    finally { set({ busy: false }); }
+    set({ busy: true, error: null, notice: null });
+    // App shell: open Google in the user's DEFAULT browser (where they're already
+    // signed into Google → one-click account pick), not the session-less webview.
+    // Rust intercepts the sentinel, runs the loopback, and signs the app in on return.
+    if (isNativeShell()) {
+      openNativeGoogleSignIn();
+      set({ busy: false, notice: "Continue with Google in your browser — this app will sign in automatically." });
+      return;
+    }
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth(), provider);
+    } catch (e) {
+      const code = (e as { code?: string })?.code ?? "";
+      // Embedded webviews (the Tauri desktop/mobile shell) and some browsers block
+      // popups → auth/popup-blocked. Fall back to a full-page redirect, which needs
+      // no popup window. onAuthStateChanged picks up the result when we return.
+      if (code.includes("popup-blocked") || code.includes("operation-not-supported") || code.includes("cancelled-popup-request")) {
+        try { await signInWithRedirect(auth(), provider); return; } // navigates away; no finally needed
+        catch (e2) { set({ error: authErr(e2), busy: false }); return; }
+      }
+      set({ error: authErr(e) });
+    }
+    set({ busy: false });
   },
 
   signInEmail: async (email, pw) => {

@@ -18,6 +18,16 @@
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       {
+        "comment": "Serve the static native-auth bridge page (out/native-auth.html). Without this, the catch-all below rewrites /native-auth to the game's index.html — the static export emits native-auth.html, not native-auth/index.html, and there's no cleanUrls.",
+        "source": "/native-auth",
+        "destination": "/native-auth.html"
+      },
+      {
+        "comment": "Same: serve the static download/landing page instead of the SPA catch-all.",
+        "source": "/download",
+        "destination": "/download.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

@@ -15,7 +15,7 @@ import { getAuth, signInAnonymously, type Auth } from "firebase/auth";
 
 const config = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "AIzaSyCtPKFSNFcu3DGIr3tMgsVMr1Dm0_K7yCA",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "poketft-arena.firebaseapp.com",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "poketft-arena.web.app",
   databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ?? "https://poketft-arena-default-rtdb.firebaseio.com",
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "poketft-arena",
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "poketft-arena.firebasestorage.app",

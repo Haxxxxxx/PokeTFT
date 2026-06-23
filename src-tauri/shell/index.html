@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>PokéTFT</title>
+    <style>
+      :root { color-scheme: dark; }
+      html, body {
+        margin: 0; height: 100%; background: #020617; color: #fbbf24;
+        font-family: system-ui, -apple-system, sans-serif;
+        display: flex; align-items: center; justify-content: center;
+        -webkit-user-select: none; user-select: none;
+      }
+      .wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+      .spin {
+        width: 34px; height: 34px; border-radius: 50%;
+        border: 3px solid rgba(251,191,36,0.25); border-top-color: #fbbf24;
+        animation: s 0.8s linear infinite;
+      }
+      @keyframes s { to { transform: rotate(360deg); } }
+      .t { font-size: 13px; letter-spacing: 0.08em; opacity: 0.8; }
+      a { color: #93c5fd; }
+      .err { display: none; max-width: 280px; text-align: center; font-size: 12px; color: #94a3b8; }
+    </style>
+  </head>
+  <body>
+    <!--
+      Thin shell: the desktop (.exe/.dmg) and mobile (.apk) apps are tiny native
+      webviews. On launch they redirect to the hosted PokéTFT build, so "remote
+      update" = `firebase deploy` — every client gets the new version instantly,
+      with no binary re-download or store resubmission.
+    -->
+    <div class="wrap">
+      <div class="spin"></div>
+      <div class="t">Loading PokéTFT…</div>
+      <div class="err" id="err">
+        Couldn't reach the server. Check your connection, then
+        <a href="#" onclick="go();return false">retry</a>.
+      </div>
+    </div>
+    <script>
+      var HOSTED = "https://poketft-arena.web.app";
+      function go() {
+        document.getElementById("err").style.display = "none";
+        window.location.replace(HOSTED);
+      }
+      // If we're still on the splash after a few seconds (offline), show a retry hint.
+      setTimeout(function () {
+        if (location.href.indexOf("poketft-arena") === -1) {
+          document.getElementById("err").style.display = "block";
+        }
+      }, 6000);
+      go();
+    </script>
+  </body>
+</html>
