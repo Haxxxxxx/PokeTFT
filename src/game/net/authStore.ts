@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import {
-  onAuthStateChanged, GoogleAuthProvider, signInWithPopup,
+  onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
   sendPasswordResetEmail, deleteUser,
   signOut as fbSignOut, type User,
@@ -77,6 +77,10 @@ export const useAuth = create<AuthState>((set, get) => ({
   init: () => {
     if (inited) return;
     inited = true;
+    // If we returned from a redirect sign-in, success flows through onAuthStateChanged;
+    // surface only the failure case (e.g. Google rejects an embedded-webview UA) so the
+    // user sees why instead of a silent no-op.
+    getRedirectResult(auth()).catch((e) => set({ error: authErr(e) }));
     onAuthStateChanged(auth(), async (u) => {
       if (friendsUnsub) { friendsUnsub(); friendsUnsub = null; }
       if (!u) {
@@ -103,9 +107,21 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   signInGoogle: async () => {
     set({ busy: true, error: null });
-    try { await signInWithPopup(auth(), new GoogleAuthProvider()); }
-    catch (e) { set({ error: authErr(e) }); }
-    finally { set({ busy: false }); }
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth(), provider);
+    } catch (e) {
+      const code = (e as { code?: string })?.code ?? "";
+      // Embedded webviews (the Tauri desktop/mobile shell) and some browsers block
+      // popups → auth/popup-blocked. Fall back to a full-page redirect, which needs
+      // no popup window. onAuthStateChanged picks up the result when we return.
+      if (code.includes("popup-blocked") || code.includes("operation-not-supported") || code.includes("cancelled-popup-request")) {
+        try { await signInWithRedirect(auth(), provider); return; } // navigates away; no finally needed
+        catch (e2) { set({ error: authErr(e2), busy: false }); return; }
+      }
+      set({ error: authErr(e) });
+    }
+    set({ busy: false });
   },
 
   signInEmail: async (email, pw) => {
