@@ -10,18 +10,7 @@
     "beforeBuildCommand": ""
   },
   "app": {
-    "withGlobalTauri": true,
-    "windows": [
-      {
-        "title": "PokéTFT",
-        "width": 1280,
-        "height": 800,
-        "minWidth": 800,
-        "minHeight": 540,
-        "resizable": true,
-        "fullscreen": false
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
     }

@@ -10,7 +10,7 @@ import {
 } from "firebase/auth";
 import { ref, remove } from "firebase/database";
 import { auth, db } from "./firebase";
-import { isNativeShell, openInSystemBrowser, HOSTED_ORIGIN } from "./nativeShell";
+import { isNativeShell, openNativeGoogleSignIn } from "./nativeShell";
 import {
   ensureProfile, setUsername as setUsernameRT, setPhoto as setPhotoRT, addFriend as addFriendRT,
   removeFriend as removeFriendRT, findUserByUsername, trackPresence, subscribeFriends,
@@ -130,12 +130,10 @@ export const useAuth = create<AuthState>((set, get) => ({
     // bounce to the system browser. The credential returns via the poketft://
     // deep link → __poketftNativeAuth (registered in init).
     if (isNativeShell()) {
-      try {
-        await openInSystemBrowser(`${HOSTED_ORIGIN}/native-auth`);
-        set({ busy: false, notice: "Finish signing in with Google in your browser…" });
-      } catch (e) {
-        set({ error: authErr(e), busy: false });
-      }
+      // Open the bridge in the SYSTEM browser (Rust intercepts the sentinel). The
+      // credential returns via the poketft:// deep link → __poketftNativeAuth.
+      openNativeGoogleSignIn();
+      set({ busy: false, notice: "Finish signing in with Google in your browser…" });
       return;
     }
     const provider = new GoogleAuthProvider();
