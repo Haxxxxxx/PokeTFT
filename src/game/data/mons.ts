@@ -3,6 +3,7 @@ import type { Cost } from "../config";
 import { GEN_DEX_RANGES } from "./generations";
 import { GENERATED } from "./mons.generated";
 import { TRAITS_BY_KEY } from "./traits";
+import { makeRng } from "../engine/rng";
 
 /** Sprite URL from national dex id. Served from our OWN origin (public/sprites/, mirrored from
  *  PokéAPI) instead of raw.githubusercontent.com — same-origin, cached-forever, no third-party
@@ -82,7 +83,7 @@ const SQUISHY_TYPES = new Set<PokeType>(["psychic", "ghost", "fairy", "poison", 
  *  the raw patch (so an explicit generator range still wins where it set one). */
 function generatedVariance(dex: number, cost: Cost, types: PokeType[], rawRange?: number): Partial<StatBlock> {
   const base = STAT_BY_COST[cost];
-  const rng = seededRng((dex * 2654435761) >>> 0);
+  const rng = makeRng((dex * 2654435761) >>> 0);
   // "bulk" axis in [0,1]: 0 = glass cannon, 1 = tank. Nudged by type identity.
   let bulk = rng();
   if (types.some((t) => BULKY_TYPES.has(t))) bulk = Math.min(1, bulk + 0.25);
@@ -1041,19 +1042,6 @@ export function unitsForGenerations(gens: number[]): string[] {
  *  being diluted by a 200+ pool you can never 3-star out of). */
 export const ROSTER_CAP = 90;
 
-// Tiny seeded RNG (mulberry32) so a game's random roster draw is identical on
-// every client (seed = the room code) yet differs game-to-game.
-function seededRng(seed: number): () => number {
-  let s = seed >>> 0;
-  return () => {
-    s = (s + 0x6d2b79f5) >>> 0;
-    let t = s;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 /** The actual playable roster for the selected generations — the source of truth
  *  for the shop pool, bots, creeps and carousel alike.
  *
@@ -1066,7 +1054,7 @@ function seededRng(seed: number): () => number {
 export function rosterForGenerations(gens: number[], size: number = ROSTER_CAP, seed = 1): string[] {
   const ids = unitsForGenerations(gens);
   if (ids.length <= size) return ids;
-  const rng = seededRng(seed);
+  const rng = makeRng(seed);
   // Group by cost, shuffle each tier, take a proportional share so the subset
   // keeps the pool's cost spread.
   const byCost: Record<number, string[]> = { 1: [], 2: [], 3: [], 4: [], 5: [] };

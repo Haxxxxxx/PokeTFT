@@ -19,17 +19,18 @@
         ".read": "auth != null",
         "username":        { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length <= 16" },
         "usernameLower":   { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length <= 16" },
-        "photoURL":        { ".write": "auth != null && $uid === auth.uid" },
+        "photoURL":        { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length <= 512" },
         "online":          { ".write": "auth != null && $uid === auth.uid" },
         "currentGame":     { ".write": "auth != null && $uid === auth.uid" },
         "createdAt":       { ".write": "auth != null && $uid === auth.uid && !data.exists()" },
-        "ultimateBotWins": { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+        "ultimateBotWins": { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000 && (!data.exists() || newData.val() === data.val() + 1)" },
         "rating":          { ".write": false },
         "history":         { ".write": false },
         "typeAff": {
-          ".write": "auth != null",
+          ".write": "auth != null && $uid === auth.uid",
           "$type": { ".validate": "newData.isNumber() && newData.val() >= 0" }
         },
+        "ghost": { ".write": "auth != null && $uid === auth.uid" },
         "friends": {
           "$fid": { ".write": "auth != null && ($uid === auth.uid || $fid === auth.uid)" }
         },
@@ -37,7 +38,8 @@
           "$code": {
             ".write": "auth != null && (root.child('users').child($uid).child('friends').child(auth.uid).exists() || (!newData.exists() && $uid === auth.uid))"
           }
-        }
+        },
+        "$other": { ".write": false }
       }
     },
     "usernames": {
