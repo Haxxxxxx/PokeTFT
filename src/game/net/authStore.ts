@@ -10,7 +10,7 @@ import {
 } from "firebase/auth";
 import { ref, remove } from "firebase/database";
 import { auth, db } from "./firebase";
-import { isNativeShell, openNativeGoogleSignIn } from "./nativeShell";
+import { isNativeShell } from "./nativeShell";
 import {
   ensureProfile, setUsername as setUsernameRT, setPhoto as setPhotoRT, addFriend as addFriendRT,
   removeFriend as removeFriendRT, findUserByUsername, trackPresence, subscribeFriends,
@@ -134,17 +134,15 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   signInGoogle: async () => {
     set({ busy: true, error: null, notice: null });
-    // Desktop/mobile shell: Google blocks OAuth inside the embedded webview, so
-    // bounce to the system browser. The credential returns via the poketft://
-    // deep link → __poketftNativeAuth (registered in init).
+    const provider = new GoogleAuthProvider();
+    // App shell: the embedded webview can't open a popup, so go STRAIGHT to the
+    // full-page redirect — the webview navigates to the Google portal exactly like
+    // the website does. onAuthStateChanged picks up the result when we return.
     if (isNativeShell()) {
-      // Open the bridge in the SYSTEM browser (Rust intercepts the sentinel). The
-      // credential returns via the poketft:// deep link → __poketftNativeAuth.
-      openNativeGoogleSignIn();
-      set({ busy: false, notice: "Finish signing in with Google in your browser…" });
+      try { await signInWithRedirect(auth(), provider); }
+      catch (e) { set({ error: authErr(e), busy: false }); }
       return;
     }
-    const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth(), provider);
     } catch (e) {
