@@ -16,15 +16,15 @@
     },
     "users": {
       "$uid": {
-        ".read": "auth != null",
-        "username":        { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length <= 16" },
+        ".read": "auth != null && ($uid === auth.uid || root.child('users').child(auth.uid).child('friends').child($uid).val() === true)",
+        "username":        { ".read": "auth != null", ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 16 && newData.val().matches(/^[a-zA-Z0-9_]+$/)" },
         "usernameLower":   { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length <= 16" },
-        "photoURL":        { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length <= 512" },
-        "online":          { ".write": "auth != null && $uid === auth.uid" },
-        "currentGame":     { ".write": "auth != null && $uid === auth.uid" },
+        "photoURL":        { ".read": "auth != null", ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length <= 512" },
+        "online":          { ".read": "auth != null", ".write": "auth != null && $uid === auth.uid" },
+        "currentGame":     { ".read": "auth != null", ".write": "auth != null && $uid === auth.uid" },
+        "rating":          { ".read": "auth != null", ".write": false },
         "createdAt":       { ".write": "auth != null && $uid === auth.uid && !data.exists()" },
         "ultimateBotWins": { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000 && (!data.exists() || newData.val() === data.val() + 1)" },
-        "rating":          { ".write": false },
         "history":         { ".write": false },
         "typeAff": {
           ".write": "auth != null && $uid === auth.uid",
@@ -32,7 +32,9 @@
         },
         "ghost": { ".write": "auth != null && $uid === auth.uid" },
         "friends": {
-          "$fid": { ".write": "auth != null && ($uid === auth.uid || $fid === auth.uid)" }
+          "$fid": {
+            ".write": "auth != null && ($uid === auth.uid || ($fid === auth.uid && root.child('users').child(auth.uid).child('friends').child($uid).val() === true))"
+          }
         },
         "invites": {
           "$code": {

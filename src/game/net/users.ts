@@ -109,13 +109,18 @@ export function usernameValid(name: string): boolean {
 export async function setUsername(uid: string, username: string): Promise<{ ok: boolean; error?: string }> {
   if (!usernameValid(username)) return { ok: false, error: "3–16 letters, numbers or _" };
   const lower = username.toLowerCase();
-  const taken = await get(nameIndexRef(lower));
-  if (taken.exists() && taken.val() !== uid) return { ok: false, error: "Username taken" };
-  // Free the old name if changing.
+  // Atomically claim the index slot — aborts if another user just took it concurrently.
+  const result = await runTransaction(nameIndexRef(lower), (cur) => {
+    if (cur !== null && cur !== uid) return; // abort — taken
+    return uid;
+  });
+  if (!result.committed) return { ok: false, error: "Username taken" };
+  // Claim succeeded: update profile, then release the previous name index.
   const prev = await getProfile(uid);
-  if (prev?.usernameLower && prev.usernameLower !== lower) await remove(nameIndexRef(prev.usernameLower)).catch(() => {});
   await update(usersRef(uid), { username, usernameLower: lower });
-  await set(nameIndexRef(lower), uid);
+  if (prev?.usernameLower && prev.usernameLower !== lower) {
+    await remove(nameIndexRef(prev.usernameLower)).catch(() => {});
+  }
   return { ok: true };
 }
 
@@ -125,13 +130,13 @@ export async function findUserByUsername(username: string): Promise<UserProfile 
   return getProfile(snap.val() as string);
 }
 
-/** Quick-add: symmetric friendship written on both sides. */
+/** Quick-add: symmetric friendship written on both sides.
+ *  Two-phase write: A's side first so the RTDB rule on B's side (which requires
+ *  A to already be in A's own friends list) evaluates true in the second write. */
 export async function addFriend(uid: string, friendUid: string): Promise<void> {
   if (uid === friendUid) return;
-  await update(ref(db()), {
-    [`users/${uid}/friends/${friendUid}`]: true,
-    [`users/${friendUid}/friends/${uid}`]: true,
-  });
+  await update(ref(db()), { [`users/${uid}/friends/${friendUid}`]: true });
+  await update(ref(db()), { [`users/${friendUid}/friends/${uid}`]: true });
 }
 
 export async function removeFriend(uid: string, friendUid: string): Promise<void> {

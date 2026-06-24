@@ -3,10 +3,10 @@
 import { create } from "zustand";
 import {
   onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
-  signInWithCredential,
+  signInWithCredential, linkWithPopup, linkWithCredential, EmailAuthProvider,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
   sendPasswordResetEmail, deleteUser,
-  signOut as fbSignOut, type User,
+  signOut as fbSignOut, type User, type AuthError,
 } from "firebase/auth";
 import { ref, remove } from "firebase/database";
 import { auth, db } from "./firebase";
@@ -61,9 +61,13 @@ function mapUser(u: User): AuthUser {
 function authErr(e: unknown): string {
   const code = (e as { code?: string })?.code ?? "";
   if (code.includes("email-already-in-use")) return "Email already registered — sign in instead.";
+  if (code.includes("account-exists-with-different-credential")) return "An account with this email already exists. Try signing in with Google instead.";
   if (code.includes("invalid-credential") || code.includes("wrong-password")) return "Wrong email or password.";
   if (code.includes("weak-password")) return "Password must be at least 6 characters.";
   if (code.includes("invalid-email")) return "Invalid email address.";
+  if (code.includes("too-many-requests")) return "Too many attempts — wait a few minutes and try again.";
+  if (code.includes("network-request-failed")) return "No internet connection — check your network and try again.";
+  if (code.includes("user-disabled")) return "This account has been disabled.";
   if (code.includes("popup-closed")) return "Sign-in cancelled.";
   return (e as Error)?.message ?? "Sign-in failed.";
 }
@@ -105,7 +109,18 @@ export const useAuth = create<AuthState>((set, get) => ({
           if (!idToken) { set({ error: "Sign-in returned no credential." }); return; }
           if (nativeAuthTimer) { clearTimeout(nativeAuthTimer); nativeAuthTimer = null; }
           set({ busy: true, error: null, notice: null });
-          await signInWithCredential(auth(), GoogleAuthProvider.credential(idToken, accessToken));
+          const cred = GoogleAuthProvider.credential(idToken, accessToken);
+          const cur = auth().currentUser;
+          try {
+            // Upgrade anonymous session if possible; fall back to a plain sign-in
+            // if this Google account already has its own Firebase account.
+            if (cur?.isAnonymous) await linkWithCredential(cur, cred);
+            else await signInWithCredential(auth(), cred);
+          } catch (le) {
+            if ((le as AuthError)?.code?.includes("credential-already-in-use"))
+              await signInWithCredential(auth(), cred);
+            else throw le;
+          }
           set({ busy: false });
         } catch (e) { set({ error: authErr(e), busy: false }); }
       };
@@ -150,15 +165,32 @@ export const useAuth = create<AuthState>((set, get) => ({
       return;
     }
     const provider = new GoogleAuthProvider();
+    const currentUser = auth().currentUser;
     try {
-      await signInWithPopup(auth(), provider);
+      // Link to the existing anonymous account so the guest's stats carry over.
+      // Falls back to a plain sign-in if this Google identity already has its own
+      // Firebase account (credential-already-in-use).
+      if (currentUser?.isAnonymous) {
+        await linkWithPopup(currentUser, provider);
+      } else {
+        await signInWithPopup(auth(), provider);
+      }
     } catch (e) {
       const code = (e as { code?: string })?.code ?? "";
+      if (code.includes("credential-already-in-use")) {
+        const fallbackCred = GoogleAuthProvider.credentialFromError(e as Error);
+        if (fallbackCred) {
+          try { await signInWithCredential(auth(), fallbackCred); set({ busy: false }); return; }
+          catch (e2) { set({ error: authErr(e2), busy: false }); return; }
+        }
+        set({ error: "This Google account is already registered. Sign out first, then sign in with Google.", busy: false });
+        return;
+      }
       // Embedded webviews (the Tauri desktop/mobile shell) and some browsers block
       // popups → auth/popup-blocked. Fall back to a full-page redirect, which needs
       // no popup window. onAuthStateChanged picks up the result when we return.
       if (code.includes("popup-blocked") || code.includes("operation-not-supported") || code.includes("cancelled-popup-request")) {
-        try { await signInWithRedirect(auth(), provider); return; } // navigates away; no finally needed
+        try { await signInWithRedirect(auth(), provider); return; }
         catch (e2) { set({ error: authErr(e2), busy: false }); return; }
       }
       set({ error: authErr(e) });
@@ -175,7 +207,24 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   signUpEmail: async (email, pw) => {
     set({ busy: true, error: null });
-    try { await createUserWithEmailAndPassword(auth(), email.trim(), pw); }
+    try {
+      const currentUser = auth().currentUser;
+      if (currentUser?.isAnonymous) {
+        // Upgrade: link the new email/password identity to the anonymous UID so
+        // the guest's stats and history are preserved under the same account.
+        const emailCred = EmailAuthProvider.credential(email.trim(), pw);
+        try { await linkWithCredential(currentUser, emailCred); }
+        catch (le) {
+          const lc = (le as { code?: string })?.code ?? "";
+          // Email already belongs to an existing account — sign into that account instead.
+          if (lc.includes("credential-already-in-use") || lc.includes("email-already-in-use")) {
+            await signInWithEmailAndPassword(auth(), email.trim(), pw);
+          } else { throw le; }
+        }
+      } else {
+        await createUserWithEmailAndPassword(auth(), email.trim(), pw);
+      }
+    }
     catch (e) { set({ error: authErr(e) }); }
     finally { set({ busy: false }); }
   },
