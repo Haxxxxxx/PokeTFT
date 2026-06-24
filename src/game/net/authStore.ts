@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import {
   onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
-  signInWithCredential,
+  signInWithCredential, linkWithPopup, linkWithCredential, EmailAuthProvider,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
   sendPasswordResetEmail, deleteUser,
   signOut as fbSignOut, type User,
@@ -61,9 +61,13 @@ function mapUser(u: User): AuthUser {
 function authErr(e: unknown): string {
   const code = (e as { code?: string })?.code ?? "";
   if (code.includes("email-already-in-use")) return "Email already registered — sign in instead.";
+  if (code.includes("account-exists-with-different-credential")) return "An account with this email already exists. Try signing in with Google instead.";
   if (code.includes("invalid-credential") || code.includes("wrong-password")) return "Wrong email or password.";
   if (code.includes("weak-password")) return "Password must be at least 6 characters.";
   if (code.includes("invalid-email")) return "Invalid email address.";
+  if (code.includes("too-many-requests")) return "Too many attempts — wait a few minutes and try again.";
+  if (code.includes("network-request-failed")) return "No internet connection — check your network and try again.";
+  if (code.includes("user-disabled")) return "This account has been disabled.";
   if (code.includes("popup-closed")) return "Sign-in cancelled.";
   return (e as Error)?.message ?? "Sign-in failed.";
 }
@@ -105,7 +109,18 @@ export const useAuth = create<AuthState>((set, get) => ({
           if (!idToken) { set({ error: "Sign-in returned no credential." }); return; }
           if (nativeAuthTimer) { clearTimeout(nativeAuthTimer); nativeAuthTimer = null; }
           set({ busy: true, error: null, notice: null });
-          await signInWithCredential(auth(), GoogleAuthProvider.credential(idToken, accessToken));
+          const gCred = GoogleAuthProvider.credential(idToken, accessToken);
+          const current = auth().currentUser;
+          if (current?.isAnonymous) {
+            try { await linkWithCredential(current, gCred); }
+            catch (le) {
+              if ((le as { code?: string })?.code?.includes("credential-already-in-use")) {
+                await signInWithCredential(auth(), gCred);
+              } else { throw le; }
+            }
+          } else {
+            await signInWithCredential(auth(), gCred);
+          }
           set({ busy: false });
         } catch (e) { set({ error: authErr(e), busy: false }); }
       };
@@ -150,10 +165,22 @@ export const useAuth = create<AuthState>((set, get) => ({
       return;
     }
     const provider = new GoogleAuthProvider();
+    const current = auth().currentUser;
     try {
-      await signInWithPopup(auth(), provider);
+      if (current?.isAnonymous) {
+        await linkWithPopup(current, provider);
+      } else {
+        await signInWithPopup(auth(), provider);
+      }
     } catch (e) {
       const code = (e as { code?: string })?.code ?? "";
+      if (code.includes("credential-already-in-use")) {
+        const cred = GoogleAuthProvider.credentialFromError(e as Error);
+        if (cred) {
+          try { await signInWithCredential(auth(), cred); set({ busy: false }); return; }
+          catch (e2) { set({ error: authErr(e2), busy: false }); return; }
+        }
+      }
       // Embedded webviews (the Tauri desktop/mobile shell) and some browsers block
       // popups → auth/popup-blocked. Fall back to a full-page redirect, which needs
       // no popup window. onAuthStateChanged picks up the result when we return.
@@ -175,7 +202,21 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   signUpEmail: async (email, pw) => {
     set({ busy: true, error: null });
-    try { await createUserWithEmailAndPassword(auth(), email.trim(), pw); }
+    try {
+      const current = auth().currentUser;
+      if (current?.isAnonymous) {
+        const cred = EmailAuthProvider.credential(email.trim(), pw);
+        try { await linkWithCredential(current, cred); }
+        catch (le) {
+          const lc = (le as { code?: string })?.code ?? "";
+          if (lc.includes("credential-already-in-use") || lc.includes("email-already-in-use")) {
+            await signInWithEmailAndPassword(auth(), email.trim(), pw);
+          } else { throw le; }
+        }
+      } else {
+        await createUserWithEmailAndPassword(auth(), email.trim(), pw);
+      }
+    }
     catch (e) { set({ error: authErr(e) }); }
     finally { set({ busy: false }); }
   },
