@@ -27,7 +27,9 @@
         "ultimateBotWins": { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000 && (!data.exists() ? newData.val() <= 1 : newData.val() === data.val() + 1)" },
         "history": {
           ".write": "auth != null && $uid === auth.uid",
-          "$code": { ".write": "auth != null && $uid === auth.uid" }
+          "$code": {
+            ".write": "auth != null && ($uid === auth.uid || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)"
+          }
         },
         "appliedGames": {
           "$code": { ".write": "auth != null && $uid === auth.uid" }
