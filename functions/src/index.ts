@@ -202,6 +202,21 @@ export const pruneStale = onSchedule({ region: REGION, schedule: "every 30 minut
       || (meta.phase === "over" && now - updatedAt > OVER_AGE_MS)
       || (now - updatedAt > IDLE_AGE_MS);
     if (stale) {
+      // Before deleting an abandoned in-progress game, apply ratings for any human
+      // who never got their result (closed the tab / app instead of using Concede).
+      // This preserves their match history even when they skip the normal exit flow.
+      if (meta?.phase && meta.phase !== "over" && meta.phase !== "lobby") {
+        const room = await freshRoom(code);
+        if (room) {
+          const rated = ((await adb.ref(`games/${code}/rated`).get()).val() ?? {}) as Record<string, boolean>;
+          const unrated = Object.values(room.players ?? {})
+            .filter((p) => !p.uid.startsWith("bot-") && !rated[p.uid])
+            .sort((a, b) => (b.alive ? 1 : 0) - (a.alive ? 1 : 0) || (b.hp ?? 0) - (a.hp ?? 0));
+          await Promise.all(
+            unrated.map((p, i) => applyRatingFor(code, room, p.uid, i + 1).catch(() => {})),
+          );
+        }
+      }
       updates[`games/${code}`] = null;
       updates[`lobbies/${code}`] = null;
       updates[`priv/${code}`] = null;

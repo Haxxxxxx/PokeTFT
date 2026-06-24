@@ -744,6 +744,32 @@ export function NetGameClient() {
     return unsub;
   }, [serverResultCode, myUid]);
 
+  // Auto-concede when the user closes the tab / navigates away while alive mid-game.
+  // pagehide fires on tab close, navigation and bfcache freeze; visibilitychange
+  // catches background/minimize on mobile. Both are best-effort (the request may be
+  // cut by the browser) — pruneStale is the guaranteed fallback within 30 min.
+  useEffect(() => {
+    const code = room?.code;
+    if (!code || !myUid) return;
+    const tryAutoForfeit = () => {
+      const r = useRoom.getState().room;
+      const phase = r?.meta?.phase;
+      const alive = r?.players?.[myUid]?.alive;
+      if (!alive || (phase !== "planning" && phase !== "combat" && phase !== "carousel")) return;
+      if (recordedRef.current === code) return;
+      recordedRef.current = code;
+      callConcede(code).catch(() => {});
+    };
+    const onHide = () => tryAutoForfeit();
+    const onVisibility = () => { if (document.visibilityState === "hidden") tryAutoForfeit(); };
+    window.addEventListener("pagehide", onHide);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [room?.code, myUid]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [confirmLeave, setConfirmLeave] = useState(false);
   // Float-up text: "+X gold" or "−X HP" shown briefly near the HUD on econ events.
   const [floatText, setFloatText] = useState<string | null>(null);
