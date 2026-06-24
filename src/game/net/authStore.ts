@@ -52,6 +52,7 @@ type AuthState = {
 
 let inited = false;
 let friendsUnsub: (() => void) | null = null;
+let nativeAuthTimer: ReturnType<typeof setTimeout> | null = null;
 
 function mapUser(u: User): AuthUser {
   return { uid: u.uid, displayName: u.displayName, email: u.email, photoURL: u.photoURL, isAnonymous: u.isAnonymous };
@@ -102,6 +103,7 @@ export const useAuth = create<AuthState>((set, get) => ({
             }
           } catch { /* not a parseable URL */ }
           if (!idToken) { set({ error: "Sign-in returned no credential." }); return; }
+          if (nativeAuthTimer) { clearTimeout(nativeAuthTimer); nativeAuthTimer = null; }
           set({ busy: true, error: null, notice: null });
           await signInWithCredential(auth(), GoogleAuthProvider.credential(idToken, accessToken));
           set({ busy: false });
@@ -139,6 +141,11 @@ export const useAuth = create<AuthState>((set, get) => ({
     // Rust intercepts the sentinel, runs the loopback, and signs the app in on return.
     if (isNativeShell()) {
       openNativeGoogleSignIn();
+      if (nativeAuthTimer) clearTimeout(nativeAuthTimer);
+      nativeAuthTimer = setTimeout(() => {
+        nativeAuthTimer = null;
+        set({ notice: null, error: "Sign-in timed out. Return to the app, then try again." });
+      }, 90_000);
       set({ busy: false, notice: "Continue with Google in your browser — this app will sign in automatically." });
       return;
     }

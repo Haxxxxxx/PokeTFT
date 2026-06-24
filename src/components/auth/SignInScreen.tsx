@@ -54,6 +54,14 @@ export function SignInScreen() {
 
       {error && <p className="text-xs text-rose-400 text-center">{error}</p>}
       {notice && <p className="text-xs text-emerald-400 text-center">{notice}</p>}
+
+      <p className="text-[10px] text-slate-600 text-center leading-relaxed">
+        By continuing you agree to our{" "}
+        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-slate-300 underline underline-offset-2 transition-colors">
+          Privacy Policy
+        </a>
+        . We store only what&apos;s needed to run multiplayer.
+      </p>
     </AuthShell>
   );
 }
