@@ -505,6 +505,10 @@ export function NetGameClient() {
   // Both teams' final-frame stats, kept as STATE (read in render for the planning recap, so a
   // ref would be a "ref-during-render" violation) — and it shows the enemy team too, not just yours.
   const [lastFight, setLastFight] = useState<{ mine: FrameUnit[]; theirs: FrameUnit[]; oppName: string } | null>(null);
+  // Separate from lastRoundKey (which gates planning econ grants): addRoundStats uses
+  // the same stage-round key as the preceding planning phase, so sharing one ref causes
+  // the stat recording to always be skipped (planning always fires first and marks it seen).
+  const statsRoundKey = useRef<string | null>(null);
   useEffect(() => {
     if (!combatResult?.frames?.length || !myCombat) return;
     const myTeam = myCombat.flip ? "enemy" : "ally";
@@ -518,8 +522,8 @@ export function NetGameClient() {
     }
     if (meta && mine.length) {
       const roundKey = `${meta.stage}-${meta.round}`;
-      if (lastRoundKey.current !== roundKey) {
-        lastRoundKey.current = roundKey;
+      if (statsRoundKey.current !== roundKey) {
+        statsRoundKey.current = roundKey;
         addRoundStats({
           dmgDealt: mine.reduce((s, u) => s + (u.dmgDealt ?? 0), 0),
           dmgTaken: mine.reduce((s, u) => s + (u.dmgTaken ?? 0), 0),
