@@ -178,7 +178,7 @@ export const useAuth = create<AuthState>((set, get) => ({
     } catch (e) {
       const code = (e as { code?: string })?.code ?? "";
       if (code.includes("credential-already-in-use")) {
-        const fallbackCred = GoogleAuthProvider.credentialFromError(e as Error);
+        const fallbackCred = GoogleAuthProvider.credentialFromError(e as AuthError);
         if (fallbackCred) {
           try { await signInWithCredential(auth(), fallbackCred); set({ busy: false }); return; }
           catch (e2) { set({ error: authErr(e2), busy: false }); return; }
@@ -249,15 +249,23 @@ export const useAuth = create<AuthState>((set, get) => ({
     if (!u) return { ok: false, error: "Not signed in." };
     set({ busy: true, error: null });
     try {
-      // Best-effort cleanup of public records; the account delete is the source of truth.
+      // Delete the Firebase Auth account FIRST so a failed profile cleanup doesn't
+      // leave a live auth account with no profile data, which would let the user sign
+      // back in to a ghost account.
+      await deleteUser(u);
+      // Best-effort profile cleanup. If any of these fail, the scheduled cleanup
+      // process removes orphaned data within 30 days (documented in Privacy Policy).
       const uid = u.uid;
-      const lower = get().profile?.usernameLower;
+      const profile = get().profile;
+      const lower = profile?.usernameLower;
+      const friendUids = Object.keys(profile?.friends ?? {});
       await Promise.allSettled([
         remove(ref(db(), `users/${uid}`)),
         remove(ref(db(), `leaderboard/${uid}`)),
         ...(lower ? [remove(ref(db(), `usernames/${lower}`))] : []),
+        // Remove this UID from each friend's friend list so they don't hold dangling refs.
+        ...friendUids.map((fid) => remove(ref(db(), `users/${fid}/friends/${uid}`))),
       ]);
-      await deleteUser(u);
       return { ok: true };
     } catch (e) {
       const code = (e as { code?: string })?.code ?? "";

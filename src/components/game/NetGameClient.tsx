@@ -19,13 +19,14 @@ import { AugmentsBar } from "./AugmentsBar";
 import { CoopPanel } from "./CoopPanel";
 import { finishCarouselEarly, callConcede } from "@/game/net/serverGame";
 import { subscribeTransfers } from "@/game/net/coop";
-import { recordUltimateBotWin, type RankedResult } from "@/game/net/users";
+import { recordUltimateBotWin, claimRankedResult, type RankedResult } from "@/game/net/users";
 import { ref as dbRef, onValue } from "firebase/database";
 import { db } from "@/game/net/firebase";
 import { Trash2, Eye, Maximize, Minimize, AlertTriangle, BarChart3 } from "lucide-react";
 import { AUGMENTS, augmentSlot, teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID, tailoredAugmentPicks } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
 import { useUi } from "@/game/store/uiStore";
+import { useAuth } from "@/game/net/authStore";
 import { makeRng, hashStr } from "@/game/engine/rng";
 import { itemsArray, normalizeUnit } from "@/game/net/rtdb-utils";
 import { CarouselOverlay, AugmentOverlay, GameOverScreen } from "./GameOverlays";
@@ -730,6 +731,15 @@ export function NetGameClient() {
       if (!snap.exists()) return;
       const r = snap.val() as { delta: number; rating: number; prevRating: number };
       setRankResult({ delta: r.delta, rating: r.rating, prevRating: r.prevRating });
+      // Self-write: apply the host-written result to our own user profile so LP and
+      // leaderboard stay current even in client-host-loop fallback mode.
+      const profile = useAuth.getState().profile;
+      if (profile?.username) {
+        claimRankedResult(myUid, serverResultCode, r, {
+          username: profile.username,
+          photoURL: profile.photoURL,
+        }).catch(() => {});
+      }
     });
     return unsub;
   }, [serverResultCode, myUid]);
