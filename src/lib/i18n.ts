@@ -222,6 +222,11 @@ export type Dict = {
   net_mvp_damage: string;
   net_mvp_tanked: string;
   net_mvp_healed: string;
+  net_summary_label: string;
+  net_summary_dealt: string;
+  net_summary_taken: string;
+  net_summary_healed: string;
+  net_summary_rounds: (won: number, total: number) => string;
   net_rank_promoted: string;
   net_rank_demoted: string;
   net_team_label: string;
@@ -431,6 +436,11 @@ export const FR: Dict = {
   net_mvp_damage: "Dégâts",
   net_mvp_tanked: "Encaissé",
   net_mvp_healed: "Soins",
+  net_summary_label: "Cette partie",
+  net_summary_dealt: "Dégâts infligés",
+  net_summary_taken: "Dégâts encaissés",
+  net_summary_healed: "Soins prodigués",
+  net_summary_rounds: (won, total) => `${won} / ${total} rounds gagnés`,
   net_rank_promoted: "Promu",
   net_rank_demoted: "Rétrogradé",
   net_team_label: "Éq.",
@@ -635,6 +645,11 @@ export const EN: Dict = {
   net_mvp_damage: "Damage",
   net_mvp_tanked: "Tanked",
   net_mvp_healed: "Healed",
+  net_summary_label: "This Game",
+  net_summary_dealt: "Total damage dealt",
+  net_summary_taken: "Total damage taken",
+  net_summary_healed: "Total healed",
+  net_summary_rounds: (won, total) => `${won} / ${total} rounds won`,
   net_rank_promoted: "Promoted",
   net_rank_demoted: "Demoted",
   net_team_label: "Team",

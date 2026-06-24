@@ -292,7 +292,7 @@ export function AugmentOverlay({
 }
 
 export function GameOverScreen({
-  players, myUid, me, meta, iWon, rankResult, lastFightRef, isHost, room, leave, doubleUp,
+  players, myUid, me, meta, iWon, rankResult, lastFightRef, isHost, room, leave, doubleUp, gameTotals,
 }: {
   players: Record<string, RoomPlayer>;
   myUid: string;
@@ -305,6 +305,7 @@ export function GameOverScreen({
   room: Room;
   leave: () => void;
   doubleUp: boolean;
+  gameTotals: { dmgDealt: number; dmgTaken: number; healed: number; roundsWon: number; roundsPlayed: number };
 }) {
   const t = useT();
   // Final standings: every player ranked by placement (winner = #1), with their
@@ -347,6 +348,22 @@ export function GameOverScreen({
                 {topTank && topTank.dmgTaken > 0 && <span className="text-sky-300" title={t.net_mvp_tanked}>🛡 {fmt(topTank.dmgTaken)} ({topTank.name.split(" ")[0]})</span>}
                 {topHeal && topHeal.healed > 0 && <span className="text-emerald-300" title={t.net_mvp_healed}>✚ {fmt(topHeal.healed)}</span>}
               </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Game-wide damage summary — totals across all rounds. */}
+      {gameTotals.roundsPlayed > 0 && (() => {
+        const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${Math.round(n)}`);
+        return (
+          <div className="flex flex-col gap-1.5 px-4 py-2.5 rounded-xl border border-sky-500/30 bg-sky-500/[0.07]">
+            <div className="text-[9px] uppercase tracking-wide text-sky-200/60 font-bold">{t.net_summary_label}</div>
+            <div className="flex items-center gap-3 text-[10px] font-bold flex-wrap">
+              <span className="text-rose-300" title={t.net_summary_dealt}>⚔ {fmt(gameTotals.dmgDealt)}</span>
+              <span className="text-sky-300" title={t.net_summary_taken}>🛡 {fmt(gameTotals.dmgTaken)}</span>
+              {gameTotals.healed > 0 && <span className="text-emerald-300" title={t.net_summary_healed}>✚ {fmt(gameTotals.healed)}</span>}
+              <span className="text-slate-300">{t.net_summary_rounds(gameTotals.roundsWon, gameTotals.roundsPlayed)}</span>
             </div>
           </div>
         );

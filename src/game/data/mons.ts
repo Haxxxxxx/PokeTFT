@@ -1093,7 +1093,6 @@ export function archetypeOf(def: UnitDef): Archetype {
  *   · blast   — offensive mages hit EVERY enemy (team nuke) for reduced power
  *   · execute — physical carries deal bonus damage to low-HP targets
  *   · nuke    — default single/splash/line typed burst */
-export type CastEffect = "nuke" | "guard" | "heal" | "blast" | "execute";
 const HEAL_PRIMARY = new Set<PokeType>(["psychic", "fairy", "water", "grass", "normal"]);
 export function castEffectOf(def: UnitDef): CastEffect {
   const arch = archetypeOf(def);

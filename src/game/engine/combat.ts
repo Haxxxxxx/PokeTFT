@@ -6,8 +6,8 @@
  * Output is a list of frames the renderer replays; the sim itself is headless.
  */
 
-import type { UnitInstance, PokeType, Move } from "../types";
-import { getDef, typesForStar, castEffectOf, type CastEffect } from "../data/mons";
+import type { UnitInstance, PokeType, Move, CastEffect } from "../types";
+import { getDef, typesForStar, castEffectOf } from "../data/mons";
 import { effectiveness } from "../data/typeChart";
 import { isMegaActive, megaFormFor } from "../data/mega";
 import { ITEM_EFFECT } from "../data/items";

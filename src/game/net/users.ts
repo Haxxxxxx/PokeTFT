@@ -173,6 +173,8 @@ export type GameResult = {
   lp?: number;
   /** Game-mode id this match was played in (standard, monotype, mega-madness, region-1, …). */
   mode?: string;
+  /** Who eliminated this player (absent for 1st place / old records). */
+  eliminatedBy?: { uid: string; name: string };
 };
 
 /** Record (or idempotently overwrite) a finished game's result for this player. */
