@@ -186,7 +186,12 @@ export function ProfileScreen() {
                             <span className="shrink-0 text-[8px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ color: gm.color, background: `${gm.color}1f` }}>{lang === "fr" ? gm.nameFr : gm.name}</span>
                           ); })()}
                         </div>
-                        <div className="text-[10px] text-slate-500 truncate">{regions}</div>
+                        <div className="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
+                          <span className="truncate">{regions}</span>
+                          {g.eliminatedBy && (
+                            <span className="shrink-0 text-rose-400/70 font-medium">{tr(`· elim. by ${g.eliminatedBy.name}`, `· élim. par ${g.eliminatedBy.name}`)}</span>
+                          )}
+                        </div>
                       </div>
                       {typeof g.lp === "number" && (
                         <span className={`text-[11px] font-extrabold tabular-nums shrink-0 ${g.lp >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
@@ -263,6 +268,20 @@ function MatchDetail({ game, lang, onClose }: { game: GameResult; lang: string; 
           </div>
           <button onClick={onClose} aria-label={t.a_close} className="text-slate-500 hover:text-amber-300 shrink-0"><X size={18} /></button>
         </div>
+
+        {/* Eliminated by / Winner banner */}
+        {game.place === 1 ? (
+          <div className="mb-4 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center gap-2">
+            <Trophy size={14} className="text-amber-400 shrink-0" />
+            <span className="text-[12px] font-bold text-amber-300">{tr("Winner", "Vainqueur")}</span>
+          </div>
+        ) : game.eliminatedBy ? (
+          <div className="mb-4 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center gap-2">
+            <Swords size={14} className="text-rose-400 shrink-0" />
+            <span className="text-[12px] text-slate-400">{tr("Eliminated by", "Éliminé par")}</span>
+            <span className="text-[12px] font-bold text-slate-200 truncate">{game.eliminatedBy.name}</span>
+          </div>
+        ) : null}
 
         {/* Active traits */}
         {traits.length > 0 && (

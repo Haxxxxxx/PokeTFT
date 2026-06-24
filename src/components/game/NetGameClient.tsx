@@ -57,6 +57,7 @@ import { ShopBar } from "./ShopBar";
 import { TraitPanel } from "./TraitPanel";
 import { UnitDetail } from "./UnitDetail";
 import { OptionsMenu } from "./OptionsMenu";
+import { QuickChat } from "./QuickChat";
 import { ItemsPanel } from "./ItemsPanel";
 import { CombatStage } from "./CombatStage";
 import { CoinIcon, PawIcon, SwordIcon, GiftIcon } from "./icons";
@@ -184,6 +185,8 @@ export function NetGameClient() {
   const fillBoard = useGame((s) => s.fillBoard);
   const spawnDrops = useGame((s) => s.spawnDrops);
   const nuzlockePurge = useGame((s) => s.nuzlockePurge);
+  const addRoundStats = useGame((s) => s.addRoundStats);
+  const gameTotals = useGame((s) => s.gameTotals);
 
   // Mouse drags on a 5px move; touch drags on a short press-and-hold so finger
   // scrolling still works on mobile.
@@ -512,6 +515,18 @@ export function NetGameClient() {
       lastFightRef.current = mine;
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (!myCombat.pve) setLastFight({ mine, theirs, oppName: myCombat.oppName ?? t.net_rival });
+    }
+    if (meta && mine.length) {
+      const roundKey = `${meta.stage}-${meta.round}`;
+      if (lastRoundKey.current !== roundKey) {
+        lastRoundKey.current = roundKey;
+        addRoundStats({
+          dmgDealt: mine.reduce((s, u) => s + (u.dmgDealt ?? 0), 0),
+          dmgTaken: mine.reduce((s, u) => s + (u.dmgTaken ?? 0), 0),
+          healed: mine.reduce((s, u) => s + (u.healed ?? 0), 0),
+          won: !!myCombat.won,
+        });
+      }
     }
   }, [combatResult, myCombat?.flip]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1374,7 +1389,7 @@ export function NetGameClient() {
         <GameOverScreen
           players={players} myUid={myUid} me={me} meta={meta} iWon={iWon}
           rankResult={rankResult} lastFightRef={lastFightRef} isHost={isHost}
-          room={room} leave={leave} doubleUp={doubleUp}
+          room={room} leave={leave} doubleUp={doubleUp} gameTotals={gameTotals}
         />
       )}
 
@@ -1386,6 +1401,9 @@ export function NetGameClient() {
         sub={t.net_boot_trainers(connectedHumans, humanPlayers.length)}
         progress={humanPlayers.length ? connectedHumans / humanPlayers.length : 1}
       />}
+      {inMatch && !isSpectator && me?.alive && (
+        <QuickChat code={room.code} myUid={myUid} myName={me.name} />
+      )}
     </DndContext>
   );
 }

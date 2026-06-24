@@ -156,6 +156,22 @@ function alivePlayers(room: Room): RoomPlayer[] {
 function buildHistoryRow(room: Room, uid: string, place: number, total: number, delta: number) {
   const p = room.players?.[uid];
   const board = (p?.board ?? []).filter((u) => u.pos !== null);
+
+  // Who dealt the killing blow? Find the opponent who was paired against this player
+  // in the last combat round — the one whose fight cost them their final HP.
+  // Only set for eliminated players (place > 1); winner has no eliminator.
+  let eliminatedBy: { uid: string; name: string } | undefined;
+  if (place > 1) {
+    const c = room.combat?.[uid];
+    // Only record a real PvP eliminator (not ghost/PvE fights).
+    if (c && !c.ghost && !c.pve && c.oppUid && !c.oppUid.startsWith("bot-")) {
+      const oppPlayer = room.players?.[c.oppUid];
+      if (oppPlayer) {
+        eliminatedBy = { uid: c.oppUid, name: oppPlayer.name ?? "Rival" };
+      }
+    }
+  }
+
   return {
     code: room.code,
     place,
@@ -167,6 +183,7 @@ function buildHistoryRow(room: Room, uid: string, place: number, total: number, 
     lp: delta,
     mode: room.rules?.mode ?? "standard",
     ts: serverNow(),
+    ...(eliminatedBy ? { eliminatedBy } : {}),
   };
 }
 

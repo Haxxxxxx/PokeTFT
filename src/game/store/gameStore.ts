@@ -163,6 +163,10 @@ type State = {
    *  refund, no item recovery — they're gone. Called by the client when the host writes
    *  nuzDead/{uid} at the end of a combat the player lost. */
   nuzlockePurge: (deadIids: string[]) => void;
+  /** Running totals across the whole game — accumulated after each round. */
+  gameTotals: { dmgDealt: number; dmgTaken: number; healed: number; roundsWon: number; roundsPlayed: number };
+  /** Accumulate one round's damage stats into gameTotals. */
+  addRoundStats: (delta: { dmgDealt: number; dmgTaken: number; healed: number; won: boolean }) => void;
 };
 
 // Module-level RNG so the store stays serialisable; reseeded on newGame.
@@ -183,6 +187,7 @@ export const useGame = create<State>((set, get) => ({
   items: [],
   drops: [],
   augments: [],
+  gameTotals: { dmgDealt: 0, dmgTaken: 0, healed: 0, roundsWon: 0, roundsPlayed: 0 },
 
   benchUnits: () => get().units.filter((u) => u.pos === null),
   boardUnits: () => get().units.filter((u) => u.pos !== null),
@@ -210,6 +215,7 @@ export const useGame = create<State>((set, get) => ({
       // Game-mode starting items (region signature Emblem + item, Mega Madness stone).
       streak: 0, units, frozen: false, items: startItems ? [...startItems] : [], drops: [], augments: [],
       shop: rollShop(1, pool, rng, unitsByCost),
+      gameTotals: { dmgDealt: 0, dmgTaken: 0, healed: 0, roundsWon: 0, roundsPlayed: 0 },
     });
   },
 
@@ -699,6 +705,11 @@ export const useGame = create<State>((set, get) => ({
     // an existing pair) — if it still wouldn't fit, abort without mutating anything.
     if (units.filter((u) => u.pos === null).length > BENCH_SIZE) { toast("Bench full", "Banc plein"); return; }
     set({ units, items: [...state.items, ...dropped], pension: null, pool });
+  },
+
+  addRoundStats: ({ dmgDealt, dmgTaken, healed, won }) => {
+    const t = get().gameTotals;
+    set({ gameTotals: { dmgDealt: t.dmgDealt + dmgDealt, dmgTaken: t.dmgTaken + dmgTaken, healed: t.healed + healed, roundsWon: t.roundsWon + (won ? 1 : 0), roundsPlayed: t.roundsPlayed + 1 } });
   },
 
   nuzlockePurge: (deadIids) => {

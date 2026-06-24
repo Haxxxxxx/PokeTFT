@@ -4,14 +4,15 @@ import { useEffect } from "react";
 import { useUi } from "@/game/store/uiStore";
 import { useGame } from "@/game/store/gameStore";
 import { useAppStore } from "@/game/store/appStore";
-import { getDef, spriteUrl, archetypeOf, castEffectOf, typesForStar, type Archetype, type CastEffect } from "@/game/data/mons";
+import { getDef, spriteUrl, archetypeOf, castEffectOf, typesForStar, type Archetype } from "@/game/data/mons";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { ITEM_POOL, RARITY_COLOR } from "@/game/data/itemPool";
 import { ITEM_EFFECT } from "@/game/data/items";
 import { ItemGlyph } from "./ItemGlyph";
 import { megaFormFor, MEGA_STONE } from "@/game/data/mega";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
-import type { PokeType } from "@/game/types";
+import { TYPES, effectiveness } from "@/game/data/typeChart";
+import type { PokeType, CastEffect } from "@/game/types";
 import {
   HeartIcon, SwordIcon, DpsIcon, SpeedIcon, ShieldIcon, MagicIcon,
   TargetIcon, ManaIcon, TierIcon, StarIcon, CoinIcon, CloseIcon, InfoIcon, MegaIcon,
@@ -270,6 +271,9 @@ function Card() {
         </div>
         );
       })()}
+
+      {/* Type Matchups — move coverage + defensive weaknesses/resistances */}
+      <TypeMatchups moveType={def.move.type} monTypes={typesForStar(def, star)} lang={lang} />
     </div>
   );
 }
@@ -308,6 +312,131 @@ function HeldItems({ iid }: { iid?: string }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/** Type Matchups section — move coverage and defensive weaknesses/resists. */
+function TypeMatchups({ moveType, monTypes, lang }: { moveType: PokeType; monTypes: PokeType[]; lang: string }) {
+  // Move coverage: how moveType hits each of the 18 types (single defender)
+  const superVs: PokeType[] = [];
+  const notVeryVs: PokeType[] = [];
+  const immuneVs: PokeType[] = [];
+  for (const defender of TYPES) {
+    const mult = effectiveness(moveType, [defender]);
+    if (mult >= 2) superVs.push(defender);
+    else if (mult > 0 && mult < 1) notVeryVs.push(defender);
+    else if (mult === 0) immuneVs.push(defender);
+  }
+
+  // Defensive matchups: what each of the 18 attacking types does to this mon
+  const weakTo: PokeType[] = [];
+  const resistsFrom: PokeType[] = [];
+  const immuneFrom: PokeType[] = [];
+  for (const attacker of TYPES) {
+    const mult = effectiveness(attacker, monTypes);
+    if (mult >= 2) weakTo.push(attacker);
+    else if (mult > 0 && mult < 1) resistsFrom.push(attacker);
+    else if (mult === 0) immuneFrom.push(attacker);
+  }
+
+  const hasCoverage = superVs.length > 0 || notVeryVs.length > 0 || immuneVs.length > 0;
+  const hasDefense = weakTo.length > 0 || resistsFrom.length > 0 || immuneFrom.length > 0;
+  if (!hasCoverage && !hasDefense) return null;
+
+  const isEn = lang !== "fr";
+
+  return (
+    <div className="mx-3 mb-3 rounded-lg border border-slate-700/50 bg-slate-800/30 overflow-hidden">
+      <div className="px-2.5 py-1.5 border-b border-slate-700/40 bg-slate-800/60">
+        <span className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
+          {isEn ? "Type Matchups" : "Compatibilités"}
+        </span>
+      </div>
+      <div className="p-2.5 flex flex-col gap-2">
+        {/* Move coverage */}
+        {hasCoverage && (
+          <div>
+            <div className="text-[9px] uppercase tracking-wide text-slate-500 mb-1 flex items-center gap-1">
+              <Badge color={TYPE_COLOR[moveType]} text={traitLabel(moveType)} solid />
+              <span>{isEn ? "move hits" : "capacité touche"}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              {superVs.length > 0 && (
+                <MatchupRow
+                  label={isEn ? "2× vs" : "2× contre"}
+                  labelColor="#4ade80"
+                  types={superVs}
+                />
+              )}
+              {notVeryVs.length > 0 && (
+                <MatchupRow
+                  label={isEn ? "½× vs" : "½× contre"}
+                  labelColor="#f87171"
+                  types={notVeryVs}
+                />
+              )}
+              {immuneVs.length > 0 && (
+                <MatchupRow
+                  label={isEn ? "0× vs" : "0× contre"}
+                  labelColor="#64748b"
+                  types={immuneVs}
+                />
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Divider between the two halves */}
+        {hasCoverage && hasDefense && (
+          <div className="border-t border-slate-700/40" />
+        )}
+
+        {/* Defensive matchups */}
+        {hasDefense && (
+          <div>
+            <div className="text-[9px] uppercase tracking-wide text-slate-500 mb-1">
+              {isEn ? "As a defender" : "En défense"}
+            </div>
+            <div className="flex flex-col gap-1">
+              {weakTo.length > 0 && (
+                <MatchupRow
+                  label={isEn ? "Weak to" : "Faible à"}
+                  labelColor="#f87171"
+                  types={weakTo}
+                />
+              )}
+              {resistsFrom.length > 0 && (
+                <MatchupRow
+                  label={isEn ? "Resists" : "Résiste"}
+                  labelColor="#4ade80"
+                  types={resistsFrom}
+                />
+              )}
+              {immuneFrom.length > 0 && (
+                <MatchupRow
+                  label={isEn ? "Immune" : "Immunisé"}
+                  labelColor="#94a3b8"
+                  types={immuneFrom}
+                />
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MatchupRow({ label, labelColor, types }: { label: string; labelColor: string; types: PokeType[] }) {
+  return (
+    <div className="flex items-start gap-1.5">
+      <span className="text-[9px] font-semibold shrink-0 mt-0.5 w-14 text-right" style={{ color: labelColor }}>{label}</span>
+      <div className="flex flex-wrap gap-0.5">
+        {types.map((tp) => (
+          <Badge key={tp} color={TYPE_COLOR[tp]} text={traitLabel(tp)} solid />
+        ))}
       </div>
     </div>
   );

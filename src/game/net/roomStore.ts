@@ -159,6 +159,8 @@ export type Room = {
    *  Written by the host in endCombat; the client reads and purges them at the next
    *  planning round, then the node is wiped at the start of the next combat. */
   nuzDead?: Record<string, string[]>;
+  /** Ephemeral quick-chat messages (auto-deleted after 4 s). Keyed by timestamp. */
+  chat?: Record<string, { uid: string; name: string; msg: string; t: number }>;
 };
 
 /** Lightweight discovery entry for the game browser (lobbies/{code}). */
