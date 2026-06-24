@@ -124,6 +124,10 @@
           }
         },
 
+        "nuzDead": {
+          ".write": "auth != null && root.child('games').child($code).child('meta/hostUid').val() === auth.uid"
+        },
+
         "players": {
           "$uid": {
             ".write": "auth != null && ($uid === auth.uid || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)",
@@ -138,6 +142,21 @@
             "place": {
               ".write": "auth != null && root.child('games').child($code).child('meta/hostUid').val() === auth.uid",
               ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 1 && newData.val() <= 8)"
+            },
+            "streak": {
+              ".write": "auth != null && root.child('games').child($code).child('meta/hostUid').val() === auth.uid",
+              ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= -20 && newData.val() <= 20)"
+            },
+            "botMem": {
+              ".write": "auth != null && root.child('games').child($code).child('meta/hostUid').val() === auth.uid",
+              "$type": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10" }
+            },
+            "lastOpp": {
+              ".write": "auth != null && root.child('games').child($code).child('meta/hostUid').val() === auth.uid",
+              ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 32)"
+            },
+            "carouselPicked": {
+              ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)"
             },
             "level": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10" },
             "gold":  { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 999)" },
