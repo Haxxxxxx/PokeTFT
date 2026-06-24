@@ -34,7 +34,7 @@ export default function PrivacyPage() {
               <li><span className="text-slate-200">Current game</span> — the room code of your active match (shown to friends only)</li>
               <li><span className="text-slate-200">Account creation date</span></li>
             </ul>
-            <p className="mt-3 text-slate-500">Guest (anonymous) accounts store no email. They get a temporary UID and a generated display name. Guest progress is not linked to any account — it cannot be recovered after sign-out.</p>
+            <p className="mt-3 text-slate-500">Guest (anonymous) accounts store no email. They get a temporary UID and a generated display name. If you sign up with a new email/password or link your Google account while still playing as a guest, your guest stats and history carry over to the new account — the UID is preserved. If you sign in to an existing account, the guest session ends and that account&apos;s data is used instead.</p>
           </section>
 
           <section>
