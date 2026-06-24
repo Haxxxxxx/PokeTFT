@@ -3,13 +3,13 @@
  *  room's `rules.mode`. Everything here is pure data + deterministic helpers so host and
  *  clients always agree (combat determinism).
  *
- *  Two families today:
+ *  Two families:
  *   • REGION modes — lock the roster to one region and hand every trainer that region's
  *     signature synergy (a trait Emblem) + a signature item, so each region plays with
  *     its own identity.
- *   • GIMMICK modes — rule twists: Mono-Type, Mega Madness, Treasure Hunt.
- *
- *  Double Up (2v2) is a separate, larger effort and is intentionally NOT here yet. */
+ *   • GIMMICK modes — rule twists: Mono-Type, Mega Madness, Treasure Hunt, Double Up,
+ *     Hyper Roll (fast games, cost 1-3 only, 50 HP), Legendary Clash (cost 4-5 only,
+ *     150 HP), and Nuzlocke (units that die are permanently lost). */
 
 import type { PokeType } from "../types";
 import type { TeamBuff } from "../engine/combat";
@@ -26,6 +26,14 @@ export type GameModeFlags = {
   treasure?: boolean;
   /** 2v2: players pair into teams sharing ONE HP pool; combat pairs across teams. */
   doubleUp?: boolean;
+  /** Fast-paced mode: shop restricted to cost 1-3 units only. */
+  hyperRoll?: boolean;
+  /** Elite mode: shop restricted to cost 4-5 units only. */
+  legendaryClash?: boolean;
+  /** Permadeath: units that die in combat are permanently lost after the round. */
+  nuzlocke?: boolean;
+  /** PvE loot multiplier override (stacks on top of the base treasure flag). */
+  lootScale?: number;
 };
 
 export type GameMode = {
@@ -39,7 +47,7 @@ export type GameMode = {
   /** Accent colour for the lobby chip. */
   color: string;
   /** Rule overrides forced when this mode is picked (e.g. a region forces its gen). */
-  rulesPatch?: { generations?: number[]; draftPoolSize?: number };
+  rulesPatch?: { generations?: number[]; draftPoolSize?: number; startingHp?: number };
   /** Engine behaviour flags. */
   flags?: GameModeFlags;
   /** Region signature: the gen it locks, the synergy Emblem + item every trainer gets. */
@@ -137,6 +145,32 @@ export const MODES: GameMode[] = [
     descFr: "Formez des équipes de 2 partageant une barre de PV. Combattez entre équipes — la dernière debout gagne.",
     group: "gimmick", color: "#34d399", flags: { doubleUp: true },
   },
+  {
+    id: "hyper-roll",
+    name: "Hyper Roll", nameFr: "Hyper Roulette",
+    desc: "Faster rounds. Smaller boards. The best team at the right time wins.",
+    descFr: "Tours plus rapides. Équipes plus petites. La meilleure équipe au bon moment gagne.",
+    group: "gimmick", color: "#f472b6",
+    rulesPatch: { startingHp: 50, draftPoolSize: 25 },
+    flags: { hyperRoll: true, lootScale: 1.5 },
+  },
+  {
+    id: "legendary-clash",
+    name: "Legendary Clash", nameFr: "Clash Légendaire",
+    desc: "Only powerful Pokémon. Every fight is a clash of legends.",
+    descFr: "Uniquement des Pokémon puissants. Chaque combat est un choc de légendes.",
+    group: "gimmick", color: "#a78bfa",
+    rulesPatch: { startingHp: 150 },
+    flags: { legendaryClash: true, lootScale: 1.5 },
+  },
+  {
+    id: "nuzlocke",
+    name: "Nuzlocke", nameFr: "Nuzlocke",
+    desc: "If a Pokémon faints in combat, it's gone forever. Choose every battle wisely.",
+    descFr: "Si un Pokémon tombe au combat, il est perdu pour toujours. Chaque combat compte.",
+    group: "gimmick", color: "#ef4444",
+    flags: { nuzlocke: true },
+  },
 ];
 
 export const MODE_BY_ID: Record<string, GameMode> = Object.fromEntries(MODES.map((m) => [m.id, m]));
@@ -191,9 +225,12 @@ export function modeRoundItem(rules: RoomRulesLike | undefined): string | null {
   return getMode(rules?.mode).flags?.megaMadness ? MEGA_STONE : null;
 }
 
-/** PvE loot multiplier for the mode (Treasure Hunt pours out more). */
+/** PvE loot multiplier for the mode (Treasure Hunt pours out more; other modes may set a
+ *  custom lootScale flag). */
 export function modeLootScale(rules: RoomRulesLike | undefined): number {
-  return getMode(rules?.mode).flags?.treasure ? 2.5 : 1;
+  const flags = getMode(rules?.mode).flags;
+  if (flags?.treasure) return 2.5;
+  return flags?.lootScale ?? 1;
 }
 
 /** The region modifier's team-wide combat buff (folded into every fight in a Region
@@ -228,6 +265,21 @@ export function modeBossName(rules: RoomRulesLike | undefined): string {
 /** True if this room is a 2v2 Double Up game. */
 export function isDoubleUp(rules: RoomRulesLike | undefined): boolean {
   return !!getMode(rules?.mode).flags?.doubleUp;
+}
+
+/** True if the shop should be restricted to cost 1-3 units (Hyper Roll). */
+export function isHyperRoll(rules: RoomRulesLike | undefined): boolean {
+  return !!getMode(rules?.mode).flags?.hyperRoll;
+}
+
+/** True if the shop should be restricted to cost 4-5 units (Legendary Clash). */
+export function isLegendaryClash(rules: RoomRulesLike | undefined): boolean {
+  return !!getMode(rules?.mode).flags?.legendaryClash;
+}
+
+/** True if units that die in combat are permanently removed (Nuzlocke). */
+export function isNuzlocke(rules: RoomRulesLike | undefined): boolean {
+  return !!getMode(rules?.mode).flags?.nuzlocke;
 }
 
 /** Pair players into deterministic teams of 2 (sorted by uid so host + clients agree).
