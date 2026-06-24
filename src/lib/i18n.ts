@@ -141,8 +141,9 @@ export type Dict = {
   a_signin_sub: string; a_google: string; a_or: string; a_email: string; a_password: string;
   a_signin: string; a_create_account: string; a_no_account: string; a_have_account: string;
   a_forgot: string; a_username_rule: string; a_continue: string; a_signout: string;
+  a_guest_play: string; a_guest_note: string; a_guest_signin_warn: string;
   // Profile editor + tile
-  pe_title: string; pe_guest: string; pe_username: string; pe_avatar: string; pe_done: string;
+  pe_title: string; pe_guest: string; pe_upgrade: string; pe_username: string; pe_avatar: string; pe_done: string;
   pe_delete: string; pe_delete_confirm: string; pe_delete_forever: string; pe_cancel: string;
   pt_view: string; pt_games: string; pt_wins: string; pt_best: string;
   // Friends
@@ -371,7 +372,8 @@ export const FR: Dict = {
   a_signin_sub: "Connecte-toi pour jouer avec tes amis", a_google: "Continuer avec Google", a_or: "ou", a_email: "E-mail", a_password: "Mot de passe (6+ car.)",
   a_signin: "Se connecter", a_create_account: "Créer un compte", a_no_account: "Pas de compte ? Créez-en un", a_have_account: "Déjà un compte ? Connectez-vous",
   a_forgot: "Mot de passe oublié ?", a_username_rule: "3–16 lettres, chiffres ou tiret bas.", a_continue: "Continuer", a_signout: "Se déconnecter",
-  pe_title: "Modifier le profil", pe_guest: "Compte invité", pe_username: "Nom d'utilisateur", pe_avatar: "Avatar", pe_done: "Terminé",
+  a_guest_play: "Jouer comme invité", a_guest_note: "Ta progression sera perdue à la déconnexion.", a_guest_signin_warn: "Tu joues en tant qu'invité — cette connexion mettra fin à ta session.",
+  pe_title: "Modifier le profil", pe_guest: "Compte invité", pe_upgrade: "Créer un compte pour sauvegarder ta progression", pe_username: "Nom d'utilisateur", pe_avatar: "Avatar", pe_done: "Terminé",
   pe_delete: "Supprimer le compte", pe_delete_confirm: "Cela supprime définitivement ton compte, ton rang et ton historique. Es-tu sûr ?", pe_delete_forever: "Supprimer définitivement", pe_cancel: "Annuler",
   pt_view: "Voir le profil", pt_games: "Parties", pt_wins: "Victoires", pt_best: "Meilleur",
   fr_title: "Amis", fr_create_acct: "Crée un compte pour ajouter des amis et rejoindre leurs parties.", fr_add_ph: "Ajouter par nom", fr_add: "Ajouter", fr_empty: "Aucun ami — ajoute quelqu'un par son nom.",
@@ -580,7 +582,8 @@ export const EN: Dict = {
   a_signin_sub: "Sign in to play with friends", a_google: "Continue with Google", a_or: "or", a_email: "Email", a_password: "Password (6+ chars)",
   a_signin: "Sign in", a_create_account: "Create account", a_no_account: "No account? Create one", a_have_account: "Already have an account? Sign in",
   a_forgot: "Forgot password?", a_username_rule: "3–16 letters, numbers or underscore.", a_continue: "Continue", a_signout: "Sign out",
-  pe_title: "Edit profile", pe_guest: "Guest account", pe_username: "Username", pe_avatar: "Avatar", pe_done: "Done",
+  a_guest_play: "Play as Guest", a_guest_note: "Progress won't be saved after sign-out.", a_guest_signin_warn: "You're currently a guest — signing in will end your guest session.",
+  pe_title: "Edit profile", pe_guest: "Guest account", pe_upgrade: "Create an account to save your progress", pe_username: "Username", pe_avatar: "Avatar", pe_done: "Done",
   pe_delete: "Delete account", pe_delete_confirm: "This permanently deletes your account, rank and history. Are you sure?", pe_delete_forever: "Delete forever", pe_cancel: "Cancel",
   pt_view: "View profile", pt_games: "Games", pt_wins: "Wins", pt_best: "Best",
   fr_title: "Friends", fr_create_acct: "Create an account to add friends and quick-join their games.", fr_add_ph: "Add by username", fr_add: "Add", fr_empty: "No friends yet — add someone by their username.",

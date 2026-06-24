@@ -5,9 +5,9 @@ import { useAuth } from "@/game/net/authStore";
 import { useT } from "@/lib/i18n";
 import { AuthShell } from "./AuthShell";
 
-export function SignInScreen() {
+export function SignInScreen({ overlayMode, onClose }: { overlayMode?: boolean; onClose?: () => void } = {}) {
   const t = useT();
-  const { signInGoogle, signInEmail, signUpEmail, resetPassword, error, notice, busy } = useAuth();
+  const { signInGoogle, signInAnonymous, signInEmail, signUpEmail, resetPassword, error, notice, busy, user } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -20,8 +20,8 @@ export function SignInScreen() {
 
   const inputCls = "w-full bg-white/[0.03] border border-white/10 rounded-lg px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50 transition-colors";
 
-  return (
-    <AuthShell subtitle={t.a_signin_sub}>
+  const content = (
+    <>
       <button
         onClick={signInGoogle}
         disabled={busy}
@@ -32,6 +32,12 @@ export function SignInScreen() {
       </button>
 
       <div className="flex items-center gap-3 text-[11px] uppercase tracking-widest text-slate-600"><span className="flex-1 h-px bg-slate-800" />{t.a_or}<span className="flex-1 h-px bg-slate-800" /></div>
+
+      {mode === "signin" && user?.isAnonymous && (
+        <p className="text-[11px] text-amber-400 text-center bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 leading-snug">
+          {t.a_guest_signin_warn}
+        </p>
+      )}
 
       <div className="flex flex-col gap-2.5">
         <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder={t.a_email} className={inputCls} />
@@ -55,6 +61,20 @@ export function SignInScreen() {
       {error && <p className="text-xs text-rose-400 text-center">{error}</p>}
       {notice && <p className="text-xs text-emerald-400 text-center">{notice}</p>}
 
+      {!overlayMode && (
+        <>
+          <div className="flex items-center gap-3 text-[11px] uppercase tracking-widest text-slate-600"><span className="flex-1 h-px bg-slate-800" />{t.a_or}<span className="flex-1 h-px bg-slate-800" /></div>
+          <button
+            onClick={signInAnonymous}
+            disabled={busy}
+            className="w-full py-2 rounded-lg text-[12px] text-slate-400 hover:text-slate-200 border border-slate-800 hover:border-slate-700 transition-colors disabled:opacity-40"
+          >
+            {t.a_guest_play}
+          </button>
+          <p className="text-[10px] text-slate-600 text-center -mt-2">{t.a_guest_note}</p>
+        </>
+      )}
+
       <p className="text-[10px] text-slate-600 text-center leading-relaxed">
         By continuing you agree to our{" "}
         <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-slate-300 underline underline-offset-2 transition-colors">
@@ -62,6 +82,29 @@ export function SignInScreen() {
         </a>
         . We store only what&apos;s needed to run multiplayer.
       </p>
+    </>
+  );
+
+  if (overlayMode) {
+    return (
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-5" onClick={onClose}>
+        <div className="w-full max-w-[348px] panel rounded-xl px-7 py-8 flex flex-col gap-5 relative" onClick={(e) => e.stopPropagation()}>
+          {onClose && (
+            <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 text-xl leading-none">×</button>
+          )}
+          <div className="flex flex-col items-center gap-1">
+            <h2 className="font-bold tracking-tight text-xl text-slate-100">Save your progress</h2>
+            <p className="text-slate-500 text-[12px] text-center leading-relaxed">Your guest stats carry over when you create an account.</p>
+          </div>
+          {content}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <AuthShell subtitle={t.a_signin_sub}>
+      {content}
     </AuthShell>
   );
 }

@@ -29,6 +29,9 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 export function AppRoot() {
   const initAuth = useAuth((s) => s.init);
   const authStatus = useAuth((s) => s.status);
+  const upgradeModalOpen = useAuth((s) => s.upgradeModalOpen);
+  const closeUpgradeModal = useAuth((s) => s.closeUpgradeModal);
+  const user = useAuth((s) => s.user);
   const code = useRoom((s) => s.code);
   const room = useRoom((s) => s.room);
   const spectator = useRoom((s) => s.spectator);
@@ -52,6 +55,8 @@ export function AppRoot() {
   }, []);
   // Only try to reconnect to a saved room once we're authenticated.
   useEffect(() => { if (authStatus === "ready") reconnect(); }, [authStatus, reconnect]);
+  // Auto-close the upgrade modal once the user has linked an account (no longer anonymous).
+  useEffect(() => { if (upgradeModalOpen && user && !user.isAnonymous) closeUpgradeModal(); }, [upgradeModalOpen, user, closeUpgradeModal]);
 
   // Was a game in progress before a refresh? Show the loader until reconnect
   // resolves, so we never flash the home screen on the way back into a match.
@@ -82,6 +87,11 @@ export function AppRoot() {
       {/* Learn-by-doing coach for a brand-new trainer's first match (self-dismissing).
           Never for spectators — they have no board of their own to coach. */}
       {inMatch && !spectator && <FirstMatchCoach />}
+      {/* Upgrade modal: shown when a guest taps "Create Account" in ProfileEditor.
+          SignInScreen's link/signUp flows carry the anonymous UID over so stats are preserved. */}
+      {upgradeModalOpen && user?.isAnonymous && (
+        <SignInScreen overlayMode onClose={closeUpgradeModal} />
+      )}
     </ErrorBoundary>
   );
 }
