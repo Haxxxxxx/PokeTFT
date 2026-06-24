@@ -4,7 +4,7 @@ import { create } from "zustand";
 import {
   onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
   signInWithCredential, linkWithPopup, linkWithCredential, EmailAuthProvider,
-  signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously,
   sendPasswordResetEmail, deleteUser,
   signOut as fbSignOut, type User, type AuthError,
 } from "firebase/auth";
@@ -37,8 +37,11 @@ type AuthState = {
   notice: string | null;
   busy: boolean;
 
+  upgradeModalOpen: boolean;
+
   init: () => void;
   signInGoogle: () => Promise<void>;
+  signInAnonymous: () => Promise<void>;
   signInEmail: (email: string, pw: string) => Promise<void>;
   signUpEmail: (email: string, pw: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -48,6 +51,8 @@ type AuthState = {
   setAvatar: (photoURL: string) => Promise<void>;
   addFriendByName: (name: string) => Promise<{ ok: boolean; error?: string }>;
   unfriend: (uid: string) => Promise<void>;
+  openUpgradeModal: () => void;
+  closeUpgradeModal: () => void;
 };
 
 let inited = false;
@@ -80,6 +85,7 @@ export const useAuth = create<AuthState>((set, get) => ({
   error: null,
   notice: null,
   busy: false,
+  upgradeModalOpen: false,
 
   init: () => {
     if (inited) return;
@@ -198,6 +204,13 @@ export const useAuth = create<AuthState>((set, get) => ({
     set({ busy: false });
   },
 
+  signInAnonymous: async () => {
+    set({ busy: true, error: null, notice: null });
+    try { await signInAnonymously(auth()); }
+    catch (e) { set({ error: authErr(e) }); }
+    finally { set({ busy: false }); }
+  },
+
   signInEmail: async (email, pw) => {
     set({ busy: true, error: null });
     try { await signInWithEmailAndPassword(auth(), email.trim(), pw); }
@@ -309,4 +322,7 @@ export const useAuth = create<AuthState>((set, get) => ({
     const { user } = get();
     if (user) await removeFriendRT(user.uid, uid);
   },
+
+  openUpgradeModal: () => set({ upgradeModalOpen: true, error: null, notice: null }),
+  closeUpgradeModal: () => set({ upgradeModalOpen: false }),
 }));

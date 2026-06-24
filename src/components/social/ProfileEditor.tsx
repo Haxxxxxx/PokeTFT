@@ -12,7 +12,7 @@ const AVATARS = AVATAR_DEX.map(spriteUrl);
 
 export function ProfileEditor({ onClose }: { onClose: () => void }) {
   const t = useT();
-  const { profile, user, saveUsername, setAvatar, deleteAccount, error, busy } = useAuth();
+  const { profile, user, saveUsername, setAvatar, deleteAccount, openUpgradeModal, error, busy } = useAuth();
   const isGuest = user?.isAnonymous ?? false;
   const [name, setName] = useState(profile?.username ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -45,6 +45,19 @@ export function ProfileEditor({ onClose }: { onClose: () => void }) {
             <div className="text-[11px] text-slate-500">{isGuest ? t.pe_guest : user?.email}</div>
           </div>
         </div>
+
+        {/* Guest upgrade CTA */}
+        {isGuest && (
+          <div className="flex flex-col gap-1.5 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <p className="text-[11px] text-amber-300 leading-snug">{t.pe_upgrade}</p>
+            <button
+              onClick={() => { onClose(); openUpgradeModal(); }}
+              className="text-[11px] text-amber-400 underline underline-offset-2 text-left hover:text-amber-300 transition-colors"
+            >
+              {t.a_create_account} →
+            </button>
+          </div>
+        )}
 
         {/* Username */}
         <div className="flex flex-col gap-1.5">
