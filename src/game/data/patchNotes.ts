@@ -12,6 +12,18 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    id: "2026-06-25",
+    version: "v0.7",
+    title: { en: "Guest play, account security & tighter rules", fr: "Jeu invité, sécurité du compte & règles renforcées" },
+    changes: [
+      { en: "Play as Guest — jump in with one click, no account required. Your stats carry over if you create an account later.", fr: "Jouer en invité — rejoins en un clic, sans compte. Tes stats sont conservées si tu crées un compte par la suite." },
+      { en: "Guest upgrade flow: create an account from your profile without losing your rank or match history.", fr: "Conversion de compte invité : crée un compte depuis ton profil sans perdre ton rang ni ton historique." },
+      { en: "Security hardening: streak bonuses, bot memory and matchmaking fields are now server-authoritative — no more client-side exploits.", fr: "Sécurité renforcée : les bonus de série, la mémoire des bots et les champs de matchmaking sont désormais gérés côté serveur." },
+      { en: "Nuzlocke mode fixed: elimination writes now go through correctly when you're hosting.", fr: "Mode Nuzlocke corrigé : les écrits d'élimination passent désormais correctement quand tu es hôte." },
+      { en: "Desktop & mobile app (Tauri): Google sign-in now works on the game subdomain.", fr: "Application desktop & mobile (Tauri) : la connexion Google fonctionne désormais sur le sous-domaine du jeu." },
+    ],
+  },
+  {
     id: "2026-06-21",
     version: "v0.6",
     title: { en: "Game Modes, Double Up & smarter AI", fr: "Modes de jeu, Duo & IA plus maligne" },
