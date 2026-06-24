@@ -99,6 +99,39 @@ export const AUGMENTS: Augment[] = [
   { id: "sig-alola",  name: "Alola Mind",        nameFr: "Esprit Alola",      desc: "+22% Ability Power & +10 start mana.", descFr: "+22% Att. Spé & +10 mana de départ.",  kind: "passive", tier: "gold", combat: { apMult: 1.22, manaStart: 10 } },
   { id: "sig-galar",  name: "Galar Resolve",     nameFr: "Détermination Galar", desc: "+16% Attack & +18% Crit.",          descFr: "+16% Attaque & +18% Critique.",         kind: "passive", tier: "gold", combat: { adMult: 1.16, critAdd: 0.18 } },
   { id: "sig-paldea", name: "Paldea Paradox",    nameFr: "Paradoxe Paldea",   desc: "+12% Attack & AP, 12% lifesteal.",    descFr: "+12% Attaque & Att. Spé, 12% vol de vie.", kind: "passive", tier: "gold", combat: { adMult: 1.12, apMult: 1.12, lifeSteal: 0.12 } },
+
+  // ── New augments — armor-pen, burn, stun, regen, manaPerAttack, econ+item combos ──
+
+  // ── Silver ────────────────────────────────────────────────────────────────
+  { id: "hustle",        name: "Hustle",           nameFr: "Hustle",            desc: "Your team ignores 12% enemy Armor.",          descFr: "Votre équipe ignore 12% de l'Armure ennemie.",        kind: "passive", tier: "silver", combat: { armorPen: 0.12 } },
+  { id: "rattled",       name: "Rattled",          nameFr: "Tremblote",         desc: "Your team has a 10% chance to stun on hit.",  descFr: "Votre équipe a 10% de chance d'étourdir à chaque frappe.", kind: "passive", tier: "silver", combat: { stunChance: 0.10 } },
+  { id: "iron-fist",     name: "Iron Fist",        nameFr: "Poing de Fer",      desc: "Your team regenerates 1% max HP per second.", descFr: "Votre équipe régénère 1% de ses PV max par seconde.", kind: "passive", tier: "silver", combat: { regenPerSec: 0.010 } },
+  { id: "mana-flow",     name: "Mana Flow",        nameFr: "Flux de Mana",      desc: "Your team gains +8 mana per attack.",         descFr: "Votre équipe gagne +8 mana par attaque.",             kind: "passive", tier: "silver", combat: { manaPerAttack: 8 } },
+  { id: "scrappy",       name: "Scrappy",          nameFr: "Bagarreur",         desc: "+4 gold and a random component now.",         descFr: "+4 or et un objet composant aléatoire immédiatement.", kind: "instant", tier: "silver" },
+  { id: "field-prep",    name: "Field Prep",       nameFr: "Préparation",       desc: "+3 XP and a random component now.",           descFr: "+3 XP et un objet composant aléatoire immédiatement.", kind: "instant", tier: "silver" },
+
+  // ── Gold ──────────────────────────────────────────────────────────────────
+  { id: "sniper",        name: "Sniper",           nameFr: "Tireur d'Élite",    desc: "Your team ignores 20% enemy Armor.",          descFr: "Votre équipe ignore 20% de l'Armure ennemie.",        kind: "passive", tier: "gold", combat: { armorPen: 0.20 } },
+  { id: "ember-aura",    name: "Ember Aura",       nameFr: "Aura Braise",       desc: "Your team deals burn damage (3% HP/s).",      descFr: "Votre équipe inflige des brûlures (3% PV/s).",        kind: "passive", tier: "gold", combat: { burnDps: 0.03 } },
+  { id: "sand-veil",     name: "Sand Veil",        nameFr: "Voile Sable",       desc: "Your team has a 15% chance to stun on hit.",  descFr: "Votre équipe a 15% de chance d'étourdir à chaque frappe.", kind: "passive", tier: "gold", combat: { stunChance: 0.15 } },
+  { id: "swift-swim",    name: "Swift Swim",       nameFr: "Nage Vive",         desc: "Your team regenerates 1.5% max HP per second.", descFr: "Votre équipe régénère 1.5% de ses PV max par seconde.", kind: "passive", tier: "gold", combat: { regenPerSec: 0.015 } },
+  { id: "technician",    name: "Technician",       nameFr: "Technicien",        desc: "Your team gains +12 mana per attack.",        descFr: "Votre équipe gagne +12 mana par attaque.",            kind: "passive", tier: "gold", combat: { manaPerAttack: 12 } },
+  { id: "defiant",       name: "Defiant",          nameFr: "Défi",              desc: "+16% Attack & ignores 14% enemy Armor.",      descFr: "+16% Attaque & ignore 14% de l'Armure ennemie.",      kind: "passive", tier: "gold", combat: { adMult: 1.16, armorPen: 0.14 } },
+  { id: "gale-wings",    name: "Gale Wings",       nameFr: "Ailes Bourrasque",  desc: "+22% Attack Speed & +10 mana per attack.",    descFr: "+22% Vitesse d'attaque & +10 mana par attaque.",      kind: "passive", tier: "gold", combat: { asMult: 1.22, manaPerAttack: 10 } },
+  { id: "gear-shift",    name: "Gear Shift",       nameFr: "Changement de Vitesse", desc: "+8 gold and a random completed item now.", descFr: "+8 or et un objet complet aléatoire immédiatement.", kind: "instant", tier: "gold" },
+  { id: "scholar-cache", name: "Scholar's Cache",  nameFr: "Cache de l'Érudit", desc: "+6 XP and a random completed item now.",      descFr: "+6 XP et un objet complet aléatoire immédiatement.", kind: "instant", tier: "gold" },
+  { id: "loot-frenzy",   name: "Loot Frenzy",      nameFr: "Frénésie de Butin", desc: "+5 gold, +4 XP, and a random item now.",      descFr: "+5 or, +4 XP et un objet aléatoire immédiatement.",  kind: "instant", tier: "gold" },
+
+  // ── Prismatic ─────────────────────────────────────────────────────────────
+  { id: "sheer-force",   name: "Sheer Force",      nameFr: "Force Pure",        desc: "Your team ignores 30% enemy Armor & deals burn damage (3% HP/s).", descFr: "Votre équipe ignore 30% Armure & inflige des brûlures (3% PV/s).", kind: "passive", tier: "prismatic", combat: { armorPen: 0.30, burnDps: 0.03 } },
+  { id: "moxie",         name: "Moxie",            nameFr: "Moxie",             desc: "+28% Attack, +20% Crit & ignores 20% enemy Armor.", descFr: "+28% Attaque, +20% Crit & ignore 20% de l'Armure ennemie.", kind: "passive", tier: "prismatic", combat: { adMult: 1.28, critAdd: 0.20, armorPen: 0.20 } },
+  { id: "torrent",       name: "Torrent",          nameFr: "Torrent",           desc: "+35% Ability Power & +16 mana per attack.",   descFr: "+35% Att. Spé & +16 mana par attaque.",               kind: "passive", tier: "prismatic", combat: { apMult: 1.35, manaPerAttack: 16 } },
+  { id: "blaze",         name: "Blaze",            nameFr: "Brasier",           desc: "+26% Ability Power, burn (3% HP/s) & +20% Attack Speed.", descFr: "+26% Att. Spé, brûlures (3% PV/s) & +20% Vitesse.", kind: "passive", tier: "prismatic", combat: { apMult: 1.26, burnDps: 0.03, asMult: 1.20 } },
+  { id: "overgrow",      name: "Overgrow",         nameFr: "Enracine",          desc: "+28% Health, 2% HP/s regen & +25 Armor & MR.", descFr: "+28% PV, 2% PV/s regen & +25 Déf & Déf Spé.",       kind: "passive", tier: "prismatic", combat: { hpMult: 1.28, regenPerSec: 0.020, armorAdd: 25, mrAdd: 25 } },
+  { id: "competitive",   name: "Competitive",      nameFr: "Compétitif",        desc: "+25% Attack, +22% Crit & 20% stun chance.",  descFr: "+25% Attaque, +22% Crit & 20% chance d'étourdir.",    kind: "passive", tier: "prismatic", combat: { adMult: 1.25, critAdd: 0.22, stunChance: 0.20 } },
+  { id: "motherlode",    name: "Motherlode",       nameFr: "Filon Principal",   desc: "+20 gold right now.",                         descFr: "+20 or immédiatement.",                               kind: "instant", tier: "prismatic" },
+  { id: "master-class",  name: "Master Class",     nameFr: "Classe Maître",     desc: "+14 XP and a random Emblem now.",             descFr: "+14 XP et un emblème de trait aléatoire.",            kind: "instant", tier: "prismatic" },
+  { id: "grand-archive", name: "Grand Archive",    nameFr: "Grande Archive",    desc: "3 random completed items and +6 gold now.",   descFr: "3 objets complets et +6 or immédiatement.",           kind: "instant", tier: "prismatic" },
 ];
 
 export const AUGMENT_BY_ID: Record<string, Augment> = Object.fromEntries(AUGMENTS.map((a) => [a.id, a]));
@@ -121,10 +154,14 @@ export function teamBuffForAugments(ids: string[] | undefined | null): TeamBuff 
     if (c.mrAdd) buff.mrAdd = (buff.mrAdd ?? 0) + c.mrAdd;
     if (c.critAdd) buff.critAdd = (buff.critAdd ?? 0) + c.critAdd;
     if (c.manaStart) buff.manaStart = (buff.manaStart ?? 0) + c.manaStart;
-    // lifeSteal does NOT stack additively — the highest source wins (matches the item
-    // layer in combat.ts). If a 2nd lifeSteal augment is ever added, taking both grants
-    // only the larger, by design.
+    // lifeSteal, armorPen, burnDps, stunChance — take the highest source, not additive.
     if (c.lifeSteal) buff.lifeSteal = Math.max(buff.lifeSteal ?? 0, c.lifeSteal);
+    if (c.armorPen) buff.armorPen = Math.max(buff.armorPen ?? 0, c.armorPen);
+    if (c.burnDps) buff.burnDps = Math.max(buff.burnDps ?? 0, c.burnDps);
+    if (c.stunChance) buff.stunChance = Math.max(buff.stunChance ?? 0, c.stunChance);
+    // regenPerSec and manaPerAttack stack additively.
+    if (c.regenPerSec) buff.regenPerSec = (buff.regenPerSec ?? 0) + c.regenPerSec;
+    if (c.manaPerAttack) buff.manaPerAttack = (buff.manaPerAttack ?? 0) + c.manaPerAttack;
   }
   // Hard ceilings on the folded buff. A legit 3-augment stack peaks around ~1.7x / +47
   // armor, so these never touch real play — but they bound a fabricated or future
@@ -139,6 +176,11 @@ export function teamBuffForAugments(ids: string[] | undefined | null): TeamBuff 
   if (buff.critAdd) buff.critAdd = Math.min(0.5, buff.critAdd);
   if (buff.manaStart) buff.manaStart = Math.min(40, buff.manaStart);
   if (buff.lifeSteal) buff.lifeSteal = Math.min(0.4, buff.lifeSteal);
+  if (buff.armorPen) buff.armorPen = Math.min(0.5, buff.armorPen);
+  if (buff.burnDps) buff.burnDps = Math.min(0.08, buff.burnDps);
+  if (buff.stunChance) buff.stunChance = Math.min(0.4, buff.stunChance);
+  if (buff.regenPerSec) buff.regenPerSec = Math.min(0.05, buff.regenPerSec);
+  if (buff.manaPerAttack) buff.manaPerAttack = Math.min(20, buff.manaPerAttack);
   return buff;
 }
 
@@ -154,6 +196,11 @@ function capBuff(buff: TeamBuff): TeamBuff {
   if (buff.critAdd) buff.critAdd = Math.min(0.5, buff.critAdd);
   if (buff.manaStart) buff.manaStart = Math.min(40, buff.manaStart);
   if (buff.lifeSteal) buff.lifeSteal = Math.min(0.4, buff.lifeSteal);
+  if (buff.armorPen) buff.armorPen = Math.min(0.5, buff.armorPen);
+  if (buff.burnDps) buff.burnDps = Math.min(0.08, buff.burnDps);
+  if (buff.stunChance) buff.stunChance = Math.min(0.4, buff.stunChance);
+  if (buff.regenPerSec) buff.regenPerSec = Math.min(0.05, buff.regenPerSec);
+  if (buff.manaPerAttack) buff.manaPerAttack = Math.min(20, buff.manaPerAttack);
   return buff;
 }
 
@@ -173,6 +220,11 @@ export function combineTeamBuffs(...buffs: (TeamBuff | undefined | null)[]): Tea
     if (b.critAdd) out.critAdd = (out.critAdd ?? 0) + b.critAdd;
     if (b.manaStart) out.manaStart = (out.manaStart ?? 0) + b.manaStart;
     if (b.lifeSteal) out.lifeSteal = Math.max(out.lifeSteal ?? 0, b.lifeSteal);
+    if (b.armorPen) out.armorPen = Math.max(out.armorPen ?? 0, b.armorPen);
+    if (b.burnDps) out.burnDps = Math.max(out.burnDps ?? 0, b.burnDps);
+    if (b.stunChance) out.stunChance = Math.max(out.stunChance ?? 0, b.stunChance);
+    if (b.regenPerSec) out.regenPerSec = (out.regenPerSec ?? 0) + b.regenPerSec;
+    if (b.manaPerAttack) out.manaPerAttack = (out.manaPerAttack ?? 0) + b.manaPerAttack;
   }
   return capBuff(out);
 }

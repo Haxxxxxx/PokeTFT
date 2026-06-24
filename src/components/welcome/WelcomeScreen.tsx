@@ -15,7 +15,7 @@ import { HowToPlay } from "@/components/HowToPlay";
 import { NewsModal, hasUnseenNews, markNewsSeen } from "@/components/NewsModal";
 import { PokeballIcon } from "@/components/game/icons";
 import { isNativeShell } from "@/game/net/nativeShell";
-import { Swords, Trophy, Megaphone, AlertTriangle, Download } from "lucide-react";
+import { Swords, Trophy, Megaphone, AlertTriangle, Download, Users, Zap, Star, Shield } from "lucide-react";
 import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 
@@ -105,13 +105,13 @@ export function WelcomeScreen() {
       <header className="flex items-center justify-between gap-3 px-4 sm:px-6 h-14 border-b border-white/[0.06] bg-slate-950/40 backdrop-blur shrink-0">
         <div className="flex items-center gap-2.5">
           <span className="text-gold drop-shadow-[0_0_8px_rgba(212,175,55,0.5)]"><PokeballIcon size={26} /></span>
-          <span className="font-extrabold tracking-tight text-xl">Poké<span className="gild-text">TFT</span></span>
+          <span className="font-extrabold tracking-tight text-xl drop-shadow-[0_0_12px_rgba(212,175,55,0.3)]">Poké<span className="gild-text">TFT</span></span>
         </div>
         <div className="flex items-center gap-4">
           <button onClick={() => setLeaderboardOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-amber-300 uppercase tracking-wide"><Trophy size={13} /> {lang === "fr" ? "Classement" : "Ranks"}</button>
           <button onClick={openNews} aria-label={lang === "fr" ? "Nouveautés" : "What's new"} className="relative inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-emerald-300 uppercase tracking-wide"><Megaphone size={13} /> {lang === "fr" ? "Actus" : "News"}{unseenNews && <span className="absolute -top-1 -right-2 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}</button>
           <button onClick={() => setHowTo(true)} className="text-xs font-bold text-slate-400 hover:text-sky-300 uppercase tracking-wide">{t.w_how_to_play}</button>
-          {showGetApp && <a href="/download" className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:text-amber-300 uppercase tracking-wide"><Download size={13} /> {lang === "fr" ? "App" : "Get app"}</a>}
+          {showGetApp && <a href="/download" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/8 text-xs font-bold text-amber-400 hover:text-amber-300 hover:border-amber-400/60 hover:bg-amber-500/12 uppercase tracking-wide transition-colors"><Download size={13} /> {lang === "fr" ? "Télécharger" : "Get app"}</a>}
           {/* Profile chip */}
           <div className="flex items-center gap-2.5 pl-3 border-l border-slate-800">
             <span className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0">
@@ -162,16 +162,38 @@ export function WelcomeScreen() {
               {heroMons.map((m, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img key={i} src={spriteUrl(m.dex)} alt="" width={m.size} height={m.size}
-                  className="absolute hero-float" style={{ left: m.x, top: m.y, width: m.size, ["--r" as string]: `${m.rot}deg`, imageRendering: "pixelated", opacity: 0.06, filter: "saturate(1.05)", animationDelay: `${i * 0.6}s` }} />
+                  className="absolute hero-float" style={{ left: m.x, top: m.y, width: m.size, ["--r" as string]: `${m.rot}deg`, imageRendering: "pixelated", opacity: 0.13, filter: "saturate(1.3) drop-shadow(0 0 18px rgba(212,175,55,0.22))", animationDelay: `${i * 0.6}s` }} />
               ))}
             </div>
 
             <div className="text-center relative z-10">
-              <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full border border-amber-500/30 bg-amber-500/5 text-[10px] font-extrabold uppercase tracking-[0.18em] text-amber-300/80">
+              {/* Built in 48h badge */}
+              <div className="inline-flex items-center gap-1.5 mb-3 px-3 py-1 rounded-full border border-amber-500/35 bg-amber-500/6 text-[10px] font-extrabold uppercase tracking-[0.15em] text-amber-300">
+                <Zap size={10} className="shrink-0" /> Built in 48 hours · Open source fan project
+              </div>
+              <h1 className="font-bold tracking-tight text-3xl sm:text-5xl text-slate-100 drop-shadow-[0_2px_16px_rgba(212,175,55,0.15)]">{t.w_hero_title}</h1>
+              <p className="text-slate-400 text-[14px] mt-2 font-semibold tracking-wide">206 Pokémon · Type effectiveness · Live multiplayer · Free</p>
+              <p className="text-slate-600 text-[12px] mt-1.5">{t.w_subtitle}</p>
+              {/* Lobbies live pill */}
+              <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1 rounded-full border border-emerald-500/25 bg-emerald-500/5 text-[10px] font-extrabold uppercase tracking-[0.18em] text-emerald-400/80">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> {lobbies.length} {lobbies.length === 1 ? "lobby" : "lobbies"} live
               </div>
-              <h1 className="font-bold tracking-tight text-3xl sm:text-5xl text-slate-100">{t.w_hero_title}</h1>
-              <p className="text-slate-500 text-[13px] mt-2.5">{t.w_subtitle}</p>
+            </div>
+
+            {/* Feature highlights strip */}
+            <div className="flex flex-wrap justify-center gap-2 relative z-10">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full gilded text-[11px] font-bold text-amber-300/90 tracking-wide">
+                <Star size={11} /> 206 Pokémon · Gen I–IX
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full gilded text-[11px] font-bold text-sky-300/90 tracking-wide">
+                <Shield size={11} /> Type effectiveness
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full gilded text-[11px] font-bold text-purple-300/90 tracking-wide">
+                <Zap size={11} /> Mega Evolutions
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full gilded text-[11px] font-bold text-emerald-300/90 tracking-wide">
+                <Users size={11} /> 8-player live
+              </span>
             </div>
 
             <div className="flex flex-col items-center gap-3 w-full max-w-sm">
@@ -227,6 +249,11 @@ export function WelcomeScreen() {
           </div>
         </aside>
       </div>
+
+      {/* Footer */}
+      <footer className="w-full py-3 border-t border-white/[0.04] text-center">
+        <p className="text-xs text-slate-700">PokéTFT — fan project · Not affiliated with Nintendo or Game Freak · Open source</p>
+      </footer>
 
       {editProfile && <ProfileEditor onClose={() => setEditProfile(false)} />}
       {howTo && <HowToPlay onClose={() => setHowTo(false)} />}

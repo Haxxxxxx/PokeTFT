@@ -152,6 +152,16 @@ export type TeamBuff = {
   critAdd?: number;
   manaStart?: number;
   lifeSteal?: number;
+  /** Fraction of enemy armor to ignore (0–1). Takes the highest source, like lifesteal. */
+  armorPen?: number;
+  /** Burn damage applied per second as a fraction of target max HP. */
+  burnDps?: number;
+  /** Probability (0–1) to stun the target on each hit. */
+  stunChance?: number;
+  /** HP regeneration per second as a fraction of max HP. */
+  regenPerSec?: number;
+  /** Extra mana gained per attack (additive across sources). */
+  manaPerAttack?: number;
 };
 
 /** Per-surviving-unit player-damage weight: ★ value + a carry bonus for 4/5-costs. */
@@ -248,6 +258,11 @@ function toCombatant(u: UnitInstance, team: Team, buff?: TeamBuff): Combatant {
     critAdd += buff.critAdd ?? 0;
     manaAdd += buff.manaStart ?? 0;
     lifeSteal = Math.max(lifeSteal, buff.lifeSteal ?? 0);
+    armorPen = Math.max(armorPen, buff.armorPen ?? 0);
+    burnDps = Math.max(burnDps, buff.burnDps ?? 0);
+    stunChance = Math.max(stunChance, buff.stunChance ?? 0);
+    regen += buff.regenPerSec ?? 0;
+    manaPerAtk += buff.manaPerAttack ?? 0;
   }
   ad = Math.round(ad * adMult);
   hp = Math.round(hp * hpMult);

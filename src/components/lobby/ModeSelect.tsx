@@ -3,16 +3,19 @@
 import { usePreLobby } from "@/game/store/preLobbyStore";
 import { MODES, getMode } from "@/game/data/gameModes";
 import { useAppStore } from "@/game/store/appStore";
-import { Swords, Sparkles, Gem, Users, Palette, Crown, ChevronRight, Check, type LucideIcon } from "lucide-react";
+import { Swords, Sparkles, Gem, Users, Palette, Crown, ChevronRight, Check, Zap, Shield, Skull, type LucideIcon } from "lucide-react";
 
 /** Icon + one-line tagline per primary (non-region) mode. The full description lives in the
  *  footer for whichever mode is selected, keeping the cards short. */
 const MODE_META: Record<string, { icon: LucideIcon; tag: string; tagFr: string }> = {
-  standard:       { icon: Swords,   tag: "8 players · classic",     tagFr: "8 joueurs · classique" },
-  monotype:       { icon: Palette,  tag: "One shared type",         tagFr: "Un type partagé" },
-  "mega-madness": { icon: Sparkles, tag: "Mega every round",        tagFr: "Méga chaque tour" },
-  treasure:       { icon: Gem,      tag: "PvE showers loot",        tagFr: "Le PvE pleut du butin" },
-  "double-up":    { icon: Users,    tag: "2v2 · shared HP",         tagFr: "2c2 · PV partagés" },
+  standard:           { icon: Swords,   tag: "8 players · classic",      tagFr: "8 joueurs · classique" },
+  monotype:           { icon: Palette,  tag: "One shared type",           tagFr: "Un type partagé" },
+  "mega-madness":     { icon: Sparkles, tag: "Mega every round",          tagFr: "Méga chaque tour" },
+  treasure:           { icon: Gem,      tag: "PvE showers loot",          tagFr: "Le PvE pleut du butin" },
+  "double-up":        { icon: Users,    tag: "2v2 · shared HP",           tagFr: "2c2 · PV partagés" },
+  "hyper-roll":       { icon: Zap,      tag: "50 HP · cost 1-3 only",     tagFr: "50 PV · coût 1-3 seul." },
+  "legendary-clash":  { icon: Shield,   tag: "150 HP · cost 4-5 only",    tagFr: "150 PV · coût 4-5 seul." },
+  nuzlocke:           { icon: Skull,    tag: "Fainted = gone forever",     tagFr: "K.O. = perdu à jamais" },
 };
 
 export function ModeSelect({ isHost, onContinue }: { isHost: boolean; onContinue: () => void }) {

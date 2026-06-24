@@ -589,7 +589,10 @@ export function NetGameClient() {
   }, [phase, spectate, myUid, reroll, buyXp, sell]);
 
   // When you're eliminated, default to watching the current leader.
+  const prevAliveRef = useRef<boolean | undefined>(undefined);
   useEffect(() => {
+    if (me && !me.alive && prevAliveRef.current === true) sfx.eliminate();
+    prevAliveRef.current = me?.alive;
     if (me && !me.alive && !spectate) {
       const leader = Object.values(players).filter((p) => p.alive && p.uid !== myUid).sort((a, b) => b.hp - a.hp)[0];
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -683,6 +686,8 @@ export function NetGameClient() {
       const hadTopBot = all.some((p) => p.isBot && (p.botDifficulty === "ultimate" || p.botDifficulty === "nightmare"));
       if (won && hadTopBot) recordUltimateBotWin(myUid).catch(() => {});
     }
+    // Fire round-start SFX when the phase flips to combat.
+    if (phase === "combat" && prevPhase.current === "planning") sfx.roundStart();
     prevPhase.current = phase ?? null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, myUid ? room?.players?.[myUid]?.place : null, myUid ? room?.players?.[myUid]?.alive : null]);
@@ -702,6 +707,12 @@ export function NetGameClient() {
   }, [serverResultCode, myUid]);
 
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // Float-up text: "+X gold" or "−X HP" shown briefly near the HUD on econ events.
+  const [floatText, setFloatText] = useState<string | null>(null);
+  const floatKey = useRef(0);
+  // Screen-flash: brief red glow on the board container when taking HP damage.
+  const [boardFlash, setBoardFlash] = useState(false);
+
   // Stage-up announce — flash a "Stage N" banner whenever the stage increments.
   const [stageBanner, setStageBanner] = useState<number | null>(null);
   const prevStage = useRef<number | null>(null);
@@ -716,6 +727,48 @@ export function NetGameClient() {
     const id = setTimeout(() => setStageBanner(null), 2200);
     return () => clearTimeout(id);
   }, [stageBanner]);
+
+  // Level-up SFX: fire when the local level increases (buyXp or netRound passive XP).
+  const prevLevelRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (isSpectator) return;
+    if (prevLevelRef.current !== null && level > prevLevelRef.current) sfx.levelUp();
+    prevLevelRef.current = level;
+  }, [level, isSpectator]);
+
+  // Gold-gain SFX + float-up text: fire when gold increases (income, interest, augments).
+  const prevGoldRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (isSpectator) return;
+    if (prevGoldRef.current !== null && gold > prevGoldRef.current) {
+      sfx.goldGain();
+      const diff = gold - prevGoldRef.current;
+      floatKey.current += 1;
+      setFloatText(`+${diff}`);
+      const id = setTimeout(() => setFloatText(null), 1200);
+      prevGoldRef.current = gold;
+      return () => clearTimeout(id);
+    }
+    prevGoldRef.current = gold;
+  }, [gold, isSpectator]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // HP damage SFX + screen-flash + float-up text: fire when the player's HP decreases.
+  const prevHpRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (isSpectator || !me) return;
+    const hp = me.hp ?? 100;
+    if (prevHpRef.current !== null && hp < prevHpRef.current) {
+      sfx.damage();
+      setBoardFlash(true);
+      const diff = prevHpRef.current - hp;
+      floatKey.current += 1;
+      setFloatText(`−${diff} HP`);
+      const id = setTimeout(() => { setBoardFlash(false); setFloatText(null); }, 1200);
+      prevHpRef.current = hp;
+      return () => clearTimeout(id);
+    }
+    prevHpRef.current = hp;
+  }, [me?.hp, isSpectator]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A partial/glitched room sync (room present but meta/myUid briefly missing) used to
   // render a bare blank canvas with no way out. Show a reconnecting veil with an escape
@@ -790,6 +843,7 @@ export function NetGameClient() {
         useUi.getState().pushToast(t.net_no_mega);
       } else if (unit) {
         equipItem(unit.iid, itemId);
+        sfx.itemEquip();
       }
       return;
     }
@@ -1133,7 +1187,13 @@ export function NetGameClient() {
               never move — only the units on the field and what's interactive
               change. A `board-swap` fade plays when the view changes (phase flip
               or landing on a rival's / your own board). */}
-          <div className="relative min-w-0" style={{ height: CENTER_H }}>
+          <div className={`relative min-w-0 rounded-xl${boardFlash ? " screen-flash" : ""}`} style={{ height: CENTER_H }}>
+            {/* Float-up text for HP damage or gold gain feedback. */}
+            {floatText && (
+              <div key={floatKey.current} className={`float-up absolute top-4 left-1/2 -translate-x-1/2 z-30 text-sm font-extrabold drop-shadow pointer-events-none select-none ${floatText.startsWith("−") ? "text-rose-300" : "text-amber-300"}`}>
+                {floatText}
+              </div>
+            )}
             {spectating ? (
               <div key={`spec-${spectate}`} className="board-swap absolute inset-0 flex flex-col gap-2">
                 <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 shrink-0">
