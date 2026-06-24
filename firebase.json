@@ -12,55 +12,70 @@
       "anonymous": true
     }
   },
-  "hosting": {
-    "site": "poketft-arena",
-    "public": "out",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [
-      {
-        "comment": "Serve the static native-auth bridge page (out/native-auth.html). Without this, the catch-all below rewrites /native-auth to the game's index.html — the static export emits native-auth.html, not native-auth/index.html, and there's no cleanUrls.",
-        "source": "/native-auth",
-        "destination": "/native-auth.html"
-      },
-      {
-        "comment": "Same: serve the static download/landing page instead of the SPA catch-all.",
-        "source": "/download",
-        "destination": "/download.html"
-      },
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ],
-    "headers": [
-      {
-        "comment": "Default: never cache (covers the SPA routes that serve index.html via the rewrite, e.g. '/'). A stale index.html points at old JS chunks → the rules-not-applying bug.",
-        "source": "**",
-        "headers": [
-          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
-        ]
-      },
-      {
-        "comment": "Hashed build assets are immutable — safe to cache forever. Listed LAST so it overrides the catch-all for these paths (Firebase: last match wins).",
-        "source": "/_next/static/**",
-        "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-        ]
-      },
-      {
-        "comment": "Mirrored Pokémon sprites — a given dex's sprite never changes, so cache forever (overrides the no-cache catch-all). This replaced flaky raw.githubusercontent.com loads.",
-        "source": "/sprites/**",
-        "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-        ]
-      },
-      {
-        "comment": "Mirrored Pokémon cries (audio) — content-stable, cache forever. Replaced flaky raw.githubusercontent.com loads.",
-        "source": "/cries/**",
-        "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-        ]
-      }
-    ]
-  }
+  "hosting": [
+    {
+      "target": "landing",
+      "public": "out-landing",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "headers": [
+        {
+          "source": "**",
+          "headers": [
+            { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "game",
+      "public": "out",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "rewrites": [
+        {
+          "comment": "Serve the static native-auth bridge page.",
+          "source": "/native-auth",
+          "destination": "/native-auth.html"
+        },
+        {
+          "comment": "Serve the static download page.",
+          "source": "/download",
+          "destination": "/download.html"
+        },
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ],
+      "headers": [
+        {
+          "comment": "Default: never cache — stale index.html points at old JS chunks.",
+          "source": "**",
+          "headers": [
+            { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+          ]
+        },
+        {
+          "comment": "Hashed build assets are immutable.",
+          "source": "/_next/static/**",
+          "headers": [
+            { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+          ]
+        },
+        {
+          "comment": "Mirrored Pokémon sprites.",
+          "source": "/sprites/**",
+          "headers": [
+            { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+          ]
+        },
+        {
+          "comment": "Mirrored Pokémon cries (audio).",
+          "source": "/cries/**",
+          "headers": [
+            { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+          ]
+        }
+      ]
+    }
+  ]
 }

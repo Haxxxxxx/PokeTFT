@@ -1,7 +1,7 @@
 "use client";
 
 /** The hosted origin the native shell loads + bounces auth through. */
-export const HOSTED_ORIGIN = "https://poketft-arena.web.app";
+export const HOSTED_ORIGIN = "https://game-poketft-arena.web.app";
 
 /** Path the Rust shell intercepts (on_navigation) to open the system browser. */
 export const NATIVE_GOOGLE_SENTINEL = `${HOSTED_ORIGIN}/__native-google`;
