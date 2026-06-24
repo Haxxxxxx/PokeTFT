@@ -9,6 +9,8 @@ import { applyCombines, makeInstance } from "../engine/combine";
 import { MEGA_STONE, canMega } from "../data/mega";
 import { ITEM_POOL, ITEM_BY_ID, COMPONENT_IDS, COMPLETED_IDS, EMBLEM_IDS, EMBLEM_TRAIT, RECIPES, combineKey, isComponent, isEmblem } from "../data/itemPool";
 import { AUGMENT_BY_ID } from "../data/augments";
+import { isHyperRoll, isLegendaryClash } from "../data/gameModes";
+import type { RoomRules } from "../net/roomStore";
 import { useUi } from "./uiStore";
 import { useAppStore } from "./appStore";
 
@@ -112,7 +114,7 @@ type State = {
   boardUnits: () => UnitInstance[];
 
   // actions
-  newGame: (allowedIds?: string[], enabledItems?: string[], startItems?: string[]) => void;
+  newGame: (allowedIds?: string[], enabledItems?: string[], startItems?: string[], rules?: RoomRules) => void;
   reroll: () => void;
   buyXp: () => void;
   buyUnit: (slot: number) => void;
@@ -192,12 +194,15 @@ export const useGame = create<State>((set, get) => ({
   benchUnits: () => get().units.filter((u) => u.pos === null),
   boardUnits: () => get().units.filter((u) => u.pos !== null),
 
-  newGame: (allowedIds?: string[], enabledItems?: string[], startItems?: string[]) => {
+  newGame: (allowedIds?: string[], enabledItems?: string[], startItems?: string[], rules?: RoomRules) => {
     // Fresh, independent randomness each game (and per player) — not a fixed seed,
     // so every player's shop rolls differently.
     rng = makeRng((Math.floor(Math.random() * 0x7fffffff) ^ Date.now()) >>> 0);
     const pool = makePool(allowedIds);
     const unitsByCost = makeUnitsByCost(allowedIds);
+    // Hyper Roll: only cost 1-3 offered in shop. Legendary Clash: only cost 3-5.
+    if (isHyperRoll(rules)) { unitsByCost[4] = []; unitsByCost[5] = []; }
+    else if (isLegendaryClash(rules)) { unitsByCost[1] = []; unitsByCost[2] = []; }
     // One free starter, auto-placed on the front row, so the opening PvE round is
     // never an empty board. The first PvE rounds are kept deliberately soft (see
     // generateCreepBoard) so this single mon can win them.

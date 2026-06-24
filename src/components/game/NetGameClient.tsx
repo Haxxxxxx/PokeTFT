@@ -8,7 +8,7 @@ import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS, CAROUSEL_MS } from "@/game/net/match";
 import { simulate, type FrameUnit } from "@/game/engine/combat";
 import { getDef, spriteUrl, hasDef, archetypeOf } from "@/game/data/mons";
-import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, modeTeamBuff, modeSignatureAugment, getMode, pickMonoType, isDoubleUp, isNuzlocke } from "@/game/data/gameModes";
+import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, modeTeamBuff, modeSignatureAugment, getMode, pickMonoType, isDoubleUp, isNuzlocke, isHyperRoll, isLegendaryClash } from "@/game/data/gameModes";
 import { streakGold, roundKind, advanceRound, boardSizeForLevel, cumulativeRound, ECONOMY } from "@/game/config";
 import { serializeBoard, saveGhost, type GhostUnit } from "@/game/net/ghost";
 import { interest } from "@/game/engine/economy";
@@ -388,7 +388,7 @@ export function NetGameClient() {
       // save can still heal it via the self-heal branch below — a slow priv read can
       // never permanently wipe an in-progress game.
       if (save) { importSave({ ...save, units: asUnits(save.units) }, roster(), enabledItems); hydrated.current = "save"; }
-      else { newGame(roster(), enabledItems, modeStartItems(room.rules)); hydrated.current = "fresh"; ghostSnaps.current = {}; }
+      else { newGame(roster(), enabledItems, modeStartItems(room.rules), room.rules); hydrated.current = "fresh"; ghostSnaps.current = {}; }
       // Mark the current planning round consumed so netRound doesn't double-grant it.
       lastRoundKey.current = phase === "planning" ? `${meta.stage}-${meta.round}` : "__hydrated__";
       return;
@@ -1103,6 +1103,18 @@ export function NetGameClient() {
             <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md border border-red-500/40 text-[11px] font-bold text-red-400 bg-red-500/10"
               title="Nuzlocke: units that die in combat are permanently lost">
               ☠ Permadeath
+            </span>
+          )}
+          {isHyperRoll(room.rules) && (
+            <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md border border-yellow-500/40 text-[11px] font-bold text-yellow-300 bg-yellow-500/10"
+              title="Hyper Roll: shop only offers cost 1–3 units; 50 starting HP">
+              ⚡ Hyper Roll
+            </span>
+          )}
+          {isLegendaryClash(room.rules) && (
+            <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md border border-purple-500/40 text-[11px] font-bold text-purple-300 bg-purple-500/10"
+              title="Legendary Clash: shop only offers cost 3–5 units; 150 starting HP">
+              ★ Legendary
             </span>
           )}
           {doubleUp && partner && (
