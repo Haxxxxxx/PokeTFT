@@ -6,7 +6,7 @@ import { generatePlayerLikeBoard, generateCreepBoard, generateBossBoard, pickCar
 import { type CompStats, type TypeAffinity, metaWeights, counterAffinity, accrueComp, accrueAffinity, rememberLoss, activeTraitKeys } from "../engine/botBrain";
 import { hasDef } from "../data/mons";
 import { itemsArray } from "./rtdb-utils";
-import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem, modeLootScale, isDoubleUp, assignTeams, getMode } from "../data/gameModes";
+import { rosterForRoom, modeTeamBuff, modeBossId, modeBossName, modeCarouselItem, modeLootScale, isDoubleUp, assignTeams, getMode, isNuzlocke } from "../data/gameModes";
 import { loadGhost, ghostBoardForRound } from "./ghost";
 import { advanceRound, stageBaseDamage, cumulativeRound, roundKind } from "../config";
 import { weightedRatingDelta, START_RATING } from "../rating";
@@ -786,6 +786,30 @@ export async function endCombat(code: string, room: Room): Promise<void> {
           }
         }
       }
+    }
+
+    // Nuzlocke: permanently remove any unit that died in this combat. A player's
+    // selfBoard went into the fight; if they LOST (or drew), every unit on that board
+    // is dead for good. Write the dead iids to nuzDead/{uid} — the client reads this
+    // at the start of the next planning round and purges those units from its local
+    // save. Written as ONE whole-node value (not per-child keys) to avoid an
+    // ancestor/descendant path conflict in the same atomic update (same rule as teams).
+    if (isNuzlocke(room.rules)) {
+      const nuzDeadNode: Record<string, string[]> | null = (() => {
+        const entries: Record<string, string[]> = {};
+        for (const uid of aliveUids) {
+          const p = room.players[uid];
+          const c = combat[uid];
+          // Only human players own a client-side save; bots don't need this.
+          if (!p || p.isBot || !c || c.pve || c.ghost) continue;
+          if (!c.won && Array.isArray(c.selfBoard) && c.selfBoard.length) {
+            const deadIids = (c.selfBoard as UnitInstance[]).map((unit) => unit.iid).filter(Boolean);
+            if (deadIids.length) entries[uid] = deadIids;
+          }
+        }
+        return Object.keys(entries).length ? entries : null;
+      })();
+      u["nuzDead"] = nuzDeadNode;
     }
 
     let surviving = aliveUids.filter((uid) => hpAfter[uid] > 0);

@@ -159,6 +159,10 @@ type State = {
   depositToPension: (iid: string) => void;
   /** Pension: retrieve a matured mon (back to the bench, one star higher). */
   collectPension: () => void;
+  /** Nuzlocke mode: permanently remove units whose iids appear in `deadIids`. No gold
+   *  refund, no item recovery — they're gone. Called by the client when the host writes
+   *  nuzDead/{uid} at the end of a combat the player lost. */
+  nuzlockePurge: (deadIids: string[]) => void;
 };
 
 // Module-level RNG so the store stays serialisable; reseeded on newGame.
@@ -695,5 +699,19 @@ export const useGame = create<State>((set, get) => ({
     // an existing pair) — if it still wouldn't fit, abort without mutating anything.
     if (units.filter((u) => u.pos === null).length > BENCH_SIZE) { toast("Bench full", "Banc plein"); return; }
     set({ units, items: [...state.items, ...dropped], pension: null, pool });
+  },
+
+  nuzlockePurge: (deadIids) => {
+    if (!deadIids.length) return;
+    const dead = new Set(deadIids);
+    const state = get();
+    const survivors = state.units.filter((u) => !dead.has(u.iid));
+    if (survivors.length === state.units.length) return; // nothing to purge
+    // Return the dead units' copies to the shop pool so scarcity stays consistent.
+    const pool = { ...state.pool };
+    for (const u of state.units.filter((unit) => dead.has(unit.iid))) {
+      returnToPool(pool, u.defId, u.star === 1 ? 1 : u.star === 2 ? 3 : 9);
+    }
+    set({ units: survivors, pool });
   },
 }));

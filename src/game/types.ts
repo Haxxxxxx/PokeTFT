@@ -25,6 +25,9 @@ export type StatBlock = {
   /** Mana needed to cast the move; starting mana. */
   maxMana: number;
   startMana: number;
+  /** Innate crit bonus added on top of the 20% base (items + traits also stack here).
+   *  Use for mons whose lore centres on critical hits (e.g. Scyther, Shedinja). */
+  critAdd?: number;
 };
 
 export type Move = {
@@ -58,7 +61,19 @@ export type UnitDef = {
   stageNames: [string, string, string];
   stats: StatBlock;
   move: Move;
+  /** Optional per-mon override for ability flavour. When set, overrides the
+   *  archetype-derived default in castEffectOf() so curated mons can have a
+   *  unique combat signature without touching the generated pool. */
+  castEffect?: CastEffect;
 };
+
+/** Ability-cast flavour — how a unit's signature move plays out in combat.
+ *   · guard   — tanks heal themselves on cast (sustain frontline)
+ *   · heal    — supportive mages mend the most-wounded ally
+ *   · blast   — offensive mages hit EVERY enemy for reduced power (team nuke)
+ *   · execute — physical carries deal bonus damage to low-HP targets
+ *   · nuke    — default single/splash/line typed burst */
+export type CastEffect = "nuke" | "guard" | "heal" | "blast" | "execute";
 
 /** A live instance of a unit on a board or bench. */
 export type UnitInstance = {
@@ -98,6 +113,8 @@ export type TraitBuff = {
   stunChance?: number;     // chance to stun a victim on ability hit
   freezeChance?: number;   // chance to freeze a victim on ability hit
   statusImmune?: boolean;  // immune to burn/stun/freeze
+  manaStart?: number;      // bonus mana at combat start (additive with manaAdd)
+  manaPerAttack?: number;  // extra mana gained per auto-attack
 };
 
 /** One activation tier of a trait: how many units, what it grants (text + buff). */

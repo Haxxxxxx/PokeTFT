@@ -8,7 +8,7 @@ import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS, CAROUSEL_MS } from "@/game/net/match";
 import { simulate, type FrameUnit } from "@/game/engine/combat";
 import { getDef, spriteUrl, hasDef, archetypeOf } from "@/game/data/mons";
-import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, modeTeamBuff, modeSignatureAugment, getMode, pickMonoType, isDoubleUp } from "@/game/data/gameModes";
+import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, modeTeamBuff, modeSignatureAugment, getMode, pickMonoType, isDoubleUp, isNuzlocke } from "@/game/data/gameModes";
 import { streakGold, roundKind, advanceRound, boardSizeForLevel, cumulativeRound, ECONOMY } from "@/game/config";
 import { serializeBoard, saveGhost, type GhostUnit } from "@/game/net/ghost";
 import { interest } from "@/game/engine/economy";
@@ -183,6 +183,7 @@ export function NetGameClient() {
   const level = useGame((s) => s.level);
   const fillBoard = useGame((s) => s.fillBoard);
   const spawnDrops = useGame((s) => s.spawnDrops);
+  const nuzlockePurge = useGame((s) => s.nuzlockePurge);
 
   // Mouse drags on a 5px move; touch drags on a short press-and-hold so finger
   // scrolling still works on mobile.
@@ -407,6 +408,14 @@ export function NetGameClient() {
     // Game-mode round grants (Mega Madness stone, Treasure Hunt loot) ride along too.
     netRound(meta.stage, meta.round, me?.streak ?? 0, (me?.streak ?? 0) > 0,
       { roundItem: modeRoundItem(room.rules), lootScale: modeLootScale(room.rules) });
+
+    // Nuzlocke: permanently remove any unit the host flagged as dead this round.
+    // The host writes nuzDead/{uid} in endCombat for every loser's board units; we
+    // read it once here and purge — no gold back, they're gone for good.
+    if (myUid && isNuzlocke(room.rules)) {
+      const deadIids: string[] = room.nuzDead?.[myUid] ?? [];
+      if (deadIids.length) nuzlockePurge(deadIids);
+    }
   }, [phase, meta?.stage, meta?.round, mySave]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Double Up co-op: receive gold/units my partner sends, apply to my own econ, then the
@@ -1074,6 +1083,13 @@ export function NetGameClient() {
               </span>
             );
           })()}
+
+          {isNuzlocke(room.rules) && (
+            <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md border border-red-500/40 text-[11px] font-bold text-red-400 bg-red-500/10"
+              title="Nuzlocke: units that die in combat are permanently lost">
+              ☠ Permadeath
+            </span>
+          )}
           {doubleUp && partner && (
             <CoopPanel code={room.code} myUid={myUid} partner={{ uid: partner.uid, name: partner.name, hp: partner.hp, alive: partner.alive }} lang={lang} />
           )}

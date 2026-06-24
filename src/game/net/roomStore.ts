@@ -155,6 +155,10 @@ export type Room = {
   /** Clone bot: the host's last-game board snapshots (copied in at beginMatch), keyed by
    *  cumulative round, so a Clone bot can replay them. See net/ghost.ts. */
   ghost?: { ts: number; gens?: number[]; snaps: Record<number, { d: string; s: number; c: number; r: number; i?: string[] }[]> };
+  /** Nuzlocke mode: unit instance ids permanently killed this combat, keyed by player uid.
+   *  Written by the host in endCombat; the client reads and purges them at the next
+   *  planning round, then the node is wiped at the start of the next combat. */
+  nuzDead?: Record<string, string[]>;
 };
 
 /** Lightweight discovery entry for the game browser (lobbies/{code}). */

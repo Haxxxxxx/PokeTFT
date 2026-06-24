@@ -10,7 +10,7 @@ const RAW: RawTrait[] = [
       { count: 2, effect: "+15% Attack Damage · abilities burn (3% HP/s).", buff: { adMult: 1.15, burnDps: 0.03 } },
       { count: 4, effect: "+32% Attack Damage · burn 5% HP/s.", buff: { adMult: 1.32, burnDps: 0.05 } },
       { count: 6, effect: "+55% Attack Damage · burn 7% HP/s.", buff: { adMult: 1.55, burnDps: 0.07 } },
-      { count: 8, effect: "+85% Attack Damage · burn 10% HP/s.", buff: { adMult: 1.85, burnDps: 0.1 } },
+      { count: 8, effect: "+85% Attack Damage · burn 10% HP/s · burning targets are staggered (15% stun).", buff: { adMult: 1.85, burnDps: 0.1, stunChance: 0.15 } },
     ],
   },
   {
@@ -18,7 +18,7 @@ const RAW: RawTrait[] = [
     tiers: [
       { count: 2, effect: "All allies start with +15 mana.", buff: { scope: "team", manaAdd: 15 } },
       { count: 4, effect: "All allies start with +30 mana.", buff: { scope: "team", manaAdd: 30 } },
-      { count: 6, effect: "All allies start with +50 mana.", buff: { scope: "team", manaAdd: 50 } },
+      { count: 6, effect: "All allies start with +50 mana · team regenerates 2% max HP/s.", buff: { scope: "team", manaAdd: 50, regenPerSec: 0.02 } },
     ],
   },
   {
@@ -26,7 +26,7 @@ const RAW: RawTrait[] = [
     tiers: [
       { count: 2, effect: "Electric mons: +18% Attack Speed.", buff: { asMult: 1.18 } },
       { count: 4, effect: "Electric mons: +40% Attack Speed.", buff: { asMult: 1.4 } },
-      { count: 6, effect: "Electric mons: +70% Attack Speed.", buff: { asMult: 1.7 } },
+      { count: 6, effect: "Electric mons: +70% Attack Speed · each hit generates +8 bonus mana (chain lightning).", buff: { asMult: 1.7, manaPerAttack: 8 } },
     ],
   },
   {
@@ -42,7 +42,7 @@ const RAW: RawTrait[] = [
     tiers: [
       { count: 2, effect: "Team shield: +15% max HP.", buff: { scope: "team", shieldPct: 0.15 } },
       { count: 4, effect: "Team shield: +30% max HP.", buff: { scope: "team", shieldPct: 0.3 } },
-      { count: 6, effect: "Team shield: +50% max HP.", buff: { scope: "team", shieldPct: 0.5 } },
+      { count: 6, effect: "Team shield: +50% max HP · all allies start with +25 mana and gain +5 mana per attack.", buff: { scope: "team", shieldPct: 0.5, manaStart: 25, manaPerAttack: 5 } },
     ],
   },
   {
@@ -50,7 +50,7 @@ const RAW: RawTrait[] = [
     tiers: [
       { count: 2, effect: "Poison mons: +25% Ability Power · abilities poison (3% HP/s).", buff: { apMult: 1.25, burnDps: 0.03 } },
       { count: 4, effect: "Poison mons: +45% Ability Power · poison 5% HP/s.", buff: { apMult: 1.45, burnDps: 0.05 } },
-      { count: 6, effect: "Poison mons: +70% Ability Power · poison 8% HP/s.", buff: { apMult: 1.7, burnDps: 0.08 } },
+      { count: 6, effect: "Poison mons: +70% Ability Power · poison 8% HP/s · toxic cloud stuns (10% chance).", buff: { apMult: 1.7, burnDps: 0.08, stunChance: 0.1 } },
     ],
   },
   {
@@ -72,12 +72,12 @@ const RAW: RawTrait[] = [
     key: "dragon", label: "Dragon", description: "Dragons are raw, overwhelming power.",
     tiers: [
       { count: 2, effect: "Dragons: +22% Attack Damage & Ability Power.", buff: { adMult: 1.22, apMult: 1.22 } },
-      { count: 3, effect: "Dragons: +45% Attack Damage & Ability Power.", buff: { adMult: 1.45, apMult: 1.45 } },
+      { count: 3, effect: "Dragons: +45% Attack Damage & Ability Power · dragon claws pierce 25% of armor.", buff: { adMult: 1.45, apMult: 1.45, armorPen: 0.25 } },
     ],
   },
   {
     key: "ghost", label: "Ghost", description: "Ghosts phase through defenses.",
-    tiers: [{ count: 2, effect: "Ghosts: +15% Attack Speed · ignore 40% of armor.", buff: { mrAdd: 20, asMult: 1.15, armorPen: 0.4 } }],
+    tiers: [{ count: 2, effect: "Ghosts: +15% Attack Speed · ignore 40% of armor · spirits begin haunted (+30 mana).", buff: { mrAdd: 20, asMult: 1.15, armorPen: 0.4, manaStart: 30 } }],
   },
   {
     key: "ground", label: "Ground", description: "Ground mons are heavy and durable.",
@@ -103,7 +103,7 @@ const RAW: RawTrait[] = [
   },
   {
     key: "ice", label: "Ice", description: "Ice mons freeze foes with their abilities.",
-    tiers: [{ count: 2, effect: "Ice mons: +30% Ability Power · 35% to freeze on ability.", buff: { apMult: 1.3, mrAdd: 20, freezeChance: 0.35 } }],
+    tiers: [{ count: 2, effect: "Ice mons: +30% Ability Power · 35% to freeze on ability · ice drain — 15% life steal.", buff: { apMult: 1.3, mrAdd: 20, freezeChance: 0.35, lifeSteal: 0.15 } }],
   },
   {
     key: "fairy", label: "Fairy", description: "Fairy magic blunts incoming damage for the team.",
@@ -116,14 +116,14 @@ const RAW: RawTrait[] = [
     key: "fighting", label: "Fighting", description: "Fighting mons stagger foes with their blows.",
     tiers: [
       { count: 2, effect: "+22% Attack Damage · 25% to stun on ability.", buff: { adMult: 1.22, stunChance: 0.25 } },
-      { count: 4, effect: "+45% Attack Damage · 40% to stun on ability.", buff: { adMult: 1.45, stunChance: 0.4 } },
+      { count: 4, effect: "+45% Attack Damage · 40% to stun on ability · fighting breaks through armor (20% pen).", buff: { adMult: 1.45, stunChance: 0.4, armorPen: 0.2 } },
     ],
   },
   {
     key: "dark", label: "Dark", description: "Dark mons land vicious critical strikes.",
     tiers: [
       { count: 2, effect: "+18% Attack Damage · +20% crit chance.", buff: { adMult: 1.18, critAdd: 0.2 } },
-      { count: 4, effect: "+35% Attack Damage · +40% crit chance.", buff: { adMult: 1.35, critAdd: 0.4 } },
+      { count: 4, effect: "+35% Attack Damage · +40% crit chance · dark predators pierce 15% armor.", buff: { adMult: 1.35, critAdd: 0.4, armorPen: 0.15 } },
     ],
   },
   {

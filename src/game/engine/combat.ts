@@ -214,7 +214,7 @@ function toCombatant(u: UnitInstance, team: Team, buff?: TeamBuff): Combatant {
   let armor = mega ? s.armor + mega.armorBonus : s.armor;
   let mr = mega ? s.magicResist + mega.mrBonus : s.magicResist;
   let attackSpeed = s.attackSpeed;
-  let adMult = 1, hpMult = 1, critAdd = 0, lifeSteal = 0, armorPen = 0;
+  let adMult = 1, hpMult = 1, critAdd = s.critAdd ?? 0, lifeSteal = 0, armorPen = 0;
   let regen = 0, thorns = 0, burnDps = 0, stunChance = 0, manaAdd = 0, manaPerAtk = 0;
   let sash = false, statusImmune = false;
   for (const id of items) {
@@ -351,6 +351,8 @@ function applyTraitBuffs(units: Combatant[], board: UnitInstance[], team: Team) 
       if (buff.stunChance) c.inflictStun = Math.max(c.inflictStun, buff.stunChance);
       if (buff.freezeChance) c.inflictFreeze = Math.max(c.inflictFreeze, buff.freezeChance);
       if (buff.statusImmune) c.statusImmune = true;
+      if (buff.manaStart) c.mana = Math.min(c.maxMana, c.mana + buff.manaStart);
+      if (buff.manaPerAttack) c.manaPerAttack = Math.min(15, c.manaPerAttack + buff.manaPerAttack);
     }
   }
 }

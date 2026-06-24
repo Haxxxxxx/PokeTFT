@@ -1,4 +1,4 @@
-import type { UnitDef, StatBlock, Move, PokeType, RoleTrait } from "../types";
+import type { UnitDef, StatBlock, Move, PokeType, RoleTrait, CastEffect } from "../types";
 import type { Cost } from "../config";
 import { GEN_DEX_RANGES } from "./generations";
 import { GENERATED } from "./mons.generated";
@@ -123,6 +123,8 @@ type DefInput = {
   move: Move;
   /** Optional stat overrides (e.g. ranged units). */
   patch?: Partial<StatBlock>;
+  /** Optional per-mon castEffect override. */
+  castEffect?: CastEffect;
 };
 
 function def(d: DefInput): UnitDef {
@@ -130,6 +132,7 @@ function def(d: DefInput): UnitDef {
     ...d,
     roles: d.roles ?? [],
     stats: { ...STAT_BY_COST[d.cost], ...d.patch },
+    castEffect: d.castEffect,
   };
 }
 
@@ -137,12 +140,15 @@ export const UNITS: UnitDef[] = [
   // ───────────── 1-cost ─────────────
   def({ id: "charmander", name: "Charmander", cost: 1, types: ["fire"], roles: ["starter", "evolver"],
     typesByStar: [["fire"], ["fire"], ["fire", "flying"]], // Charizard gains Flying
-    dex: [4, 5, 6], stageNames: ["Charmander", "Charmeleon", "Charizard"], move: move("Ember", "fire", 180, "splash") }),
+    dex: [4, 5, 6], stageNames: ["Charmander", "Charmeleon", "Charizard"], move: move("Ember", "fire", 180, "splash"),
+    castEffect: "blast" }),
   def({ id: "bulbasaur", name: "Bulbasaur", cost: 1, types: ["grass", "poison"], roles: ["starter", "evolver"],
-    dex: [1, 2, 3], stageNames: ["Bulbasaur", "Ivysaur", "Venusaur"], move: move("Vine Whip", "grass", 170) }),
+    dex: [1, 2, 3], stageNames: ["Bulbasaur", "Ivysaur", "Venusaur"], move: move("Vine Whip", "grass", 170),
+    castEffect: "blast" }),
   def({ id: "squirtle", name: "Squirtle", cost: 1, types: ["water"], roles: ["starter", "evolver"],
     dex: [7, 8, 9], stageNames: ["Squirtle", "Wartortle", "Blastoise"], move: move("Water Gun", "water", 175, "line"),
-    patch: { range: 3, hp: [520, 936, 1685] } }),
+    patch: { range: 3, hp: [520, 936, 1685] },
+    castEffect: "nuke" }),
   def({ id: "caterpie", name: "Caterpie", cost: 1, types: ["bug"], roles: ["swarm", "evolver"],
     typesByStar: [["bug"], ["bug"], ["bug", "flying"]], // Butterfree gains Flying
     dex: [10, 11, 12], stageNames: ["Caterpie", "Metapod", "Butterfree"], move: move("Gust", "flying", 160) }),
@@ -170,12 +176,14 @@ export const UNITS: UnitDef[] = [
     dex: [66, 67, 68], stageNames: ["Machop", "Machoke", "Machamp"], move: move("Karate Chop", "fighting", 210) }),
   def({ id: "abra", name: "Abra", cost: 2, types: ["psychic"], roles: ["evolver"],
     dex: [63, 64, 65], stageNames: ["Abra", "Kadabra", "Alakazam"], move: move("Confusion", "psychic", 230, "splash"),
-    patch: { range: 4, hp: [560, 1008, 1814] } }),
+    patch: { range: 4, hp: [560, 1008, 1814], startMana: 20 },
+    castEffect: "blast" }),
   def({ id: "oddish", name: "Oddish", cost: 2, types: ["grass", "poison"], roles: ["evolver"],
     dex: [43, 44, 45], stageNames: ["Oddish", "Gloom", "Vileplume"], move: move("Acid", "poison", 195, "splash") }),
   def({ id: "gastly", name: "Gastly", cost: 2, types: ["ghost", "poison"], roles: ["evolver"],
     dex: [92, 93, 94], stageNames: ["Gastly", "Haunter", "Gengar"], move: move("Lick", "ghost", 205),
-    patch: { range: 3 } }),
+    patch: { range: 3, attackSpeed: 0.9, startMana: 15 },
+    castEffect: "nuke" }),
   def({ id: "growlithe", name: "Growlithe", cost: 2, types: ["fire"],
     dex: [58, 59, 59], stageNames: ["Growlithe", "Arcanine", "Arcanine"], move: move("Flame Wheel", "fire", 200) }),
   def({ id: "ponyta", name: "Ponyta", cost: 2, types: ["fire"], roles: ["evolver"],
@@ -203,7 +211,8 @@ export const UNITS: UnitDef[] = [
   def({ id: "eevee", name: "Eevee", cost: 3, types: ["normal"], roles: ["eeveelution", "evolver"],
     dex: [133, 135, 136], stageNames: ["Eevee", "Jolteon", "Flareon"], move: move("Swift", "normal", 240, "splash") }),
   def({ id: "scyther", name: "Scyther", cost: 3, types: ["bug", "flying"], roles: ["swarm"],
-    dex: [123, 123, 123], stageNames: ["Scyther", "Scyther", "Scyther"], move: move("Slash", "bug", 250) }),
+    dex: [123, 123, 123], stageNames: ["Scyther", "Scyther", "Scyther"], move: move("Slash", "bug", 250),
+    patch: { critAdd: 0.25 } }),
   def({ id: "cubone", name: "Cubone", cost: 3, types: ["ground"], roles: ["evolver"],
     dex: [104, 105, 105], stageNames: ["Cubone", "Marowak", "Marowak"], move: move("Bonemerang", "ground", 245, "line") }),
   def({ id: "onix", name: "Onix", cost: 3, types: ["rock", "ground"],
@@ -227,13 +236,16 @@ export const UNITS: UnitDef[] = [
   // ───────────── 4-cost ─────────────
   def({ id: "dratini", name: "Dratini", cost: 4, types: ["dragon"], roles: ["pseudo-legendary", "evolver"],
     typesByStar: [["dragon"], ["dragon"], ["dragon", "flying"]], // Dragonite gains Flying
-    dex: [147, 148, 149], stageNames: ["Dratini", "Dragonair", "Dragonite"], move: move("Dragon Rush", "dragon", 380, "splash") }),
+    dex: [147, 148, 149], stageNames: ["Dratini", "Dragonair", "Dragonite"], move: move("Dragon Rush", "dragon", 380, "splash"),
+    patch: { ad: [75, 135, 243], startMana: 25 },
+    castEffect: "blast" }),
   def({ id: "lapras", name: "Lapras", cost: 4, types: ["water", "ice"],
     dex: [131, 131, 131], stageNames: ["Lapras", "Lapras", "Lapras"], move: move("Ice Beam", "ice", 360, "line"),
     patch: { range: 3, hp: [950, 1710, 3078] } }),
   def({ id: "snorlax", name: "Snorlax", cost: 4, types: ["normal"],
     dex: [143, 143, 143], stageNames: ["Snorlax", "Snorlax", "Snorlax"], move: move("Body Slam", "normal", 340, "splash"),
-    patch: { hp: [1200, 2160, 3888], armor: 55, magicResist: 55 } }),
+    patch: { hp: [1200, 2160, 3888], armor: 55, magicResist: 55 },
+    castEffect: "blast" }),
   def({ id: "aerodactyl", name: "Aerodactyl", cost: 4, types: ["rock", "flying"], roles: ["fossil"],
     dex: [142, 142, 142], stageNames: ["Aerodactyl", "Aerodactyl", "Aerodactyl"], move: move("Sky Attack", "flying", 370),
     patch: { range: 2, attackSpeed: 0.75 } }),
@@ -256,7 +268,7 @@ export const UNITS: UnitDef[] = [
     patch: { range: 4 } }),
   def({ id: "mewtwo", name: "Mewtwo", cost: 5, types: ["psychic"], roles: ["legendary", "kanto-mythic"],
     dex: [150, 150, 150], stageNames: ["Mewtwo", "Mewtwo", "Mewtwo"], move: move("Psystrike", "psychic", 520, "splash"),
-    patch: { range: 4, hp: [1100, 1980, 3960] } }),
+    patch: { range: 4, hp: [1100, 1980, 3960], startMana: 40 } }),
   def({ id: "mew", name: "Mew", cost: 5, types: ["psychic"], roles: ["kanto-mythic"],
     dex: [151, 151, 151], stageNames: ["Mew", "Mew", "Mew"], move: move("Aura Sphere", "fairy", 480, "splash"),
     patch: { range: 3 } }),
@@ -387,7 +399,8 @@ export const UNITS: UnitDef[] = [
 
   // ───────────── 3-cost ─────────────
   def({ id: "garchomp", name: "Garchomp", cost: 3, types: ["dragon", "ground"], roles: ["pseudo-legendary", "evolver"],
-    dex: [443, 444, 445], stageNames: ["Gible", "Gabite", "Garchomp"], move: move("Dragon Claw", "dragon", 268) }),
+    dex: [443, 444, 445], stageNames: ["Gible", "Gabite", "Garchomp"], move: move("Dragon Claw", "dragon", 268),
+    patch: { attackSpeed: 0.75, ad: [60, 108, 194] } }),
   def({ id: "electivire", name: "Electivire", cost: 3, types: ["electric"],
     dex: [466, 466, 466], stageNames: ["Electivire", "Electivire", "Electivire"], move: move("Thunderpunch", "electric", 262),
     patch: { range: 2, attackSpeed: 0.8 } }),
@@ -702,7 +715,7 @@ export const UNITS: UnitDef[] = [
     patch: { range: 3 } }),
   def({ id: "shedinja", name: "Shedinja", cost: 4, types: ["bug", "ghost"],
     dex: [292, 292, 292], stageNames: ["Shedinja", "Shedinja", "Shedinja"], move: move("Shadow Sneak", "ghost", 320),
-    patch: { hp: [180, 324, 583], ad: [85, 153, 275] } }),
+    patch: { hp: [180, 324, 583], ad: [85, 153, 275], critAdd: 0.3 } }),
   def({ id: "gorebyss", name: "Gorebyss", cost: 3, types: ["water", "psychic"],
     dex: [368, 368, 368], stageNames: ["Gorebyss", "Gorebyss", "Gorebyss"], move: move("Psychic", "psychic", 255, "splash"),
     patch: { range: 3 } }),
