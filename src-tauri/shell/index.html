@@ -40,14 +40,14 @@
       </div>
     </div>
     <script>
-      var HOSTED = "https://poketft-arena.web.app";
+      var HOSTED = "https://game-poketft-arena.web.app";
       function go() {
         document.getElementById("err").style.display = "none";
         window.location.replace(HOSTED);
       }
       // If we're still on the splash after a few seconds (offline), show a retry hint.
       setTimeout(function () {
-        if (location.href.indexOf("poketft-arena") === -1) {
+        if (location.href.indexOf("game-poketft-arena") === -1) {
           document.getElementById("err").style.display = "block";
         }
       }, 6000);

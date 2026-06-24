@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 
-const HOSTED: &str = "https://poketft-arena.web.app";
+const HOSTED: &str = "https://game-poketft-arena.web.app";
 
 // Branded page shown in the browser tab once the credential is handed off — a
 // spinning-less Pokéball + wordmark matching the in-app bridge. Auto-closes.

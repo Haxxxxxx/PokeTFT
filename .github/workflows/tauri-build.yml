@@ -55,7 +55,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "PokéTFT ${{ github.ref_name }}"
-          releaseBody: "Native desktop builds. The app loads the live hosted game, so gameplay updates ship via the web deploy. The landing page (poketft-arena.web.app/download) links to the stable-named assets below."
+          releaseBody: "Native desktop builds. The app loads the live hosted game, so gameplay updates ship via the web deploy. The download page (game-poketft-arena.web.app/download) links to the stable-named assets below."
           releaseDraft: false   # published so /download links resolve
           prerelease: false
           args: ${{ matrix.args }}

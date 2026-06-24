@@ -4,31 +4,32 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PokéTFT — Team Fight Tactics meets Pokémon</title>
-  <meta name="description" content="Build teams of Pokémon, activate type synergies, and battle 8 players live. Free to play in your browser." />
+  <meta name="description" content="Build teams of Pokémon, activate type synergies, and battle 8 players live. Free to play — browser or native app." />
   <meta property="og:title" content="PokéTFT" />
-  <meta property="og:description" content="Team Fight Tactics meets Pokémon. 206+ mons, type synergies, mega evolutions. Free to play." />
+  <meta property="og:description" content="TFT meets Pokémon. 206+ mons, type synergies, mega evolutions. Free on every platform." />
   <meta property="og:image" content="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/384.png" />
   <link rel="icon" href="https://game-poketft-arena.web.app/favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap" rel="stylesheet" />
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --gold:      #f59e0b;
-      --gold-dim:  rgba(245,158,11,0.15);
-      --gold-ring: rgba(245,158,11,0.25);
-      --bg:        #080e1c;
-      --bg2:       #0d1526;
-      --surface:   #111a2e;
-      --surface2:  #172039;
-      --border:    rgba(255,255,255,0.07);
-      --border2:   rgba(255,255,255,0.12);
-      --text:      #f0f4ff;
-      --muted:     #7a8aab;
-      --muted2:    #5a6a8a;
+      --gold:       #f59e0b;
+      --gold-light: #fbbf24;
+      --gold-dim:   rgba(245,158,11,0.13);
+      --gold-ring:  rgba(245,158,11,0.22);
+      --bg:         #07101f;
+      --bg2:        #0b1628;
+      --surface:    #0f1e35;
+      --surface2:   #152540;
+      --border:     rgba(255,255,255,0.065);
+      --border2:    rgba(255,255,255,0.11);
+      --text:       #eef2ff;
+      --muted:      #7080a0;
+      --muted2:     #48587a;
     }
 
     html { scroll-behavior: smooth; }
@@ -36,442 +37,428 @@
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
-      min-height: 100vh;
-      overflow-x: hidden;
+      font-family: "Inter", -apple-system, sans-serif;
       -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
 
-    /* ─── DOT GRID ─────────────────────────────── */
-    .dot-grid {
-      position: absolute;
-      inset: 0;
-      background-image: radial-gradient(circle, rgba(255,255,255,0.035) 1px, transparent 1px);
-      background-size: 28px 28px;
-      pointer-events: none;
-      mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, black 0%, transparent 75%);
-      -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, black 0%, transparent 75%);
-    }
-
-    /* ─── HERO ─────────────────────────────────── */
-    .hero {
-      position: relative;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 6rem 1.5rem 5rem;
-      overflow: hidden;
-    }
-
-    .hero-glow {
-      position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(ellipse 70% 55% at 50% -5%,  rgba(245,158,11,0.10) 0%, transparent 65%),
-        radial-gradient(ellipse 50% 35% at 15% 85%,  rgba(99,102,241,0.06) 0%, transparent 55%),
-        radial-gradient(ellipse 50% 35% at 85% 85%,  rgba(16,185,129,0.05) 0%, transparent 55%);
-      pointer-events: none;
-    }
-
-    /* Decorative Pokémon behind the content */
-    .hero-mons {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-    }
-    .hero-mon {
-      position: absolute;
-      opacity: 0.13;
-      filter: drop-shadow(0 0 30px rgba(245,158,11,0.35)) saturate(0.7);
-      animation: hm-float 7s ease-in-out infinite;
-    }
-    .hero-mon:nth-child(2) { animation-delay: -1.4s; }
-    .hero-mon:nth-child(3) { animation-delay: -2.8s; }
-    .hero-mon:nth-child(4) { animation-delay: -4.2s; }
-    .hero-mon:nth-child(5) { animation-delay: -5.6s; }
-
-    @keyframes hm-float {
-      0%, 100% { transform: translateY(0)    rotate(var(--r)); }
-      50%       { transform: translateY(-14px) rotate(var(--r)); }
-    }
-    @media (prefers-reduced-motion: reduce) { .hero-mon { animation: none; } }
-
-    /* Pill above heading */
-    .pill {
-      display: inline-block;
-      background: var(--gold-dim);
-      border: 1px solid var(--gold-ring);
-      color: var(--gold);
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      padding: 0.35rem 0.9rem;
-      border-radius: 999px;
-      margin-bottom: 1.75rem;
-    }
-
-    h1 {
-      font-size: clamp(3.2rem, 9vw, 6.5rem);
-      font-weight: 900;
-      line-height: 0.95;
-      letter-spacing: -0.04em;
-      background: linear-gradient(160deg, #ffffff 25%, #e8d5a0 55%, var(--gold) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 1.25rem;
-    }
-
-    .tagline {
-      font-size: clamp(1rem, 2.2vw, 1.2rem);
-      font-weight: 400;
-      color: var(--muted);
-      max-width: 440px;
-      line-height: 1.65;
-      margin-bottom: 2.75rem;
-    }
-
-    .cta-row {
-      display: flex;
-      gap: 0.875rem;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-
-    .btn-play {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.6rem;
-      background: var(--gold);
-      color: #0d0a00;
-      font-size: 0.95rem;
-      font-weight: 800;
-      padding: 0.8rem 2rem;
-      border-radius: 0.625rem;
-      text-decoration: none;
-      letter-spacing: 0.01em;
-      transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
-    }
-    .btn-play:hover {
-      background: #fbbf24;
-      transform: translateY(-2px);
-      box-shadow: 0 10px 36px rgba(245,158,11,0.32);
-    }
-    .btn-play svg { flex-shrink: 0; }
-
-    .btn-ghost {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.6rem;
-      background: transparent;
-      color: var(--muted);
-      font-size: 0.95rem;
-      font-weight: 600;
-      padding: 0.8rem 1.75rem;
-      border-radius: 0.625rem;
-      text-decoration: none;
-      border: 1px solid var(--border2);
-      transition: border-color 0.15s, color 0.15s;
-    }
-    .btn-ghost:hover { border-color: rgba(255,255,255,0.22); color: var(--text); }
-
-    /* ─── STATS BAR ────────────────────────────── */
-    .stats-bar {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    .stat-cell {
-      padding: 1.5rem 1rem;
-      text-align: center;
-      border-right: 1px solid var(--border);
-    }
-    .stat-cell:last-child { border-right: none; }
-    .stat-n {
-      display: block;
-      font-size: 1.75rem;
-      font-weight: 800;
-      color: var(--gold);
-      letter-spacing: -0.03em;
-      line-height: 1;
-      margin-bottom: 0.3rem;
-    }
-    .stat-l {
-      font-size: 0.7rem;
-      font-weight: 600;
-      color: var(--muted2);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-    }
-    @media (max-width: 560px) {
-      .stats-bar { grid-template-columns: repeat(2, 1fr); }
-      .stat-cell:nth-child(2) { border-right: none; }
-      .stat-cell:nth-child(3) { border-top: 1px solid var(--border); }
-      .stat-cell:nth-child(4) { border-top: 1px solid var(--border); border-right: none; }
-    }
-
-    /* ─── SHARED SECTION WRAPPER ────────────────── */
+    /* ─── UTILITIES ──────────────────────────────── */
     .wrap { max-width: 1080px; margin: 0 auto; padding: 0 1.5rem; }
+    .sec  { padding: 6.5rem 0; }
 
-    .sec { padding: 6rem 0; }
-
-    .sec-label {
-      font-size: 0.7rem;
+    .sec-eyebrow {
+      font-size: 0.67rem;
       font-weight: 700;
       letter-spacing: 0.14em;
       text-transform: uppercase;
       color: var(--gold);
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.6rem;
     }
-    .sec-title {
-      font-size: clamp(1.75rem, 4vw, 2.6rem);
+    .sec-heading {
+      font-size: clamp(1.9rem, 4vw, 2.75rem);
       font-weight: 800;
-      letter-spacing: -0.03em;
+      letter-spacing: -0.035em;
       line-height: 1.1;
       margin-bottom: 3.5rem;
     }
-    .sec-title em { font-style: normal; color: var(--gold); }
+    .sec-heading em { font-style: normal; color: var(--gold); }
 
-    /* ─── FEATURES ──────────────────────────────── */
-    .feat-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1px;
-      background: var(--border);
-      border: 1px solid var(--border);
-      border-radius: 1.25rem;
-      overflow: hidden;
+    /* ─── DOT GRID ───────────────────────────────── */
+    .dot-bg {
+      position: absolute; inset: 0; pointer-events: none;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.032) 1px, transparent 1px);
+      background-size: 28px 28px;
+      mask-image: radial-gradient(ellipse 100% 80% at 50% 0%, black 0%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse 100% 80% at 50% 0%, black 0%, transparent 80%);
     }
-    @media (max-width: 780px) { .feat-grid { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 500px) { .feat-grid { grid-template-columns: 1fr; } }
 
-    .feat-cell {
+    /* ─── HERO ───────────────────────────────────── */
+    .hero {
+      position: relative; min-height: 100vh; overflow: hidden;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: 6rem 1.5rem 5rem;
+    }
+    .hero-glow {
+      position: absolute; inset: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 72% 55% at 50% -8%,  rgba(245,158,11,0.11) 0%, transparent 65%),
+        radial-gradient(ellipse 48% 38% at 12% 88%,  rgba(99,102,241,0.07) 0%, transparent 55%),
+        radial-gradient(ellipse 48% 38% at 88% 88%,  rgba(20,184,166,0.06) 0%, transparent 55%);
+    }
+
+    /* Decorative Pokémon */
+    .hero-mons { position: absolute; inset: 0; pointer-events: none; }
+    .hm {
+      position: absolute;
+      opacity: 0.15;
+      filter: saturate(0.65) drop-shadow(0 0 28px rgba(245,158,11,0.3));
+      animation: float 7s ease-in-out infinite;
+    }
+    .hm:nth-child(2) { animation-delay:-1.5s; }
+    .hm:nth-child(3) { animation-delay:-3s;   }
+    .hm:nth-child(4) { animation-delay:-4.5s; }
+    .hm:nth-child(5) { animation-delay:-6s;   }
+
+    @keyframes float {
+      0%,100% { transform: translateY(0)     rotate(var(--r,0deg)); }
+      50%      { transform: translateY(-14px) rotate(var(--r,0deg)); }
+    }
+    @media (prefers-reduced-motion: reduce) { .hm { animation: none; } }
+
+    /* Pill tag above heading */
+    .tag {
+      position: relative;
+      display: inline-block;
+      background: var(--gold-dim);
+      border: 1px solid var(--gold-ring);
+      color: var(--gold);
+      font-size: 0.67rem; font-weight: 700;
+      letter-spacing: 0.13em; text-transform: uppercase;
+      padding: 0.35rem 1rem; border-radius: 999px;
+      margin-bottom: 1.75rem;
+    }
+
+    h1 {
+      position: relative;
+      font-size: clamp(3.5rem, 10vw, 7rem);
+      font-weight: 900; line-height: 0.93; letter-spacing: -0.045em;
+      background: linear-gradient(160deg, #fff 20%, #e8d8a8 52%, var(--gold) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1.25rem;
+    }
+
+    .hero-sub {
+      position: relative;
+      font-size: clamp(1rem, 2vw, 1.15rem);
+      color: var(--muted); max-width: 420px;
+      line-height: 1.7; margin-bottom: 2.75rem;
+    }
+
+    /* CTA stack */
+    .cta-stack {
+      position: relative;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 0.75rem;
+    }
+    .cta-row {
+      display: flex; gap: 0.75rem;
+      flex-wrap: wrap; justify-content: center;
+    }
+
+    /* Primary shimmer button */
+    .btn-dl {
+      position: relative; overflow: hidden;
+      display: inline-flex; align-items: center; gap: 0.6rem;
+      background: var(--gold); color: #09070000;
+      color: #120f00;
+      font-size: 0.95rem; font-weight: 800;
+      padding: 0.85rem 2rem; border-radius: 0.625rem;
+      text-decoration: none; letter-spacing: 0.01em;
+      transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+    }
+    .btn-dl::after {
+      content: "";
+      position: absolute; top: 0; left: -120%;
+      width: 60%; height: 100%;
+      background: linear-gradient(105deg, transparent, rgba(255,255,255,0.28), transparent);
+      animation: shimmer 3.5s ease-in-out infinite;
+    }
+    @keyframes shimmer {
+      0%   { left: -120%; }
+      30%  { left: 140%;  }
+      100% { left: 140%;  }
+    }
+    .btn-dl:hover {
+      background: var(--gold-light);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 40px rgba(245,158,11,0.3);
+    }
+
+    /* Ghost secondary */
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 0.55rem;
+      background: transparent; color: var(--muted);
+      font-size: 0.9rem; font-weight: 600;
+      padding: 0.8rem 1.6rem; border-radius: 0.625rem;
+      text-decoration: none; border: 1px solid var(--border2);
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-ghost:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+
+    /* Small inline link */
+    .inline-link {
+      font-size: 0.78rem; color: var(--muted2);
+      text-decoration: none; transition: color 0.15s;
+    }
+    .inline-link:hover { color: var(--muted); }
+
+    /* ─── STATS BAR ──────────────────────────────── */
+    .stats-bar {
+      display: grid; grid-template-columns: repeat(4,1fr);
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .sc {
+      padding: 1.6rem 1rem; text-align: center;
+      border-right: 1px solid var(--border);
+    }
+    .sc:last-child { border-right: none; }
+    .sn { display:block; font-size:1.8rem; font-weight:800; color:var(--gold); letter-spacing:-0.04em; line-height:1; margin-bottom:0.3rem; }
+    .sl { font-size:0.68rem; font-weight:600; color:var(--muted2); text-transform:uppercase; letter-spacing:0.1em; }
+
+    @media(max-width:560px){
+      .stats-bar { grid-template-columns:repeat(2,1fr); }
+      .sc:nth-child(2) { border-right:none; }
+      .sc:nth-child(3),
+      .sc:nth-child(4) { border-top:1px solid var(--border); }
+      .sc:nth-child(4) { border-right:none; }
+    }
+
+    /* ─── HOW IT WORKS ───────────────────────────── */
+    .how-band {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 4rem 1.5rem;
+    }
+    .how-grid {
+      max-width: 900px; margin: 0 auto;
+      display: grid; grid-template-columns: repeat(3,1fr);
+      gap: 2px;
+    }
+    @media(max-width:580px){ .how-grid { grid-template-columns:1fr; gap:0; } }
+
+    .how-cell {
+      padding: 2rem 1.75rem;
+      display: flex; flex-direction: column; gap: 0.6rem;
+      position: relative;
+    }
+    .how-cell:not(:last-child)::after {
+      content: "";
+      position: absolute; right: 0; top: 25%; bottom: 25%;
+      width: 1px; background: var(--border);
+    }
+    @media(max-width:580px){
+      .how-cell:not(:last-child)::after { display: none; }
+      .how-cell:not(:last-child)::before {
+        content: ""; display: block; height: 1px;
+        background: var(--border);
+        position: absolute; bottom: 0; left: 1.75rem; right: 1.75rem;
+      }
+    }
+    .how-num {
+      font-size: 0.65rem; font-weight: 800;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--gold); opacity: 0.8;
+    }
+    .how-title {
+      font-size: 1rem; font-weight: 700; color: var(--text);
+    }
+    .how-desc {
+      font-size: 0.8rem; color: var(--muted); line-height: 1.65;
+    }
+
+    /* ─── FEATURES ───────────────────────────────── */
+    .feat-grid {
+      display: grid; grid-template-columns: repeat(3,1fr);
+      border: 1px solid var(--border); border-radius: 1.25rem;
+      overflow: hidden; gap: 1px; background: var(--border);
+    }
+    @media(max-width:780px){ .feat-grid { grid-template-columns:repeat(2,1fr); } }
+    @media(max-width:500px){ .feat-grid { grid-template-columns:1fr; } }
+
+    .fc {
       background: var(--surface);
       padding: 2rem 1.75rem;
       transition: background 0.2s;
     }
-    .feat-cell:hover { background: var(--surface2); }
+    .fc:hover { background: var(--surface2); }
 
-    .feat-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 0.5rem;
-      background: var(--gold-dim);
-      border: 1px solid var(--gold-ring);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--gold);
-      margin-bottom: 1.1rem;
-      flex-shrink: 0;
+    .fi {
+      width: 34px; height: 34px; border-radius: 8px;
+      background: var(--gold-dim); border: 1px solid var(--gold-ring);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--gold); margin-bottom: 1rem; flex-shrink: 0;
     }
-    .feat-icon svg { width: 16px; height: 16px; }
+    .fi svg { width: 16px; height: 16px; }
+    .fn { font-size: 0.875rem; font-weight: 700; margin-bottom: 0.45rem; color: var(--text); }
+    .fd { font-size: 0.8rem; color: var(--muted); line-height: 1.65; }
 
-    .feat-name {
-      font-size: 0.9rem;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 0.5rem;
-    }
-    .feat-body {
-      font-size: 0.8rem;
-      color: var(--muted);
-      line-height: 1.65;
-    }
-
-    /* ─── TYPES ─────────────────────────────────── */
+    /* ─── TYPE MARQUEE ───────────────────────────── */
     .types-band {
       background: var(--bg2);
       border-top: 1px solid var(--border);
       border-bottom: 1px solid var(--border);
-      padding: 4rem 1.5rem;
+      padding: 3.5rem 0;
+      overflow: hidden;
+    }
+    .types-label {
       text-align: center;
+      font-size: 0.67rem; font-weight: 700;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--muted2); margin-bottom: 1.25rem;
     }
-    .chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      justify-content: center;
-      max-width: 680px;
-      margin: 1.5rem auto 0;
+    .marquee-outer { overflow: hidden; }
+    .marquee-track {
+      display: flex; gap: 0.5rem;
+      width: max-content;
+      animation: marquee 38s linear infinite;
     }
+    .marquee-track:hover { animation-play-state: paused; }
+    @keyframes marquee {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+    @media(prefers-reduced-motion:reduce){ .marquee-track { animation: none; } }
     .chip {
-      font-size: 0.67rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      padding: 0.3rem 0.8rem;
-      border-radius: 999px;
-      border: 1px solid;
+      font-size: 0.67rem; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 0.3rem 0.85rem; border-radius: 999px;
+      border: 1px solid; white-space: nowrap;
     }
 
-    /* ─── MODES ─────────────────────────────────── */
+    /* ─── MODES ──────────────────────────────────── */
     .modes-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      display: grid; grid-template-columns: repeat(3,1fr);
       gap: 1rem;
     }
-    @media (max-width: 640px) { .modes-grid { grid-template-columns: 1fr; } }
+    @media(max-width:720px){ .modes-grid { grid-template-columns:repeat(2,1fr); } }
+    @media(max-width:480px){ .modes-grid { grid-template-columns:1fr; } }
 
-    .mode-card {
+    .mc {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 0.875rem;
-      padding: 1.5rem 1.75rem;
-      display: flex;
-      align-items: flex-start;
-      gap: 1.1rem;
-      transition: border-color 0.2s;
+      padding: 1.5rem;
+      display: flex; flex-direction: column; gap: 0.5rem;
+      border-top: 2px solid var(--mode-color, var(--border));
+      transition: transform 0.18s, box-shadow 0.18s;
     }
-    .mode-card:hover { border-color: var(--border2); }
+    .mc:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,0.3); }
+    .mn { font-size: 0.875rem; font-weight: 700; color: var(--text); }
+    .md { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
 
-    .mode-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-top: 0.35rem;
-      flex-shrink: 0;
-    }
-    .mode-text {}
-    .mode-name {
-      font-size: 0.875rem;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 0.3rem;
-    }
-    .mode-desc {
-      font-size: 0.8rem;
-      color: var(--muted);
-      line-height: 1.6;
-    }
-
-    /* ─── BOTTOM CTA ────────────────────────────── */
+    /* ─── BOTTOM CTA ─────────────────────────────── */
     .cta-band {
       background: var(--bg2);
       border-top: 1px solid var(--border);
-      padding: 6rem 1.5rem;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
+      padding: 7rem 1.5rem; text-align: center;
+      position: relative; overflow: hidden;
     }
     .cta-band::before {
       content: "";
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(ellipse 70% 80% at 50% 100%, rgba(245,158,11,0.07) 0%, transparent 70%);
-      pointer-events: none;
+      position: absolute; inset: 0; pointer-events: none;
+      background: radial-gradient(ellipse 65% 90% at 50% 105%, rgba(245,158,11,0.08) 0%, transparent 65%);
     }
     .cta-band h2 {
-      font-size: clamp(2rem, 5vw, 3.25rem);
-      font-weight: 900;
-      letter-spacing: -0.04em;
-      line-height: 1.05;
-      margin-bottom: 0.875rem;
+      font-size: clamp(2.2rem, 5.5vw, 3.5rem);
+      font-weight: 900; letter-spacing: -0.04em;
+      line-height: 1.05; margin-bottom: 0.875rem;
     }
-    .cta-band p {
-      font-size: 1rem;
-      color: var(--muted);
-      margin-bottom: 2.25rem;
-    }
+    .cta-band p { font-size: 1rem; color: var(--muted); margin-bottom: 2.25rem; }
 
-    /* ─── FOOTER ────────────────────────────────── */
+    /* ─── FOOTER ─────────────────────────────────── */
     footer {
       border-top: 1px solid var(--border);
-      padding: 1.75rem 1.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      flex-wrap: wrap;
+      padding: 1.75rem 2rem;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 1rem;
     }
-    .footer-copy {
-      font-size: 0.75rem;
-      color: var(--muted2);
-    }
-    .footer-links {
-      display: flex;
-      gap: 1.5rem;
-    }
-    .footer-links a {
-      font-size: 0.75rem;
-      font-weight: 500;
-      color: var(--muted);
-      text-decoration: none;
+    .fc-copy { font-size: 0.73rem; color: var(--muted2); max-width: 56ch; line-height: 1.5; }
+    .fc-links { display: flex; gap: 1.5rem; }
+    .fc-links a {
+      font-size: 0.73rem; font-weight: 500;
+      color: var(--muted); text-decoration: none;
       transition: color 0.15s;
     }
-    .footer-links a:hover { color: var(--text); }
+    .fc-links a:hover { color: var(--text); }
   </style>
 </head>
 <body>
 
-<!-- ═══ HERO ══════════════════════════════════════ -->
+<!-- ══════════════ HERO ═══════════════════════════ -->
 <section class="hero">
-  <div class="dot-grid" aria-hidden="true"></div>
+  <div class="dot-bg" aria-hidden="true"></div>
   <div class="hero-glow" aria-hidden="true"></div>
 
   <div class="hero-mons" aria-hidden="true">
-    <img class="hero-mon" style="left:5%;top:10%;width:180px;--r:-11deg"
+    <img class="hm" style="left:5%;top:9%;width:190px;--r:-11deg"
       src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/6.png" alt="" />
-    <img class="hero-mon" style="right:5%;top:8%;width:160px;--r:9deg"
+    <img class="hm" style="right:5%;top:7%;width:165px;--r:9deg"
       src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/149.png" alt="" />
-    <img class="hero-mon" style="left:1%;bottom:14%;width:165px;--r:7deg"
+    <img class="hm" style="left:0%;bottom:14%;width:170px;--r:7deg"
       src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/248.png" alt="" />
-    <img class="hero-mon" style="right:2%;bottom:12%;width:160px;--r:-7deg"
+    <img class="hm" style="right:1%;bottom:12%;width:165px;--r:-7deg"
       src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/384.png" alt="" />
-    <img class="hero-mon" style="left:43%;top:3%;width:115px;--r:0deg"
+    <img class="hm" style="left:43%;top:2%;width:115px;--r:0deg"
       src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/94.png" alt="" />
   </div>
 
-  <div class="pill" style="position:relative">Free to play &nbsp;·&nbsp; No download required</div>
+  <span class="tag">Free on every platform</span>
+  <h1>PokéTFT</h1>
+  <p class="hero-sub">Team Fight Tactics meets Pokémon. Draft your team, activate type synergies, and battle eight trainers live.</p>
 
-  <h1 style="position:relative">PokéTFT</h1>
-
-  <p class="tagline" style="position:relative">
-    Team Fight Tactics meets Pokémon. Draft your team, activate type synergies, and battle eight trainers live.
-  </p>
-
-  <div class="cta-row" style="position:relative">
-    <a href="https://game-poketft-arena.web.app" class="btn-play">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
-        <path d="M3 2.5a.5.5 0 0 1 .757-.429l8 4.5a.5.5 0 0 1 0 .858l-8 4.5A.5.5 0 0 1 3 11.5v-9Z"/>
-      </svg>
-      Play Now
-    </a>
-    <a href="https://game-poketft-arena.web.app/download" class="btn-ghost">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M7 2v7M4 6.5 7 9.5l3-3"/>
-        <path d="M2 10.5v.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-.5"/>
-      </svg>
-      Get the App
-    </a>
+  <div class="cta-stack">
+    <div class="cta-row">
+      <a href="https://game-poketft-arena.web.app/download" class="btn-dl">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M7 2v7M4 6.5 7 9.5l3-3"/>
+          <path d="M2 11v.5a.5.5 0 0 0 .5.5h9a.5.5 0 0 0 .5-.5V11"/>
+        </svg>
+        Download the App
+      </a>
+      <a href="https://game-poketft-arena.web.app" class="btn-ghost">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+          <path d="M3 2.5a.5.5 0 0 1 .757-.429l8 4.5a.5.5 0 0 1 0 .858l-8 4.5A.5.5 0 0 1 3 11.5v-9Z"/>
+        </svg>
+        Play in Browser
+      </a>
+    </div>
+    <a href="https://game-poketft-arena.web.app/download" class="inline-link">Windows · macOS · Android</a>
   </div>
 </section>
 
-<!-- ═══ STATS ═════════════════════════════════════ -->
+<!-- ══════════════ STATS ══════════════════════════ -->
 <div class="stats-bar">
-  <div class="stat-cell"><span class="stat-n">206+</span><span class="stat-l">Pokémon</span></div>
-  <div class="stat-cell"><span class="stat-n">18</span><span class="stat-l">Type traits</span></div>
-  <div class="stat-cell"><span class="stat-n">68</span><span class="stat-l">Items</span></div>
-  <div class="stat-cell"><span class="stat-n">8</span><span class="stat-l">Players live</span></div>
+  <div class="sc"><span class="sn">206+</span><span class="sl">Pokémon</span></div>
+  <div class="sc"><span class="sn">18</span><span class="sl">Type traits</span></div>
+  <div class="sc"><span class="sn">68</span><span class="sl">Items</span></div>
+  <div class="sc"><span class="sn">8</span><span class="sl">Players live</span></div>
 </div>
 
-<!-- ═══ FEATURES ══════════════════════════════════ -->
+<!-- ══════════════ HOW IT WORKS ══════════════════ -->
+<div class="how-band">
+  <div class="how-grid">
+    <div class="how-cell">
+      <span class="how-num">01 — Draft</span>
+      <span class="how-title">Build your board</span>
+      <p class="how-desc">Each round you roll a shop of five Pokémon drawn from the shared pool. Buy, bench, and position your team before the timer hits zero.</p>
+    </div>
+    <div class="how-cell">
+      <span class="how-num">02 — Equip</span>
+      <span class="how-title">Items, stars, and megas</span>
+      <p class="how-desc">Combine components into completed items, collect three copies to star up a carry, and slot in a Mega Stone for a mid-fight transformation.</p>
+    </div>
+    <div class="how-cell">
+      <span class="how-num">03 — Battle</span>
+      <span class="how-title">Last trainer standing</span>
+      <p class="how-desc">Combat resolves automatically. Eight players bleed HP each loss. Outlast everyone else and climb the leaderboard.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ FEATURES ══════════════════════ -->
 <div class="wrap">
   <div class="sec">
-    <div class="sec-label">What's inside</div>
-    <div class="sec-title">Everything TFT, <em>built for Pokémon</em></div>
+    <div class="sec-eyebrow">What's inside</div>
+    <div class="sec-heading">Everything TFT, <em>built for Pokémon</em></div>
 
     <div class="feat-grid">
 
-      <div class="feat-cell">
-        <div class="feat-icon">
-          <!-- Nodes + edges: synergies -->
+      <div class="fc">
+        <div class="fi">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
             <circle cx="8" cy="2.5" r="1.5" fill="currentColor" stroke="none"/>
             <circle cx="2.5" cy="13" r="1.5" fill="currentColor" stroke="none"/>
@@ -481,36 +468,33 @@
             <line x1="4" y1="13" x2="12" y2="13"/>
           </svg>
         </div>
-        <div class="feat-name">Type Synergies</div>
-        <div class="feat-body">Stack Fire-types for burn damage, Electric for mana surges, Dragon for armor shred. 18 trait trees, each with multiple breakpoints.</div>
+        <div class="fn">Type Synergies</div>
+        <div class="fd">Stack Fire-types for burn damage, Electric for mana surges, Dragon for armor shred. 18 trait trees, each with multiple breakpoints that unlock unique combat behaviors.</div>
       </div>
 
-      <div class="feat-cell">
-        <div class="feat-icon">
-          <!-- Star -->
+      <div class="fc">
+        <div class="fi">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="8,1.5 9.8,6 14.5,6.3 11,9.4 12.1,14 8,11.5 3.9,14 5,9.4 1.5,6.3 6.2,6" fill="none"/>
+            <polygon points="8,1.5 9.8,6 14.5,6.3 11,9.4 12.1,14 8,11.5 3.9,14 5,9.4 1.5,6.3 6.2,6"/>
           </svg>
         </div>
-        <div class="feat-name">Star Upgrades</div>
-        <div class="feat-body">Collect three copies to evolve into a two-star powerhouse. Time your spikes right and snowball before opponents can stabilise.</div>
+        <div class="fn">Star Upgrades</div>
+        <div class="fd">Collect three copies to evolve into a two-star powerhouse. Time your spikes right and snowball before opponents can stabilise their boards.</div>
       </div>
 
-      <div class="feat-cell">
-        <div class="feat-icon">
-          <!-- Diamond within diamond: mega -->
+      <div class="fc">
+        <div class="fi">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="8,1 15,8 8,15 1,8"/>
             <polygon points="8,4.5 11.5,8 8,11.5 4.5,8"/>
           </svg>
         </div>
-        <div class="feat-name">Mega Evolutions</div>
-        <div class="feat-body">Equip a Mega Stone for a mid-fight transformation. Mega Charizard X, Mega Rayquaza, Mega Mewtwo — over 30 forms available.</div>
+        <div class="fn">Mega Evolutions</div>
+        <div class="fd">Equip a Mega Stone for a mid-fight transformation. Mega Charizard X, Mega Rayquaza, Mega Mewtwo — over 30 forms that reshape how a unit fights.</div>
       </div>
 
-      <div class="feat-cell">
-        <div class="feat-icon">
-          <!-- 2x2 grid with plus in corner: combine items -->
+      <div class="fc">
+        <div class="fi">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1"/>
             <rect x="9" y="1.5" width="5.5" height="5.5" rx="1"/>
@@ -519,142 +503,152 @@
             <line x1="9" y1="11.75" x2="14.5" y2="11.75"/>
           </svg>
         </div>
-        <div class="feat-name">Item Crafting</div>
-        <div class="feat-body">Combine 68 items from 9 components. Spatulas forge trait emblems. Region Clash carousels feature the mode's signature completed item.</div>
+        <div class="fn">Item Crafting</div>
+        <div class="fd">Combine 68 items from 9 components. Spatulas forge trait emblems. Region Clash carousels feature the mode's signature completed item at high probability.</div>
       </div>
 
-      <div class="feat-cell">
-        <div class="feat-icon">
-          <!-- Layered hexagons: tiers -->
+      <div class="fc">
+        <div class="fi">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="8,1 14.5,4.75 14.5,11.25 8,15 1.5,11.25 1.5,4.75"/>
-            <polygon points="8,4 11.5,6 11.5,10 8,12 4.5,10 4.5,6"/>
+            <path d="M8 1L14.5 4.75V11.25L8 15L1.5 11.25V4.75L8 1Z"/>
+            <path d="M8 4.5L11.5 6.5V10.5L8 12.5L4.5 10.5V6.5L8 4.5Z"/>
           </svg>
         </div>
-        <div class="feat-name">Augment Choices</div>
-        <div class="feat-body">Silver, Gold, and Prismatic augments reshape your strategy every game. 82 augments across three tiers — no two games play the same.</div>
+        <div class="fn">Augment Choices</div>
+        <div class="fd">Silver, Gold, and Prismatic augments reshape your strategy every game. 82 augments across three tiers — no two games play identically.</div>
       </div>
 
-      <div class="feat-cell">
-        <div class="feat-icon">
-          <!-- Globe: all regions -->
+      <div class="fc">
+        <div class="fi">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
             <circle cx="8" cy="8" r="6.5"/>
             <ellipse cx="8" cy="8" rx="3" ry="6.5"/>
             <line x1="1.5" y1="8" x2="14.5" y2="8"/>
           </svg>
         </div>
-        <div class="feat-name">All 9 Generations</div>
-        <div class="feat-body">Kanto through Paldea — every generation fully represented, including branching evolutions: Leafeon, Gallade, Appletun, Annihilape, and more.</div>
+        <div class="fn">All 9 Generations</div>
+        <div class="fd">Kanto through Paldea — every generation fully represented including branching evolutions: Leafeon, Gallade, Appletun, Annihilape, and more.</div>
       </div>
 
     </div>
   </div>
 </div>
 
-<!-- ═══ TYPES ══════════════════════════════════════ -->
+<!-- ══════════════ TYPE MARQUEE ══════════════════ -->
 <div class="types-band">
-  <div class="sec-label">Active synergies</div>
-  <div class="chips">
-    <span class="chip" style="background:rgba(238,129,48,0.12);color:#ee8130;border-color:rgba(238,129,48,0.25)">Fire</span>
-    <span class="chip" style="background:rgba(99,144,240,0.12);color:#6390f0;border-color:rgba(99,144,240,0.25)">Water</span>
-    <span class="chip" style="background:rgba(122,199,76,0.12);color:#7ac74c;border-color:rgba(122,199,76,0.25)">Grass</span>
-    <span class="chip" style="background:rgba(249,207,48,0.12);color:#d4af30;border-color:rgba(249,207,48,0.25)">Electric</span>
-    <span class="chip" style="background:rgba(150,98,212,0.12);color:#c17aee;border-color:rgba(150,98,212,0.25)">Psychic</span>
-    <span class="chip" style="background:rgba(111,185,79,0.12);color:#6fb94f;border-color:rgba(111,185,79,0.25)">Bug</span>
-    <span class="chip" style="background:rgba(190,185,170,0.12);color:#b0a88e;border-color:rgba(190,185,170,0.2)">Normal</span>
-    <span class="chip" style="background:rgba(163,62,161,0.12);color:#c066be;border-color:rgba(163,62,161,0.25)">Poison</span>
-    <span class="chip" style="background:rgba(249,85,135,0.12);color:#f95587;border-color:rgba(249,85,135,0.25)">Fairy</span>
-    <span class="chip" style="background:rgba(196,160,32,0.12);color:#b09430;border-color:rgba(196,160,32,0.25)">Ground</span>
-    <span class="chip" style="background:rgba(175,175,175,0.12);color:#9a9ab0;border-color:rgba(175,175,175,0.2)">Rock</span>
-    <span class="chip" style="background:rgba(98,183,167,0.12);color:#6dc8b8;border-color:rgba(98,183,167,0.25)">Ice</span>
-    <span class="chip" style="background:rgba(122,160,200,0.12);color:#7ab0d8;border-color:rgba(122,160,200,0.25)">Flying</span>
-    <span class="chip" style="background:rgba(195,66,63,0.12);color:#e04040;border-color:rgba(195,66,63,0.25)">Fighting</span>
-    <span class="chip" style="background:rgba(115,90,70,0.12);color:#b09070;border-color:rgba(115,90,70,0.25)">Ghost</span>
-    <span class="chip" style="background:rgba(111,53,252,0.12);color:#9060f0;border-color:rgba(111,53,252,0.25)">Dragon</span>
-    <span class="chip" style="background:rgba(145,165,180,0.12);color:#8fa3b1;border-color:rgba(145,165,180,0.2)">Steel</span>
-    <span class="chip" style="background:rgba(90,70,55,0.12);color:#9a7a60;border-color:rgba(90,70,55,0.2)">Dark</span>
+  <p class="types-label">18 active type synergies</p>
+  <div class="marquee-outer">
+    <div class="marquee-track">
+      <!-- Set 1 -->
+      <span class="chip" style="background:rgba(238,129,48,.11);color:#d97430;border-color:rgba(238,129,48,.22)">Fire</span>
+      <span class="chip" style="background:rgba(99,144,240,.11);color:#6390f0;border-color:rgba(99,144,240,.22)">Water</span>
+      <span class="chip" style="background:rgba(122,199,76,.11);color:#6ab040;border-color:rgba(122,199,76,.22)">Grass</span>
+      <span class="chip" style="background:rgba(220,190,40,.11);color:#c8a828;border-color:rgba(220,190,40,.22)">Electric</span>
+      <span class="chip" style="background:rgba(160,100,220,.11);color:#b070e0;border-color:rgba(160,100,220,.22)">Psychic</span>
+      <span class="chip" style="background:rgba(111,185,79,.11);color:#70b050;border-color:rgba(111,185,79,.22)">Bug</span>
+      <span class="chip" style="background:rgba(190,185,165,.11);color:#9890780;border-color:rgba(190,185,165,.18)">Normal</span>
+      <span class="chip" style="background:rgba(163,62,161,.11);color:#b860b8;border-color:rgba(163,62,161,.22)">Poison</span>
+      <span class="chip" style="background:rgba(249,85,135,.11);color:#e8406a;border-color:rgba(249,85,135,.22)">Fairy</span>
+      <span class="chip" style="background:rgba(196,160,32,.11);color:#a88820;border-color:rgba(196,160,32,.22)">Ground</span>
+      <span class="chip" style="background:rgba(160,160,160,.11);color:#909090;border-color:rgba(160,160,160,.18)">Rock</span>
+      <span class="chip" style="background:rgba(98,183,167,.11);color:#60b8a8;border-color:rgba(98,183,167,.22)">Ice</span>
+      <span class="chip" style="background:rgba(122,160,200,.11);color:#78a8d0;border-color:rgba(122,160,200,.22)">Flying</span>
+      <span class="chip" style="background:rgba(195,66,63,.11);color:#d84040;border-color:rgba(195,66,63,.22)">Fighting</span>
+      <span class="chip" style="background:rgba(115,90,70,.11);color:#a08060;border-color:rgba(115,90,70,.2)">Ghost</span>
+      <span class="chip" style="background:rgba(111,53,252,.11);color:#8050e0;border-color:rgba(111,53,252,.22)">Dragon</span>
+      <span class="chip" style="background:rgba(145,165,180,.11);color:#8898a8;border-color:rgba(145,165,180,.18)">Steel</span>
+      <span class="chip" style="background:rgba(90,70,55,.11);color:#907050;border-color:rgba(90,70,55,.2)">Dark</span>
+      <!-- separator -->
+      <span style="width:1.5rem;display:inline-block"></span>
+      <!-- Set 2 (duplicate for seamless loop) -->
+      <span class="chip" style="background:rgba(238,129,48,.11);color:#d97430;border-color:rgba(238,129,48,.22)">Fire</span>
+      <span class="chip" style="background:rgba(99,144,240,.11);color:#6390f0;border-color:rgba(99,144,240,.22)">Water</span>
+      <span class="chip" style="background:rgba(122,199,76,.11);color:#6ab040;border-color:rgba(122,199,76,.22)">Grass</span>
+      <span class="chip" style="background:rgba(220,190,40,.11);color:#c8a828;border-color:rgba(220,190,40,.22)">Electric</span>
+      <span class="chip" style="background:rgba(160,100,220,.11);color:#b070e0;border-color:rgba(160,100,220,.22)">Psychic</span>
+      <span class="chip" style="background:rgba(111,185,79,.11);color:#70b050;border-color:rgba(111,185,79,.22)">Bug</span>
+      <span class="chip" style="background:rgba(190,185,165,.11);color:#9890780;border-color:rgba(190,185,165,.18)">Normal</span>
+      <span class="chip" style="background:rgba(163,62,161,.11);color:#b860b8;border-color:rgba(163,62,161,.22)">Poison</span>
+      <span class="chip" style="background:rgba(249,85,135,.11);color:#e8406a;border-color:rgba(249,85,135,.22)">Fairy</span>
+      <span class="chip" style="background:rgba(196,160,32,.11);color:#a88820;border-color:rgba(196,160,32,.22)">Ground</span>
+      <span class="chip" style="background:rgba(160,160,160,.11);color:#909090;border-color:rgba(160,160,160,.18)">Rock</span>
+      <span class="chip" style="background:rgba(98,183,167,.11);color:#60b8a8;border-color:rgba(98,183,167,.22)">Ice</span>
+      <span class="chip" style="background:rgba(122,160,200,.11);color:#78a8d0;border-color:rgba(122,160,200,.22)">Flying</span>
+      <span class="chip" style="background:rgba(195,66,63,.11);color:#d84040;border-color:rgba(195,66,63,.22)">Fighting</span>
+      <span class="chip" style="background:rgba(115,90,70,.11);color:#a08060;border-color:rgba(115,90,70,.2)">Ghost</span>
+      <span class="chip" style="background:rgba(111,53,252,.11);color:#8050e0;border-color:rgba(111,53,252,.22)">Dragon</span>
+      <span class="chip" style="background:rgba(145,165,180,.11);color:#8898a8;border-color:rgba(145,165,180,.18)">Steel</span>
+      <span class="chip" style="background:rgba(90,70,55,.11);color:#907050;border-color:rgba(90,70,55,.2)">Dark</span>
+      <span style="width:1.5rem;display:inline-block"></span>
+    </div>
   </div>
 </div>
 
-<!-- ═══ MODES ══════════════════════════════════════ -->
+<!-- ══════════════ MODES ══════════════════════════ -->
 <div class="wrap">
   <div class="sec">
-    <div class="sec-label">Game modes</div>
-    <div class="sec-title">Six ways to <em>play</em></div>
+    <div class="sec-eyebrow">Game modes</div>
+    <div class="sec-heading">Six ways to <em>play</em></div>
 
     <div class="modes-grid">
-
-      <div class="mode-card">
-        <div class="mode-dot" style="background:#6390f0"></div>
-        <div class="mode-text">
-          <div class="mode-name">Standard</div>
-          <div class="mode-desc">Classic 8-player TFT. Full item pool, all nine generations, 100 HP. The definitive experience.</div>
-        </div>
+      <div class="mc" style="--mode-color:#6390f0">
+        <div class="mn">Standard</div>
+        <div class="md">Classic 8-player TFT. Full item pool, all nine generations, 100 HP. The definitive experience.</div>
       </div>
-
-      <div class="mode-card">
-        <div class="mode-dot" style="background:#f9cf30"></div>
-        <div class="mode-text">
-          <div class="mode-name">Hyper Roll</div>
-          <div class="mode-desc">50 HP, cost 1–3 shop only. Fast, chaotic, reroll-heavy. A full game in under 20 minutes.</div>
-        </div>
+      <div class="mc" style="--mode-color:#d4af30">
+        <div class="mn">Hyper Roll</div>
+        <div class="md">50 HP, cost 1–3 shop only. Fast, chaotic, reroll-heavy. A full game in under 20 minutes.</div>
       </div>
-
-      <div class="mode-card">
-        <div class="mode-dot" style="background:#c17aee"></div>
-        <div class="mode-text">
-          <div class="mode-name">Legendary Clash</div>
-          <div class="mode-desc">150 HP, cost 3–5 shop only. High-power units only — build the perfect late-game comp or lose slowly.</div>
-        </div>
+      <div class="mc" style="--mode-color:#b070e0">
+        <div class="mn">Legendary Clash</div>
+        <div class="md">150 HP, cost 3–5 shop only. High-power units only — build the perfect late-game composition.</div>
       </div>
-
-      <div class="mode-card">
-        <div class="mode-dot" style="background:#e04040"></div>
-        <div class="mode-text">
-          <div class="mode-name">Nuzlocke</div>
-          <div class="mode-desc">Any Pokémon that faints in combat is gone for the rest of the game. Every positioning decision counts.</div>
-        </div>
+      <div class="mc" style="--mode-color:#d84040">
+        <div class="mn">Nuzlocke</div>
+        <div class="md">Any Pokémon that faints in combat is gone for the rest of the game. Every decision counts.</div>
       </div>
-
-      <div class="mode-card">
-        <div class="mode-dot" style="background:#6dc8b8"></div>
-        <div class="mode-text">
-          <div class="mode-name">Region Clash</div>
-          <div class="mode-desc">Draft from a single generation with its exclusive signature item. Kanto, Johto, Hoenn — through Paldea.</div>
-        </div>
+      <div class="mc" style="--mode-color:#60b8a8">
+        <div class="mn">Region Clash</div>
+        <div class="md">Draft from a single generation with its exclusive signature item. Kanto, Johto, Hoenn — through Paldea.</div>
       </div>
-
-      <div class="mode-card">
-        <div class="mode-dot" style="background:#7ac74c"></div>
-        <div class="mode-text">
-          <div class="mode-name">Double Up</div>
-          <div class="mode-desc">2v2 team mode. Share HP with your partner, trade items mid-game, and draft together against rival pairs.</div>
-        </div>
+      <div class="mc" style="--mode-color:#6ab040">
+        <div class="mn">Double Up</div>
+        <div class="md">2v2 team mode. Share HP with your partner, trade items mid-game, and draft together against rival pairs.</div>
       </div>
-
     </div>
   </div>
 </div>
 
-<!-- ═══ BOTTOM CTA ═════════════════════════════════ -->
+<!-- ══════════════ BOTTOM CTA ════════════════════ -->
 <div class="cta-band">
-  <h2>Ready to build your team?</h2>
-  <p>No account required. Plays in your browser. Free forever.</p>
-  <a href="https://game-poketft-arena.web.app" class="btn-play" style="font-size:1rem;padding:0.9rem 2.25rem;">
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
-      <path d="M3 2.5a.5.5 0 0 1 .757-.429l8 4.5a.5.5 0 0 1 0 .858l-8 4.5A.5.5 0 0 1 3 11.5v-9Z"/>
-    </svg>
-    Start Playing
-  </a>
+  <h2>Get the app. Start playing.</h2>
+  <p>Windows, macOS, and Android. Or open it straight in your browser — free, no account needed.</p>
+  <div class="cta-stack" style="position:relative">
+    <div class="cta-row">
+      <a href="https://game-poketft-arena.web.app/download" class="btn-dl">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M7 2v7M4 6.5 7 9.5l3-3"/>
+          <path d="M2 11v.5a.5.5 0 0 0 .5.5h9a.5.5 0 0 0 .5-.5V11"/>
+        </svg>
+        Download the App
+      </a>
+      <a href="https://game-poketft-arena.web.app" class="btn-ghost">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+          <path d="M3 2.5a.5.5 0 0 1 .757-.429l8 4.5a.5.5 0 0 1 0 .858l-8 4.5A.5.5 0 0 1 3 11.5v-9Z"/>
+        </svg>
+        Play in Browser
+      </a>
+    </div>
+    <a href="https://game-poketft-arena.web.app/download" class="inline-link">Windows · macOS · Android</a>
+  </div>
 </div>
 
-<!-- ═══ FOOTER ══════════════════════════════════════ -->
+<!-- ══════════════ FOOTER ═════════════════════════ -->
 <footer>
-  <span class="footer-copy">PokéTFT is a fan project — not affiliated with Nintendo, Game Freak, or The Pokémon Company.</span>
-  <div class="footer-links">
-    <a href="https://game-poketft-arena.web.app">Play</a>
+  <span class="fc-copy">PokéTFT is a fan project — not affiliated with Nintendo, Game Freak, or The Pokémon Company. Personal, non-commercial use only.</span>
+  <div class="fc-links">
     <a href="https://game-poketft-arena.web.app/download">Download</a>
+    <a href="https://game-poketft-arena.web.app">Play</a>
   </div>
 </footer>
 

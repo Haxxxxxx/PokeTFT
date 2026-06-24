@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PokeballIcon } from "@/components/game/icons";
+import { isNativeShell } from "@/game/net/nativeShell";
 
 const REPO = "https://github.com/Haxxxxxx/PokeTFT";
 const RELEASE = `${REPO}/releases/latest`;
@@ -32,7 +33,8 @@ const PLATFORMS: { id: OS; name: string; file: string; href: string; glyph: stri
 
 export default function DownloadPage() {
   const [os, setOs] = useState<OS>("other");
-  useEffect(() => { setOs(detectOS()); }, []);
+  const [native, setNative] = useState(false);
+  useEffect(() => { setOs(detectOS()); setNative(isNativeShell()); }, []);
 
   return (
     <main className="min-h-screen app-bg flex flex-col items-center px-5 py-12 sm:py-20">
@@ -51,9 +53,11 @@ export default function DownloadPage() {
           Teamfight Tactics — Pokémon edition. Evolutions are star-ups, types are traits,
           and the type chart is a combat layer. Play in your browser, or install the app.
         </p>
-        <a href="/" className="inline-flex items-center gap-2 mt-6 px-6 py-3 rounded-xl font-bold text-[15px] bg-amber-500/95 hover:bg-amber-400 text-black transition-colors">
-          ▶ Play in browser
-        </a>
+        {!native && (
+          <a href="/" className="inline-flex items-center gap-2 mt-6 px-6 py-3 rounded-xl font-bold text-[15px] bg-amber-500/95 hover:bg-amber-400 text-black transition-colors">
+            ▶ Play in browser
+          </a>
+        )}
       </div>
 
       {/* Download cards */}
