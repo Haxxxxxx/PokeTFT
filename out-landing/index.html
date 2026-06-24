@@ -9,18 +9,26 @@
   <meta property="og:description" content="Team Fight Tactics meets Pokémon. 206+ mons, type synergies, mega evolutions. Free to play." />
   <meta property="og:image" content="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/384.png" />
   <link rel="icon" href="https://game-poketft-arena.web.app/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --gold: #f59e0b;
-      --gold-light: #fbbf24;
-      --bg: #0b1020;
-      --surface: #111827;
-      --surface2: #1f2937;
-      --border: rgba(255,255,255,0.08);
-      --text: #f1f5f9;
-      --muted: #94a3b8;
+      --gold:      #f59e0b;
+      --gold-dim:  rgba(245,158,11,0.15);
+      --gold-ring: rgba(245,158,11,0.25);
+      --bg:        #080e1c;
+      --bg2:       #0d1526;
+      --surface:   #111a2e;
+      --surface2:  #172039;
+      --border:    rgba(255,255,255,0.07);
+      --border2:   rgba(255,255,255,0.12);
+      --text:      #f0f4ff;
+      --muted:     #7a8aab;
+      --muted2:    #5a6a8a;
     }
 
     html { scroll-behavior: smooth; }
@@ -28,12 +36,24 @@
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
       min-height: 100vh;
       overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* ── Hero ──────────────────────────────────── */
+    /* ─── DOT GRID ─────────────────────────────── */
+    .dot-grid {
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.035) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+      mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, black 0%, transparent 75%);
+      -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, black 0%, transparent 75%);
+    }
+
+    /* ─── HERO ─────────────────────────────────── */
     .hero {
       position: relative;
       min-height: 100vh;
@@ -42,389 +62,600 @@
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 2rem 1.5rem 4rem;
+      padding: 6rem 1.5rem 5rem;
       overflow: hidden;
     }
 
-    .hero::before {
-      content: "";
+    .hero-glow {
       position: absolute;
       inset: 0;
       background:
-        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(245,158,11,0.08) 0%, transparent 70%),
-        radial-gradient(ellipse 60% 40% at 20% 80%, rgba(99,102,241,0.06) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(16,185,129,0.06) 0%, transparent 60%);
+        radial-gradient(ellipse 70% 55% at 50% -5%,  rgba(245,158,11,0.10) 0%, transparent 65%),
+        radial-gradient(ellipse 50% 35% at 15% 85%,  rgba(99,102,241,0.06) 0%, transparent 55%),
+        radial-gradient(ellipse 50% 35% at 85% 85%,  rgba(16,185,129,0.05) 0%, transparent 55%);
       pointer-events: none;
     }
 
+    /* Decorative Pokémon behind the content */
     .hero-mons {
       position: absolute;
       inset: 0;
       pointer-events: none;
     }
-
     .hero-mon {
       position: absolute;
-      opacity: 0.1;
-      filter: drop-shadow(0 0 24px rgba(245,158,11,0.4));
-      animation: float 6s ease-in-out infinite;
+      opacity: 0.13;
+      filter: drop-shadow(0 0 30px rgba(245,158,11,0.35)) saturate(0.7);
+      animation: hm-float 7s ease-in-out infinite;
     }
-    .hero-mon:nth-child(2) { animation-delay: -1.2s; }
-    .hero-mon:nth-child(3) { animation-delay: -2.4s; }
-    .hero-mon:nth-child(4) { animation-delay: -3.6s; }
-    .hero-mon:nth-child(5) { animation-delay: -4.8s; }
+    .hero-mon:nth-child(2) { animation-delay: -1.4s; }
+    .hero-mon:nth-child(3) { animation-delay: -2.8s; }
+    .hero-mon:nth-child(4) { animation-delay: -4.2s; }
+    .hero-mon:nth-child(5) { animation-delay: -5.6s; }
 
-    @keyframes float {
-      0%, 100% { transform: translateY(0px) rotate(var(--rot)); }
-      50%       { transform: translateY(-12px) rotate(var(--rot)); }
+    @keyframes hm-float {
+      0%, 100% { transform: translateY(0)    rotate(var(--r)); }
+      50%       { transform: translateY(-14px) rotate(var(--r)); }
     }
+    @media (prefers-reduced-motion: reduce) { .hero-mon { animation: none; } }
 
-    @media (prefers-reduced-motion: reduce) {
-      .hero-mon { animation: none; }
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      background: rgba(245,158,11,0.12);
-      border: 1px solid rgba(245,158,11,0.3);
-      color: var(--gold-light);
-      font-size: 0.7rem;
+    /* Pill above heading */
+    .pill {
+      display: inline-block;
+      background: var(--gold-dim);
+      border: 1px solid var(--gold-ring);
+      color: var(--gold);
+      font-size: 0.68rem;
       font-weight: 700;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
-      padding: 0.3rem 0.75rem;
+      padding: 0.35rem 0.9rem;
       border-radius: 999px;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.75rem;
     }
 
     h1 {
-      font-size: clamp(2.8rem, 8vw, 5.5rem);
+      font-size: clamp(3.2rem, 9vw, 6.5rem);
       font-weight: 900;
-      line-height: 1;
-      letter-spacing: -0.03em;
-      background: linear-gradient(135deg, #fff 30%, var(--gold) 100%);
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+      background: linear-gradient(160deg, #ffffff 25%, #e8d5a0 55%, var(--gold) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      margin-bottom: 1rem;
+      margin-bottom: 1.25rem;
     }
 
-    .hero-sub {
-      font-size: clamp(1rem, 2.5vw, 1.25rem);
+    .tagline {
+      font-size: clamp(1rem, 2.2vw, 1.2rem);
+      font-weight: 400;
       color: var(--muted);
-      max-width: 480px;
-      line-height: 1.6;
-      margin-bottom: 2.5rem;
+      max-width: 440px;
+      line-height: 1.65;
+      margin-bottom: 2.75rem;
     }
 
-    .cta-group {
+    .cta-row {
       display: flex;
-      gap: 1rem;
+      gap: 0.875rem;
       flex-wrap: wrap;
       justify-content: center;
     }
 
-    .btn-primary {
+    .btn-play {
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.6rem;
       background: var(--gold);
-      color: #000;
+      color: #0d0a00;
+      font-size: 0.95rem;
       font-weight: 800;
-      font-size: 1rem;
-      padding: 0.85rem 2rem;
-      border-radius: 0.75rem;
+      padding: 0.8rem 2rem;
+      border-radius: 0.625rem;
       text-decoration: none;
-      transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
-      box-shadow: 0 0 0 0 rgba(245,158,11,0);
+      letter-spacing: 0.01em;
+      transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
     }
-    .btn-primary:hover {
-      background: var(--gold-light);
+    .btn-play:hover {
+      background: #fbbf24;
       transform: translateY(-2px);
-      box-shadow: 0 8px 32px rgba(245,158,11,0.35);
+      box-shadow: 0 10px 36px rgba(245,158,11,0.32);
     }
+    .btn-play svg { flex-shrink: 0; }
 
-    .btn-secondary {
+    .btn-ghost {
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.6rem;
       background: transparent;
       color: var(--muted);
+      font-size: 0.95rem;
       font-weight: 600;
-      font-size: 1rem;
-      padding: 0.85rem 1.75rem;
-      border-radius: 0.75rem;
+      padding: 0.8rem 1.75rem;
+      border-radius: 0.625rem;
       text-decoration: none;
-      border: 1px solid var(--border);
+      border: 1px solid var(--border2);
       transition: border-color 0.15s, color 0.15s;
     }
-    .btn-secondary:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+    .btn-ghost:hover { border-color: rgba(255,255,255,0.22); color: var(--text); }
 
-    /* ── Stat strip ──────────────────────────── */
-    .stats {
-      display: flex;
-      gap: 1px;
-      background: var(--border);
+    /* ─── STATS BAR ────────────────────────────── */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      background: var(--surface);
       border-top: 1px solid var(--border);
       border-bottom: 1px solid var(--border);
     }
-    .stat {
-      flex: 1;
+    .stat-cell {
+      padding: 1.5rem 1rem;
       text-align: center;
-      padding: 1.25rem 1rem;
-      background: var(--surface);
+      border-right: 1px solid var(--border);
     }
-    .stat-num {
-      font-size: 1.6rem;
+    .stat-cell:last-child { border-right: none; }
+    .stat-n {
+      display: block;
+      font-size: 1.75rem;
       font-weight: 800;
       color: var(--gold);
-      display: block;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      margin-bottom: 0.3rem;
     }
-    .stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
-
-    /* ── Features ────────────────────────────── */
-    .section { padding: 5rem 1.5rem; max-width: 1100px; margin: 0 auto; }
-
-    .section-title {
-      font-size: clamp(1.6rem, 4vw, 2.4rem);
-      font-weight: 800;
-      text-align: center;
-      margin-bottom: 3rem;
+    .stat-l {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--muted2);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
     }
-    .section-title span { color: var(--gold); }
-
-    .features {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 1.25rem;
+    @media (max-width: 560px) {
+      .stats-bar { grid-template-columns: repeat(2, 1fr); }
+      .stat-cell:nth-child(2) { border-right: none; }
+      .stat-cell:nth-child(3) { border-top: 1px solid var(--border); }
+      .stat-cell:nth-child(4) { border-top: 1px solid var(--border); border-right: none; }
     }
 
-    .feature-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 1rem;
-      padding: 1.75rem;
-      transition: border-color 0.2s, transform 0.2s;
-    }
-    .feature-card:hover { border-color: rgba(245,158,11,0.3); transform: translateY(-2px); }
+    /* ─── SHARED SECTION WRAPPER ────────────────── */
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 1.5rem; }
 
-    .feature-icon {
-      font-size: 1.6rem;
-      margin-bottom: 0.75rem;
-    }
-    .feature-title {
-      font-size: 1rem;
-      font-weight: 700;
-      margin-bottom: 0.4rem;
-    }
-    .feature-desc { font-size: 0.875rem; color: var(--muted); line-height: 1.6; }
+    .sec { padding: 6rem 0; }
 
-    /* ── Type badges ────────────────────────── */
-    .types-section { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 3rem 1.5rem; text-align: center; }
-    .type-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; max-width: 700px; margin: 1.5rem auto 0; }
-
-    .type-chip {
+    .sec-label {
       font-size: 0.7rem;
       font-weight: 700;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
-      padding: 0.3rem 0.75rem;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.15);
+      color: var(--gold);
+      margin-bottom: 0.75rem;
+    }
+    .sec-title {
+      font-size: clamp(1.75rem, 4vw, 2.6rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 3.5rem;
+    }
+    .sec-title em { font-style: normal; color: var(--gold); }
+
+    /* ─── FEATURES ──────────────────────────────── */
+    .feat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 1.25rem;
+      overflow: hidden;
+    }
+    @media (max-width: 780px) { .feat-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 500px) { .feat-grid { grid-template-columns: 1fr; } }
+
+    .feat-cell {
+      background: var(--surface);
+      padding: 2rem 1.75rem;
+      transition: background 0.2s;
+    }
+    .feat-cell:hover { background: var(--surface2); }
+
+    .feat-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 0.5rem;
+      background: var(--gold-dim);
+      border: 1px solid var(--gold-ring);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gold);
+      margin-bottom: 1.1rem;
+      flex-shrink: 0;
+    }
+    .feat-icon svg { width: 16px; height: 16px; }
+
+    .feat-name {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+    .feat-body {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.65;
     }
 
-    /* ── Modes ───────────────────────────────── */
-    .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+    /* ─── TYPES ─────────────────────────────────── */
+    .types-band {
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 4rem 1.5rem;
+      text-align: center;
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+      max-width: 680px;
+      margin: 1.5rem auto 0;
+    }
+    .chip {
+      font-size: 0.67rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.3rem 0.8rem;
+      border-radius: 999px;
+      border: 1px solid;
+    }
+
+    /* ─── MODES ─────────────────────────────────── */
+    .modes-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+    @media (max-width: 640px) { .modes-grid { grid-template-columns: 1fr; } }
+
     .mode-card {
-      background: var(--surface2);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 0.875rem;
-      padding: 1.5rem;
-      text-align: center;
+      padding: 1.5rem 1.75rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 1.1rem;
+      transition: border-color 0.2s;
     }
-    .mode-icon { font-size: 2rem; margin-bottom: 0.6rem; }
-    .mode-name { font-weight: 700; margin-bottom: 0.3rem; }
-    .mode-desc { font-size: 0.8rem; color: var(--muted); }
+    .mode-card:hover { border-color: var(--border2); }
 
-    /* ── Bottom CTA ──────────────────────────── */
-    .bottom-cta {
-      text-align: center;
-      padding: 5rem 1.5rem;
-      background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(245,158,11,0.06) 0%, transparent 70%);
+    .mode-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-top: 0.35rem;
+      flex-shrink: 0;
+    }
+    .mode-text {}
+    .mode-name {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.3rem;
+    }
+    .mode-desc {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* ─── BOTTOM CTA ────────────────────────────── */
+    .cta-band {
+      background: var(--bg2);
       border-top: 1px solid var(--border);
+      padding: 6rem 1.5rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
     }
-    .bottom-cta h2 { font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 900; margin-bottom: 1rem; }
-    .bottom-cta p { color: var(--muted); margin-bottom: 2rem; font-size: 1.05rem; }
+    .cta-band::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 70% 80% at 50% 100%, rgba(245,158,11,0.07) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .cta-band h2 {
+      font-size: clamp(2rem, 5vw, 3.25rem);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+      margin-bottom: 0.875rem;
+    }
+    .cta-band p {
+      font-size: 1rem;
+      color: var(--muted);
+      margin-bottom: 2.25rem;
+    }
 
-    /* ── Footer ──────────────────────────────── */
+    /* ─── FOOTER ────────────────────────────────── */
     footer {
       border-top: 1px solid var(--border);
-      padding: 1.5rem;
-      text-align: center;
+      padding: 1.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .footer-copy {
+      font-size: 0.75rem;
+      color: var(--muted2);
+    }
+    .footer-links {
+      display: flex;
+      gap: 1.5rem;
+    }
+    .footer-links a {
+      font-size: 0.75rem;
+      font-weight: 500;
       color: var(--muted);
-      font-size: 0.8rem;
+      text-decoration: none;
+      transition: color 0.15s;
     }
-    footer a { color: var(--muted); text-decoration: none; }
-    footer a:hover { color: var(--text); }
-
-    @media (max-width: 600px) {
-      .stats { flex-wrap: wrap; }
-      .stat { min-width: 50%; }
-    }
+    .footer-links a:hover { color: var(--text); }
   </style>
 </head>
 <body>
 
-<!-- ── Hero ─────────────────────────────────── -->
+<!-- ═══ HERO ══════════════════════════════════════ -->
 <section class="hero">
+  <div class="dot-grid" aria-hidden="true"></div>
+  <div class="hero-glow" aria-hidden="true"></div>
+
   <div class="hero-mons" aria-hidden="true">
-    <img class="hero-mon" style="left:6%;top:12%;width:170px;--rot:-12deg"
+    <img class="hero-mon" style="left:5%;top:10%;width:180px;--r:-11deg"
       src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/6.png" alt="" />
-    <img class="hero-mon" style="right:6%;top:10%;width:150px;--rot:10deg"
+    <img class="hero-mon" style="right:5%;top:8%;width:160px;--r:9deg"
       src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/149.png" alt="" />
-    <img class="hero-mon" style="left:2%;bottom:18%;width:155px;--rot:8deg"
+    <img class="hero-mon" style="left:1%;bottom:14%;width:165px;--r:7deg"
       src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/248.png" alt="" />
-    <img class="hero-mon" style="right:3%;bottom:16%;width:150px;--rot:-8deg"
+    <img class="hero-mon" style="right:2%;bottom:12%;width:160px;--r:-7deg"
       src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/384.png" alt="" />
-    <img class="hero-mon" style="left:42%;top:4%;width:110px;--rot:0deg"
+    <img class="hero-mon" style="left:43%;top:3%;width:115px;--r:0deg"
       src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/94.png" alt="" />
   </div>
 
-  <div class="badge">⚔ Free to play · No download required</div>
-  <h1>PokéTFT</h1>
-  <p class="hero-sub">Team Fight Tactics meets Pokémon. Draft your team, activate type synergies, and battle 8 trainers live.</p>
+  <div class="pill" style="position:relative">Free to play &nbsp;·&nbsp; No download required</div>
 
-  <div class="cta-group">
-    <a href="https://game-poketft-arena.web.app" class="btn-primary">
-      ▶ &nbsp;Play Now — It's Free
+  <h1 style="position:relative">PokéTFT</h1>
+
+  <p class="tagline" style="position:relative">
+    Team Fight Tactics meets Pokémon. Draft your team, activate type synergies, and battle eight trainers live.
+  </p>
+
+  <div class="cta-row" style="position:relative">
+    <a href="https://game-poketft-arena.web.app" class="btn-play">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+        <path d="M3 2.5a.5.5 0 0 1 .757-.429l8 4.5a.5.5 0 0 1 0 .858l-8 4.5A.5.5 0 0 1 3 11.5v-9Z"/>
+      </svg>
+      Play Now
     </a>
-    <a href="https://game-poketft-arena.web.app/download" class="btn-secondary">
-      ⬇ &nbsp;Get the App
+    <a href="https://game-poketft-arena.web.app/download" class="btn-ghost">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M7 2v7M4 6.5 7 9.5l3-3"/>
+        <path d="M2 10.5v.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-.5"/>
+      </svg>
+      Get the App
     </a>
   </div>
 </section>
 
-<!-- ── Stats ─────────────────────────────────── -->
-<div class="stats">
-  <div class="stat"><span class="stat-num">206+</span><span class="stat-label">Pokémon</span></div>
-  <div class="stat"><span class="stat-num">18</span><span class="stat-label">Type Traits</span></div>
-  <div class="stat"><span class="stat-num">68</span><span class="stat-label">Items</span></div>
-  <div class="stat"><span class="stat-num">8</span><span class="stat-label">Players Live</span></div>
+<!-- ═══ STATS ═════════════════════════════════════ -->
+<div class="stats-bar">
+  <div class="stat-cell"><span class="stat-n">206+</span><span class="stat-l">Pokémon</span></div>
+  <div class="stat-cell"><span class="stat-n">18</span><span class="stat-l">Type traits</span></div>
+  <div class="stat-cell"><span class="stat-n">68</span><span class="stat-l">Items</span></div>
+  <div class="stat-cell"><span class="stat-n">8</span><span class="stat-l">Players live</span></div>
 </div>
 
-<!-- ── Features ──────────────────────────────── -->
-<div class="section">
-  <h2 class="section-title">Everything you love about <span>TFT</span>, with Pokémon</h2>
-  <div class="features">
-    <div class="feature-card">
-      <div class="feature-icon">🧬</div>
-      <div class="feature-title">Type Synergies</div>
-      <div class="feature-desc">Stack Fire-types for burn damage, Electric for mana surges, Dragon for armor shred. 18 trait trees with high-breakpoint unlocks.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">⭐</div>
-      <div class="feature-title">Star Upgrades</div>
-      <div class="feature-desc">Combine three copies to evolve into a ★★ powerhouse. Collect the right mons, time your upgrades, and spike before opponents stabilise.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🌀</div>
-      <div class="feature-title">Mega Evolutions</div>
-      <div class="feature-desc">Equip Mega Stones for explosive mid-fight transformations. Mega Charizard X, Mega Rayquaza, Mega Mewtwo — 30+ mega forms.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">⚗️</div>
-      <div class="feature-title">Item Crafting</div>
-      <div class="feature-desc">Combine 68 items from 9 components. Spatulas forge trait emblems. Region Clash carousels feature signature completed items.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🔮</div>
-      <div class="feature-title">Augment Choices</div>
-      <div class="feature-desc">Silver, Gold, and Prismatic augments reshape your strategy every game. 82 augments across three tiers — no two games play the same.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🌍</div>
-      <div class="feature-title">All 9 Generations</div>
-      <div class="feature-desc">Kanto through Paldea — every Gen fully represented including branching evolutions like Leafeon, Gallade, Appletun, and Annihilape.</div>
+<!-- ═══ FEATURES ══════════════════════════════════ -->
+<div class="wrap">
+  <div class="sec">
+    <div class="sec-label">What's inside</div>
+    <div class="sec-title">Everything TFT, <em>built for Pokémon</em></div>
+
+    <div class="feat-grid">
+
+      <div class="feat-cell">
+        <div class="feat-icon">
+          <!-- Nodes + edges: synergies -->
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <circle cx="8" cy="2.5" r="1.5" fill="currentColor" stroke="none"/>
+            <circle cx="2.5" cy="13" r="1.5" fill="currentColor" stroke="none"/>
+            <circle cx="13.5" cy="13" r="1.5" fill="currentColor" stroke="none"/>
+            <line x1="8" y1="4" x2="2.5" y2="11.5"/>
+            <line x1="8" y1="4" x2="13.5" y2="11.5"/>
+            <line x1="4" y1="13" x2="12" y2="13"/>
+          </svg>
+        </div>
+        <div class="feat-name">Type Synergies</div>
+        <div class="feat-body">Stack Fire-types for burn damage, Electric for mana surges, Dragon for armor shred. 18 trait trees, each with multiple breakpoints.</div>
+      </div>
+
+      <div class="feat-cell">
+        <div class="feat-icon">
+          <!-- Star -->
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="8,1.5 9.8,6 14.5,6.3 11,9.4 12.1,14 8,11.5 3.9,14 5,9.4 1.5,6.3 6.2,6" fill="none"/>
+          </svg>
+        </div>
+        <div class="feat-name">Star Upgrades</div>
+        <div class="feat-body">Collect three copies to evolve into a two-star powerhouse. Time your spikes right and snowball before opponents can stabilise.</div>
+      </div>
+
+      <div class="feat-cell">
+        <div class="feat-icon">
+          <!-- Diamond within diamond: mega -->
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="8,1 15,8 8,15 1,8"/>
+            <polygon points="8,4.5 11.5,8 8,11.5 4.5,8"/>
+          </svg>
+        </div>
+        <div class="feat-name">Mega Evolutions</div>
+        <div class="feat-body">Equip a Mega Stone for a mid-fight transformation. Mega Charizard X, Mega Rayquaza, Mega Mewtwo — over 30 forms available.</div>
+      </div>
+
+      <div class="feat-cell">
+        <div class="feat-icon">
+          <!-- 2x2 grid with plus in corner: combine items -->
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1"/>
+            <rect x="9" y="1.5" width="5.5" height="5.5" rx="1"/>
+            <rect x="1.5" y="9" width="5.5" height="5.5" rx="1"/>
+            <line x1="11.75" y1="9" x2="11.75" y2="14.5"/>
+            <line x1="9" y1="11.75" x2="14.5" y2="11.75"/>
+          </svg>
+        </div>
+        <div class="feat-name">Item Crafting</div>
+        <div class="feat-body">Combine 68 items from 9 components. Spatulas forge trait emblems. Region Clash carousels feature the mode's signature completed item.</div>
+      </div>
+
+      <div class="feat-cell">
+        <div class="feat-icon">
+          <!-- Layered hexagons: tiers -->
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="8,1 14.5,4.75 14.5,11.25 8,15 1.5,11.25 1.5,4.75"/>
+            <polygon points="8,4 11.5,6 11.5,10 8,12 4.5,10 4.5,6"/>
+          </svg>
+        </div>
+        <div class="feat-name">Augment Choices</div>
+        <div class="feat-body">Silver, Gold, and Prismatic augments reshape your strategy every game. 82 augments across three tiers — no two games play the same.</div>
+      </div>
+
+      <div class="feat-cell">
+        <div class="feat-icon">
+          <!-- Globe: all regions -->
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <circle cx="8" cy="8" r="6.5"/>
+            <ellipse cx="8" cy="8" rx="3" ry="6.5"/>
+            <line x1="1.5" y1="8" x2="14.5" y2="8"/>
+          </svg>
+        </div>
+        <div class="feat-name">All 9 Generations</div>
+        <div class="feat-body">Kanto through Paldea — every generation fully represented, including branching evolutions: Leafeon, Gallade, Appletun, Annihilape, and more.</div>
+      </div>
+
     </div>
   </div>
 </div>
 
-<!-- ── Types ──────────────────────────────────── -->
-<div class="types-section">
-  <p style="color:var(--muted);font-size:0.8rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">Type traits</p>
-  <div class="type-chips">
-    <span class="type-chip" style="background:rgba(238,129,48,0.15);color:#ee8130;border-color:rgba(238,129,48,0.3)">Fire</span>
-    <span class="type-chip" style="background:rgba(99,144,240,0.15);color:#6390f0;border-color:rgba(99,144,240,0.3)">Water</span>
-    <span class="type-chip" style="background:rgba(122,199,76,0.15);color:#7ac74c;border-color:rgba(122,199,76,0.3)">Grass</span>
-    <span class="type-chip" style="background:rgba(249,207,48,0.15);color:#f9cf30;border-color:rgba(249,207,48,0.3)">Electric</span>
-    <span class="type-chip" style="background:rgba(150,98,212,0.15);color:#9656d4;border-color:rgba(150,98,212,0.3)">Psychic</span>
-    <span class="type-chip" style="background:rgba(111,185,79,0.15);color:#6fb94f;border-color:rgba(111,185,79,0.3)">Bug</span>
-    <span class="type-chip" style="background:rgba(182,161,54,0.15);color:#b6a136;border-color:rgba(182,161,54,0.3)">Normal</span>
-    <span class="type-chip" style="background:rgba(150,98,212,0.15);color:#a33ea1;border-color:rgba(150,98,212,0.3)">Poison</span>
-    <span class="type-chip" style="background:rgba(200,80,192,0.15);color:#f95587;border-color:rgba(200,80,192,0.3)">Fairy</span>
-    <span class="type-chip" style="background:rgba(196,185,26,0.15);color:#b7a13a;border-color:rgba(196,185,26,0.3)">Ground</span>
-    <span class="type-chip" style="background:rgba(182,161,54,0.15);color:#b7b7ce;border-color:rgba(182,161,54,0.3)">Rock</span>
-    <span class="type-chip" style="background:rgba(98,183,167,0.15);color:#6dc8b8;border-color:rgba(98,183,167,0.3)">Ice</span>
-    <span class="type-chip" style="background:rgba(116,150,181,0.15);color:#7ab4e0;border-color:rgba(116,150,181,0.3)">Flying</span>
-    <span class="type-chip" style="background:rgba(195,66,63,0.15);color:#e73535;border-color:rgba(195,66,63,0.3)">Fighting</span>
-    <span class="type-chip" style="background:rgba(112,87,70,0.15);color:#b5915a;border-color:rgba(112,87,70,0.3)">Ghost</span>
-    <span class="type-chip" style="background:rgba(111,53,252,0.15);color:#6f35fc;border-color:rgba(111,53,252,0.3)">Dragon</span>
-    <span class="type-chip" style="background:rgba(116,150,181,0.15);color:#8fa3b1;border-color:rgba(116,150,181,0.3)">Steel</span>
-    <span class="type-chip" style="background:rgba(80,80,80,0.15);color:#705848;border-color:rgba(80,80,80,0.3)">Dark</span>
+<!-- ═══ TYPES ══════════════════════════════════════ -->
+<div class="types-band">
+  <div class="sec-label">Active synergies</div>
+  <div class="chips">
+    <span class="chip" style="background:rgba(238,129,48,0.12);color:#ee8130;border-color:rgba(238,129,48,0.25)">Fire</span>
+    <span class="chip" style="background:rgba(99,144,240,0.12);color:#6390f0;border-color:rgba(99,144,240,0.25)">Water</span>
+    <span class="chip" style="background:rgba(122,199,76,0.12);color:#7ac74c;border-color:rgba(122,199,76,0.25)">Grass</span>
+    <span class="chip" style="background:rgba(249,207,48,0.12);color:#d4af30;border-color:rgba(249,207,48,0.25)">Electric</span>
+    <span class="chip" style="background:rgba(150,98,212,0.12);color:#c17aee;border-color:rgba(150,98,212,0.25)">Psychic</span>
+    <span class="chip" style="background:rgba(111,185,79,0.12);color:#6fb94f;border-color:rgba(111,185,79,0.25)">Bug</span>
+    <span class="chip" style="background:rgba(190,185,170,0.12);color:#b0a88e;border-color:rgba(190,185,170,0.2)">Normal</span>
+    <span class="chip" style="background:rgba(163,62,161,0.12);color:#c066be;border-color:rgba(163,62,161,0.25)">Poison</span>
+    <span class="chip" style="background:rgba(249,85,135,0.12);color:#f95587;border-color:rgba(249,85,135,0.25)">Fairy</span>
+    <span class="chip" style="background:rgba(196,160,32,0.12);color:#b09430;border-color:rgba(196,160,32,0.25)">Ground</span>
+    <span class="chip" style="background:rgba(175,175,175,0.12);color:#9a9ab0;border-color:rgba(175,175,175,0.2)">Rock</span>
+    <span class="chip" style="background:rgba(98,183,167,0.12);color:#6dc8b8;border-color:rgba(98,183,167,0.25)">Ice</span>
+    <span class="chip" style="background:rgba(122,160,200,0.12);color:#7ab0d8;border-color:rgba(122,160,200,0.25)">Flying</span>
+    <span class="chip" style="background:rgba(195,66,63,0.12);color:#e04040;border-color:rgba(195,66,63,0.25)">Fighting</span>
+    <span class="chip" style="background:rgba(115,90,70,0.12);color:#b09070;border-color:rgba(115,90,70,0.25)">Ghost</span>
+    <span class="chip" style="background:rgba(111,53,252,0.12);color:#9060f0;border-color:rgba(111,53,252,0.25)">Dragon</span>
+    <span class="chip" style="background:rgba(145,165,180,0.12);color:#8fa3b1;border-color:rgba(145,165,180,0.2)">Steel</span>
+    <span class="chip" style="background:rgba(90,70,55,0.12);color:#9a7a60;border-color:rgba(90,70,55,0.2)">Dark</span>
   </div>
 </div>
 
-<!-- ── Modes ───────────────────────────────────── -->
-<div class="section">
-  <h2 class="section-title">Multiple <span>Game Modes</span></h2>
-  <div class="modes">
-    <div class="mode-card">
-      <div class="mode-icon">⚔️</div>
-      <div class="mode-name">Standard</div>
-      <div class="mode-desc">Classic 8-player TFT. Full item pool, all generations, 100 HP. The definitive experience.</div>
-    </div>
-    <div class="mode-card">
-      <div class="mode-icon">⚡</div>
-      <div class="mode-name">Hyper Roll</div>
-      <div class="mode-desc">50 HP, cost 1–3 shop only. Fast, chaotic, reroll-heavy. Ends in under 20 minutes.</div>
-    </div>
-    <div class="mode-card">
-      <div class="mode-icon">★</div>
-      <div class="mode-name">Legendary Clash</div>
-      <div class="mode-desc">150 HP, cost 3–5 shop only. High-power units only — build the perfect late-game comp.</div>
-    </div>
-    <div class="mode-card">
-      <div class="mode-icon">☠</div>
-      <div class="mode-name">Nuzlocke</div>
-      <div class="mode-desc">Any Pokémon that faints in combat is gone forever. Every fight counts.</div>
-    </div>
-    <div class="mode-card">
-      <div class="mode-icon">🌏</div>
-      <div class="mode-name">Region Clash</div>
-      <div class="mode-desc">Play with one generation's Pokémon and their exclusive signature item. Kanto through Paldea.</div>
-    </div>
-    <div class="mode-card">
-      <div class="mode-icon">🤝</div>
-      <div class="mode-name">Double Up</div>
-      <div class="mode-desc">2v2 team mode. Share HP with your partner, trade items, draft together against rival pairs.</div>
+<!-- ═══ MODES ══════════════════════════════════════ -->
+<div class="wrap">
+  <div class="sec">
+    <div class="sec-label">Game modes</div>
+    <div class="sec-title">Six ways to <em>play</em></div>
+
+    <div class="modes-grid">
+
+      <div class="mode-card">
+        <div class="mode-dot" style="background:#6390f0"></div>
+        <div class="mode-text">
+          <div class="mode-name">Standard</div>
+          <div class="mode-desc">Classic 8-player TFT. Full item pool, all nine generations, 100 HP. The definitive experience.</div>
+        </div>
+      </div>
+
+      <div class="mode-card">
+        <div class="mode-dot" style="background:#f9cf30"></div>
+        <div class="mode-text">
+          <div class="mode-name">Hyper Roll</div>
+          <div class="mode-desc">50 HP, cost 1–3 shop only. Fast, chaotic, reroll-heavy. A full game in under 20 minutes.</div>
+        </div>
+      </div>
+
+      <div class="mode-card">
+        <div class="mode-dot" style="background:#c17aee"></div>
+        <div class="mode-text">
+          <div class="mode-name">Legendary Clash</div>
+          <div class="mode-desc">150 HP, cost 3–5 shop only. High-power units only — build the perfect late-game comp or lose slowly.</div>
+        </div>
+      </div>
+
+      <div class="mode-card">
+        <div class="mode-dot" style="background:#e04040"></div>
+        <div class="mode-text">
+          <div class="mode-name">Nuzlocke</div>
+          <div class="mode-desc">Any Pokémon that faints in combat is gone for the rest of the game. Every positioning decision counts.</div>
+        </div>
+      </div>
+
+      <div class="mode-card">
+        <div class="mode-dot" style="background:#6dc8b8"></div>
+        <div class="mode-text">
+          <div class="mode-name">Region Clash</div>
+          <div class="mode-desc">Draft from a single generation with its exclusive signature item. Kanto, Johto, Hoenn — through Paldea.</div>
+        </div>
+      </div>
+
+      <div class="mode-card">
+        <div class="mode-dot" style="background:#7ac74c"></div>
+        <div class="mode-text">
+          <div class="mode-name">Double Up</div>
+          <div class="mode-desc">2v2 team mode. Share HP with your partner, trade items mid-game, and draft together against rival pairs.</div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
 
-<!-- ── Bottom CTA ─────────────────────────────── -->
-<div class="bottom-cta">
+<!-- ═══ BOTTOM CTA ═════════════════════════════════ -->
+<div class="cta-band">
   <h2>Ready to build your team?</h2>
   <p>No account required. Plays in your browser. Free forever.</p>
-  <a href="https://game-poketft-arena.web.app" class="btn-primary" style="font-size:1.1rem;padding:1rem 2.5rem;">
-    ▶ &nbsp;Start Playing
+  <a href="https://game-poketft-arena.web.app" class="btn-play" style="font-size:1rem;padding:0.9rem 2.25rem;">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+      <path d="M3 2.5a.5.5 0 0 1 .757-.429l8 4.5a.5.5 0 0 1 0 .858l-8 4.5A.5.5 0 0 1 3 11.5v-9Z"/>
+    </svg>
+    Start Playing
   </a>
 </div>
 
-<!-- ── Footer ────────────────────────────────── -->
+<!-- ═══ FOOTER ══════════════════════════════════════ -->
 <footer>
-  <p>PokéTFT is a fan project — not affiliated with Nintendo, Game Freak, or The Pokémon Company. &nbsp;·&nbsp; <a href="https://game-poketft-arena.web.app">Play</a> &nbsp;·&nbsp; <a href="https://game-poketft-arena.web.app/download">Download App</a></p>
+  <span class="footer-copy">PokéTFT is a fan project — not affiliated with Nintendo, Game Freak, or The Pokémon Company.</span>
+  <div class="footer-links">
+    <a href="https://game-poketft-arena.web.app">Play</a>
+    <a href="https://game-poketft-arena.web.app/download">Download</a>
+  </div>
 </footer>
 
 </body>
