@@ -167,10 +167,6 @@ export function WelcomeScreen() {
             </div>
 
             <div className="text-center relative z-10">
-              {/* Built in 48h badge */}
-              <div className="inline-flex items-center gap-1.5 mb-3 px-3 py-1 rounded-full border border-amber-500/35 bg-amber-500/6 text-[10px] font-extrabold uppercase tracking-[0.15em] text-amber-300">
-                <Zap size={10} className="shrink-0" /> Built in 48 hours · Open source fan project
-              </div>
               <h1 className="font-bold tracking-tight text-3xl sm:text-5xl text-slate-100 drop-shadow-[0_2px_16px_rgba(212,175,55,0.15)]">{t.w_hero_title}</h1>
               <p className="text-slate-400 text-[14px] mt-2 font-semibold tracking-wide">206 Pokémon · Type effectiveness · Live multiplayer · Free</p>
               <p className="text-slate-600 text-[12px] mt-1.5">{t.w_subtitle}</p>
