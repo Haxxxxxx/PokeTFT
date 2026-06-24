@@ -133,7 +133,7 @@
               ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500"
             },
             "alive": {
-              ".write": "auth != null && (root.child('games').child($code).child('meta/hostUid').val() === auth.uid || ($uid === auth.uid && !newData.val()))"
+              ".write": "auth != null && (root.child('games').child($code).child('meta/hostUid').val() === auth.uid || ($uid === auth.uid && newData.val() === false))"
             },
             "place": {
               ".write": "auth != null && root.child('games').child($code).child('meta/hostUid').val() === auth.uid",
