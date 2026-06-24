@@ -16,6 +16,7 @@ import { normalizeUnit } from "@/game/net/rtdb-utils";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import { useT } from "@/lib/i18n";
 import { useAppStore } from "@/game/store/appStore";
+import { sfx } from "@/lib/audio";
 import type { FrameUnit } from "@/game/engine/combat";
 import type { Room, RoomPlayer, RoomMeta } from "@/game/net/roomStore";
 import type { UnitInstance, PokeType } from "@/game/types";
@@ -188,7 +189,7 @@ export function CarouselOverlay({
         return (
         <div className="flex gap-3 justify-center items-start">
           {opts.map((pick, i) => {
-            const onPick = () => { if (pickLatch.current === `c-${key}`) return; pickLatch.current = `c-${key}`; netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); };
+            const onPick = () => { if (pickLatch.current === `c-${key}`) return; pickLatch.current = `c-${key}`; sfx.carouselPick(); netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); };
             if (pick === MEGA_STONE) return <CarouselCard key={i} onClick={onPick} color="#f0abfc" name={t.it_mega_stone} sub={t.net_carousel_mega_sub} art={<span className="text-fuchsia-300"><MegaIcon size={56} /></span>} />;
             const item = ITEM_DEF_BY_ID[pick];
             if (item) return <CarouselCard key={i} onClick={onPick} color={RARITY_COLOR[item.rarity] ?? "#fbbf24"} name={lang === "fr" ? item.nameFr : item.name} sub={lang === "fr" ? item.textFr : item.text} art={<span style={{ color: RARITY_COLOR[item.rarity] ?? "#fbbf24" }}><ItemGlyph id={item.id} size={46} /></span>} />;
@@ -262,7 +263,7 @@ export function AugmentOverlay({
         {augOptions.map((a) => (
           <OrnateAugmentCard
             key={a.id}
-            onClick={() => { const lk = `a-${augSlotNow}`; if (pickLatch.current === lk) return; pickLatch.current = lk; pickAugment(a.id); setPickedSlot(augSlotNow); flushSync(); }}
+            onClick={() => { const lk = `a-${augSlotNow}`; if (pickLatch.current === lk) return; pickLatch.current = lk; sfx.augmentPick(); pickAugment(a.id); setPickedSlot(augSlotNow); flushSync(); }}
             icon={<AugmentGlyph id={a.id} size={34} />}
             name={lang === "fr" ? a.nameFr : a.name}
             desc={lang === "fr" ? a.descFr : a.desc}

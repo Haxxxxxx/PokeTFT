@@ -108,6 +108,57 @@ export const sfx = {
   sell(): void {
     tone(330, 0.14, "sine", 0.09);
   },
+
+  /** Played on level up — triumphant ascending tones. */
+  levelUp(): void {
+    [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, 0.18, "sine", 0.13, i * 0.06));
+  },
+
+  /** Played when picking an augment — magical prismatic chime. */
+  augmentPick(): void {
+    tone(880, 0.10, "sine", 0.10);
+    tone(1109, 0.14, "sine", 0.12, 0.06);
+    tone(1397, 0.20, "sine", 0.10, 0.14);
+    tone(1760, 0.28, "sine", 0.07, 0.24);
+  },
+
+  /** Played when picking from the carousel — satisfying thud/click. */
+  carouselPick(): void {
+    tone(220, 0.12, "triangle", 0.14);
+    tone(330, 0.10, "triangle", 0.10, 0.06);
+    tone(440, 0.14, "sine", 0.08, 0.10);
+  },
+
+  /** Played when an item is equipped — quick satisfying ding. */
+  itemEquip(): void {
+    tone(880, 0.08, "sine", 0.11);
+    tone(1109, 0.12, "sine", 0.09, 0.06);
+  },
+
+  /** Played when a player is eliminated — short descending tone. */
+  eliminate(): void {
+    [440, 370, 294, 220].forEach((f, i) => tone(f, 0.22, "sine", 0.11, i * 0.09));
+  },
+
+  /** Played when combat phase begins — short punchy "fight!" hit. */
+  roundStart(): void {
+    tone(200, 0.06, "sawtooth", 0.14);
+    tone(280, 0.08, "sawtooth", 0.12, 0.05);
+    tone(440, 0.16, "triangle", 0.10, 0.10);
+  },
+
+  /** Played on gold income — quick coin jingle. */
+  goldGain(): void {
+    tone(1047, 0.07, "sine", 0.09);
+    tone(1319, 0.07, "sine", 0.09, 0.07);
+    tone(1568, 0.10, "sine", 0.08, 0.14);
+  },
+
+  /** Played when the player takes HP damage — low thump. */
+  damage(): void {
+    tone(80, 0.18, "sine", 0.14);
+    tone(55, 0.22, "triangle", 0.10, 0.05);
+  },
 };
 
 // ── Generative background music ──────────────────────────────────────────────
