@@ -12,7 +12,11 @@ import { auth } from "@/game/net/firebase";
  * to a one-tap popup so it never dead-ends.
  */
 function cbPort(): string | null {
-  return new URLSearchParams(window.location.search).get("cb");
+  const raw = new URLSearchParams(window.location.search).get("cb");
+  if (!raw) return null;
+  const port = parseInt(raw, 10);
+  if (isNaN(port) || port < 1024 || port > 65535) return null;
+  return String(port);
 }
 function handoff(cb: string, result: UserCredential): boolean {
   const cred = GoogleAuthProvider.credentialFromResult(result);

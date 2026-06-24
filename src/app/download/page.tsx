@@ -25,10 +25,19 @@ function detectOS(): OS {
   return "other";
 }
 
-const PLATFORMS: { id: OS; name: string; file: string; href: string; glyph: string }[] = [
-  { id: "windows", name: "Windows", file: ".exe installer", href: DL.windows, glyph: "🪟" },
-  { id: "macos", name: "macOS", file: ".dmg (Apple Silicon)", href: DL.macos, glyph: "" },
-  { id: "android", name: "Android", file: ".apk (sideload)", href: DL.android, glyph: "🤖" },
+const PLATFORMS: { id: OS; name: string; file: string; href: string; glyph: string; tip: string }[] = [
+  {
+    id: "windows", name: "Windows", file: ".exe installer", href: DL.windows, glyph: "🪟",
+    tip: 'Windows SmartScreen may warn about this file. Click "More info" → "Run anyway" to install.',
+  },
+  {
+    id: "macos", name: "macOS", file: ".dmg (Apple Silicon)", href: DL.macos, glyph: "🍎",
+    tip: "macOS Gatekeeper may block the first launch. Right-click the app → Open → Open, or go to System Settings → Privacy & Security → Open Anyway.",
+  },
+  {
+    id: "android", name: "Android", file: ".apk (sideload)", href: DL.android, glyph: "🤖",
+    tip: 'Enable "Install from unknown sources" in Settings → Apps → Special app access, then open the .apk.',
+  },
 ];
 
 export default function DownloadPage() {
@@ -77,6 +86,7 @@ export default function DownloadPage() {
               <span className={`mt-2 w-full py-2 rounded-lg text-[13px] font-bold transition-colors ${primary ? "bg-amber-500/90 group-hover:bg-amber-400 text-black" : "bg-white/[0.05] group-hover:bg-white/10 text-slate-200"}`}>
                 Download
               </span>
+              <span className="text-[10px] text-slate-600 leading-snug text-left mt-1">{p.tip}</span>
             </a>
           );
         })}
@@ -90,9 +100,9 @@ export default function DownloadPage() {
         </p>
       </div>
 
-      <footer className="mt-12 text-[11px] text-slate-600 text-center max-w-md leading-relaxed">
-        Fan project. Pokémon IP belongs to Nintendo / Game Freak / The Pokémon Company.
-        Personal / non-commercial use only.
+      <footer className="mt-12 text-[11px] text-slate-600 text-center max-w-md leading-relaxed flex flex-col gap-1.5 items-center">
+        <a href="/privacy" className="text-slate-500 hover:text-slate-300 transition-colors">Privacy Policy</a>
+        <span>Fan project. Pokémon IP belongs to Nintendo / Game Freak / The Pokémon Company. Personal / non-commercial use only.</span>
       </footer>
     </main>
   );
