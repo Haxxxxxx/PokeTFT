@@ -101,6 +101,9 @@ export type CombatAssign = {
   dmg: number;
   selfBoard?: UnitInstance[];
   oppBoard?: UnitInstance[];
+  /** Nuzlocke: iids of units on this player's side that died during the fight.
+   *  Set on both winners and losers so Nuzlocke can purge dead winners' units too. */
+  deadIids?: string[];
 };
 
 /** Snapshot of a player's local economy — synced so a refresh can rehydrate. */

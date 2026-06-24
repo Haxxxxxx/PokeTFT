@@ -344,6 +344,13 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
   // stage can't climb to force a finish). Chip both sides on a draw there so the
   // stalemate resolves into an elimination.
   const drawChip = draw && stage >= 50 ? 10 : 0;
+  // Nuzlocke: extract per-side dead iids from the final frame so both winners and
+  // losers can have their fallen units purged (a winner can still lose units mid-fight).
+  const lastFrame = r.frames.length ? r.frames[r.frames.length - 1] : null;
+  const deadFromFrame = (team: "ally" | "enemy"): string[] =>
+    lastFrame ? lastFrame.units.filter(u => u.team === team && !u.alive).map(u => u.id.slice(u.id.indexOf("-") + 1)) : [];
+  const aDeadIids = deadFromFrame("ally");
+  const bDeadIids = deadFromFrame("enemy");
   combat[aUid] = {
     oppUid: bUid,
     oppName: (room.players[bUid]?.name ?? "Rival") + (ghost ? " (ghost)" : ""),
@@ -353,6 +360,7 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
     dmg: aWon ? 0 : draw ? drawChip : stageBaseDamage(stage) + r.survivorDamage,
     selfBoard: sa,
     oppBoard: sb,
+    ...(aDeadIids.length ? { deadIids: aDeadIids } : {}),
   };
   if (!ghost) {
     combat[bUid] = {
@@ -364,9 +372,10 @@ function assign(combat: Record<string, CombatAssign>, room: Room, aUid: string, 
       dmg: bWon ? 0 : draw ? drawChip : stageBaseDamage(stage) + r.survivorDamage,
       selfBoard: sb,
       oppBoard: sa,
-      // B is the "enemy" side of the canonical simulate(ba, bb): B replays the
+      // B is the "enemy" side of the canonical simulate(sa, sb): B replays the
       // exact same call and mirrors the view, so both screens share one outcome.
       flip: true,
+      ...(bDeadIids.length ? { deadIids: bDeadIids } : {}),
     };
   }
 }
@@ -573,7 +582,12 @@ function buildCombat(room: Room, brainCtx?: BrainCtx): { combat: Record<string, 
       const r = simulate(self, creeps, teamBuffFor(room.players[p.uid], room), undefined);
       // A boss round CAN deal HP damage on a loss (it's a real threat); ordinary PvE doesn't.
       const dmg = isBossRound && r.winner !== "ally" ? Math.min(8, stageBaseDamage(stage)) : 0;
-      combat[p.uid] = { oppUid: p.uid, oppName: pveName, ghost: true, pve: true, won: r.winner === "ally", survivors: 0, dmg, selfBoard: self, oppBoard: creeps };
+      const pveWon = r.winner === "ally";
+      const pveLast = r.frames.length ? r.frames[r.frames.length - 1] : null;
+      const pveDeadIids = pveLast
+        ? pveLast.units.filter(u => u.team === "ally" && !u.alive).map(u => u.id.slice(u.id.indexOf("-") + 1))
+        : [];
+      combat[p.uid] = { oppUid: p.uid, oppName: pveName, ghost: true, pve: true, won: pveWon, survivors: 0, dmg, selfBoard: self, oppBoard: creeps, ...(pveDeadIids.length ? { deadIids: pveDeadIids } : {}) };
     }
   } else if (isDoubleUp(room.rules)) {
     // Double Up (Phase 3): TEAM-vs-TEAM matchmaking — both partners face the two members
@@ -710,6 +724,10 @@ export async function startCarousel(code: string, room: Room): Promise<void> {
         ? EMBLEM_IDS[(salt >>> 5) % EMBLEM_IDS.length]
         : wantSpatula
         ? SPATULA_ID
+        // Region Clash: 50% chance to feature the signature item so players reliably
+        // see it at least once across 2-3 carousels without it always monopolising.
+        : (sigItem && (salt >>> 1) % 2 === 0)
+        ? sigItem
         : itemPool[(salt >>> 3) % itemPool.length];
       carousel[p.uid] = [item, ...pickCarouselOptions(room.meta.stage, salt, 4, rosterFor(room))];
     }
@@ -805,11 +823,11 @@ export async function endCombat(code: string, room: Room): Promise<void> {
       }
     }
 
-    // Nuzlocke: permanently remove any unit that died in this combat. A player's
-    // selfBoard went into the fight; if they LOST (or drew), every unit on that board
-    // is dead for good. Write the dead iids to nuzDead/{uid} — the client reads this
-    // at the start of the next planning round and purges those units from its local
-    // save. Written as ONE whole-node value (not per-child keys) to avoid an
+    // Nuzlocke: permanently remove any unit that died in this combat round, for both
+    // winners (units that fell mid-fight before the win) and losers (all units die).
+    // PvE deaths also count — a Nuzlocke Pokémon that faints to wild creeps is gone.
+    // Ghost fights have no real opponents so no units are considered dead there.
+    // Written as ONE whole-node value (not per-child keys) to avoid an
     // ancestor/descendant path conflict in the same atomic update (same rule as teams).
     if (isNuzlocke(room.rules)) {
       const nuzDeadNode: Record<string, string[]> | null = (() => {
@@ -818,11 +836,10 @@ export async function endCombat(code: string, room: Room): Promise<void> {
           const p = room.players[uid];
           const c = combat[uid];
           // Only human players own a client-side save; bots don't need this.
-          if (!p || p.isBot || !c || c.pve || c.ghost) continue;
-          if (!c.won && Array.isArray(c.selfBoard) && c.selfBoard.length) {
-            const deadIids = (c.selfBoard as UnitInstance[]).map((unit) => unit.iid).filter(Boolean);
-            if (deadIids.length) entries[uid] = deadIids;
-          }
+          // Ghost fights (odd-player bye rounds) have no real combat — skip.
+          if (!p || p.isBot || !c || c.ghost) continue;
+          const dead = c.deadIids ?? [];
+          if (dead.length) entries[uid] = dead;
         }
         return Object.keys(entries).length ? entries : null;
       })();
