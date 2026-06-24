@@ -121,6 +121,8 @@ export async function setUsername(uid: string, username: string): Promise<{ ok: 
   if (prev?.usernameLower && prev.usernameLower !== lower) {
     await remove(nameIndexRef(prev.usernameLower)).catch(() => {});
   }
+  // Keep the leaderboard entry in sync so the username displays correctly.
+  await update(ref(db(), `leaderboard/${uid}`), { username }).catch(() => {});
   return { ok: true };
 }
 
@@ -158,6 +160,7 @@ export function setCurrentGame(uid: string, code: string | null) {
 }
 
 export function setPhoto(uid: string, photoURL: string | null) {
+  update(ref(db(), `leaderboard/${uid}`), { photoURL }).catch(() => {});
   return update(usersRef(uid), { photoURL });
 }
 
@@ -185,6 +188,30 @@ export type GameResult = {
 /** Record (or idempotently overwrite) a finished game's result for this player. */
 export async function recordGameResult(uid: string, code: string, r: Omit<GameResult, "code" | "ts">): Promise<void> {
   await set(ref(db(), `users/${uid}/history/${code}`), { ...r, code, ts: serverTimestamp() }).catch(() => {});
+}
+
+/** Client self-write: apply the LP result the host wrote to games/{code}/results/{uid}.
+ *  Idempotent via users/{uid}/appliedGames/{code} — safe to call on reconnect or retry.
+ *  Only writes self-owned nodes so it works under RTDB self-write rules. */
+export async function claimRankedResult(
+  uid: string,
+  code: string,
+  result: { delta: number; rating: number; prevRating: number },
+  snapshot: { username: string; photoURL?: string | null },
+): Promise<void> {
+  // Idempotency: skip if already applied for this game.
+  const claimRef = ref(db(), `users/${uid}/appliedGames/${code}`);
+  const already = await get(claimRef);
+  if (already.exists()) return;
+  await set(claimRef, true).catch(() => {});
+  await update(ref(db(), `users/${uid}`), {
+    rating: result.rating,
+  }).catch(() => {});
+  await set(ref(db(), `leaderboard/${uid}`), {
+    username: snapshot.username,
+    rating: result.rating,
+    photoURL: snapshot.photoURL ?? null,
+  }).catch(() => {});
 }
 
 /** Read a player's recent finished games, newest first. */
