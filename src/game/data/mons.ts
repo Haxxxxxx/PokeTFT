@@ -181,7 +181,7 @@ export const UNITS: UnitDef[] = [
   def({ id: "ponyta", name: "Ponyta", cost: 2, types: ["fire"], roles: ["evolver"],
     dex: [77, 78, 78], stageNames: ["Ponyta", "Rapidash", "Rapidash"], move: move("Stomp", "fire", 195) }),
   def({ id: "magnemite", name: "Magnemite", cost: 2, types: ["electric"], roles: ["evolver"],
-    dex: [81, 82, 462], stageNames: ["Magnemite", "Magneton", "Magnezone"], move: move("ThunderShock", "electric", 190, "splash"),
+    dex: [81, 82, 82], stageNames: ["Magnemite", "Magneton", "Magneton"], move: move("ThunderShock", "electric", 190, "splash"),
     patch: { range: 3, hp: [580, 1044, 1879] } }),
   def({ id: "psyduck", name: "Psyduck", cost: 2, types: ["water", "psychic"], roles: ["evolver"],
     dex: [54, 55, 55], stageNames: ["Psyduck", "Golduck", "Golduck"], move: move("Confusion", "psychic", 200, "splash"),
@@ -203,24 +203,26 @@ export const UNITS: UnitDef[] = [
   def({ id: "eevee", name: "Eevee", cost: 3, types: ["normal"], roles: ["eeveelution", "evolver"],
     dex: [133, 135, 136], stageNames: ["Eevee", "Jolteon", "Flareon"], move: move("Swift", "normal", 240, "splash") }),
   def({ id: "scyther", name: "Scyther", cost: 3, types: ["bug", "flying"], roles: ["swarm"],
-    dex: [123, 212, 212], stageNames: ["Scyther", "Scizor", "Scizor"], move: move("Slash", "bug", 250) }),
+    dex: [123, 123, 123], stageNames: ["Scyther", "Scyther", "Scyther"], move: move("Slash", "bug", 250) }),
   def({ id: "cubone", name: "Cubone", cost: 3, types: ["ground"], roles: ["evolver"],
     dex: [104, 105, 105], stageNames: ["Cubone", "Marowak", "Marowak"], move: move("Bonemerang", "ground", 245, "line") }),
   def({ id: "onix", name: "Onix", cost: 3, types: ["rock", "ground"],
-    dex: [95, 208, 208], stageNames: ["Onix", "Steelix", "Steelix"], move: move("Rock Slide", "rock", 230, "splash"),
+    dex: [95, 95, 95], stageNames: ["Onix", "Onix", "Onix"], move: move("Rock Slide", "rock", 230, "splash"),
     patch: { hp: [900, 1620, 2916], armor: 50 } }),
   def({ id: "electabuzz", name: "Electabuzz", cost: 3, types: ["electric"],
-    dex: [125, 466, 466], stageNames: ["Electabuzz", "Electivire", "Electivire"], move: move("Thunderpunch", "electric", 260),
+    dex: [125, 125, 125], stageNames: ["Electabuzz", "Electabuzz", "Electabuzz"], move: move("Thunderpunch", "electric", 260),
     patch: { attackSpeed: 0.8, range: 2 } }),
   def({ id: "jynx", name: "Jynx", cost: 3, types: ["ice", "psychic"],
     dex: [124, 124, 124], stageNames: ["Jynx", "Jynx", "Jynx"], move: move("Ice Beam", "ice", 255, "line"),
     patch: { range: 3, hp: [680, 1224, 2203] } }),
   def({ id: "rhyhorn", name: "Rhyhorn", cost: 3, types: ["rock", "ground"], roles: ["evolver"],
-    dex: [111, 112, 464], stageNames: ["Rhyhorn", "Rhydon", "Rhyperior"], move: move("Horn Attack", "normal", 240, "line"),
+    dex: [111, 112, 112], stageNames: ["Rhyhorn", "Rhydon", "Rhydon"], move: move("Horn Attack", "normal", 240, "line"),
     patch: { hp: [950, 1710, 3078], armor: 50, attackSpeed: 0.5 } }),
   def({ id: "hitmonlee", name: "Hitmonlee", cost: 3, types: ["fighting"],
     dex: [106, 106, 106], stageNames: ["Hitmonlee", "Hitmonlee", "Hitmonlee"], move: move("High Jump Kick", "fighting", 270),
     patch: { ad: [60, 108, 194], attackSpeed: 0.75 } }),
+  def({ id: "hitmonchan", name: "Hitmonchan", cost: 3, types: ["fighting"],
+    dex: [107, 107, 107], stageNames: ["Hitmonchan", "Hitmonchan", "Hitmonchan"], move: move("Ice Punch", "ice", 250) }),
 
   // ───────────── 4-cost ─────────────
   def({ id: "dratini", name: "Dratini", cost: 4, types: ["dragon"], roles: ["pseudo-legendary", "evolver"],
@@ -239,7 +241,7 @@ export const UNITS: UnitDef[] = [
     dex: [138, 139, 139], stageNames: ["Omanyte", "Omastar", "Omastar"], move: move("Water Pulse", "water", 355, "splash"),
     patch: { range: 3, hp: [850, 1530, 2754] } }),
   def({ id: "porygon", name: "Porygon", cost: 4, types: ["normal"],
-    dex: [137, 233, 474], stageNames: ["Porygon", "Porygon2", "Porygon-Z"], move: move("Tri Attack", "normal", 345, "splash"),
+    dex: [137, 137, 137], stageNames: ["Porygon", "Porygon", "Porygon"], move: move("Tri Attack", "normal", 345, "splash"),
     patch: { range: 4, hp: [820, 1476, 2657] } }),
 
   // ───────────── 5-cost (legendaries) ─────────────
@@ -278,7 +280,7 @@ export const UNITS: UnitDef[] = [
   def({ id: "snubbull", name: "Snubbull", cost: 2, types: ["fairy"], roles: ["evolver"],
     dex: [209, 210, 210], stageNames: ["Snubbull", "Granbull", "Granbull"], move: move("Play Rough", "fairy", 200) }),
   def({ id: "murkrow", name: "Murkrow", cost: 2, types: ["dark", "flying"],
-    dex: [198, 430, 430], stageNames: ["Murkrow", "Honchkrow", "Honchkrow"], move: move("Feint Attack", "dark", 195),
+    dex: [198, 198, 198], stageNames: ["Murkrow", "Murkrow", "Murkrow"], move: move("Feint Attack", "dark", 195),
     patch: { range: 2 } }),
 
   // ───────────── 3-cost ─────────────
@@ -288,13 +290,16 @@ export const UNITS: UnitDef[] = [
     dex: [228, 229, 229], stageNames: ["Houndour", "Houndoom", "Houndoom"], move: move("Flamethrower", "fire", 255),
     patch: { range: 3 } }),
   def({ id: "misdreavus", name: "Misdreavus", cost: 3, types: ["ghost"],
-    dex: [200, 429, 429], stageNames: ["Misdreavus", "Mismagius", "Mismagius"], move: move("Shadow Ball", "ghost", 255, "splash"),
+    dex: [200, 200, 200], stageNames: ["Misdreavus", "Misdreavus", "Misdreavus"], move: move("Shadow Ball", "ghost", 255, "splash"),
     patch: { range: 3 } }),
 
   // ───────────── 4-cost ─────────────
   def({ id: "tyranitar", name: "Tyranitar", cost: 4, types: ["rock", "dark"], roles: ["pseudo-legendary", "evolver"],
     dex: [246, 247, 248], stageNames: ["Larvitar", "Pupitar", "Tyranitar"], move: move("Rock Slide", "rock", 375, "splash"),
     patch: { hp: [1100, 1980, 3564], armor: 50 } }),
+  def({ id: "steelix", name: "Steelix", cost: 4, types: ["steel", "ground"], roles: ["evolver"],
+    dex: [208, 208, 208], stageNames: ["Steelix", "Steelix", "Steelix"], move: move("Iron Tail", "steel", 360),
+    patch: { hp: [1000, 1800, 3240], armor: 65, attackSpeed: 0.5 } }),
 
   // ───────────── 5-cost ─────────────
   def({ id: "lugia", name: "Lugia", cost: 5, types: ["psychic", "flying"], roles: ["legendary"],
@@ -383,6 +388,9 @@ export const UNITS: UnitDef[] = [
   // ───────────── 3-cost ─────────────
   def({ id: "garchomp", name: "Garchomp", cost: 3, types: ["dragon", "ground"], roles: ["pseudo-legendary", "evolver"],
     dex: [443, 444, 445], stageNames: ["Gible", "Gabite", "Garchomp"], move: move("Dragon Claw", "dragon", 268) }),
+  def({ id: "electivire", name: "Electivire", cost: 3, types: ["electric"],
+    dex: [466, 466, 466], stageNames: ["Electivire", "Electivire", "Electivire"], move: move("Thunderpunch", "electric", 262),
+    patch: { range: 2, attackSpeed: 0.8 } }),
   def({ id: "togekiss", name: "Togekiss", cost: 3, types: ["fairy", "flying"],
     dex: [468, 468, 468], stageNames: ["Togekiss", "Togekiss", "Togekiss"], move: move("Air Slash", "flying", 258, "splash"),
     patch: { range: 3 } }),
@@ -649,6 +657,17 @@ export const UNITS: UnitDef[] = [
   def({ id: "suicune", name: "Suicune", cost: 5, types: ["water"], roles: ["legendary"],
     dex: [245, 245, 245], stageNames: ["Suicune", "Suicune", "Suicune"], move: move("Hydro Pump", "water", 460, "splash"),
     patch: { range: 4 } }),
+  def({ id: "bellossom", name: "Bellossom", cost: 3, types: ["grass"],
+    dex: [182, 182, 182], stageNames: ["Bellossom", "Bellossom", "Bellossom"], move: move("Petal Dance", "grass", 255, "splash"),
+    patch: { range: 3 } }),
+  def({ id: "politoed", name: "Politoed", cost: 4, types: ["water"],
+    dex: [186, 186, 186], stageNames: ["Politoed", "Politoed", "Politoed"], move: move("Hyper Voice", "water", 340, "splash"),
+    patch: { range: 3 } }),
+  def({ id: "slowking", name: "Slowking", cost: 4, types: ["water", "psychic"],
+    dex: [199, 199, 199], stageNames: ["Slowking", "Slowking", "Slowking"], move: move("Psychic", "psychic", 340, "splash"),
+    patch: { range: 3 } }),
+  def({ id: "hitmontop", name: "Hitmontop", cost: 3, types: ["fighting"],
+    dex: [237, 237, 237], stageNames: ["Hitmontop", "Hitmontop", "Hitmontop"], move: move("Triple Kick", "fighting", 240) }),
 
   // ══════════════════════════════════════════════════════════════
   // GEN III — HOENN — additions (+8)
@@ -675,6 +694,18 @@ export const UNITS: UnitDef[] = [
   def({ id: "latios", name: "Latios", cost: 5, types: ["dragon", "psychic"], roles: ["legendary"],
     dex: [381, 381, 381], stageNames: ["Latios", "Latios", "Latios"], move: move("Luster Purge", "psychic", 475, "line"),
     patch: { range: 4 } }),
+  def({ id: "cascoon", name: "Cascoon", cost: 1, types: ["bug"],
+    dex: [268, 268, 268], stageNames: ["Cascoon", "Cascoon", "Cascoon"], move: move("String Shot", "bug", 155, "splash"),
+    patch: { range: 3, hp: [650, 1170, 2106] } }),
+  def({ id: "dustox", name: "Dustox", cost: 2, types: ["bug", "poison"],
+    dex: [269, 269, 269], stageNames: ["Dustox", "Dustox", "Dustox"], move: move("Poison Powder", "poison", 200, "splash"),
+    patch: { range: 3 } }),
+  def({ id: "shedinja", name: "Shedinja", cost: 4, types: ["bug", "ghost"],
+    dex: [292, 292, 292], stageNames: ["Shedinja", "Shedinja", "Shedinja"], move: move("Shadow Sneak", "ghost", 320),
+    patch: { hp: [180, 324, 583], ad: [85, 153, 275] } }),
+  def({ id: "gorebyss", name: "Gorebyss", cost: 3, types: ["water", "psychic"],
+    dex: [368, 368, 368], stageNames: ["Gorebyss", "Gorebyss", "Gorebyss"], move: move("Psychic", "psychic", 255, "splash"),
+    patch: { range: 3 } }),
 
   // ══════════════════════════════════════════════════════════════
   // GEN IV — SINNOH — additions (+8)
@@ -703,6 +734,15 @@ export const UNITS: UnitDef[] = [
   def({ id: "heatran", name: "Heatran", cost: 5, types: ["fire", "steel"], roles: ["legendary"],
     dex: [485, 485, 485], stageNames: ["Heatran", "Heatran", "Heatran"], move: move("Magma Storm", "fire", 480, "splash"),
     patch: { range: 3, armor: 50 } }),
+  def({ id: "mothim", name: "Mothim", cost: 2, types: ["bug", "flying"],
+    dex: [414, 414, 414], stageNames: ["Mothim", "Mothim", "Mothim"], move: move("Air Slash", "flying", 200, "splash"),
+    patch: { range: 3 } }),
+  def({ id: "leafeon", name: "Leafeon", cost: 3, types: ["grass"], roles: ["eeveelution"],
+    dex: [470, 470, 470], stageNames: ["Leafeon", "Leafeon", "Leafeon"], move: move("Leaf Blade", "grass", 260) }),
+  def({ id: "glaceon", name: "Glaceon", cost: 3, types: ["ice"], roles: ["eeveelution"],
+    dex: [471, 471, 471], stageNames: ["Glaceon", "Glaceon", "Glaceon"], move: move("Ice Fang", "ice", 255) }),
+  def({ id: "gallade", name: "Gallade", cost: 4, types: ["psychic", "fighting"], roles: ["evolver"],
+    dex: [475, 475, 475], stageNames: ["Gallade", "Gallade", "Gallade"], move: move("Psycho Cut", "psychic", 355) }),
 
   // ══════════════════════════════════════════════════════════════
   // GEN V — UNOVA — additions (+8)
@@ -808,6 +848,19 @@ export const UNITS: UnitDef[] = [
   def({ id: "calyrex", name: "Calyrex", cost: 5, types: ["psychic", "grass"], roles: ["mythic"],
     dex: [898, 898, 898], stageNames: ["Calyrex", "Calyrex", "Calyrex"], move: move("Expanding Force", "psychic", 485, "splash"),
     patch: { range: 4 } }),
+  def({ id: "appletun", name: "Appletun", cost: 3, types: ["grass", "dragon"],
+    dex: [842, 842, 842], stageNames: ["Appletun", "Appletun", "Appletun"], move: move("Dragon Pulse", "dragon", 260, "splash"),
+    patch: { range: 3, hp: [800, 1440, 2592] } }),
+  def({ id: "perrserker", name: "Perrserker", cost: 3, types: ["steel"],
+    dex: [863, 863, 863], stageNames: ["Perrserker", "Perrserker", "Perrserker"], move: move("Iron Head", "steel", 255) }),
+  def({ id: "runerigus", name: "Runerigus", cost: 4, types: ["ground", "ghost"],
+    dex: [867, 867, 867], stageNames: ["Runerigus", "Runerigus", "Runerigus"], move: move("Shadow Ball", "ghost", 350, "splash"),
+    patch: { range: 3, armor: 50 } }),
+  def({ id: "cursola", name: "Cursola", cost: 4, types: ["ghost"],
+    dex: [900, 900, 900], stageNames: ["Cursola", "Cursola", "Cursola"], move: move("Shadow Ball", "ghost", 360, "splash"),
+    patch: { range: 4, hp: [700, 1260, 2268] } }),
+  def({ id: "sneasler", name: "Sneasler", cost: 4, types: ["fighting", "poison"], roles: ["evolver"],
+    dex: [903, 903, 903], stageNames: ["Sneasler", "Sneasler", "Sneasler"], move: move("Poison Jab", "poison", 350) }),
 
   // ══════════════════════════════════════════════════════════════
   // GEN IX — PALDEA — additions (+8)
@@ -834,6 +887,18 @@ export const UNITS: UnitDef[] = [
   def({ id: "ogerpon", name: "Ogerpon", cost: 4, types: ["grass"], roles: ["legendary"],
     dex: [1017, 1017, 1017], stageNames: ["Ogerpon", "Ogerpon", "Ogerpon"], move: move("Ivy Cudgel", "grass", 370),
     patch: { attackSpeed: 0.78 } }),
+  def({ id: "annihilape", name: "Annihilape", cost: 4, types: ["fighting", "ghost"],
+    dex: [937, 937, 937], stageNames: ["Annihilape", "Annihilape", "Annihilape"], move: move("Rage Fist", "ghost", 360),
+    patch: { ad: [80, 144, 259], hp: [950, 1710, 3078] } }),
+  def({ id: "clodsire", name: "Clodsire", cost: 3, types: ["poison", "ground"],
+    dex: [980, 980, 980], stageNames: ["Clodsire", "Clodsire", "Clodsire"], move: move("Earthquake", "ground", 265, "splash"),
+    patch: { hp: [900, 1620, 2916], armor: 40 } }),
+  def({ id: "hydrapple", name: "Hydrapple", cost: 4, types: ["grass", "dragon"],
+    dex: [1011, 1011, 1011], stageNames: ["Hydrapple", "Hydrapple", "Hydrapple"], move: move("Dragon Pulse", "dragon", 350, "splash"),
+    patch: { range: 3, hp: [900, 1620, 2916] } }),
+  def({ id: "archaludon", name: "Archaludon", cost: 5, types: ["steel", "dragon"], roles: ["legendary"],
+    dex: [1019, 1019, 1019], stageNames: ["Archaludon", "Archaludon", "Archaludon"], move: move("Flash Cannon", "steel", 430, "line"),
+    patch: { range: 4, hp: [950, 1710, 3078], armor: 50 } }),
 ];
 
 // Fill out each region's full national-dex roster from the auto-generated set.
@@ -866,9 +931,9 @@ export const UNITS: UnitDef[] = [
 // generated) only when that unit doesn't already define its own typesByStar. Index 0 = ★,
 // 1 = ★★, 2 = ★★★.
 const TYPE_SHIFTS: Record<string, PokeType[][]> = {
-  magikarp:  [["water"], ["water", "flying"], ["water", "flying"]],       // Gyarados (at ★★) gains Flying
-  onix:      [["rock", "ground"], ["steel", "ground"], ["steel", "ground"]], // → Steelix (Steel replaces Rock)
-  magnemite: [["electric"], ["electric", "steel"], ["electric", "steel"]], // → Magneton/Magnezone gain Steel
+  magikarp: [["water"], ["water", "flying"], ["water", "flying"]],       // Gyarados (at ★★, 2-stage) gains Flying
+  // (Onix is a standalone unit here — dex [95,95,95], never evolves — so it stays Rock/Ground;
+  //  Steelix is its own buyable unit. No shift.)
   bagon:    [["dragon"], ["dragon"], ["dragon", "flying"]],              // → Salamence (Flying)
   swablu:   [["normal", "flying"], ["dragon", "flying"], ["dragon", "flying"]], // → Altaria (Dragon)
   azurill:  [["normal", "fairy"], ["water", "fairy"], ["water", "fairy"]], // → Marill (Water)
