@@ -1,12 +1,15 @@
 /**
  * Firebase client (PokéTFT Arena) — Realtime Database + Anonymous Auth.
- * Config values are public-safe identifiers (not secrets).
  *
- * Identity: we prefer Firebase Anonymous Auth (server-issued `auth.uid`, which
- * the RTDB rules can bind writes to). If anonymous sign-in isn't enabled yet
- * (one-time Firebase console toggle), we fall back to a per-tab sessionStorage
- * id so the game keeps working — but the locked `auth != null` rules can only
- * be deployed once anonymous auth is live for every client.
+ * These are Firebase *client* config values — public-safe project identifiers,
+ * not API secrets. They are intentionally committed as fallbacks so the build
+ * works out of the box without requiring every contributor to configure env vars.
+ * Access is enforced by Realtime Database security rules + anonymous auth, not
+ * by keeping these values private.
+ *
+ * For your own fork/deployment, override via NEXT_PUBLIC_FIREBASE_* env vars
+ * (see .env.example). For the canonical PokéTFT Arena deploy the fallbacks ARE
+ * the correct values.
  */
 
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
@@ -14,13 +17,13 @@ import { getDatabase, type Database } from "firebase/database";
 import { getAuth, signInAnonymously, type Auth } from "firebase/auth";
 
 const config = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "AIzaSyCtPKFSNFcu3DGIr3tMgsVMr1Dm0_K7yCA",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "poketft-arena.web.app",
-  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ?? "https://poketft-arena-default-rtdb.firebaseio.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "poketft-arena",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "poketft-arena.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "250210808933",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? "1:250210808933:web:1586c9b3494548b27a028c",
+  apiKey:             process.env.NEXT_PUBLIC_FIREBASE_API_KEY             ?? "AIzaSyCtPKFSNFcu3DGIr3tMgsVMr1Dm0_K7yCA",
+  authDomain:         process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN         ?? "poketft-arena.web.app",
+  databaseURL:        process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL        ?? "https://poketft-arena-default-rtdb.firebaseio.com",
+  projectId:          process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID          ?? "poketft-arena",
+  storageBucket:      process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET      ?? "poketft-arena.firebasestorage.app",
+  messagingSenderId:  process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "250210808933",
+  appId:              process.env.NEXT_PUBLIC_FIREBASE_APP_ID              ?? "1:250210808933:web:1586c9b3494548b27a028c",
 };
 
 let app: FirebaseApp | null = null;
