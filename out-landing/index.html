@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PokéTFT — Team Fight Tactics meets Pokémon</title>
-  <meta name="description" content="Build teams of Pokémon, activate type synergies, and battle 8 players live. Free to play — browser or native app." />
+  <meta name="description" content="Build teams of Pokémon, activate type synergies, and battle 8 players live. Free to play — browser or native app. Source available on GitHub." />
   <meta property="og:title" content="PokéTFT" />
   <meta property="og:description" content="TFT meets Pokémon. 206+ mons, type synergies, mega evolutions. Free on every platform." />
-  <meta property="og:image" content="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/384.png" />
+  <meta property="og:image" content="https://poketft-arena.web.app/screenshots/combat.jpg" />
   <link rel="icon" href="https://game-poketft-arena.web.app/favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -17,19 +17,19 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --gold:       #f59e0b;
-      --gold-light: #fbbf24;
-      --gold-dim:   rgba(245,158,11,0.13);
-      --gold-ring:  rgba(245,158,11,0.22);
-      --bg:         #07101f;
-      --bg2:        #0b1628;
-      --surface:    #0f1e35;
-      --surface2:   #152540;
-      --border:     rgba(255,255,255,0.065);
-      --border2:    rgba(255,255,255,0.11);
-      --text:       #eef2ff;
-      --muted:      #7080a0;
-      --muted2:     #48587a;
+      --gold:       #e0a12a;
+      --gold-light: #f0b846;
+      --gold-dim:   rgba(224,161,42,0.12);
+      --gold-ring:  rgba(224,161,42,0.24);
+      --bg:         #0a0f1a;
+      --bg2:        #0d1420;
+      --surface:    #101827;
+      --surface2:   #16212f;
+      --border:     rgba(255,255,255,0.07);
+      --border2:    rgba(255,255,255,0.12);
+      --text:       #e9edf5;
+      --muted:      #8391a8;
+      --muted2:     #56637c;
     }
 
     html { scroll-behavior: smooth; }
@@ -44,381 +44,337 @@
 
     /* ─── UTILITIES ──────────────────────────────── */
     .wrap { max-width: 1080px; margin: 0 auto; padding: 0 1.5rem; }
-    .sec  { padding: 6.5rem 0; }
+    .sec  { padding: 6rem 0; }
 
     .sec-eyebrow {
-      font-size: 0.67rem;
+      font-size: 0.7rem;
       font-weight: 700;
-      letter-spacing: 0.14em;
+      letter-spacing: 0.11em;
       text-transform: uppercase;
       color: var(--gold);
       margin-bottom: 0.6rem;
     }
     .sec-heading {
-      font-size: clamp(1.9rem, 4vw, 2.75rem);
+      font-size: clamp(1.7rem, 3.4vw, 2.35rem);
       font-weight: 800;
-      letter-spacing: -0.035em;
-      line-height: 1.1;
-      margin-bottom: 3.5rem;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 3rem;
+      color: var(--text);
     }
-    .sec-heading em { font-style: normal; color: var(--gold); }
 
-    /* ─── DOT GRID ───────────────────────────────── */
-    .dot-bg {
-      position: absolute; inset: 0; pointer-events: none;
-      background-image: radial-gradient(circle, rgba(255,255,255,0.032) 1px, transparent 1px);
-      background-size: 28px 28px;
-      mask-image: radial-gradient(ellipse 100% 80% at 50% 0%, black 0%, transparent 80%);
-      -webkit-mask-image: radial-gradient(ellipse 100% 80% at 50% 0%, black 0%, transparent 80%);
+    /* ─── NAV ────────────────────────────────────── */
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      max-width: 1080px; margin: 0 auto;
+      padding: 1.5rem 1.5rem 0;
     }
+    .brand { display: flex; align-items: center; gap: 0.55rem; font-weight: 800; font-size: 0.95rem; letter-spacing: -0.01em; }
+    .brand .gold-word { color: var(--gold); }
+    nav a.navlink {
+      font-size: 0.8rem; font-weight: 600; color: var(--muted);
+      text-decoration: none; transition: color 0.15s;
+    }
+    nav a.navlink:hover { color: var(--text); }
+    .nav-links { display: flex; gap: 1.75rem; align-items: center; }
 
     /* ─── HERO ───────────────────────────────────── */
     .hero {
-      position: relative; min-height: 100vh; overflow: hidden;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      text-align: center; padding: 6rem 1.5rem 5rem;
+      position: relative;
+      padding: 4.5rem 1.5rem 5rem;
     }
     .hero-glow {
-      position: absolute; inset: 0; pointer-events: none;
-      background:
-        radial-gradient(ellipse 72% 55% at 50% -8%,  rgba(245,158,11,0.11) 0%, transparent 65%),
-        radial-gradient(ellipse 48% 38% at 12% 88%,  rgba(99,102,241,0.07) 0%, transparent 55%),
-        radial-gradient(ellipse 48% 38% at 88% 88%,  rgba(20,184,166,0.06) 0%, transparent 55%);
+      position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background: radial-gradient(ellipse 60% 45% at 50% 0%, rgba(224,161,42,0.09) 0%, transparent 70%);
+    }
+    .hero-inner {
+      position: relative; z-index: 1;
+      max-width: 1080px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr; gap: 2.75rem;
+      text-align: center;
     }
 
-    /* Decorative Pokémon */
-    .hero-mons { position: absolute; inset: 0; pointer-events: none; }
-    .hm {
-      position: absolute;
-      opacity: 0.15;
-      filter: saturate(0.65) drop-shadow(0 0 28px rgba(245,158,11,0.3));
-      animation: float 7s ease-in-out infinite;
-    }
-    .hm:nth-child(2) { animation-delay:-1.5s; }
-    .hm:nth-child(3) { animation-delay:-3s;   }
-    .hm:nth-child(4) { animation-delay:-4.5s; }
-    .hm:nth-child(5) { animation-delay:-6s;   }
-
-    @keyframes float {
-      0%,100% { transform: translateY(0)     rotate(var(--r,0deg)); }
-      50%      { transform: translateY(-14px) rotate(var(--r,0deg)); }
-    }
-    @media (prefers-reduced-motion: reduce) { .hm { animation: none; } }
-
-    /* Pill tag above heading */
     .tag {
-      position: relative;
-      display: inline-block;
+      display: inline-flex; align-items: center; gap: 0.45rem;
       background: var(--gold-dim);
       border: 1px solid var(--gold-ring);
       color: var(--gold);
-      font-size: 0.67rem; font-weight: 700;
-      letter-spacing: 0.13em; text-transform: uppercase;
-      padding: 0.35rem 1rem; border-radius: 999px;
-      margin-bottom: 1.75rem;
+      font-size: 0.72rem; font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 0.35rem 0.9rem 0.35rem 0.7rem; border-radius: 999px;
+      margin: 0 auto 1.5rem;
     }
+    .tag .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--gold); }
 
     h1 {
-      position: relative;
-      font-size: clamp(3.5rem, 10vw, 7rem);
-      font-weight: 900; line-height: 0.93; letter-spacing: -0.045em;
-      background: linear-gradient(160deg, #fff 20%, #e8d8a8 52%, var(--gold) 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 1.25rem;
+      font-size: clamp(2.6rem, 6.5vw, 4.4rem);
+      font-weight: 900; line-height: 1.02; letter-spacing: -0.04em;
+      color: var(--text);
+      margin-bottom: 1.15rem;
     }
+    h1 .gold-word { color: var(--gold); }
 
     .hero-sub {
-      position: relative;
-      font-size: clamp(1rem, 2vw, 1.15rem);
-      color: var(--muted); max-width: 420px;
-      line-height: 1.7; margin-bottom: 2.75rem;
+      font-size: clamp(1rem, 1.6vw, 1.1rem);
+      color: var(--muted); max-width: 480px;
+      line-height: 1.65; margin: 0 auto 2rem;
     }
 
     /* CTA stack */
-    .cta-stack {
-      position: relative;
-      display: flex; flex-direction: column;
-      align-items: center; gap: 0.75rem;
-    }
-    .cta-row {
-      display: flex; gap: 0.75rem;
-      flex-wrap: wrap; justify-content: center;
-    }
+    .cta-stack { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+    .cta-row { display: flex; gap: 0.7rem; flex-wrap: wrap; justify-content: center; }
 
-    /* Primary shimmer button */
     .btn-dl {
-      position: relative; overflow: hidden;
-      display: inline-flex; align-items: center; gap: 0.6rem;
-      background: var(--gold); color: #09070000;
-      color: #120f00;
-      font-size: 0.95rem; font-weight: 800;
-      padding: 0.85rem 2rem; border-radius: 0.625rem;
-      text-decoration: none; letter-spacing: 0.01em;
-      transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
-    }
-    .btn-dl::after {
-      content: "";
-      position: absolute; top: 0; left: -120%;
-      width: 60%; height: 100%;
-      background: linear-gradient(105deg, transparent, rgba(255,255,255,0.28), transparent);
-      animation: shimmer 3.5s ease-in-out infinite;
-    }
-    @keyframes shimmer {
-      0%   { left: -120%; }
-      30%  { left: 140%;  }
-      100% { left: 140%;  }
-    }
-    .btn-dl:hover {
-      background: var(--gold-light);
-      transform: translateY(-2px);
-      box-shadow: 0 10px 40px rgba(245,158,11,0.3);
-    }
-
-    /* Ghost secondary */
-    .btn-ghost {
       display: inline-flex; align-items: center; gap: 0.55rem;
+      background: var(--gold); color: #16110a;
+      font-size: 0.9rem; font-weight: 700;
+      padding: 0.8rem 1.75rem; border-radius: 0.6rem;
+      text-decoration: none; letter-spacing: 0.005em;
+      transition: background 0.15s, transform 0.15s;
+    }
+    .btn-dl:hover { background: var(--gold-light); transform: translateY(-1px); }
+
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 0.5rem;
       background: transparent; color: var(--muted);
-      font-size: 0.9rem; font-weight: 600;
-      padding: 0.8rem 1.6rem; border-radius: 0.625rem;
+      font-size: 0.87rem; font-weight: 600;
+      padding: 0.78rem 1.5rem; border-radius: 0.6rem;
       text-decoration: none; border: 1px solid var(--border2);
       transition: border-color 0.15s, color 0.15s;
     }
-    .btn-ghost:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+    .btn-ghost:hover { border-color: rgba(255,255,255,0.22); color: var(--text); }
 
-    /* Small inline link */
-    .inline-link {
-      font-size: 0.78rem; color: var(--muted2);
-      text-decoration: none; transition: color 0.15s;
-    }
+    .inline-link { font-size: 0.76rem; color: var(--muted2); text-decoration: none; transition: color 0.15s; }
     .inline-link:hover { color: var(--muted); }
+
+    /* Hero screenshot — real gameplay, framed plainly. */
+    .hero-shot {
+      position: relative;
+      max-width: 900px; margin: 0.5rem auto 0;
+      border-radius: 0.85rem;
+      border: 1px solid var(--border2);
+      background: var(--surface);
+      box-shadow: 0 30px 60px -25px rgba(0,0,0,0.55);
+      overflow: hidden;
+    }
+    .hero-shot img { display: block; width: 100%; height: auto; }
+    .hero-shot-bar {
+      display: flex; align-items: center; gap: 0.4rem;
+      padding: 0.6rem 0.85rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .hero-shot-bar span { width: 8px; height: 8px; border-radius: 999px; background: var(--border2); }
+
+    /* ─── TRUST STRIP ────────────────────────────── */
+    .trust-band {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 2.5rem 1.5rem;
+    }
+    .trust-grid {
+      max-width: 1080px; margin: 0 auto;
+      display: grid; grid-template-columns: repeat(3,1fr);
+      gap: 2rem;
+    }
+    @media(max-width:760px){ .trust-grid { grid-template-columns:1fr; gap:1.75rem; } }
+    .trust-item { display: flex; gap: 0.85rem; align-items: flex-start; }
+    .trust-icon {
+      width: 30px; height: 30px; border-radius: 7px; flex-shrink: 0;
+      background: var(--gold-dim); border: 1px solid var(--gold-ring);
+      display: flex; align-items: center; justify-content: center; color: var(--gold);
+    }
+    .trust-icon svg { width: 15px; height: 15px; }
+    .trust-title { font-size: 0.85rem; font-weight: 700; color: var(--text); margin-bottom: 0.25rem; }
+    .trust-desc { font-size: 0.79rem; color: var(--muted); line-height: 1.55; }
+    .trust-desc a { color: var(--gold); text-decoration: none; }
+    .trust-desc a:hover { text-decoration: underline; }
 
     /* ─── STATS BAR ──────────────────────────────── */
     .stats-bar {
       display: grid; grid-template-columns: repeat(4,1fr);
-      background: var(--surface);
-      border-top: 1px solid var(--border);
+      background: var(--bg2);
       border-bottom: 1px solid var(--border);
     }
-    .sc {
-      padding: 1.6rem 1rem; text-align: center;
-      border-right: 1px solid var(--border);
-    }
+    .sc { padding: 1.5rem 1rem; text-align: center; border-right: 1px solid var(--border); }
     .sc:last-child { border-right: none; }
-    .sn { display:block; font-size:1.8rem; font-weight:800; color:var(--gold); letter-spacing:-0.04em; line-height:1; margin-bottom:0.3rem; }
-    .sl { font-size:0.68rem; font-weight:600; color:var(--muted2); text-transform:uppercase; letter-spacing:0.1em; }
-
+    .sn { display:block; font-size:1.65rem; font-weight:800; color:var(--gold); letter-spacing:-0.03em; line-height:1; margin-bottom:0.3rem; }
+    .sl { font-size:0.67rem; font-weight:600; color:var(--muted2); text-transform:uppercase; letter-spacing:0.09em; }
     @media(max-width:560px){
       .stats-bar { grid-template-columns:repeat(2,1fr); }
       .sc:nth-child(2) { border-right:none; }
-      .sc:nth-child(3),
-      .sc:nth-child(4) { border-top:1px solid var(--border); }
+      .sc:nth-child(3), .sc:nth-child(4) { border-top:1px solid var(--border); }
       .sc:nth-child(4) { border-right:none; }
     }
 
     /* ─── HOW IT WORKS ───────────────────────────── */
-    .how-band {
-      background: var(--bg2);
-      border-bottom: 1px solid var(--border);
-      padding: 4rem 1.5rem;
-    }
-    .how-grid {
-      max-width: 900px; margin: 0 auto;
-      display: grid; grid-template-columns: repeat(3,1fr);
-      gap: 2px;
-    }
+    .how-band { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 4rem 1.5rem; }
+    .how-grid { max-width: 900px; margin: 0 auto; display: grid; grid-template-columns: repeat(3,1fr); gap: 2px; }
     @media(max-width:580px){ .how-grid { grid-template-columns:1fr; gap:0; } }
-
-    .how-cell {
-      padding: 2rem 1.75rem;
-      display: flex; flex-direction: column; gap: 0.6rem;
-      position: relative;
-    }
+    .how-cell { padding: 1.75rem; display: flex; flex-direction: column; gap: 0.55rem; position: relative; }
     .how-cell:not(:last-child)::after {
-      content: "";
-      position: absolute; right: 0; top: 25%; bottom: 25%;
-      width: 1px; background: var(--border);
+      content: ""; position: absolute; right: 0; top: 25%; bottom: 25%; width: 1px; background: var(--border);
     }
     @media(max-width:580px){
       .how-cell:not(:last-child)::after { display: none; }
       .how-cell:not(:last-child)::before {
-        content: ""; display: block; height: 1px;
-        background: var(--border);
+        content: ""; display: block; height: 1px; background: var(--border);
         position: absolute; bottom: 0; left: 1.75rem; right: 1.75rem;
       }
     }
-    .how-num {
-      font-size: 0.65rem; font-weight: 800;
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--gold); opacity: 0.8;
-    }
-    .how-title {
-      font-size: 1rem; font-weight: 700; color: var(--text);
-    }
-    .how-desc {
-      font-size: 0.8rem; color: var(--muted); line-height: 1.65;
-    }
+    .how-num { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); opacity: 0.85; }
+    .how-title { font-size: 0.98rem; font-weight: 700; color: var(--text); }
+    .how-desc { font-size: 0.79rem; color: var(--muted); line-height: 1.6; }
 
     /* ─── FEATURES ───────────────────────────────── */
     .feat-grid {
       display: grid; grid-template-columns: repeat(3,1fr);
-      border: 1px solid var(--border); border-radius: 1.25rem;
+      border: 1px solid var(--border); border-radius: 1rem;
       overflow: hidden; gap: 1px; background: var(--border);
     }
     @media(max-width:780px){ .feat-grid { grid-template-columns:repeat(2,1fr); } }
     @media(max-width:500px){ .feat-grid { grid-template-columns:1fr; } }
-
-    .fc {
-      background: var(--surface);
-      padding: 2rem 1.75rem;
-      transition: background 0.2s;
-    }
-    .fc:hover { background: var(--surface2); }
-
+    .fc { background: var(--surface); padding: 1.85rem 1.65rem; }
     .fi {
-      width: 34px; height: 34px; border-radius: 8px;
+      width: 32px; height: 32px; border-radius: 7px;
       background: var(--gold-dim); border: 1px solid var(--gold-ring);
       display: flex; align-items: center; justify-content: center;
-      color: var(--gold); margin-bottom: 1rem; flex-shrink: 0;
+      color: var(--gold); margin-bottom: 0.9rem; flex-shrink: 0;
     }
-    .fi svg { width: 16px; height: 16px; }
-    .fn { font-size: 0.875rem; font-weight: 700; margin-bottom: 0.45rem; color: var(--text); }
-    .fd { font-size: 0.8rem; color: var(--muted); line-height: 1.65; }
+    .fi svg { width: 15px; height: 15px; }
+    .fn { font-size: 0.86rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--text); }
+    .fd { font-size: 0.79rem; color: var(--muted); line-height: 1.6; }
 
-    /* ─── TYPE MARQUEE ───────────────────────────── */
-    .types-band {
-      background: var(--bg2);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      padding: 3.5rem 0;
-      overflow: hidden;
-    }
-    .types-label {
-      text-align: center;
-      font-size: 0.67rem; font-weight: 700;
-      letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--muted2); margin-bottom: 1.25rem;
-    }
+    /* ─── TYPE STRIP ─────────────────────────────── */
+    .types-band { background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 3rem 0; overflow: hidden; }
+    .types-label { text-align: center; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted2); margin-bottom: 1.1rem; }
     .marquee-outer { overflow: hidden; }
-    .marquee-track {
-      display: flex; gap: 0.5rem;
-      width: max-content;
-      animation: marquee 38s linear infinite;
-    }
+    .marquee-track { display: flex; gap: 0.5rem; width: max-content; animation: marquee 42s linear infinite; }
     .marquee-track:hover { animation-play-state: paused; }
-    @keyframes marquee {
-      from { transform: translateX(0); }
-      to   { transform: translateX(-50%); }
-    }
+    @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
     @media(prefers-reduced-motion:reduce){ .marquee-track { animation: none; } }
-    .chip {
-      font-size: 0.67rem; font-weight: 700;
-      letter-spacing: 0.08em; text-transform: uppercase;
-      padding: 0.3rem 0.85rem; border-radius: 999px;
-      border: 1px solid; white-space: nowrap;
-    }
+    .chip { font-size: 0.67rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.3rem 0.85rem; border-radius: 999px; border: 1px solid; white-space: nowrap; }
 
     /* ─── MODES ──────────────────────────────────── */
-    .modes-grid {
-      display: grid; grid-template-columns: repeat(3,1fr);
-      gap: 1rem;
-    }
+    .modes-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; }
     @media(max-width:720px){ .modes-grid { grid-template-columns:repeat(2,1fr); } }
     @media(max-width:480px){ .modes-grid { grid-template-columns:1fr; } }
-
     .mc {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 0.875rem;
-      padding: 1.5rem;
-      display: flex; flex-direction: column; gap: 0.5rem;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 0.8rem;
+      padding: 1.4rem; display: flex; flex-direction: column; gap: 0.45rem;
       border-top: 2px solid var(--mode-color, var(--border));
-      transition: transform 0.18s, box-shadow 0.18s;
     }
-    .mc:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,0.3); }
-    .mn { font-size: 0.875rem; font-weight: 700; color: var(--text); }
-    .md { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
+    .mn { font-size: 0.86rem; font-weight: 700; color: var(--text); }
+    .md { font-size: 0.77rem; color: var(--muted); line-height: 1.55; }
 
     /* ─── BOTTOM CTA ─────────────────────────────── */
-    .cta-band {
-      background: var(--bg2);
-      border-top: 1px solid var(--border);
-      padding: 7rem 1.5rem; text-align: center;
-      position: relative; overflow: hidden;
-    }
-    .cta-band::before {
-      content: "";
-      position: absolute; inset: 0; pointer-events: none;
-      background: radial-gradient(ellipse 65% 90% at 50% 105%, rgba(245,158,11,0.08) 0%, transparent 65%);
-    }
-    .cta-band h2 {
-      font-size: clamp(2.2rem, 5.5vw, 3.5rem);
-      font-weight: 900; letter-spacing: -0.04em;
-      line-height: 1.05; margin-bottom: 0.875rem;
-    }
-    .cta-band p { font-size: 1rem; color: var(--muted); margin-bottom: 2.25rem; }
+    .cta-band { background: var(--bg2); border-top: 1px solid var(--border); padding: 5.5rem 1.5rem; text-align: center; }
+    .cta-band h2 { font-size: clamp(1.9rem, 4.4vw, 2.6rem); font-weight: 900; letter-spacing: -0.035em; line-height: 1.1; margin-bottom: 0.8rem; }
+    .cta-band p { font-size: 0.95rem; color: var(--muted); margin-bottom: 2rem; }
 
     /* ─── FOOTER ─────────────────────────────────── */
     footer {
       border-top: 1px solid var(--border);
       padding: 1.75rem 2rem;
+      max-width: 1080px; margin: 0 auto;
       display: flex; align-items: center; justify-content: space-between;
       flex-wrap: wrap; gap: 1rem;
     }
     .fc-copy { font-size: 0.73rem; color: var(--muted2); max-width: 56ch; line-height: 1.5; }
     .fc-links { display: flex; gap: 1.5rem; }
-    .fc-links a {
-      font-size: 0.73rem; font-weight: 500;
-      color: var(--muted); text-decoration: none;
-      transition: color 0.15s;
-    }
+    .fc-links a { font-size: 0.73rem; font-weight: 500; color: var(--muted); text-decoration: none; transition: color 0.15s; }
     .fc-links a:hover { color: var(--text); }
   </style>
 </head>
 <body>
 
+<nav>
+  <div class="brand">PokéTFT</div>
+  <div class="nav-links">
+    <a class="navlink" href="#how">How it works</a>
+    <a class="navlink" href="#modes">Modes</a>
+    <a class="navlink" href="https://github.com/Haxxxxxx/PokeTFT">GitHub</a>
+    <a class="navlink" href="https://game-poketft-arena.web.app">Play</a>
+  </div>
+</nav>
+
 <!-- ══════════════ HERO ═══════════════════════════ -->
 <section class="hero">
-  <div class="dot-bg" aria-hidden="true"></div>
   <div class="hero-glow" aria-hidden="true"></div>
-
-  <div class="hero-mons" aria-hidden="true">
-    <img class="hm" style="left:5%;top:9%;width:190px;--r:-11deg"
-      src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/6.png" alt="" />
-    <img class="hm" style="right:5%;top:7%;width:165px;--r:9deg"
-      src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/149.png" alt="" />
-    <img class="hm" style="left:0%;bottom:14%;width:170px;--r:7deg"
-      src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/248.png" alt="" />
-    <img class="hm" style="right:1%;bottom:12%;width:165px;--r:-7deg"
-      src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/384.png" alt="" />
-    <img class="hm" style="left:43%;top:2%;width:115px;--r:0deg"
-      src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/94.png" alt="" />
-  </div>
-
-  <span class="tag">Free on every platform</span>
-  <h1>PokéTFT</h1>
-  <p class="hero-sub">Team Fight Tactics meets Pokémon. Draft your team, activate type synergies, and battle eight trainers live. Sign in with Google to save your rank and friends — or jump in as a guest.</p>
-
-  <div class="cta-stack">
-    <div class="cta-row">
-      <a href="https://game-poketft-arena.web.app/download" class="btn-dl">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M7 2v7M4 6.5 7 9.5l3-3"/>
-          <path d="M2 11v.5a.5.5 0 0 0 .5.5h9a.5.5 0 0 0 .5-.5V11"/>
-        </svg>
-        Download the App
-      </a>
-      <a href="https://game-poketft-arena.web.app" class="btn-ghost">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
-          <path d="M3 2.5a.5.5 0 0 1 .757-.429l8 4.5a.5.5 0 0 1 0 .858l-8 4.5A.5.5 0 0 1 3 11.5v-9Z"/>
-        </svg>
-        Play in Browser
-      </a>
+  <div class="hero-inner">
+    <div>
+      <span class="tag"><span class="dot"></span>Free · source on GitHub · no account required</span>
+      <h1>Team Fight Tactics,<br>played with <span class="gold-word">Pokémon</span>.</h1>
+      <p class="hero-sub">Draft a team of 206+ Pokémon, stack type synergies, and battle seven other trainers live. Sign in to save your rank and friends, or jump in as a guest — no commitment either way.</p>
+      <div class="cta-stack">
+        <div class="cta-row">
+          <a href="https://game-poketft-arena.web.app/download" class="btn-dl">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M7 2v7M4 6.5 7 9.5l3-3"/>
+              <path d="M2 11v.5a.5.5 0 0 0 .5.5h9a.5.5 0 0 0 .5-.5V11"/>
+            </svg>
+            Download the app
+          </a>
+          <a href="https://game-poketft-arena.web.app" class="btn-ghost">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+              <path d="M3 2.5a.5.5 0 0 1 .757-.429l8 4.5a.5.5 0 0 1 0 .858l-8 4.5A.5.5 0 0 1 3 11.5v-9Z"/>
+            </svg>
+            Play in browser
+          </a>
+        </div>
+        <a href="https://game-poketft-arena.web.app/download" class="inline-link">Windows · macOS · Android</a>
+      </div>
     </div>
-    <a href="https://game-poketft-arena.web.app/download" class="inline-link">Windows · macOS · Android</a>
+
+    <!-- Real gameplay, not decoration — a live combat round on the actual board. -->
+    <div class="hero-shot">
+      <div class="hero-shot-bar" aria-hidden="true"><span></span><span></span><span></span></div>
+      <img src="/screenshots/combat.jpg" alt="A live PokéTFT combat round: a hexagonal battlefield mid-fight, with the HP bar, synergy panel, and bench of drafted Pokémon visible." loading="eager" width="1200" height="674" />
+    </div>
   </div>
 </section>
+
+<!-- ══════════════ TRUST STRIP ═══════════════════ -->
+<div class="trust-band">
+  <div class="trust-grid">
+    <div class="trust-item">
+      <div class="trust-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 1.5 2 4v4c0 3.5 2.5 5.7 6 6.5 3.5-.8 6-3 6-6.5V4L8 1.5Z"/>
+          <path d="M5.5 8 7.3 9.8 10.5 6.2"/>
+        </svg>
+      </div>
+      <div>
+        <div class="trust-title">Source available on GitHub</div>
+        <div class="trust-desc">Every line ships publicly — check what it does before you run it. <a href="https://github.com/Haxxxxxx/PokeTFT">github.com/Haxxxxxx/PokeTFT</a></div>
+      </div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="5" width="12" height="9" rx="1.5"/>
+          <path d="M5 5V3.5a3 3 0 0 1 6 0V5"/>
+        </svg>
+      </div>
+      <div>
+        <div class="trust-title">Your data, minimal footprint</div>
+        <div class="trust-desc">Only what multiplayer needs — username, rank, match history. Guests need no account at all. <a href="https://game-poketft-arena.web.app/privacy">Privacy policy</a></div>
+      </div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 3.5h12M2 8h12M2 12.5h7"/>
+        </svg>
+      </div>
+      <div>
+        <div class="trust-title">The desktop app is unsigned</div>
+        <div class="trust-desc">It's a solo project — I haven't paid for an Apple/Microsoft signing certificate. Your OS will warn you on first launch; that's expected, not a red flag. Or just play in the browser, no install needed.</div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ══════════════ STATS ══════════════════════════ -->
 <div class="stats-bar">
@@ -429,7 +385,7 @@
 </div>
 
 <!-- ══════════════ HOW IT WORKS ══════════════════ -->
-<div class="how-band">
+<div class="how-band" id="how">
   <div class="how-grid">
     <div class="how-cell">
       <span class="how-num">01 — Draft</span>
@@ -453,10 +409,9 @@
 <div class="wrap">
   <div class="sec">
     <div class="sec-eyebrow">What's inside</div>
-    <div class="sec-heading">Everything TFT, <em>built for Pokémon</em></div>
+    <div class="sec-heading">Everything TFT, built for Pokémon</div>
 
     <div class="feat-grid">
-
       <div class="fc">
         <div class="fi">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
@@ -529,24 +484,22 @@
         <div class="fn">All 9 Generations</div>
         <div class="fd">Kanto through Paldea — every generation fully represented including branching evolutions: Leafeon, Gallade, Appletun, Annihilape, and more.</div>
       </div>
-
     </div>
   </div>
 </div>
 
-<!-- ══════════════ TYPE MARQUEE ══════════════════ -->
+<!-- ══════════════ TYPE STRIP ═════════════════════ -->
 <div class="types-band">
   <p class="types-label">18 active type synergies</p>
   <div class="marquee-outer">
     <div class="marquee-track">
-      <!-- Set 1 -->
       <span class="chip" style="background:rgba(238,129,48,.11);color:#d97430;border-color:rgba(238,129,48,.22)">Fire</span>
       <span class="chip" style="background:rgba(99,144,240,.11);color:#6390f0;border-color:rgba(99,144,240,.22)">Water</span>
       <span class="chip" style="background:rgba(122,199,76,.11);color:#6ab040;border-color:rgba(122,199,76,.22)">Grass</span>
       <span class="chip" style="background:rgba(220,190,40,.11);color:#c8a828;border-color:rgba(220,190,40,.22)">Electric</span>
       <span class="chip" style="background:rgba(160,100,220,.11);color:#b070e0;border-color:rgba(160,100,220,.22)">Psychic</span>
       <span class="chip" style="background:rgba(111,185,79,.11);color:#70b050;border-color:rgba(111,185,79,.22)">Bug</span>
-      <span class="chip" style="background:rgba(190,185,165,.11);color:#9890780;border-color:rgba(190,185,165,.18)">Normal</span>
+      <span class="chip" style="background:rgba(190,185,165,.11);color:#989078;border-color:rgba(190,185,165,.18)">Normal</span>
       <span class="chip" style="background:rgba(163,62,161,.11);color:#b860b8;border-color:rgba(163,62,161,.22)">Poison</span>
       <span class="chip" style="background:rgba(249,85,135,.11);color:#e8406a;border-color:rgba(249,85,135,.22)">Fairy</span>
       <span class="chip" style="background:rgba(196,160,32,.11);color:#a88820;border-color:rgba(196,160,32,.22)">Ground</span>
@@ -558,16 +511,14 @@
       <span class="chip" style="background:rgba(111,53,252,.11);color:#8050e0;border-color:rgba(111,53,252,.22)">Dragon</span>
       <span class="chip" style="background:rgba(145,165,180,.11);color:#8898a8;border-color:rgba(145,165,180,.18)">Steel</span>
       <span class="chip" style="background:rgba(90,70,55,.11);color:#907050;border-color:rgba(90,70,55,.2)">Dark</span>
-      <!-- separator -->
       <span style="width:1.5rem;display:inline-block"></span>
-      <!-- Set 2 (duplicate for seamless loop) -->
       <span class="chip" style="background:rgba(238,129,48,.11);color:#d97430;border-color:rgba(238,129,48,.22)">Fire</span>
       <span class="chip" style="background:rgba(99,144,240,.11);color:#6390f0;border-color:rgba(99,144,240,.22)">Water</span>
       <span class="chip" style="background:rgba(122,199,76,.11);color:#6ab040;border-color:rgba(122,199,76,.22)">Grass</span>
       <span class="chip" style="background:rgba(220,190,40,.11);color:#c8a828;border-color:rgba(220,190,40,.22)">Electric</span>
       <span class="chip" style="background:rgba(160,100,220,.11);color:#b070e0;border-color:rgba(160,100,220,.22)">Psychic</span>
       <span class="chip" style="background:rgba(111,185,79,.11);color:#70b050;border-color:rgba(111,185,79,.22)">Bug</span>
-      <span class="chip" style="background:rgba(190,185,165,.11);color:#9890780;border-color:rgba(190,185,165,.18)">Normal</span>
+      <span class="chip" style="background:rgba(190,185,165,.11);color:#989078;border-color:rgba(190,185,165,.18)">Normal</span>
       <span class="chip" style="background:rgba(163,62,161,.11);color:#b860b8;border-color:rgba(163,62,161,.22)">Poison</span>
       <span class="chip" style="background:rgba(249,85,135,.11);color:#e8406a;border-color:rgba(249,85,135,.22)">Fairy</span>
       <span class="chip" style="background:rgba(196,160,32,.11);color:#a88820;border-color:rgba(196,160,32,.22)">Ground</span>
@@ -586,9 +537,9 @@
 
 <!-- ══════════════ MODES ══════════════════════════ -->
 <div class="wrap">
-  <div class="sec">
+  <div class="sec" id="modes">
     <div class="sec-eyebrow">Game modes</div>
-    <div class="sec-heading">Six ways to <em>play</em></div>
+    <div class="sec-heading">Six ways to play</div>
 
     <div class="modes-grid">
       <div class="mc" style="--mode-color:#6390f0">
@@ -623,20 +574,20 @@
 <div class="cta-band">
   <h2>Get the app. Start playing.</h2>
   <p>Windows, macOS, and Android. Or open it straight in your browser — free, no account needed.</p>
-  <div class="cta-stack" style="position:relative">
+  <div class="cta-stack">
     <div class="cta-row">
       <a href="https://game-poketft-arena.web.app/download" class="btn-dl">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M7 2v7M4 6.5 7 9.5l3-3"/>
           <path d="M2 11v.5a.5.5 0 0 0 .5.5h9a.5.5 0 0 0 .5-.5V11"/>
         </svg>
-        Download the App
+        Download the app
       </a>
       <a href="https://game-poketft-arena.web.app" class="btn-ghost">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
           <path d="M3 2.5a.5.5 0 0 1 .757-.429l8 4.5a.5.5 0 0 1 0 .858l-8 4.5A.5.5 0 0 1 3 11.5v-9Z"/>
         </svg>
-        Play in Browser
+        Play in browser
       </a>
     </div>
     <a href="https://game-poketft-arena.web.app/download" class="inline-link">Windows · macOS · Android</a>
@@ -647,6 +598,7 @@
 <footer>
   <span class="fc-copy">PokéTFT is a fan project — not affiliated with Nintendo, Game Freak, or The Pokémon Company. Personal, non-commercial use only.</span>
   <div class="fc-links">
+    <a href="https://github.com/Haxxxxxx/PokeTFT">GitHub</a>
     <a href="https://game-poketft-arena.web.app/download">Download</a>
     <a href="https://game-poketft-arena.web.app">Play</a>
     <a href="https://game-poketft-arena.web.app/privacy">Privacy</a>
