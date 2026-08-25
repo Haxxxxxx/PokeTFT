@@ -7,7 +7,7 @@ import { AuthShell } from "./AuthShell";
 
 export function SignInScreen({ overlayMode, onClose }: { overlayMode?: boolean; onClose?: () => void } = {}) {
   const t = useT();
-  const { signInGoogle, signInAnonymous, signInEmail, signUpEmail, resetPassword, error, notice, busy, user, nativeDebug } = useAuth();
+  const { signInGoogle, signInAnonymous, signInEmail, signUpEmail, resetPassword, error, notice, busy, user } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -60,14 +60,6 @@ export function SignInScreen({ overlayMode, onClose }: { overlayMode?: boolean; 
 
       {error && <p className="text-xs text-rose-400 text-center">{error}</p>}
       {notice && <p className="text-xs text-emerald-400 text-center">{notice}</p>}
-      {/* Temporary native-shell diagnostic — see nativeDebug's doc comment in
-          authStore.ts. Appending log, oldest first. Remove once native sign-in is
-          confirmed reliable. */}
-      {nativeDebug && (
-        <pre className="text-[9px] text-slate-600 text-left font-mono whitespace-pre-wrap break-all max-h-32 overflow-y-auto bg-black/20 rounded-md p-2 border border-slate-800">
-          {nativeDebug}
-        </pre>
-      )}
 
       {!overlayMode && (
         <>
