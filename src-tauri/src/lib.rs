@@ -1,4 +1,5 @@
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+#[cfg(any(windows, target_os = "linux"))]
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_opener::OpenerExt;
 
@@ -34,7 +35,16 @@ pub fn run() {
         )?;
         // `tauri dev` runs an unbundled binary the OS never registered as the
         // `poketft://` handler — register it for this session so the deep-link
-        // round trip is testable without a full install.
+        // round trip is testable without a full install. Windows/Linux only:
+        // register() is a real OS-registry/xdg-mime write there, but on macOS
+        // (and Android/iOS) it unconditionally returns UnsupportedPlatform — the
+        // scheme comes from the app bundle's Info.plist/manifest there instead,
+        // which only exists in a packaged build, so a macOS/mobile dev binary
+        // can't register at runtime at all. Calling it unguarded crashes the
+        // whole app: tauri's macOS app-delegate setup path can't unwind a
+        // setup-hook Err cleanly, so the propagated error aborts the process
+        // instead of just failing gracefully.
+        #[cfg(any(windows, target_os = "linux"))]
         app.deep_link().register_all()?;
       }
 
