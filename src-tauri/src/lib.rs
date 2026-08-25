@@ -53,17 +53,30 @@ pub fn run() {
       // forward for that path. Without this, the sign-in can complete correctly
       // in the background while the user is still staring at the login screen,
       // with no visible sign anything happened.
+      //
+      // TEMPORARY DIAGNOSTIC: also stamp the window TITLE with how many URLs
+      // arrived. This is Rust-side and independent of the JS event bus (Tauri's
+      // `listen()`/`onOpenUrl` on the frontend) — real-device testing left it
+      // ambiguous whether the OS ever calls into this app at all for the
+      // poketft:// scheme, or whether it does and only the JS side is failing to
+      // react. The title is visible with zero clicks and no permissions needed,
+      // so it cleanly separates those two failure domains. Remove once resolved.
       let focus_handle = app.handle().clone();
-      app.deep_link().on_open_url(move |_event| {
+      app.deep_link().on_open_url(move |event| {
         if let Some(win) = focus_handle.get_webview_window("main") {
           let _ = win.unminimize();
           let _ = win.set_focus();
+          let n = event.urls().len();
+          let _ = win.set_title(&format!("PokéTFT — deep link received ({n} url)"));
         }
       });
 
       let app_handle = app.handle().clone();
       WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-        .title("PokéTFT")
+        // Diagnostic build marker — confirms at a glance this is the build with the
+        // on_open_url title-stamp above, before even testing the deep link. Remove
+        // alongside it.
+        .title("PokéTFT [diag-build]")
         .inner_size(1280.0, 800.0)
         .min_inner_size(800.0, 540.0)
         .resizable(true)
