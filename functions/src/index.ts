@@ -209,11 +209,26 @@ export const pruneStale = onSchedule({ region: REGION, schedule: "every 30 minut
         const room = await freshRoom(code);
         if (room) {
           const rated = ((await adb.ref(`games/${code}/rated`).get()).val() ?? {}) as Record<string, boolean>;
-          const unrated = Object.values(room.players ?? {})
-            .filter((p) => !p.uid.startsWith("bot-") && !rated[p.uid])
+          const allPlayers = Object.values(room.players ?? {});
+          const unrated = allPlayers.filter((p) => !p.uid.startsWith("bot-") && !rated[p.uid]);
+          // Players already eliminated earlier in the match carry a REAL `place` (set by
+          // endCombat) — honor it instead of recomputing, or a still-unrated eliminated
+          // player could be misplaced relative to already-rated players from the same
+          // game. Only players with no place yet (still alive when the game went stale)
+          // need a placement invented here, ranked by HP and slotted into whichever
+          // place numbers aren't already taken (by rated OR unrated-but-placed players).
+          const usedPlaces = new Set(allPlayers.map((p) => p.place).filter((x): x is number => typeof x === "number"));
+          let nextPlace = 1;
+          const takePlace = () => { while (usedPlaces.has(nextPlace)) nextPlace++; usedPlaces.add(nextPlace); return nextPlace; };
+          const stillAlive = unrated
+            .filter((p) => typeof p.place !== "number")
             .sort((a, b) => (b.alive ? 1 : 0) - (a.alive ? 1 : 0) || (b.hp ?? 0) - (a.hp ?? 0));
+          const jobs: Array<{ uid: string; place: number }> = [
+            ...unrated.filter((p) => typeof p.place === "number").map((p) => ({ uid: p.uid, place: p.place! })),
+            ...stillAlive.map((p) => ({ uid: p.uid, place: takePlace() })),
+          ];
           await Promise.all(
-            unrated.map((p, i) => applyRatingFor(code, room, p.uid, i + 1).catch(() => {})),
+            jobs.map(({ uid, place }) => applyRatingFor(code, room, uid, place).catch(() => {})),
           );
         }
       }

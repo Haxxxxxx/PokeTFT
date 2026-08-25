@@ -744,10 +744,16 @@ export function NetGameClient() {
     return unsub;
   }, [serverResultCode, myUid]);
 
-  // Auto-concede when the user closes the tab / navigates away while alive mid-game.
-  // pagehide fires on tab close, navigation and bfcache freeze; visibilitychange
-  // catches background/minimize on mobile. Both are best-effort (the request may be
-  // cut by the browser) — pruneStale is the guaranteed fallback within 30 min.
+  // Auto-concede when the user actually LEAVES mid-game (closes the tab, navigates away)
+  // while still alive — so history/LP get recorded near-instantly instead of waiting up
+  // to 30 min for pruneStale's fallback sweep. pagehide fires on tab close, navigation
+  // and bfcache freeze, so it forfeits right away. visibilitychange=hidden ALSO fires on
+  // ordinary mobile backgrounding (switching apps, a phone call, locking the screen for
+  // a second) — treating that as an immediate forfeit would eliminate players out of
+  // their match just for tabbing away briefly, so it only starts a grace timer and is
+  // cancelled if the tab comes back before the timer fires. Both are best-effort (the
+  // request may be cut by the browser); pruneStale is the guaranteed fallback.
+  const backgroundGraceMs = 20_000;
   useEffect(() => {
     const code = room?.code;
     if (!code || !myUid) return;
@@ -760,11 +766,17 @@ export function NetGameClient() {
       recordedRef.current = code;
       callConcede(code).catch(() => {});
     };
-    const onHide = () => tryAutoForfeit();
-    const onVisibility = () => { if (document.visibilityState === "hidden") tryAutoForfeit(); };
+    let graceTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearGrace = () => { if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; } };
+    const onHide = () => { clearGrace(); tryAutoForfeit(); };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") { clearGrace(); graceTimer = setTimeout(tryAutoForfeit, backgroundGraceMs); }
+      else clearGrace(); // came back before the grace period elapsed — not abandonment
+    };
     window.addEventListener("pagehide", onHide);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
+      clearGrace();
       window.removeEventListener("pagehide", onHide);
       document.removeEventListener("visibilitychange", onVisibility);
     };
