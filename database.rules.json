@@ -102,6 +102,12 @@
           }
         },
 
+        "ratingFailures": {
+          "$uid": {
+            ".write": "auth != null && root.child('games').child($code).child('meta/hostUid').val() === auth.uid"
+          }
+        },
+
         "results": {
           "$uid": {
             ".write": "auth != null && root.child('games').child($code).child('meta/hostUid').val() === auth.uid"

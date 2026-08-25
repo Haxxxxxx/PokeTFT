@@ -202,31 +202,49 @@ export const pruneStale = onSchedule({ region: REGION, schedule: "every 30 minut
       || (meta.phase === "over" && now - updatedAt > OVER_AGE_MS)
       || (now - updatedAt > IDLE_AGE_MS);
     if (stale) {
-      // Before deleting an abandoned in-progress game, apply ratings for any human
-      // who never got their result (closed the tab / app instead of using Concede).
-      // This preserves their match history even when they skip the normal exit flow.
-      if (meta?.phase && meta.phase !== "over" && meta.phase !== "lobby") {
+      // Before deleting any game that had real play, make sure every human's rating
+      // was actually applied AND fully persisted. Two distinct gaps this repairs, both
+      // previously silent, permanent data loss:
+      //  1. A human never got applyRatingFor called at all — closed the tab/app instead
+      //     of using Concede, so the game went stale mid-match without ever finishing.
+      //  2. applyRatingFor WAS called and its rating transaction committed, but the
+      //     separate leaderboard/history/results write threw — a real incident traced
+      //     live: a player's rating changed with zero corresponding history or
+      //     leaderboard entry, and zero trace in any log, because the old claim was a
+      //     bare boolean consumed up front, so nothing would ever retry it. That can
+      //     happen on any finished ("over") game too, not just an abandoned in-progress
+      //     one, so this repair now runs for both instead of skipping "over" as before.
+      // applyRatingFor's own idempotency + self-heal logic (see match.ts) makes it safe
+      // to call again for every real player on every stale game: a fully-persisted
+      // player is detected via their history row already existing and short-circuits
+      // immediately; a partially-persisted one resumes from its stored decision without
+      // ever re-crediting rating.
+      if (meta?.phase && meta.phase !== "lobby") {
         const room = await freshRoom(code);
         if (room) {
-          const rated = ((await adb.ref(`games/${code}/rated`).get()).val() ?? {}) as Record<string, boolean>;
+          const claims = ((await adb.ref(`games/${code}/rated`).get()).val() ?? {}) as Record<string, { place?: number } | boolean>;
           const allPlayers = Object.values(room.players ?? {});
-          const unrated = allPlayers.filter((p) => !p.uid.startsWith("bot-") && !rated[p.uid]);
-          // Players already eliminated earlier in the match carry a REAL `place` (set by
-          // endCombat) — honor it instead of recomputing, or a still-unrated eliminated
-          // player could be misplaced relative to already-rated players from the same
-          // game. Only players with no place yet (still alive when the game went stale)
-          // need a placement invented here, ranked by HP and slotted into whichever
-          // place numbers aren't already taken (by rated OR unrated-but-placed players).
+          const realPlayers = allPlayers.filter((p) => !p.uid.startsWith("bot-"));
+          // Placement: honor whatever's already decided — endCombat's `place`, or a
+          // prior (possibly incomplete) claim's stored place — and only invent a fresh
+          // one for a player with neither, ranked by HP among themselves and slotted
+          // into whichever place numbers aren't already taken (still-mid-match
+          // stragglers on a genuinely abandoned game).
           const usedPlaces = new Set(allPlayers.map((p) => p.place).filter((x): x is number => typeof x === "number"));
           let nextPlace = 1;
           const takePlace = () => { while (usedPlaces.has(nextPlace)) nextPlace++; usedPlaces.add(nextPlace); return nextPlace; };
-          const stillAlive = unrated
-            .filter((p) => typeof p.place !== "number")
+          const claimPlaceOf = (uid: string): number | undefined => {
+            const c = claims[uid];
+            return typeof c === "object" && c && typeof c.place === "number" ? c.place : undefined;
+          };
+          const needsInventedPlace = realPlayers
+            .filter((p) => typeof p.place !== "number" && claimPlaceOf(p.uid) === undefined)
             .sort((a, b) => (b.alive ? 1 : 0) - (a.alive ? 1 : 0) || (b.hp ?? 0) - (a.hp ?? 0));
-          const jobs: Array<{ uid: string; place: number }> = [
-            ...unrated.filter((p) => typeof p.place === "number").map((p) => ({ uid: p.uid, place: p.place! })),
-            ...stillAlive.map((p) => ({ uid: p.uid, place: takePlace() })),
-          ];
+          const inventedPlace = new Map(needsInventedPlace.map((p) => [p.uid, takePlace()]));
+          const jobs: Array<{ uid: string; place: number }> = realPlayers.map((p) => ({
+            uid: p.uid,
+            place: p.place ?? claimPlaceOf(p.uid) ?? inventedPlace.get(p.uid)!,
+          }));
           await Promise.all(
             jobs.map(({ uid, place }) => applyRatingFor(code, room, uid, place).catch(() => {})),
           );

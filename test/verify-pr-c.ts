@@ -64,7 +64,7 @@ async function run() {
   const lb = getPath(store, "leaderboard/alice") as Record<string, unknown>;
   const hist = getPath(store, `users/alice/history/${CODE}`) as Record<string, unknown>;
   const result = getPath(store, `games/${CODE}/results/alice`) as Record<string, unknown>;
-  const rated = getPath(store, `games/${CODE}/rated/alice`);
+  const rated = getPath(store, `games/${CODE}/rated/alice`) as { place?: number; delta?: number; ratingApplied?: boolean } | null;
 
   assert(typeof rating === "number", `users/alice/rating written (${rating})`);
   assert(rating !== START_RATING, "rating changed from START_RATING");
@@ -72,7 +72,10 @@ async function run() {
   assert(!!hist && hist.place === 2, "history row has correct place");
   assert(!!hist && hist.lp === result?.delta, "history.lp matches results.delta");
   assert(!!result && typeof result.rating === "number", "results/{uid} has rating");
-  assert(rated === true, "rated/{uid} idempotency marker set");
+  // The claim now stores the decided outcome (place/delta), not a bare boolean — see
+  // match.ts's RatingClaim: this is what lets a retry resume from a partial failure
+  // (rating committed, persist write didn't) without ever re-crediting the delta.
+  assert(!!rated && rated.place === 2 && rated.ratingApplied === true, "rated/{uid} stores the decided outcome + ratingApplied");
 
   // Idempotency
   const ratingBefore = rating;
