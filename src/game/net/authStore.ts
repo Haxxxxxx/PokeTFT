@@ -9,6 +9,7 @@ import {
   signOut as fbSignOut, type User, type AuthError,
 } from "firebase/auth";
 import { ref, remove } from "firebase/database";
+import { onOpenUrl, getCurrent as getCurrentDeepLinkUrls } from "@tauri-apps/plugin-deep-link";
 import { auth, db } from "./firebase";
 import { isNativeShell, openNativeGoogleSignIn } from "./nativeShell";
 import {
@@ -94,24 +95,17 @@ export const useAuth = create<AuthState>((set, get) => ({
     // surface only the failure case (e.g. Google rejects an embedded-webview UA) so the
     // user sees why instead of a silent no-op.
     getRedirectResult(auth()).catch((e) => set({ error: authErr(e) }));
-    // Native shell bridge: the Rust deep-link handler calls this with the
-    // poketft://auth#id_token=...&access_token=... URL after the system-browser
-    // Google sign-in. Finish by signing into Firebase with that credential.
-    if (typeof window !== "undefined") {
-      (window as unknown as { __poketftNativeAuth?: (url: string) => void }).__poketftNativeAuth = async (url: string) => {
+    // Native shell bridge: after the system-browser Google sign-in, the bridge page
+    // (native-auth/page.tsx) redirects to a REAL poketft://auth-callback?id_token=...
+    // deep link — registered with the OS via tauri-plugin-deep-link (src-tauri/tauri.conf.json),
+    // and forwarded to this already-running window on Windows/Linux via
+    // tauri-plugin-single-instance (see src-tauri/src/lib.rs). Finish by signing into
+    // Firebase with the handed-off credential.
+    if (isNativeShell()) {
+      const finishNativeAuth = async (raw: string) => {
         try {
-          let idToken: string | null = null;
-          let accessToken: string | undefined;
-          try {
-            const u = new URL(url);
-            idToken = u.searchParams.get("id_token");
-            accessToken = u.searchParams.get("access_token") ?? undefined;
-            if (!idToken && u.hash) {
-              const h = new URLSearchParams(u.hash.replace(/^#/, ""));
-              idToken = h.get("id_token");
-              accessToken = h.get("access_token") ?? undefined;
-            }
-          } catch { /* not a parseable URL */ }
+          const idToken = new URL(raw).searchParams.get("id_token");
+          const accessToken = new URL(raw).searchParams.get("access_token") ?? undefined;
           if (!idToken) { set({ error: "Sign-in returned no credential." }); return; }
           if (nativeAuthTimer) { clearTimeout(nativeAuthTimer); nativeAuthTimer = null; }
           set({ busy: true, error: null, notice: null });
@@ -130,6 +124,13 @@ export const useAuth = create<AuthState>((set, get) => ({
           set({ busy: false });
         } catch (e) { set({ error: authErr(e), busy: false }); }
       };
+      // Live event: fires while the app is already running (macOS/Android directly;
+      // Windows/Linux via the single-instance forward above).
+      onOpenUrl((urls) => { if (urls[0]) void finishNativeAuth(urls[0]); }).catch(() => {});
+      // Cold start: the browser may have handed off before the app finished
+      // launching, so the event above was attached too late to catch it — check
+      // the URL that actually launched this process too.
+      getCurrentDeepLinkUrls().then((urls) => { if (urls?.[0]) void finishNativeAuth(urls[0].toString()); }).catch(() => {});
     }
     onAuthStateChanged(auth(), async (u) => {
       if (friendsUnsub) { friendsUnsub(); friendsUnsub = null; }
