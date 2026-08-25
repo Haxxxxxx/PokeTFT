@@ -37,6 +37,13 @@ type AuthState = {
   /** Transient success message (e.g. "reset email sent"). */
   notice: string | null;
   busy: boolean;
+  /** Native shell only: a short, redacted trace of what the deep-link listener has
+   *  actually seen, surfaced on the sign-in screen. The failure mode we're chasing
+   *  (browser hands off, app never updates) leaves NO trace in the browser or the
+   *  app's own UI otherwise — this makes "did the event even arrive" answerable by
+   *  looking at the screen instead of guessing. Remove once native sign-in is
+   *  confirmed reliable across a few real runs. */
+  nativeDebug: string | null;
 
   upgradeModalOpen: boolean;
 
@@ -86,6 +93,7 @@ export const useAuth = create<AuthState>((set, get) => ({
   error: null,
   notice: null,
   busy: false,
+  nativeDebug: null,
   upgradeModalOpen: false,
 
   init: () => {
@@ -102,11 +110,21 @@ export const useAuth = create<AuthState>((set, get) => ({
     // tauri-plugin-single-instance (see src-tauri/src/lib.rs). Finish by signing into
     // Firebase with the handed-off credential.
     if (isNativeShell()) {
+      // Redacted preview for on-screen debug: scheme + host + which params showed up,
+      // never the token values themselves (see nativeDebug's doc comment).
+      const redact = (raw: string): string => {
+        try {
+          const u = new URL(raw);
+          const keys = [...u.searchParams.keys()].join(",") || "none";
+          return `${u.protocol}//${u.host}${u.pathname} params=[${keys}]`;
+        } catch { return `unparseable: ${raw.slice(0, 60)}`; }
+      };
       const finishNativeAuth = async (raw: string) => {
+        set({ nativeDebug: `event received: ${redact(raw)}` });
         try {
           const idToken = new URL(raw).searchParams.get("id_token");
           const accessToken = new URL(raw).searchParams.get("access_token") ?? undefined;
-          if (!idToken) { set({ error: "Sign-in returned no credential." }); return; }
+          if (!idToken) { set({ error: "Sign-in returned no credential.", nativeDebug: `no id_token in: ${redact(raw)}` }); return; }
           if (nativeAuthTimer) { clearTimeout(nativeAuthTimer); nativeAuthTimer = null; }
           set({ busy: true, error: null, notice: null });
           const cred = GoogleAuthProvider.credential(idToken, accessToken);
@@ -121,12 +139,16 @@ export const useAuth = create<AuthState>((set, get) => ({
               await signInWithCredential(auth(), cred);
             else throw le;
           }
-          set({ busy: false });
-        } catch (e) { set({ error: authErr(e), busy: false }); }
+          set({ busy: false, nativeDebug: "credential exchange succeeded" });
+        } catch (e) { set({ error: authErr(e), busy: false, nativeDebug: `credential exchange threw: ${(e as Error)?.message}` }); }
       };
       // Live event: fires while the app is already running (macOS/Android directly;
       // Windows/Linux via the single-instance forward above).
-      onOpenUrl((urls) => { if (urls[0]) void finishNativeAuth(urls[0]); }).catch(() => {});
+      onOpenUrl((urls) => {
+        set({ nativeDebug: `onOpenUrl fired, ${urls.length} url(s)` });
+        if (urls[0]) void finishNativeAuth(urls[0]);
+      }).then(() => set({ nativeDebug: "listener attached" }))
+        .catch((e) => set({ nativeDebug: `listener attach failed: ${(e as Error)?.message}` }));
       // Cold start: the browser may have handed off before the app finished
       // launching, so the event above was attached too late to catch it — check
       // the URL that actually launched this process too.
@@ -160,8 +182,11 @@ export const useAuth = create<AuthState>((set, get) => ({
     set({ busy: true, error: null, notice: null });
     // App shell: open Google in the user's DEFAULT browser (where they're already
     // signed into Google → one-click account pick), not the session-less webview.
-    // Rust intercepts the sentinel, runs the loopback, and signs the app in on return.
+    // Rust intercepts the sentinel and opens native-auth/page.tsx there; its "Open
+    // PokéTFT" link hands a poketft://auth-callback deep link back to this app,
+    // caught by the native-shell branch above.
     if (isNativeShell()) {
+      set({ nativeDebug: "signInGoogle: opening system browser" });
       openNativeGoogleSignIn();
       if (nativeAuthTimer) clearTimeout(nativeAuthTimer);
       nativeAuthTimer = setTimeout(() => {
