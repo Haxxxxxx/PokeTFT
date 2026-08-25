@@ -37,15 +37,6 @@ type AuthState = {
   /** Transient success message (e.g. "reset email sent"). */
   notice: string | null;
   busy: boolean;
-  /** Native shell only: a redacted, APPENDING trace of the whole native-auth
-   *  sequence, surfaced on the sign-in screen. Rust-side diagnostics (a window-title
-   *  stamp) already confirmed the OS delivers the deep link to this process
-   *  correctly, so the remaining mystery is purely JS-side — an overwriting single
-   *  string can't show it since a later step (e.g. clicking the button) silently
-   *  erases evidence of an earlier one (e.g. whether the listener ever attached).
-   *  This keeps the full sequence. Remove once native sign-in is confirmed
-   *  reliable across a few real runs. */
-  nativeDebug: string | null;
 
   upgradeModalOpen: boolean;
 
@@ -69,13 +60,6 @@ let inited = false;
 let friendsUnsub: (() => void) | null = null;
 let nativeAuthTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** Bumped by hand on each native-auth debug iteration — shows up as the first line
- *  of nativeDebug, so a stale cached webview bundle (this app loads its JS remotely
- *  and reloads are rare) is immediately visible as an old marker instead of silent
- *  confusion about why a just-shipped fix isn't showing up. Remove alongside the
- *  rest of the native-auth debug scaffold. */
-const NATIVE_DEBUG_BUILD = "js-trace-1";
-
 function mapUser(u: User): AuthUser {
   return { uid: u.uid, displayName: u.displayName, email: u.email, photoURL: u.photoURL, isAnonymous: u.isAnonymous };
 }
@@ -94,18 +78,6 @@ function authErr(e: unknown): string {
   return (e as Error)?.message ?? "Sign-in failed.";
 }
 
-// Appends (never overwrites) so the full native-auth sequence stays visible even
-// after a later step — e.g. clicking "Continue with Google" — would otherwise
-// silently erase evidence of an earlier one, such as whether the deep-link
-// listener ever attached in the first place. Shared by init() and signInGoogle().
-function makeLogNative(set: (partial: Partial<AuthState>) => void, get: () => AuthState) {
-  return (msg: string) => {
-    const prev = get().nativeDebug ?? "";
-    const line = `[${new Date().toISOString().slice(11, 19)}] ${msg}`;
-    set({ nativeDebug: (prev ? prev + "\n" : "") + line });
-  };
-}
-
 export const useAuth = create<AuthState>((set, get) => ({
   user: null,
   profile: null,
@@ -114,41 +86,28 @@ export const useAuth = create<AuthState>((set, get) => ({
   error: null,
   notice: null,
   busy: false,
-  nativeDebug: null,
   upgradeModalOpen: false,
 
   init: () => {
     if (inited) return;
     inited = true;
-    const logNative = makeLogNative(set, get);
     // If we returned from a redirect sign-in, success flows through onAuthStateChanged;
     // surface only the failure case (e.g. Google rejects an embedded-webview UA) so the
     // user sees why instead of a silent no-op.
     getRedirectResult(auth()).catch((e) => set({ error: authErr(e) }));
-    const native = isNativeShell();
-    if (native) logNative(`build=${NATIVE_DEBUG_BUILD} isNativeShell=true`);
     // Native shell bridge: after the system-browser Google sign-in, the bridge page
     // (native-auth/page.tsx) redirects to a REAL poketft://auth-callback?id_token=...
-    // deep link — registered with the OS via tauri-plugin-deep-link (src-tauri/tauri.conf.json),
-    // and forwarded to this already-running window on Windows/Linux via
-    // tauri-plugin-single-instance (see src-tauri/src/lib.rs). Finish by signing into
-    // Firebase with the handed-off credential.
-    if (native) {
-      // Redacted preview for on-screen debug: scheme + host + which params showed up,
-      // never the token values themselves (see nativeDebug's doc comment).
-      const redact = (raw: string): string => {
-        try {
-          const u = new URL(raw);
-          const keys = [...u.searchParams.keys()].join(",") || "none";
-          return `${u.protocol}//${u.host}${u.pathname} params=[${keys}]`;
-        } catch { return `unparseable: ${raw.slice(0, 60)}`; }
-      };
+    // deep link — registered with the OS via tauri-plugin-deep-link (src-tauri/tauri.conf.json
+    // + capabilities/default.json's remote-origin grant, required since this whole app runs
+    // under the hosted origin, not Tauri's local asset origin), and forwarded to this
+    // already-running window on Windows/Linux via tauri-plugin-single-instance (see
+    // src-tauri/src/lib.rs). Finish by signing into Firebase with the handed-off credential.
+    if (isNativeShell()) {
       const finishNativeAuth = async (raw: string) => {
-        logNative(`event received: ${redact(raw)}`);
         try {
           const idToken = new URL(raw).searchParams.get("id_token");
           const accessToken = new URL(raw).searchParams.get("access_token") ?? undefined;
-          if (!idToken) { set({ error: "Sign-in returned no credential." }); logNative(`no id_token in: ${redact(raw)}`); return; }
+          if (!idToken) { set({ error: "Sign-in returned no credential." }); return; }
           if (nativeAuthTimer) { clearTimeout(nativeAuthTimer); nativeAuthTimer = null; }
           set({ busy: true, error: null, notice: null });
           const cred = GoogleAuthProvider.credential(idToken, accessToken);
@@ -164,25 +123,15 @@ export const useAuth = create<AuthState>((set, get) => ({
             else throw le;
           }
           set({ busy: false });
-          logNative("credential exchange succeeded");
-        } catch (e) { set({ error: authErr(e), busy: false }); logNative(`credential exchange threw: ${(e as Error)?.message}`); }
+        } catch (e) { set({ error: authErr(e), busy: false }); }
       };
       // Live event: fires while the app is already running (macOS/Android directly;
       // Windows/Linux via the single-instance forward above).
-      onOpenUrl((urls) => {
-        logNative(`onOpenUrl fired, ${urls.length} url(s)`);
-        if (urls[0]) void finishNativeAuth(urls[0]);
-      }).then(() => logNative("listener attached"))
-        .catch((e) => logNative(`listener attach failed: ${(e as Error)?.message}`));
+      onOpenUrl((urls) => { if (urls[0]) void finishNativeAuth(urls[0]); }).catch(() => {});
       // Cold start: the browser may have handed off before the app finished
       // launching, so the event above was attached too late to catch it — check
       // the URL that actually launched this process too.
-      getCurrentDeepLinkUrls()
-        .then((urls) => {
-          logNative(`getCurrent: ${urls?.length ?? 0} url(s)`);
-          if (urls?.[0]) void finishNativeAuth(urls[0].toString());
-        })
-        .catch((e) => logNative(`getCurrent failed: ${(e as Error)?.message}`));
+      getCurrentDeepLinkUrls().then((urls) => { if (urls?.[0]) void finishNativeAuth(urls[0].toString()); }).catch(() => {});
     }
     onAuthStateChanged(auth(), async (u) => {
       if (friendsUnsub) { friendsUnsub(); friendsUnsub = null; }
@@ -216,7 +165,6 @@ export const useAuth = create<AuthState>((set, get) => ({
     // PokéTFT" link hands a poketft://auth-callback deep link back to this app,
     // caught by the native-shell branch above.
     if (isNativeShell()) {
-      makeLogNative(set, get)("signInGoogle: opening system browser");
       openNativeGoogleSignIn();
       if (nativeAuthTimer) clearTimeout(nativeAuthTimer);
       nativeAuthTimer = setTimeout(() => {
