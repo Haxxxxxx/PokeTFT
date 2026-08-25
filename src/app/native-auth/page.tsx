@@ -7,25 +7,22 @@ import { auth } from "@/game/net/firebase";
 /**
  * Native sign-in bridge — opened in the user's DEFAULT browser by the app shell.
  * Auto-fires signInWithRedirect on landing (no button) so the user goes straight
- * to Google. On return, hands the credential to the app's loopback (127.0.0.1:cb).
+ * to Google. On return, hands the credential to the app via a REAL poketft://
+ * deep link (registered with the OS by the desktop/mobile shell) instead of a
+ * local loopback server — the OS routes it straight back to the running app, so
+ * there's no port/timing race to silently strand the user in this tab.
  * If the redirect-return can't read the result (cross-domain storage), falls back
  * to a one-tap popup so it never dead-ends.
  */
-function cbPort(): string | null {
-  const raw = new URLSearchParams(window.location.search).get("cb");
-  if (!raw) return null;
-  const port = parseInt(raw, 10);
-  if (isNaN(port) || port < 1024 || port > 65535) return null;
-  return String(port);
-}
-function handoff(cb: string, result: UserCredential): boolean {
+function handoff(result: UserCredential): string | null {
   const cred = GoogleAuthProvider.credentialFromResult(result);
-  if (!cred?.idToken) return false;
+  if (!cred?.idToken) return null;
   const p = new URLSearchParams();
   p.set("id_token", cred.idToken);
   if (cred.accessToken) p.set("access_token", cred.accessToken);
-  window.location.href = `http://127.0.0.1:${cb}/?${p.toString()}`;
-  return true;
+  const deepLink = `poketft://auth-callback?${p.toString()}`;
+  window.location.href = deepLink;
+  return deepLink;
 }
 
 const ATTEMPT_KEY = "poketft_auth_redirected";
@@ -34,18 +31,22 @@ export default function NativeAuthBridge() {
   const [needsButton, setNeedsButton] = useState(false);
   const [status, setStatus] = useState("Connecting to Google…");
   const [error, setError] = useState<string | null>(null);
+  // Some browsers silently swallow a `location.href` navigation to an unfamiliar
+  // custom scheme (no OS prompt, no error) instead of handing off to the app — so
+  // once we've attempted the deep link, show an explicit manual fallback rather
+  // than leaving the user staring at a tab that looks finished but isn't.
+  const [returnLink, setReturnLink] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      const cb = cbPort();
-      if (!cb) { setError("Missing app callback port — reopen sign-in from the app."); setStatus(""); return; }
       // Returning from Google?
       try {
         const result = await getRedirectResult(auth());
         if (result) {
           sessionStorage.removeItem(ATTEMPT_KEY);
           setStatus("Signing you into PokéTFT…");
-          if (handoff(cb, result)) return;
+          const link = handoff(result);
+          if (link) { setReturnLink(link); return; }
         }
       } catch { /* storage blocked — fall through to the popup fallback */ }
 
@@ -68,13 +69,13 @@ export default function NativeAuthBridge() {
   }, []);
 
   const goPopup = async () => {
-    const cb = cbPort();
-    if (!cb) { setError("Missing app callback port."); return; }
     setError(null); setStatus("Opening Google…");
     try {
       const result = await signInWithPopup(auth(), new GoogleAuthProvider());
       setStatus("Signing you into PokéTFT…");
-      if (!handoff(cb, result)) throw new Error("No Google credential was returned.");
+      const link = handoff(result);
+      if (!link) throw new Error("No Google credential was returned.");
+      setReturnLink(link);
     } catch (e) {
       setError((e as Error)?.message ?? "Sign-in failed."); setStatus("");
     }
@@ -88,7 +89,7 @@ export default function NativeAuthBridge() {
     <main style={wrap}>
       <div style={card}>
         {/* Spinning Pokéball */}
-        <div style={{ position: "relative", width: 56, height: 56, animation: needsButton ? "none" : "spin 1s linear infinite" }}>
+        <div style={{ position: "relative", width: 56, height: 56, animation: needsButton || returnLink ? "none" : "spin 1s linear infinite" }}>
           <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "linear-gradient(#ef4444 0 50%, #f8fafc 50% 100%)", border: "3px solid #0a0e1a", boxShadow: "0 6px 18px -6px rgba(239,68,68,0.6)" }} />
           <div style={{ position: "absolute", top: "calc(50% - 2px)", left: 0, right: 0, height: 4, background: "#0a0e1a" }} />
           <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 18, height: 18, borderRadius: "50%", background: "#f8fafc", border: "3px solid #0a0e1a" }} />
@@ -102,8 +103,20 @@ export default function NativeAuthBridge() {
         </div>
 
         {needsButton && <button style={btn} onClick={goPopup}>Continue with Google</button>}
-        {status && !needsButton && <div style={{ fontSize: 12.5, color: "#94a3b8" }}>{status}</div>}
+        {status && !needsButton && !returnLink && <div style={{ fontSize: 12.5, color: "#94a3b8" }}>{status}</div>}
         {error && <div style={{ fontSize: 12.5, color: "#fca5a5", lineHeight: 1.5 }}>{error}</div>}
+        {/* The poketft:// navigation above should hand off automatically, but some
+            browsers silently swallow a redirect to an unfamiliar custom scheme (no
+            OS prompt, no error) — so give this a visible, clickable way back
+            instead of leaving the user staring at a tab that looks done but isn't. */}
+        {returnLink && (
+          <>
+            <div style={{ fontSize: 12.5, color: "#94a3b8", lineHeight: 1.5 }}>
+              Signed in! If PokéTFT didn&apos;t open automatically:
+            </div>
+            <a href={returnLink} style={{ ...btn, textDecoration: "none", display: "inline-block" }}>Return to PokéTFT</a>
+          </>
+        )}
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </main>

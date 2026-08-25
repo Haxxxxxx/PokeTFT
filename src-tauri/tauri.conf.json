@@ -15,6 +15,16 @@
       "csp": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'"
     }
   },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["poketft"]
+      },
+      "mobile": [
+        { "host": "auth-callback" }
+      ]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",

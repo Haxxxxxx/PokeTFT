@@ -16,7 +16,8 @@ export function isNativeShell(): boolean {
 /** Ask the shell to open the Google sign-in bridge in the SYSTEM browser.
  *  Navigating to the sentinel is caught by on_navigation in lib.rs, which opens
  *  the real browser and cancels this in-webview navigation. The result returns
- *  via the poketft:// deep link → window.__poketftNativeAuth. */
+ *  via a poketft://auth-callback deep link, handled in authStore.ts's native-shell
+ *  branch (tauri-plugin-deep-link's onOpenUrl / getCurrent). */
 export function openNativeGoogleSignIn(): void {
   window.location.href = NATIVE_GOOGLE_SENTINEL;
 }

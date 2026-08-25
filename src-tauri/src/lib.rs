@@ -1,36 +1,30 @@
-use std::sync::{Arc, Mutex};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_opener::OpenerExt;
 
 const HOSTED: &str = "https://game-poketft-arena.web.app";
 
-// Branded page shown in the browser tab once the credential is handed off — a
-// spinning-less Pokéball + wordmark matching the in-app bridge. Auto-closes.
-const DONE_HTML: &str = r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><title>PokéTFT</title>
-<style>
-  html,body{height:100%;margin:0;background:#0a0e1a;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center}
-  .card{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:40px 34px;border-radius:20px;background:rgba(15,23,42,.55);border:1px solid rgba(251,191,36,.14);box-shadow:0 30px 80px -30px rgba(0,0,0,.8)}
-  .ball{position:relative;width:54px;height:54px}
-  .ball .b{position:absolute;inset:0;border-radius:50%;background:linear-gradient(#ef4444 0 50%,#f8fafc 50% 100%);border:3px solid #0a0e1a}
-  .ball .band{position:absolute;top:calc(50% - 2px);left:0;right:0;height:4px;background:#0a0e1a}
-  .ball .c{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:#f8fafc;border:3px solid #0a0e1a}
-  .title{font-size:20px;font-weight:800}
-  .gild{background:linear-gradient(180deg,#fde68a,#d4af37);-webkit-background-clip:text;background-clip:text;color:transparent}
-  .sub{font-size:13px;color:#94a3b8;line-height:1.5}
-</style></head>
-<body><div class="card">
-  <div class="ball"><span class="b"></span><span class="band"></span><span class="c"></span></div>
-  <div class="title">Signed in to Poké<span class="gild">TFT</span></div>
-  <div class="sub">You're all set — switch back to the app.<br>This tab will close automatically.</div>
-</div>
-<script>setTimeout(function(){window.close()},1400)</script>
-</body></html>"#;
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    // Must be registered FIRST: on Windows/Linux a deep-link click launches a new
+    // process (unlike macOS/Android, which route the URL to the running app via an
+    // OS event) — this plugin re-forwards that second launch's URL into the ALREADY
+    // running instance (as the same `onOpenUrl` event the JS side listens for) and
+    // exits the new process, instead of leaving the user signed in on a duplicate,
+    // orphaned window while the original stays signed out.
+    .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+      // The deep-link plugin only re-emits the URL event on this forward — it
+      // doesn't touch window focus, and unlike macOS (which auto-activates the
+      // app on a scheme handoff), nothing else brings the window to the front
+      // here either, so the user could sign in successfully and never notice.
+      if let Some(win) = app.get_webview_window("main") {
+        let _ = win.unminimize();
+        let _ = win.set_focus();
+      }
+    }))
     .plugin(tauri_plugin_opener::init())
-    .plugin(tauri_plugin_oauth::init())
+    .plugin(tauri_plugin_deep_link::init())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -38,12 +32,12 @@ pub fn run() {
             .level(log::LevelFilter::Info)
             .build(),
         )?;
+        // `tauri dev` runs an unbundled binary the OS never registered as the
+        // `poketft://` handler — register it for this session so the deep-link
+        // round trip is testable without a full install.
+        app.deep_link().register_all()?;
       }
 
-      // Build the main window in Rust so we can (a) flag the shell to the
-      // remotely-loaded page via an init script, and (b) intercept the sentinel
-      // the page navigates to when the user clicks Google (which Google blocks
-      // inside an embedded webview).
       let app_handle = app.handle().clone();
       WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
         .title("PokéTFT")
@@ -55,31 +49,14 @@ pub fn run() {
           if !url.as_str().contains("/__native-google") {
             return true;
           }
-          // Seamless Google sign-in: start a localhost loopback, open the system
-          // browser to the bridge, and on the credential callback sign the app in,
-          // focus it, and SHUT THE SERVER DOWN (no lingering localhost listener).
-          let cb_handle = app_handle.clone();
-          let port_cell: Arc<Mutex<Option<u16>>> = Arc::new(Mutex::new(None));
-          let port_cb = port_cell.clone();
-          let started = tauri_plugin_oauth::start_with_config(
-            tauri_plugin_oauth::OauthConfig { ports: None, response: Some(DONE_HTML.into()) },
-            move |redirect_url| {
-              if let Some(win) = cb_handle.get_webview_window("main") {
-                let arg = serde_json::to_string(&redirect_url).unwrap_or_else(|_| "\"\"".to_string());
-                let _ = win.eval(&format!("window.__poketftNativeAuth && window.__poketftNativeAuth({arg})"));
-                let _ = win.set_focus();
-              }
-              if let Some(p) = *port_cb.lock().unwrap() {
-                let _ = tauri_plugin_oauth::cancel(p);
-              }
-            },
-          );
-          if let Ok(port) = started {
-            *port_cell.lock().unwrap() = Some(port);
-            let _ = app_handle
-              .opener()
-              .open_url(format!("{HOSTED}/native-auth?cb={port}"), None::<&str>);
-          }
+          // Seamless Google sign-in: Google refuses to run its OAuth flow inside an
+          // embedded webview, so hand off to the user's real default browser (where
+          // they're likely already signed into Google) instead of navigating here.
+          // The bridge page it opens signs in with Firebase, then redirects to the
+          // poketft://auth-callback deep link, which the OS (or, on Windows/Linux,
+          // the single-instance forward above) routes back into THIS window as an
+          // `onOpenUrl` event — see authStore.ts's native-shell branch.
+          let _ = app_handle.opener().open_url(format!("{HOSTED}/native-auth"), None::<&str>);
           false // cancel the in-webview navigation; the browser takes over
         })
         .build()?;
