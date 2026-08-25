@@ -8,5 +8,10 @@
   "permissions": [
     "core:default",
     "deep-link:default"
-  ]
+  ],
+  "remote": {
+    "urls": [
+      "https://game-poketft-arena.web.app/*"
+    ]
+  }
 }
