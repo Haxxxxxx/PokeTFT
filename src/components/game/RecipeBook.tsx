@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { COMPONENTS, RECIPES, combineKey, ITEM_BY_ID, RARITY_COLOR, isEmblem } from "@/game/data/itemPool";
 import { useAppStore } from "@/game/store/appStore";
@@ -29,7 +30,15 @@ export function RecipeBook({ onClose }: { onClose: () => void }) {
     .map((p) => ({ partner: p.id, result: RECIPES[combineKey(base, p.id)] }))
     .filter((r): r is { partner: string; result: string } => Boolean(r.result));
 
-  return (
+  // Portaled to document.body: this is opened from deep inside the `tft-shell` game
+  // canvas, which is scaled via a CSS `transform` — and a `transform` on an ancestor
+  // makes it the containing block for any `position: fixed` descendant, silently
+  // trapping this "fixed inset-0" overlay inside that ancestor's local stacking
+  // context. Any sibling overlay rendered OUTSIDE the transformed canvas (end-of-round
+  // banners, the augment/carousel picker, the fight recap panel) then always painted
+  // on top of it regardless of z-index — the recipe list was unreadable underneath
+  // them. Portaling escapes the transform so this behaves like a real top-level modal.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
         className="gilded rounded-xl p-4 w-full max-w-2xl max-h-[85vh] overflow-y-auto"
@@ -93,6 +102,7 @@ export function RecipeBook({ onClose }: { onClose: () => void }) {
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

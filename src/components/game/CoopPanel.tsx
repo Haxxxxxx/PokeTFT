@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useGame } from "@/game/store/gameStore";
 import { syncBoard } from "@/game/net/match";
 import { sendGold, sendUnit } from "@/game/net/coop";
 import { getDef, spriteUrl } from "@/game/data/mons";
 import { Users, Coins, Send } from "lucide-react";
+import { useAnchoredPopover } from "@/lib/useAnchoredPopover";
 
 /** Double Up co-op controls: hand gold or a bench unit to your partner. The "help your
  *  partner when you finish early" flow — once your board's set, ship your spares over.
@@ -16,6 +18,10 @@ export function CoopPanel({ code, myUid, partner, lang }: {
   lang: string;
 }) {
   const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  // Portaled below (see comment there) — this popover needs a viewport-fixed anchor
+  // since it can no longer rely on CSS `absolute` positioning off the trigger button.
+  const pos = useAnchoredPopover(btnRef, open);
   const gold = useGame((s) => s.gold);
   const units = useGame((s) => s.units);
   const bench = units.filter((u) => u.pos === null);
@@ -38,6 +44,7 @@ export function CoopPanel({ code, myUid, partner, lang }: {
   return (
     <div className="relative shrink-0">
       <button
+        ref={btnRef}
         onClick={() => setOpen((v) => !v)}
         title={fr ? "Coopération — envoyer or/unités à ton partenaire" : "Co-op — send gold/units to your partner"}
         className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors ${open ? "border-emerald-400 bg-emerald-900/60" : "border-emerald-500/50 bg-emerald-900/30 hover:bg-emerald-900/50"} text-emerald-200`}
@@ -47,10 +54,17 @@ export function CoopPanel({ code, myUid, partner, lang }: {
         <span className="text-[11px] font-extrabold tabular-nums text-emerald-300">{Math.max(0, partner.hp)}♥</span>
       </button>
 
-      {open && (
+      {/* Portaled to document.body: this HUD chip lives inside the `tft-shell` game
+          canvas, which is scaled via a CSS `transform` — an ancestor `transform` makes
+          it the containing block for `position: fixed` descendants, so without the
+          portal this popover would be trapped in a local stacking context and could
+          render UNDER sibling overlays declared outside the canvas (round banners,
+          the augment/carousel picker) no matter its z-index. `useAnchoredPopover`
+          supplies the fixed-position coordinates that `absolute right-0` used to. */}
+      {open && pos && createPortal(
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute z-50 mt-2 right-0 w-64 max-w-[82vw] rounded-xl border border-emerald-500/40 bg-[#0d1426] shadow-2xl p-3">
+          <div style={{ position: "fixed", top: pos.top, right: pos.right }} className="z-50 w-64 max-w-[82vw] rounded-xl border border-emerald-500/40 bg-[#0d1426] shadow-2xl p-3">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-extrabold text-emerald-300 uppercase tracking-wide">{fr ? "Aider mon partenaire" : "Help your partner"}</h3>
               <span className="text-[10px] text-slate-500">{partner.name}</span>
@@ -97,7 +111,8 @@ export function CoopPanel({ code, myUid, partner, lang }: {
               )}
             </div>
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </div>
   );
