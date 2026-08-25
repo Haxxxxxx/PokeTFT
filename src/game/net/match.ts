@@ -187,19 +187,34 @@ function buildHistoryRow(room: Room, uid: string, place: number, total: number, 
   };
 }
 
+/** The per-player games/{code}/rated/{uid} claim's durable value — the DECIDED outcome
+ *  for this player's placement, not just a boolean flag. Storing the actual decision
+ *  (not just "has this run") is what makes the self-heal path in applyRatingFor safe:
+ *  a retry can re-attempt the leaderboard/history/results write using this exact
+ *  already-decided data without ever recomputing — and therefore never double-crediting
+ *  — the rating delta. */
+type RatingClaim = { place: number; delta: number; ratingApplied?: boolean };
+
 /** Server-authoritative rating write for one human at the moment their place is decided.
  *  Idempotent via a per-player games/{code}/rated/{uid} claim — safe to call on Cloud Tasks
  *  retries. Writes rating (transaction), leaderboard, history, and results/{uid} so the client
- *  end screen can read the LP outcome without touching the write path. */
+ *  end screen can read the LP outcome without touching the write path.
+ *
+ *  Resilient to partial failure: the rating transaction and the leaderboard/history/results
+ *  write are separate operations (RTDB has no cross-path read-modify-write), so a failure
+ *  in the second can land after the first already committed. That used to be silently lost
+ *  forever — the claim was a bare `true`, consumed up front, so nothing would ever retry it,
+ *  and every call site swallowed the thrown error with `.catch(() => {})` (a real production
+ *  incident: a player's rating changed but their history/leaderboard entry never appeared,
+ *  with zero trace in any log). Now the claim stores the decided outcome so a later call for
+ *  the same uid+code can detect an incomplete persist and safely finish it, and any error
+ *  that still occurs is logged and durably recorded instead of discarded. */
 export async function applyRatingFor(code: string, room: Room, uid: string, place: number): Promise<void> {
   const p = room.players?.[uid];
   // Skip genuine bots. Key off the unforgeable "bot-" uid prefix (assigned in
   // roomStore) — NOT the player-writable `isBot` field, which a human could set
   // on their own node to dodge an LP loss before elimination.
   if (!p || uid.startsWith("bot-")) return;
-  // Idempotency: claim per-player once. Abort if already applied (retry-safe).
-  const claim = await dbAdapter().transaction<boolean>(`games/${code}/rated/${uid}`, (cur) => (cur ? undefined : true));
-  if (!claim.committed) return;
 
   const players = Object.values(room.players ?? {});
   const total = players.length;
@@ -207,16 +222,55 @@ export async function applyRatingFor(code: string, room: Room, uid: string, plac
   const bots = players.filter((q) => q.isBot).length;
   const delta = weightedRatingDelta(place, total, humans, bots);
 
-  const res = await dbAdapter().transaction<number>(`users/${uid}/rating`, (cur) =>
-    Math.max(0, (typeof cur === "number" ? cur : START_RATING) + delta),
-  );
-  const rating = (res.value as number) ?? START_RATING;
+  const claimPath = `games/${code}/rated/${uid}`;
+  const claim = await dbAdapter().transaction<RatingClaim>(claimPath, (cur) => (cur ? undefined : { place, delta }));
 
-  await dbAdapter().update("", {
-    [`leaderboard/${uid}`]: { username: p.name, rating, photoURL: p.photoURL ?? null },
-    [`users/${uid}/history/${code}`]: buildHistoryRow(room, uid, place, total, delta),
-    [`games/${code}/results/${uid}`]: { place, delta, prevRating: rating - delta, rating },
-  });
+  let decided: RatingClaim;
+  let ratingAlreadyApplied: boolean;
+  if (claim.committed) {
+    decided = { place, delta };
+    ratingAlreadyApplied = false;
+  } else {
+    // Already claimed by an earlier attempt for this uid+code. If that attempt fully
+    // finished (history row exists), there's nothing to do — the common case for a
+    // legitimate Cloud Tasks retry hitting an already-completed transition. Otherwise
+    // self-heal: resume from the stored decision instead of returning early and losing
+    // it, but NEVER recompute delta or re-run the rating transaction once it's already
+    // applied — that would double-credit this player's LP for one game.
+    if (await dbAdapter().get(`users/${uid}/history/${code}`)) return;
+    decided = (claim.value as RatingClaim | null) ?? { place, delta };
+    ratingAlreadyApplied = !!decided.ratingApplied;
+  }
+
+  try {
+    let rating: number;
+    if (ratingAlreadyApplied) {
+      rating = (await dbAdapter().get<number>(`users/${uid}/rating`)) ?? START_RATING;
+    } else {
+      const res = await dbAdapter().transaction<number>(`users/${uid}/rating`, (cur) =>
+        Math.max(0, (typeof cur === "number" ? cur : START_RATING) + decided.delta),
+      );
+      rating = (res.value as number) ?? START_RATING;
+      // Record that the rating step is done BEFORE attempting the persist write below,
+      // so if THAT throws, a later retry knows not to touch the rating transaction again.
+      await dbAdapter().update(claimPath, { ratingApplied: true });
+    }
+
+    await dbAdapter().update("", {
+      [`leaderboard/${uid}`]: { username: p.name, rating, photoURL: p.photoURL ?? null },
+      [`users/${uid}/history/${code}`]: buildHistoryRow(room, uid, decided.place, total, decided.delta),
+      [`games/${code}/results/${uid}`]: { place: decided.place, delta: decided.delta, prevRating: rating - decided.delta, rating },
+    });
+  } catch (e) {
+    // This is the failure this rewrite exists to fix: previously silent, unrecoverable
+    // data loss. Now: loud (so it's actually debuggable) and durable (so the exact data
+    // needed to safely repair it — the already-decided place/delta — isn't lost either).
+    console.error(`[applyRatingFor] persist failed for ${uid} in game ${code}:`, e);
+    await dbAdapter().update(`games/${code}/ratingFailures`, {
+      [uid]: { place: decided.place, delta: decided.delta, error: (e as Error)?.message ?? String(e), ts: serverNow() },
+    }).catch(() => {});
+    throw e;
+  }
 }
 
 /** Host: start the match — reset every player and open round 1 planning. */
