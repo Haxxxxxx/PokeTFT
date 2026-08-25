@@ -19,9 +19,17 @@
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
       "headers": [
         {
+          "comment": "Default: never cache — stale index.html could point at old copy/links.",
           "source": "**",
           "headers": [
             { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+          ]
+        },
+        {
+          "comment": "Screenshots are static assets, safe to cache long — re-uploading a changed file gets a new deploy anyway.",
+          "source": "/screenshots/**",
+          "headers": [
+            { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
           ]
         }
       ]
