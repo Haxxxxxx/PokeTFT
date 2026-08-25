@@ -744,6 +744,44 @@ export function NetGameClient() {
     return unsub;
   }, [serverResultCode, myUid]);
 
+  // Auto-concede when the user actually LEAVES mid-game (closes the tab, navigates away)
+  // while still alive — so history/LP get recorded near-instantly instead of waiting up
+  // to 30 min for pruneStale's fallback sweep. pagehide fires on tab close, navigation
+  // and bfcache freeze, so it forfeits right away. visibilitychange=hidden ALSO fires on
+  // ordinary mobile backgrounding (switching apps, a phone call, locking the screen for
+  // a second) — treating that as an immediate forfeit would eliminate players out of
+  // their match just for tabbing away briefly, so it only starts a grace timer and is
+  // cancelled if the tab comes back before the timer fires. Both are best-effort (the
+  // request may be cut by the browser); pruneStale is the guaranteed fallback.
+  const backgroundGraceMs = 20_000;
+  useEffect(() => {
+    const code = room?.code;
+    if (!code || !myUid) return;
+    const tryAutoForfeit = () => {
+      const r = useRoom.getState().room;
+      const phase = r?.meta?.phase;
+      const alive = r?.players?.[myUid]?.alive;
+      if (!alive || (phase !== "planning" && phase !== "combat" && phase !== "carousel")) return;
+      if (recordedRef.current === code) return;
+      recordedRef.current = code;
+      callConcede(code).catch(() => {});
+    };
+    let graceTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearGrace = () => { if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; } };
+    const onHide = () => { clearGrace(); tryAutoForfeit(); };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") { clearGrace(); graceTimer = setTimeout(tryAutoForfeit, backgroundGraceMs); }
+      else clearGrace(); // came back before the grace period elapsed — not abandonment
+    };
+    window.addEventListener("pagehide", onHide);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearGrace();
+      window.removeEventListener("pagehide", onHide);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [room?.code, myUid]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [confirmLeave, setConfirmLeave] = useState(false);
   // Float-up text: "+X gold" or "−X HP" shown briefly near the HUD on econ events.
   const [floatText, setFloatText] = useState<string | null>(null);
