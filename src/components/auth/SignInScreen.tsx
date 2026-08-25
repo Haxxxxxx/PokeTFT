@@ -61,8 +61,13 @@ export function SignInScreen({ overlayMode, onClose }: { overlayMode?: boolean; 
       {error && <p className="text-xs text-rose-400 text-center">{error}</p>}
       {notice && <p className="text-xs text-emerald-400 text-center">{notice}</p>}
       {/* Temporary native-shell diagnostic — see nativeDebug's doc comment in
-          authStore.ts. Remove once native sign-in is confirmed reliable. */}
-      {nativeDebug && <p className="text-[10px] text-slate-600 text-center font-mono break-all">{nativeDebug}</p>}
+          authStore.ts. Appending log, oldest first. Remove once native sign-in is
+          confirmed reliable. */}
+      {nativeDebug && (
+        <pre className="text-[9px] text-slate-600 text-left font-mono whitespace-pre-wrap break-all max-h-32 overflow-y-auto bg-black/20 rounded-md p-2 border border-slate-800">
+          {nativeDebug}
+        </pre>
+      )}
 
       {!overlayMode && (
         <>
