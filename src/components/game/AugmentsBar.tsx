@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AUGMENT_BY_ID, AUGMENT_TIER_COLOR, teamBuffForAugments } from "@/game/data/augments";
 import { AugmentGlyph } from "./ItemGlyph";
+import { useAnchoredPopover } from "@/lib/useAnchoredPopover";
 
 /** Summarise the folded team-wide combat buff your augments are applying right now,
  *  as short stat tags — so the player can SEE what their augments are actually doing
@@ -27,6 +29,10 @@ function buffTags(ids: string[], fr: boolean): { label: string; color: string }[
  *  each augment's tier, name, full effect, and the combined team buff currently in play. */
 export function AugmentsBar({ augments, lang }: { augments: string[]; lang: string }) {
   const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  // Portaled below (see comment there) — this popover needs a viewport-fixed anchor
+  // since it can no longer rely on CSS `absolute` positioning off the trigger button.
+  const pos = useAnchoredPopover(btnRef, open);
   const fr = lang === "fr";
   if (!augments.length) return null;
   const tags = buffTags(augments, fr);
@@ -34,6 +40,7 @@ export function AugmentsBar({ augments, lang }: { augments: string[]; lang: stri
   return (
     <div className="relative shrink-0">
       <button
+        ref={btnRef}
         onClick={() => setOpen((v) => !v)}
         title={fr ? "Augmentations — cliquer pour les détails" : "Augments — click for details"}
         className={`flex items-center gap-1 px-1 py-0.5 rounded-md border transition-colors ${open ? "border-violet-400 bg-violet-900/60" : "border-violet-500/40 bg-violet-900/30 hover:bg-violet-900/50"}`}
@@ -49,11 +56,18 @@ export function AugmentsBar({ augments, lang }: { augments: string[]; lang: stri
         })}
       </button>
 
-      {open && (
+      {/* Portaled to document.body: this HUD chip lives inside the `tft-shell` game
+          canvas, which is scaled via a CSS `transform` — an ancestor `transform` makes
+          it the containing block for `position: fixed` descendants, so without the
+          portal this popover would be trapped in a local stacking context and could
+          render UNDER sibling overlays declared outside the canvas (round banners,
+          the augment/carousel picker) no matter its z-index. `useAnchoredPopover`
+          supplies the fixed-position coordinates that `absolute right-0` used to. */}
+      {open && pos && createPortal(
         <>
           {/* click-away */}
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute z-50 mt-2 right-0 w-72 max-w-[80vw] rounded-xl border border-violet-500/40 bg-[#0d1426] shadow-2xl p-3">
+          <div style={{ position: "fixed", top: pos.top, right: pos.right }} className="z-50 w-72 max-w-[80vw] rounded-xl border border-violet-500/40 bg-[#0d1426] shadow-2xl p-3">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-extrabold text-violet-300 uppercase tracking-wide">{fr ? "Augmentations" : "Augments"}</h3>
               <span className="text-[10px] text-slate-500">{augments.length}/3</span>
@@ -89,7 +103,8 @@ export function AugmentsBar({ augments, lang }: { augments: string[]; lang: stri
               </div>
             )}
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </div>
   );
