@@ -1,5 +1,4 @@
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
-#[cfg(any(windows, target_os = "linux"))]
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_opener::OpenerExt;
 
@@ -47,6 +46,20 @@ pub fn run() {
         #[cfg(any(windows, target_os = "linux"))]
         app.deep_link().register_all()?;
       }
+
+      // Bring the window to front whenever a poketft:// URL is delivered — on
+      // macOS/Android the OS calls this directly on the already-running app (no
+      // new process, unlike Windows/Linux), and NOTHING else pulls the window
+      // forward for that path. Without this, the sign-in can complete correctly
+      // in the background while the user is still staring at the login screen,
+      // with no visible sign anything happened.
+      let focus_handle = app.handle().clone();
+      app.deep_link().on_open_url(move |_event| {
+        if let Some(win) = focus_handle.get_webview_window("main") {
+          let _ = win.unminimize();
+          let _ = win.set_focus();
+        }
+      });
 
       let app_handle = app.handle().clone();
       WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
