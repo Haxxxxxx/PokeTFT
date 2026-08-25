@@ -12,6 +12,16 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    id: "2026-08-25",
+    version: "v0.8",
+    title: { en: "Desktop app sign-in actually fixed, plus UI & history fixes", fr: "Connexion de l'appli desktop enfin corrigée, plus correctifs d'affichage & d'historique" },
+    changes: [
+      { en: "Desktop & mobile app: Google sign-in now completes reliably end to end — no more getting stuck on the login screen after signing in through your browser.", fr: "Application desktop & mobile : la connexion Google se termine désormais de bout en bout — plus de blocage sur l'écran de connexion après s'être identifié dans le navigateur." },
+      { en: "Fixed the item Recipe Book, Augments panel and Co-op panel sometimes rendering underneath other UI, making them unreadable.", fr: "Correction du Livre de recettes, du panneau Augmentations et du panneau Coopération qui s'affichaient parfois sous le reste de l'interface, les rendant illisibles." },
+      { en: "Match history and rating now record reliably even if you close the app mid-game or your opponents are all bots.", fr: "L'historique des parties et le classement sont désormais enregistrés de manière fiable, même en quittant l'appli en cours de partie ou face à des bots uniquement." },
+    ],
+  },
+  {
     id: "2026-06-25",
     version: "v0.7",
     title: { en: "Guest play, account security & tighter rules", fr: "Jeu invité, sécurité du compte & règles renforcées" },
