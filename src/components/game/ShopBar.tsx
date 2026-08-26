@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { useGame } from "@/game/store/gameStore";
 import { useUi } from "@/game/store/uiStore";
 import { getDef, spriteUrl } from "@/game/data/mons";
@@ -45,6 +45,27 @@ function ShopBarBase() {
   const toggleFreeze = useGame((s) => s.toggleFreeze);
   const setInspect = useUi((s) => s.setInspect);
 
+  // Purchase feedback: a short-lived overlay on the slot just bought (buy = green
+  // pop, 3-copy combine = gold starburst). Rendered on both the filled AND the
+  // now-empty slot branch since buyUnit nulls the slot on the very next render.
+  const [popFx, setPopFx] = useState<{ slot: number; kind: "buy" | "combine" } | null>(null);
+  // Bumped on every successful reroll so the shop row remounts with a staggered
+  // deal-in animation instead of just instantly swapping content.
+  const [rerollTick, setRerollTick] = useState(0);
+  // Level-up beat: pops the Buy XP button when the level actually increases
+  // (mirrors the sfx.levelUp() already fired elsewhere for this change).
+  const [levelUpFx, setLevelUpFx] = useState(false);
+  const prevLevelRef = useRef(level);
+  useEffect(() => {
+    if (level > prevLevelRef.current) {
+      setLevelUpFx(true);
+      const id = setTimeout(() => setLevelUpFx(false), 500);
+      prevLevelRef.current = level;
+      return () => clearTimeout(id);
+    }
+    prevLevelRef.current = level;
+  }, [level]);
+
   const t = useT();
   const owned = ownedByDef(units);
   const activeTraits = new Set(
@@ -85,7 +106,7 @@ function ShopBarBase() {
         <button
           onClick={buyXp}
           disabled={gold < ECONOMY.buyXpCost || atMax}
-          className="flex flex-col gap-1 px-2.5 py-1.5 rounded-lg bg-sky-800/80 hover:bg-sky-700 disabled:opacity-40 border border-sky-600/40 transition-colors"
+          className={`flex flex-col gap-1 px-2.5 py-1.5 rounded-lg bg-sky-800/80 hover:bg-sky-700 disabled:opacity-40 border border-sky-600/40 transition-colors ${levelUpFx ? "celebrate-pop" : ""}`}
         >
           <div className="flex items-center justify-between w-full text-[10px] leading-none">
             <span className="font-extrabold text-slate-100">{t.net_level} {level}</span>
@@ -102,7 +123,7 @@ function ShopBarBase() {
         </button>
         {/* Reroll — bigger, with your current gold shown alongside the cost. */}
         <button
-          onClick={() => { reroll(); sfx.reroll(); }}
+          onClick={() => { reroll(); sfx.reroll(); setRerollTick((n) => n + 1); }}
           disabled={gold < ECONOMY.rerollCost}
           className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg bg-slate-700/80 hover:bg-slate-600 disabled:opacity-40 transition-colors"
         >
@@ -124,10 +145,24 @@ function ShopBarBase() {
 
       <div className="flex gap-2 flex-1">
         {shop.map((defId, i) => {
+          const key = `${i}-${rerollTick}`;
+          const popOverlay = popFx?.slot === i ? (
+            <span
+              className={`absolute inset-0 pointer-events-none z-30 rounded-lg ${popFx.kind === "combine" ? "shop-combine-burst" : "shop-buy-pop"}`}
+            />
+          ) : null;
           if (!defId) {
             // Sold/empty slot — same footprint + border treatment as a filled slot
             // so every shop slot stays visually uniform.
-            return <div key={i} className="flex-1 self-stretch min-h-[120px] rounded-lg border border-slate-700/50 bg-slate-900/30" />;
+            return (
+              <div
+                key={key}
+                className="shop-deal-in relative flex-1 self-stretch min-h-[120px] rounded-lg border border-slate-700/50 bg-slate-900/30 overflow-hidden"
+                style={{ animationDelay: `${i * 40}ms` }}
+              >
+                {popOverlay}
+              </div>
+            );
           }
           const def = getDef(defId);
           const color = COST_COLOR[def.cost];
@@ -141,20 +176,29 @@ function ShopBarBase() {
 
           return (
             <button
-              key={i}
+              key={key}
               onClick={() => {
                 const starsBefore = units.filter((u) => u.star > 1).map((u) => `${u.defId}-${u.star}`).join();
                 buyUnit(i);
+                const st = useGame.getState();
+                if (st.shop[i] != null) return; // insufficient gold/pool/bench full — buyUnit no-op'd, no fx
                 // Detect combine by checking if new 2★/3★ appeared
-                const starsAfter = useGame.getState().units.filter((u) => u.star > 1).map((u) => `${u.defId}-${u.star}`).join();
-                if (starsAfter !== starsBefore) sfx.combine();
+                const starsAfter = st.units.filter((u) => u.star > 1).map((u) => `${u.defId}-${u.star}`).join();
+                const combined = starsAfter !== starsBefore;
+                if (combined) sfx.combine();
                 else { sfx.buy(); playCry(def.dex[0]); }
+                setPopFx({ slot: i, kind: combined ? "combine" : "buy" });
+                window.setTimeout(() => setPopFx((cur) => (cur?.slot === i ? null : cur)), 600);
               }}
               disabled={!affordable}
-              style={{ borderColor: `${color}aa`, boxShadow: own ? `inset 0 0 0 1.5px ${color}` : undefined }}
-              className={`group relative flex-1 self-stretch min-h-[148px] overflow-hidden rounded-lg border hover:brightness-125 disabled:opacity-50
-                transition ${oneFromStar ? "ring-2 ring-amber-300/80 ring-inset" : ""}`}
+              style={{ borderColor: `${color}aa`, boxShadow: own ? `inset 0 0 0 1.5px ${color}` : undefined, animationDelay: `${i * 40}ms` }}
+              className="shop-deal-in group relative flex-1 self-stretch min-h-[148px] overflow-hidden rounded-lg border hover:brightness-125 disabled:opacity-50 transition"
             >
+              {popOverlay}
+              {/* One-from-star: a separate pulsing overlay (not a class on the button
+                  itself — it already carries the shop-deal-in `animation`, and a second
+                  class setting the same shorthand property would just clobber it). */}
+              {oneFromStar && <span className="star-pulse absolute inset-0 pointer-events-none rounded-lg" />}
               {/* Cost-coloured card body (TFT-style): the WHOLE card carries the rarity tint —
                   a vertical wash from the cost colour at the bottom up into the dark top. */}
               <span className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(180deg, #0b1020 0%, ${color}1f 60%, ${color}3d 100%)` }} />
