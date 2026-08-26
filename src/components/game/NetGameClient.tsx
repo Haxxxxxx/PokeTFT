@@ -1637,6 +1637,15 @@ function Countdown({ deadline }: { deadline: number }) {
   return <>{Math.max(0, Math.ceil((deadline - serverNow()) / 1000))}</>;
 }
 
+/** Last 5 seconds of a phase — used to pulse the timer so players glance up
+ *  before it auto-advances, instead of just trusting the smooth bar. */
+const URGENT_MS = 5000;
+function useTimerUrgent(deadline: number) {
+  useClockTick(true, 100);
+  const left = deadline - serverNow();
+  return left > 0 && left <= URGENT_MS;
+}
+
 /** A progress bar that DRAINS smoothly via a single CSS transition over the
  *  remaining time, instead of stepping every tick — so it never jumps. Re-renders
  *  only when the deadline changes (new round), the animation is pure CSS. */
@@ -1669,11 +1678,16 @@ function PhaseTimer({ phase, phaseLabel, deadline, totalMs, resolvingLabel }: { 
   // parked the deadline far in the future (>40s, since real phases are ≤30s).
   const left = deadline - serverNow();
   const resolving = active && (left <= 0 || left > 40_000);
+  // Combat's countdown is already rose/red throughout — the urgency pulse is only
+  // useful on planning/carousel, where the calm sky-blue otherwise never changes.
+  // (Hook called unconditionally per the Rules of Hooks; gated below instead.)
+  const isUrgentWindow = useTimerUrgent(deadline);
+  const urgent = !resolving && phase !== "combat" && isUrgentWindow;
   return (
     <div className="flex-1 min-w-[220px] flex flex-col gap-1 px-2">
       <div className="flex justify-between items-baseline">
-        <span className={`text-xs font-bold uppercase tracking-wide ${resolving ? "text-amber-300 animate-pulse" : phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{resolving ? resolvingLabel : phaseLabel}</span>
-        <span className="text-sm font-bold tabular-nums text-slate-200">
+        <span className={`text-xs font-bold uppercase tracking-wide ${resolving ? "text-amber-300 animate-pulse" : urgent ? "text-rose-300 timer-urgent" : phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{resolving ? resolvingLabel : phaseLabel}</span>
+        <span className={`text-sm font-bold tabular-nums ${urgent ? "text-rose-300 timer-urgent" : "text-slate-200"}`}>
           {resolving
             ? <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-amber-400/25 border-t-amber-400 animate-spin align-middle" />
             : <><Countdown deadline={deadline} />s</>}
