@@ -1228,17 +1228,23 @@ export function NetGameClient() {
               the drawer button in the top strip). */}
           {!L.railsAsDrawers && (
           <div className="flex flex-col gap-3 min-h-0">
-            <div className="flex-1 min-h-0 flex flex-col">
+            {/* Synergies sit at the TOP of the rail at their natural height;
+                the item stash is pushed to the bottom (mt-auto), matching TFT's
+                component stash in the lower-left. The gap between them is empty
+                space on purpose rather than a stretched, half-empty panel. */}
+            <div className="min-h-0 flex flex-col">
               <TraitPanel units={spectateUnits ?? undefined} />
             </div>
             {!isSpectator && phase !== "combat" && !spectating && (
-              <div className="shrink-0"><ItemsPanel /></div>
+              <div className="shrink-0 mt-auto"><ItemsPanel /></div>
             )}
           </div>
           )}
 
           {/* Players rail (RIGHT): every trainer as their profile picture with HP. */}
-          <div className="order-last gilded w-full p-2 rounded-xl min-h-0 overflow-y-auto">
+          {/* self-start so the trainers panel is as tall as its roster — a
+              2-player lobby shouldn't draw a full-height empty box. */}
+          <div className="order-last self-start gilded w-full p-2 rounded-xl min-h-0 max-h-full overflow-y-auto">
             <h2 className="text-[10px] uppercase tracking-wider text-amber-200/55 px-1 mb-1.5">{t.net_trainers(aliveCount)}</h2>
             <div className="flex flex-col gap-1">
               {ladder.map((p, i) => {

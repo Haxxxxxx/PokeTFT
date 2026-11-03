@@ -92,6 +92,17 @@ export const TILE_ASPECT = 100 / 106;
 /** Padding + border the Board draws around the field itself. */
 const BOARD_CHROME = 28;
 
+/**
+ * Camera distance as a multiple of the board's width.
+ *
+ * Perspective distortion depends on the RATIO of camera distance to subject
+ * size, not an absolute pixel value — a fixed `perspective` that looks right on
+ * a laptop turns into a fish-eye on a large board, with the far rows crushed to
+ * a fraction of the near ones. Scaling it with the field keeps the rake
+ * consistent at every size: a long lens rather than a wide one.
+ */
+const PERSPECTIVE_RATIO = 3.6;
+
 /** Below this the hex tokens stop being reliably tappable with a thumb. */
 const MIN_TILE_W = 34;
 /** Above this the board stops reading as a board on huge monitors. */
@@ -122,9 +133,12 @@ type Tier = {
 const TIERS: Record<Density, Tier> = {
   // Tilt stays gentle on small screens: a hard rake shrinks the far rows most,
   // and on a phone those tokens are already at the edge of being tappable.
-  compact: { topH: 32, benchSlot: 44, shopH: 86, leftRail: 0, rightRail: 48, gap: 4, pad: 4, font: 0.8, railsAsDrawers: true, tilt: 24, perspective: 1400 },
-  medium: { topH: 48, benchSlot: 66, shopH: 128, leftRail: 188, rightRail: 188, gap: 8, pad: 8, font: 0.9, railsAsDrawers: false, tilt: 30, perspective: 1500 },
-  full: { topH: 56, benchSlot: 92, shopH: 158, leftRail: 260, rightRail: 300, gap: 12, pad: 10, font: 1, railsAsDrawers: false, tilt: 34, perspective: 1700 },
+  // `perspective` here is only a FLOOR — the real value scales with the board
+  // (see PERSPECTIVE_RATIO), because distortion depends on the ratio between
+  // camera distance and subject size, not on an absolute pixel number.
+  compact: { topH: 32, benchSlot: 44, shopH: 86, leftRail: 0, rightRail: 48, gap: 4, pad: 4, font: 0.8, railsAsDrawers: true, tilt: 17, perspective: 1500 },
+  medium: { topH: 48, benchSlot: 66, shopH: 128, leftRail: 188, rightRail: 188, gap: 8, pad: 8, font: 0.9, railsAsDrawers: false, tilt: 21, perspective: 1800 },
+  full: { topH: 56, benchSlot: 92, shopH: 158, leftRail: 260, rightRail: 300, gap: 12, pad: 10, font: 1, railsAsDrawers: false, tilt: 24, perspective: 2100 },
 };
 
 /** Rows shown while planning when the full field can't fit: the ally half plus
@@ -230,7 +244,9 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
     pad,
     font,
     tilt,
-    perspective,
+    // Scale the camera distance with the board so the rake reads the same on a
+    // phone and an ultrawide; the tier value is only a floor.
+    perspective: Math.round(Math.max(perspective, field.w * PERSPECTIVE_RATIO)),
   };
 }
 

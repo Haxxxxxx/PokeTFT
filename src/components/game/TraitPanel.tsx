@@ -71,7 +71,10 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
   const hovered = hover ? traits.find((t) => t.key === hover.key) : null;
 
   return (
-    <div className="gilded w-full h-full min-h-0 flex flex-col p-3 rounded-xl">
+    // max-h-full, not h-full: the panel should be as tall as its synergies, not
+    // a full-height box with a mostly-empty border around three traits. It still
+    // caps at the rail height and scrolls internally once the list gets long.
+    <div className="gilded w-full max-h-full min-h-0 flex flex-col p-3 rounded-xl">
       <h2 className="text-xs uppercase tracking-wide text-amber-200/60 mb-2 shrink-0">{tr.tp_synergies}</h2>
       {traits.length === 0 && <p className="text-xs text-slate-500">{tr.tp_place_mons}</p>}
       {/* Scrolls when the list gets long. */}

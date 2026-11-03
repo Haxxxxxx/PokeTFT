@@ -153,7 +153,9 @@ function BoardBase({
         height: innerH + pad * 2,
         padding: pad,
         perspective: `${layout.perspective}px`,
-        perspectiveOrigin: "50% 42%",
+        // Centered: an off-center origin skews the rake so one half of the
+        // board foreshortens harder than the other.
+        perspectiveOrigin: "50% 50%",
       }}
     >
       <div
