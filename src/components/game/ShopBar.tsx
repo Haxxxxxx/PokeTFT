@@ -12,6 +12,7 @@ import { ECONOMY, COPIES_TO_STAR, SHOP_ODDS, MAX_LEVEL, XP_TO_REACH, type Cost }
 import { RerollIcon, SnowIcon, CoinIcon, InfoIcon, StarIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
 import { useT } from "@/lib/i18n";
+import { interest } from "@/game/engine/economy";
 import { sfx, playCry } from "@/lib/audio";
 
 /** Copies a unit instance is worth toward star-ups (1 / 3 / 9). */
@@ -141,6 +142,27 @@ function ShopBarBase() {
         >
           <SnowIcon size={13} /> {frozen ? t.sh_frozen : t.sh_freeze}
         </button>
+      </div>
+
+      {/* Gold — sits between the level/reroll controls and the cards, so the
+          number you spend is right next to the things you spend it on and
+          aligned with the shop row (TFT puts it in exactly this spot). The
+          interest preview rides along, since interest is a function of this
+          number and players bank to the next breakpoint. */}
+      <div className="gilded flex flex-col items-center justify-center gap-0.5 px-3 rounded-lg shrink-0 min-w-[76px]">
+        <span className="inline-flex items-center gap-1.5 text-2xl font-extrabold text-amber-300 tabular-nums leading-none drop-shadow">
+          <CoinIcon size={20} />
+          {gold}
+        </span>
+        <span className="text-[9px] font-bold uppercase tracking-wide text-amber-200/50 leading-none">
+          {t.net_gold_label}
+        </span>
+        <span
+          title={t.net_interest_label}
+          className="mt-0.5 text-[10px] font-bold tabular-nums text-amber-200/75 leading-none"
+        >
+          +{interest(gold)}
+        </span>
       </div>
 
       <div className="flex gap-2 flex-1">
