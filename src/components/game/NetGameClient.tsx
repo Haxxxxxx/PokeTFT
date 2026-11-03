@@ -43,7 +43,6 @@ function asUnits(u: unknown): UnitInstance[] {
 }
 import { Board } from "./Board";
 import { useGameLayout } from "./LayoutProvider";
-import { Bench } from "./Bench";
 import { UnitChip } from "./UnitChip";
 import { ShopBar } from "./ShopBar";
 import { TraitPanel } from "./TraitPanel";
@@ -1347,7 +1346,13 @@ export function NetGameClient() {
                     onResolve={() => {}}
                   />
                 ) : (
-                  <Board />
+                  <Board
+                    withBench
+                    // TFT lets you shop and sell during a fight; only the board
+                    // is locked, so the bench stays live in both phases.
+                    benchInteractive={(phase === "planning" || phase === "combat") && (!spectate || spectate === myUid)}
+                    benchCanDeploy={phase === "planning" && (!spectate || spectate === myUid)}
+                  />
                 )}
               </div>
             )}
@@ -1377,36 +1382,24 @@ export function NetGameClient() {
             spectators (no econ) AND while scouting a rival (it's all YOUR controls — the centre
             shows the rival's board + bench instead, so your shop/bench would just be noise). */}
         {!isSpectator && !spectating && <div className="flex flex-col items-center gap-2">
-          <div className="flex items-stretch gap-2">
-            {/* Board capacity (placed / cap) + one-click auto-fill from the bench. */}
-            {(() => {
-              const boardCount = units.filter((u) => u.pos !== null).length;
-              const benchCount = units.length - boardCount;
-              const cap = boardSizeForLevel(level);
-              const full = boardCount >= cap;
-              return (
-                <div className="gilded flex flex-col justify-center gap-1 px-2.5 py-1.5 rounded-xl shrink-0">
-                  <div className="text-[9px] uppercase tracking-wider text-amber-200/55 text-center leading-none">{t.net_board_label}</div>
-                  <div className="text-center text-base font-extrabold tabular-nums leading-none">
-                    <span className={full ? "text-emerald-300" : "text-amber-300"}>{boardCount}</span>
-                    <span className="text-slate-600">/{cap}</span>
-                  </div>
-                  <button
-                    onClick={fillBoard}
-                    disabled={phase !== "planning" || benchCount === 0 || full}
-                    title={t.net_board_fill_title}
-                    className="px-2 py-1 rounded-md bg-emerald-700/80 hover:bg-emerald-600 disabled:opacity-30 text-[10px] font-bold text-white leading-none"
-                  >
-                    {t.net_board_fill}
-                  </button>
-                </div>
-              );
-            })()}
-            <Bench
-              interactive={(phase === "planning" || phase === "combat") && (!spectate || spectate === myUid)}
-              canDeploy={phase === "planning" && (!spectate || spectate === myUid)}
-            />
-          </div>
+          {/* The bench now lives ON the platform (see Board's `withBench`), and the
+              board count is ghosted across the arena floor, so only the auto-fill
+              action still needs a home down here. */}
+          {(() => {
+            const boardCount = units.filter((u) => u.pos !== null).length;
+            const benchCount = units.length - boardCount;
+            const full = boardCount >= boardSizeForLevel(level);
+            if (phase !== "planning" || benchCount === 0 || full) return null;
+            return (
+              <button
+                onClick={fillBoard}
+                title={t.net_board_fill_title}
+                className="self-center px-3 py-1 rounded-md bg-emerald-700/80 hover:bg-emerald-600 text-[11px] font-bold text-white leading-none"
+              >
+                {t.net_board_fill}
+              </button>
+            );
+          })()}
           <div className="flex gap-3 w-full max-w-[1480px]">
             {/* Pension on the far LEFT and Sell on the far RIGHT — separated by the
                 whole shop so a drag-to-sell can't accidentally land in the Day Care. */}

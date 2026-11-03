@@ -456,6 +456,37 @@ body {
   pointer-events: none;
 }
 
+/* Bench slabs set into the platform's near edge. Recessed rather than raised —
+   inset shadow plus a darker fill reads as a socket cut into the stone, which
+   is what makes the bench part of the arena instead of a tray sitting on it. */
+.bench-slab {
+  border-radius: 7px;
+  background: linear-gradient(180deg, rgba(8, 13, 26, 0.92) 0%, rgba(17, 26, 48, 0.8) 100%);
+  border: 1px solid rgba(150, 180, 230, 0.16);
+  box-shadow:
+    inset 0 3px 9px rgba(0, 0, 0, 0.6),
+    inset 0 -1px 0 rgba(190, 215, 255, 0.07);
+  transition: background 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+.bench-slab.is-over {
+  border-color: rgba(56, 189, 248, 0.85);
+  background: linear-gradient(180deg, rgba(14, 42, 71, 0.95) 0%, rgba(22, 56, 92, 0.85) 100%);
+  box-shadow:
+    inset 0 3px 9px rgba(0, 0, 0, 0.45),
+    0 0 16px -2px rgba(56, 189, 248, 0.55);
+}
+
+/* Rim light on board units. A stack of tight drop-shadows traces the sprite's
+   alpha edge, so the silhouette separates from the stone underneath it — the
+   cheapest stand-in for the lit edge a 3D model would get from the scene. The
+   last, softer shadow is the ambient occlusion back toward the ground. */
+.unit-rim {
+  filter:
+    drop-shadow(0 0 1px rgba(226, 240, 255, 0.85))
+    drop-shadow(0 0 2px rgba(150, 200, 255, 0.4))
+    drop-shadow(0 3px 4px rgba(0, 0, 0, 0.7));
+}
+
 /* Contact shadow pooled under a standing unit — the cue that actually sells
    "planted on the ground" rather than "floating above it". */
 .unit-contact {

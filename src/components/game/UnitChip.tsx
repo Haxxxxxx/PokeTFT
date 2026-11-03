@@ -75,9 +75,12 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
 
   const ring = megaReady ? "#f0abfc" : color;
   const title = megaReady ? `${def.stageNames[unit.star - 1]} · ${t.uc_mega_ready}` : `${def.stageNames[unit.star - 1]} · ${t.uc_click_details}`;
-  // Fill the token: the mon is the point, so let the sprite take nearly the whole cell (the
-  // hex token has no border to clear; the square chip leaves room for its 2px frame).
-  const spriteSize = shape === "hex" ? size - 2 : size - 6;
+  // Fill the token, then some. PokéAPI sprites carry a lot of transparent
+  // padding, so a sprite drawn at exactly the tile size reads much smaller than
+  // the tile. On the board we oversize it and let it break the hex — the same
+  // reason TFT's champions overflow their cell — which is what makes a unit read
+  // as a creature standing there rather than an icon sitting in a box.
+  const spriteSize = shape === "hex" ? Math.round(size * 1.34) : size - 6;
   const sprite = (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -85,7 +88,7 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
       alt={def.name}
       width={spriteSize}
       height={spriteSize}
-      className="image-render-pixel pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
+      className={`image-render-pixel pointer-events-none ${shape === "hex" ? "unit-rim" : "drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"}`}
       style={{ imageRendering: "pixelated" }}
       draggable={false}
     />

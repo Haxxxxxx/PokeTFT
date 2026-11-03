@@ -4,7 +4,7 @@ import { memo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { FIELD, ALLY_ROW0, HEX_CLIP, hexToPixel, fieldPixelSize, rowsPixelHeight } from "@/game/engine/hex";
 import { boardSizeForLevel } from "@/game/config";
-import { useGame } from "@/game/store/gameStore";
+import { useGame, BENCH_SIZE, resolveBenchSlots } from "@/game/store/gameStore";
 import { useGameLayout } from "./LayoutProvider";
 import { UnitChip } from "./UnitChip";
 import { ItemGlyph } from "./ItemGlyph";
@@ -119,15 +119,56 @@ function HexCell({
   );
 }
 
+/** One bench slab at the arena's near edge. Same plane, same rake as the hexes
+ *  — which is the point: in TFT the bench is part of the platform, not a
+ *  separate widget floating beneath it. */
+function BenchSlab({
+  index, unit, interactive, canDeploy, size, tilt,
+}: {
+  index: number; unit: UnitInstance | null; interactive: boolean; canDeploy: boolean;
+  size: number; tilt: number;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `bench-${index}` });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`relative shrink-0 flex items-end justify-center bench-slab${isOver ? " is-over" : ""}`}
+      style={{ width: size, height: size }}
+    >
+      {unit && (
+        <>
+          <span
+            className="absolute pointer-events-none unit-contact"
+            style={{ width: size * 0.56, height: size * 0.18, bottom: size * 0.1 }}
+          />
+          <div
+            className="relative unit-stand"
+            style={{ transform: `rotateX(${-tilt}deg)`, transformOrigin: "bottom center" }}
+          >
+            <UnitChip unit={unit} size={size - 8} interactive={interactive} canDeploy={canDeploy} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function BoardBase({
   units,
   interactive = true,
   rows,
+  withBench = false,
+  benchInteractive = true,
+  benchCanDeploy = true,
 }: {
   units?: UnitInstance[];
   interactive?: boolean;
   /** Field rows to show. Defaults to the full 8-row battlefield. */
   rows?: number;
+  /** Render the bench as slabs on the platform's near edge. */
+  withBench?: boolean;
+  benchInteractive?: boolean;
+  benchCanDeploy?: boolean;
 }) {
   const t = useT();
   const layout = useGameLayout();
@@ -161,6 +202,12 @@ function BoardBase({
   // every board size.
   const wallT = Math.max(10, Math.round(tileW * 0.26));
 
+  // Bench slabs live ON the platform at its near edge (TFT puts them there), so
+  // their height is part of the arena rather than a separate zone below it.
+  const benchSlots = withBench ? resolveBenchSlots(source) : [];
+  const benchSize = Math.round(Math.min(tileW * 0.82, (innerW - (BENCH_SIZE - 1) * 6) / BENCH_SIZE));
+  const benchStripH = withBench ? benchSize + 12 : 0;
+
   // Board capacity, ghosted on the floor. Only on your OWN live board — on a
   // scouted rival's board it would be their number shown over your context.
   const capacity = boardSizeForLevel(level);
@@ -172,7 +219,7 @@ function BoardBase({
       className="relative arena-frame"
       style={{
         width: innerW + pad * 2,
-        height: innerH + pad * 2,
+        height: innerH + benchStripH + pad * 2,
         padding: pad,
         perspective: `${layout.perspective}px`,
         // Centered: an off-center origin skews the rake so one half of the
@@ -284,6 +331,30 @@ function BoardBase({
             );
           })}
         </div>
+
+        {/* ── Bench: slabs set into the platform's near edge ──
+            Inside the same tilted plane as the hexes, so it rakes with the
+            board and reads as part of the arena rather than a widget parked
+            underneath it. Drop ids are unchanged (`bench-N`), so all existing
+            drag logic keeps working. */}
+        {withBench && (
+          <div
+            className="absolute flex items-end justify-center gap-1.5"
+            style={{ left: pad, top: pad + innerH, width: innerW, height: benchStripH }}
+          >
+            {Array.from({ length: BENCH_SIZE }).map((_, i) => (
+              <BenchSlab
+                key={i}
+                index={i}
+                unit={benchSlots[i] ?? null}
+                interactive={benchInteractive}
+                canDeploy={benchCanDeploy}
+                size={benchSize}
+                tilt={tilt}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
