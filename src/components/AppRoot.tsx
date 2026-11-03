@@ -9,6 +9,7 @@ import { useAppStore } from "@/game/store/appStore";
 import { WelcomeScreen } from "@/components/welcome/WelcomeScreen";
 import { LobbyScreen } from "@/components/lobby/LobbyScreen";
 import { NetGameClient } from "@/components/game/NetGameClient";
+import { LayoutProvider } from "@/components/game/LayoutProvider";
 import { OrientationGate } from "@/components/game/OrientationGate";
 import { FirstMatchCoach } from "@/components/game/FirstMatchCoach";
 import { ProfileScreen } from "@/components/profile/ProfileScreen";
@@ -81,8 +82,10 @@ export function AppRoot() {
 
   return (
     <ErrorBoundary>
-      {view}
-      {/* The fixed-canvas match is the only view that needs landscape — gate it. */}
+      {/* The match view sizes itself from the live viewport (board tile, rails,
+          bench, shop), so it must sit under the layout provider. */}
+      {inMatch ? <LayoutProvider>{view}</LayoutProvider> : view}
+      {/* The match is landscape-only, same as TFT Mobile — gate it. */}
       {inMatch && <OrientationGate />}
       {/* Learn-by-doing coach for a brand-new trainer's first match (self-dismissing).
           Never for spectators — they have no board of their own to coach. */}

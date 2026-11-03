@@ -59,7 +59,14 @@ export function neighbors({ c, r }: Hex): Hex[] {
 }
 
 // Pointy-top hexes: rows overlap vertically by 1/4 of tile height.
-const ROW_STEP = 0.75;
+export const ROW_STEP = 0.75;
+
+/** Pixel height of an arbitrary ROW COUNT at a given tile height. The responsive
+ *  layout renders a windowed field (fewer rows) on small screens, so it needs
+ *  this independently of FIELD.rows. */
+export function rowsPixelHeight(rows: number, tileH: number): number {
+  return (Math.max(1, rows) - 1) * tileH * ROW_STEP + tileH;
+}
 
 /** Pixel center of a hex cell, given tile width/height. */
 export function hexToPixel({ c, r }: Hex, tileW: number, tileH: number): { x: number; y: number } {

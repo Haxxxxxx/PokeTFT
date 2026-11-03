@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, PointerSensor, TouchSensor, closestCenter, MeasuringStrategy, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
 import { useGame, PENSION_COST, PENSION_ROUNDS, resolveBenchSlots } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
@@ -9,7 +9,7 @@ import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, s
 import { simulate, type FrameUnit } from "@/game/engine/combat";
 import { getDef, spriteUrl, hasDef, archetypeOf } from "@/game/data/mons";
 import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, modeTeamBuff, modeSignatureAugment, getMode, pickMonoType, isDoubleUp, isNuzlocke, isHyperRoll, isLegendaryClash } from "@/game/data/gameModes";
-import { streakGold, roundKind, advanceRound, boardSizeForLevel, cumulativeRound, ECONOMY } from "@/game/config";
+import { streakGold, roundKind, advanceRound, boardSizeForLevel, cumulativeRound } from "@/game/config";
 import { serializeBoard, saveGhost, type GhostUnit } from "@/game/net/ghost";
 import { interest } from "@/game/engine/economy";
 import { MEGA_STONE, canMega } from "@/game/data/mega";
@@ -33,25 +33,16 @@ import { CarouselOverlay, AugmentOverlay, GameOverScreen } from "./GameOverlays"
 import type { UnitInstance } from "@/game/types";
 
 
-// Fixed design canvas the game is laid out on; scaled uniformly to fit any
-// screen. Planning and combat now share the SAME layout height (the center
-// column is a fixed height in both phases — see CENTER_H), so the canvas size is
-// constant and nothing jumps between phases.
-const DESIGN_W = 1760;
-const DESIGN_H = 1190;
-// The middle row (field column) is locked to this height in BOTH phases so the
-// battlefield stays put and the bench/shop below it never move when the phase
-// flips. Sized to hold the 8-row field plus the floating combat chrome.
-const CENTER_H = 748;
-// Let the canvas scale UP (not just down) so big monitors aren't left with huge
-// empty margins — capped so it doesn't become cartoonishly large.
-const MAX_SCALE = 1.5;
+// The fixed design canvas (1760x1190, uniformly scaled) that used to live here
+// is gone — see src/game/ui/layout.ts. Zones are sized from the live viewport
+// and the layout reflows, so there is no canvas constant to keep in sync.
 
 function asUnits(u: unknown): UnitInstance[] {
   if (!u) return [];
   return (Array.isArray(u) ? u : Object.values(u as Record<string, UnitInstance>)).map(normalizeUnit);
 }
 import { Board } from "./Board";
+import { useGameLayout } from "./LayoutProvider";
 import { Bench } from "./Bench";
 import { UnitChip } from "./UnitChip";
 import { ShopBar } from "./ShopBar";
@@ -241,28 +232,11 @@ export function NetGameClient() {
   // scale only ever changes on a window resize — NEVER when planning flips to
   // combat. Both phases live on the same-sized canvas, so the board no longer
   // resizes or jumps between phases (the old measured-height refit did).
-  const [scale, setScale] = useState(1);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    const fit = () => {
-      // Prefer the visual viewport on mobile — it excludes the browser toolbars, so
-      // the canvas fills the *actually visible* area instead of leaving a strip
-      // hidden behind the URL bar. Falls back to the layout viewport on desktop.
-      const w = vv?.width ?? window.innerWidth;
-      const h = vv?.height ?? window.innerHeight;
-      const s = Math.min(MAX_SCALE, (w - 8) / DESIGN_W, (h - 8) / DESIGN_H);
-      setScale(s > 0 ? s : 1);
-    };
-    fit();
-    window.addEventListener("resize", fit);
-    window.addEventListener("orientationchange", fit);
-    vv?.addEventListener("resize", fit);
-    return () => {
-      window.removeEventListener("resize", fit);
-      window.removeEventListener("orientationchange", fit);
-      vv?.removeEventListener("resize", fit);
-    };
-  }, []);
+  // The screen used to be one fixed 1760x1190 canvas scaled uniformly to fit,
+  // which shrank hex tokens and label text together until neither worked on a
+  // phone. Now every zone is sized from the live viewport by the layout engine
+  // (src/game/ui/layout.ts) and the arrangement reflows instead of scaling.
+  const L = useGameLayout();
 
   // Boot-veil readiness ref filled in below (after `me` is known).
   const bootReadyRef = useRef(false);
@@ -1016,7 +990,19 @@ export function NetGameClient() {
   }
 
   return (
-    <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+    <DndContext
+      sensors={sensors}
+      onDragEnd={onDragEnd}
+      // closestCenter, not the default rectIntersection: the arena is a
+      // 3D-tilted plane, and getBoundingClientRect() on a transformed element
+      // returns the PROJECTED axis-aligned box. Those projected boxes overlap
+      // and mis-rank under perspective, but their centers stay correctly
+      // ordered — so center distance is the collision test that survives tilt.
+      collisionDetection={closestCenter}
+      // Re-measure droppables on every drag: the board resizes with the
+      // viewport now, so cached rects from a previous size would be stale.
+      measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+    >
       <Toasts />
       {/* Concede / forfeit confirm */}
       {confirmLeave && (
@@ -1046,10 +1032,10 @@ export function NetGameClient() {
           </div>
         </div>
       )}
-      <div className="tft-shell fixed inset-0 flex justify-center items-center overflow-hidden">
+      <div className="tft-shell fixed inset-0 overflow-hidden">
       <div
-        style={{ width: DESIGN_W, height: DESIGN_H, transform: `scale(${scale})`, transformOrigin: "center" }}
-        className="flex flex-col gap-2 px-3 py-2 shrink-0"
+        style={{ padding: L.pad, gap: L.gap }}
+        className="w-full h-full flex flex-col"
       >
         {/* Round tracker (TFT-style): an icon per round — Sword=PvP, Leaf=PvE, Gift=
             carousel — grouped by stage. The current round glows; past PvP rounds
@@ -1226,10 +1212,33 @@ export function NetGameClient() {
         {/* Columns spread to the edges (TFT-style) so wide screens use the side
             space; the centre field column is fixed-width + centred, so it stays
             pinned across phases. */}
-        <div className="grid items-stretch gap-4" style={{ gridTemplateColumns: "260px 64px 824px 340px", justifyContent: "space-between", height: CENTER_H }}>
-          {/* Left sidebar: scoreboard + synergies, a full-height rail beside the board. */}
+        {/* Three fluid tracks: traits rail · BOARD · players rail. The board takes
+            every pixel the chrome doesn't, so it grows with the window instead of
+            being scaled. Rail widths come from the layout engine's density tier. */}
+        <div
+          className="flex-1 min-h-0 grid items-stretch"
+          style={{
+            gridTemplateColumns: L.railsAsDrawers
+              ? `1fr ${L.rightRail}px`
+              : `${L.leftRail}px 1fr ${L.rightRail}px`,
+            gap: L.gap,
+          }}
+        >
+          {/* Left rail: synergies + item stash (hidden on compact — reachable from
+              the drawer button in the top strip). */}
+          {!L.railsAsDrawers && (
           <div className="flex flex-col gap-3 min-h-0">
-          <div className="gilded w-full p-2 rounded-xl shrink-0">
+            <div className="flex-1 min-h-0 flex flex-col">
+              <TraitPanel units={spectateUnits ?? undefined} />
+            </div>
+            {!isSpectator && phase !== "combat" && !spectating && (
+              <div className="shrink-0"><ItemsPanel /></div>
+            )}
+          </div>
+          )}
+
+          {/* Players rail (RIGHT): every trainer as their profile picture with HP. */}
+          <div className="order-last gilded w-full p-2 rounded-xl min-h-0 overflow-y-auto">
             <h2 className="text-[10px] uppercase tracking-wider text-amber-200/55 px-1 mb-1.5">{t.net_trainers(aliveCount)}</h2>
             <div className="flex flex-col gap-1">
               {ladder.map((p, i) => {
@@ -1272,43 +1281,13 @@ export function NetGameClient() {
               })}
             </div>
           </div>
-            <div className="flex-1 min-h-0 flex flex-col">
-              <TraitPanel units={spectateUnits ?? undefined} />
-            </div>
-          </div>
 
-          {/* Interest "piggy bank" — its own narrow track between the left rail and the
-              field, so it sits right against the board (TFT-style). A vertical coin
-              column (one slot per 10 gold) that fills bottom-up toward the +5 cap.
-              Always reflects YOUR own gold. */}
-          <div className="flex flex-col items-center justify-center gap-2 min-h-0">
-            {!isSpectator && <>
-            <span className="text-base font-extrabold text-amber-300 tabular-nums drop-shadow">+{interest(gold)}</span>
-            <div className="flex flex-col-reverse gap-2">
-              {Array.from({ length: ECONOMY.interestCap }).map((_, i) => {
-                const threshold = (i + 1) * ECONOMY.interestPer;
-                const filled = gold >= threshold;
-                return (
-                  <span
-                    key={i}
-                    title={`${threshold} ${t.net_gold_label}`}
-                    className={`w-11 h-11 rounded-xl border-2 flex items-center justify-center transition-all ${filled ? "bg-amber-400/25 border-amber-400/80 text-amber-300 shadow-[0_0_12px_-2px_rgba(251,191,36,0.75)]" : "bg-slate-800/40 border-slate-700/50 text-slate-700"}`}
-                  >
-                    <CoinIcon size={24} />
-                  </span>
-                );
-              })}
-            </div>
-            <span className="text-[8px] font-bold uppercase tracking-wide text-amber-200/45 mt-0.5 text-center leading-tight">{t.net_interest_label}</span>
-            </>}
-          </div>
-
-          {/* Center: the shared field. Locked to CENTER_H in EVERY phase so the
-              battlefield stays in the exact same spot and the bench/shop below it
-              never move — only the units on the field and what's interactive
-              change. A `board-swap` fade plays when the view changes (phase flip
-              or landing on a rival's / your own board). */}
-          <div className={`relative min-w-0 rounded-xl${boardFlash ? " screen-flash" : ""}`} style={{ height: CENTER_H }}>
+          {/* Center: the shared field. Fills the track the rails leave behind, so
+              it grows with the window rather than being scaled. The board itself
+              keeps ONE tile size across phases (the layout engine solves planning
+              and combat together), so the arena never jumps when the phase flips.
+              A `board-swap` fade plays when the view changes. */}
+          <div className={`order-2 relative min-w-0 min-h-0 flex items-center justify-center rounded-xl${boardFlash ? " screen-flash" : ""}`}>
             {/* Float-up text for HP damage or gold gain feedback. */}
             {floatText && (
               <div key={floatKey} className={`float-up absolute top-4 left-1/2 -translate-x-1/2 z-30 text-sm font-extrabold drop-shadow pointer-events-none select-none ${floatText.startsWith("−") ? "text-rose-300" : "text-amber-300"}`}>
@@ -1368,28 +1347,25 @@ export function NetGameClient() {
             )}
           </div>
 
-          {/* Right rail: items inventory + details (planning). During combat the
-              recap (with tabs) lives inside CombatStage; the 300px track stays
-              reserved so the field column doesn't move. */}
-          <div className="w-[340px] min-h-0">
-            {phase !== "combat" && !spectating && (
-              <div className="flex flex-col gap-3 h-full">
-                <ItemsPanel />
-                <div className="flex-1 min-h-0 flex flex-col">
-                  <UnitDetail />
-                </div>
-              </div>
-            )}
-            {/* During combat the rail is otherwise free — show the inspected mon's
-                stats when one is clicked (e.g. a bench unit), so you can still
-                consult details mid-fight. */}
-            {phase === "combat" && !spectating && (inspect || inspectedItem) && (
-              <div className="flex flex-col h-full min-h-0">
-                <UnitDetail />
-              </div>
-            )}
-          </div>
         </div>
+
+        {/* Unit / item detail. The right track now belongs to the trainers list,
+            so details float over the board on demand instead of permanently
+            reserving a 340px column — which is also what frees that width for
+            the board on smaller screens. Available in every phase. */}
+        {!spectating && (inspect || inspectedItem) && (
+          <div
+            className="fixed z-40 flex flex-col detail-pop"
+            style={{
+              right: L.rightRail + L.gap + L.pad,
+              top: L.pad + L.topH + L.gap,
+              width: Math.min(340, Math.max(240, L.viewport.w * 0.26)),
+              maxHeight: `calc(100vh - ${L.pad * 2 + L.topH + L.gap * 2}px)`,
+            }}
+          >
+            <UnitDetail />
+          </div>
+        )}
 
         {/* Bottom bar: board controls + bench (centred), then the shop. Hidden for dedicated
             spectators (no econ) AND while scouting a rival (it's all YOUR controls — the centre

@@ -5,7 +5,8 @@ import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 import { usePrefersReducedMotion } from "@/lib/useReducedMotion";
 import { sfx } from "@/lib/audio";
-import { hexToPixel, fieldPixelSize, hexDistance, FIELD, TILE, HEX_CLIP } from "@/game/engine/hex";
+import { hexToPixel, fieldPixelSize, hexDistance, FIELD, HEX_CLIP } from "@/game/engine/hex";
+import { useGameLayout } from "./LayoutProvider";
 import { TYPE_COLOR } from "@/game/ui";
 import { SnowIcon, SwordIcon, ShieldIcon } from "./icons";
 import { Leaf, BarChart3 } from "lucide-react";
@@ -33,8 +34,9 @@ function mirrorResult(r: CombatResult): CombatResult {
   };
 }
 
-const TILE_W = TILE.w;
-const TILE_H = TILE.h;
+/** Tile size is responsive now (see LayoutProvider) — each component that draws
+ *  on the field reads it from the layout and keeps the old local names, so the
+ *  geometry call sites below are unchanged. */
 const SIM_DT = 1 / 16;
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -188,6 +190,10 @@ export function CombatStage({
     playedEnd.current = true;
     if (wonRef.current) sfx.victory(); else sfx.defeat();
   }, [finished]);
+
+  const layout = useGameLayout();
+  const TILE_W = layout.tile.w;
+  const TILE_H = layout.tile.h;
 
   const { w, h } = fieldPixelSize(TILE_W, TILE_H);
   const fi = Math.min(Math.floor(idx), last);
@@ -503,6 +509,9 @@ function CombatRecapTabs({ units, label, onClose }: { units: FrameUnit[]; label:
 }
 
 const HexGrid = memo(function HexGrid() {
+  const layout = useGameLayout();
+  const TILE_W = layout.tile.w;
+  const TILE_H = layout.tile.h;
   const cells = [];
   for (let r = 0; r < FIELD.rows; r++) {
     for (let c = 0; c < FIELD.cols; c++) {
@@ -587,14 +596,20 @@ function CombatUnit({
 }
 
 function Corpse({ unit }: { unit: FrameUnit }) {
+  const layout = useGameLayout();
+  const TILE_W = layout.tile.w;
+  const TILE_H = layout.tile.h;
   const p = hexToPixel({ c: unit.c, r: unit.r }, TILE_W, TILE_H);
+  // Sprite + puff scale with the tile, so a corpse doesn't dwarf a 34px hex.
+  const sprite = Math.round(TILE_W * 0.44);
+  const puff = Math.round(TILE_W * 0.5);
   return (
     <>
       {/* One-shot dissipation puff at the moment of death (plays once on mount). */}
-      <span className="absolute pointer-events-none rounded-full combat-burst" style={{ left: p.x - 26, top: p.y - 26, width: 52, height: 52, background: "radial-gradient(circle, rgba(226,232,240,0.55), rgba(148,163,184,0) 70%)" }} />
-      <div key={unit.id} className="absolute pointer-events-none combat-die" style={{ left: p.x - 23, top: p.y - 23 }}>
+      <span className="absolute pointer-events-none rounded-full combat-burst" style={{ left: p.x - puff / 2, top: p.y - puff / 2, width: puff, height: puff, background: "radial-gradient(circle, rgba(226,232,240,0.55), rgba(148,163,184,0) 70%)" }} />
+      <div key={unit.id} className="absolute pointer-events-none combat-die" style={{ left: p.x - sprite / 2, top: p.y - sprite / 2 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={spriteUrl(unit.dex)} alt="" width={46} height={46} style={{ imageRendering: "pixelated", filter: "grayscale(1) brightness(0.6)" }} draggable={false} />
+        <img src={spriteUrl(unit.dex)} alt="" width={sprite} height={sprite} style={{ imageRendering: "pixelated", filter: "grayscale(1) brightness(0.6)" }} draggable={false} />
       </div>
     </>
   );
