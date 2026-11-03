@@ -20,7 +20,7 @@ import { START_RATING } from "../src/game/rating";
 import type { Room, RoomPlayer } from "../src/game/net/roomStore";
 
 type Obj = Record<string, unknown>;
-let store: Obj = {};
+const store: Obj = {};
 function getPath(root: Obj, path: string): unknown {
   return path.split("/").filter(Boolean).reduce<unknown>((cur, k) => (cur == null ? cur : (cur as Obj)[k]), root);
 }

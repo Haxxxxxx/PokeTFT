@@ -30,5 +30,14 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "functions",
+    "server",
+    "src-tauri",
+    "tools",
+    "out",
+    "out-landing",
+    ".next"
+  ]
 }

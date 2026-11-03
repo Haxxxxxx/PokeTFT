@@ -13,7 +13,7 @@
 
 import type { PokeType } from "../types";
 import type { TeamBuff } from "../engine/combat";
-import { GEN_DEX_RANGES, GEN_LABELS } from "./generations";
+import { GEN_DEX_RANGES } from "./generations";
 import { unitsForGenerations, getDef, rosterForGenerations } from "./mons";
 import { MEGA_STONE } from "./mega";
 

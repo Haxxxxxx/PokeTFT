@@ -133,8 +133,7 @@ async function run() {
 
   // 2) Run PvP combat rounds until a team is eliminated (game over), capped to avoid loops.
   console.log("\nRunning PvP rounds:");
-  let round = 0;
-  let team1HpTrail: number[] = [100];
+  const team1HpTrail: number[] = [100];
   let crossTeamOk = true;
   for (let i = 0; i < 12 && freshRoom().meta.phase !== "over"; i++) {
     armPvpRound(2, 1); // a PvP round with an elapsed deadline
@@ -153,7 +152,6 @@ async function run() {
     room = freshRoom();
     const t1 = room.teams?.[1]?.hp ?? 0;
     team1HpTrail.push(t1);
-    round++;
   }
   console.log(`  team 1 shared-HP trail: ${team1HpTrail.join(" → ")}`);
   assert(crossTeamOk, "every real fight was cross-team (no teammate clashes)");

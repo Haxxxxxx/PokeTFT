@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ref, set, remove, onValue } from "firebase/database";
 import { db } from "@/game/net/firebase";
 
@@ -60,15 +60,22 @@ export function QuickChat({ code, myUid, myName }: QuickChatProps) {
     };
   }, [code]);
 
-  // Cleanup timers on unmount.
+  // Cleanup timers on unmount. The ref arrays are captured into locals here so the
+  // cleanup clears the SAME arrays this effect saw, not whatever the refs point at
+  // by teardown time.
   useEffect(() => {
+    const pendingDeletes = deleteTimers.current;
+    const pendingToasts = toastTimers.current;
     return () => {
-      for (const t of deleteTimers.current) clearTimeout(t);
-      for (const t of toastTimers.current) clearTimeout(t);
+      for (const t of pendingDeletes) clearTimeout(t);
+      for (const t of pendingToasts) clearTimeout(t);
     };
   }, []);
 
-  function sendMessage(msg: string) {
+  // useCallback, not a bare function declaration: Date.now()/Math.random() are impure,
+  // and a function declared in the render body is treated as render-time code by the
+  // React compiler. This is an event handler — the impurity is correct and intended here.
+  const sendMessage = useCallback(function sendMessage(msg: string) {
     setOpen(false);
     const key = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const chatRef = ref(db(), `games/${code}/chat/${key}`);
@@ -79,7 +86,7 @@ export function QuickChat({ code, myUid, myName }: QuickChatProps) {
       remove(chatRef).catch(() => {});
     }, CHAT_EXPIRE_MS);
     deleteTimers.current.push(timer);
-  }
+  }, [code, myUid, myName]);
 
   return (
     <>

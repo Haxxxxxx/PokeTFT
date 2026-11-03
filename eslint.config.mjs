@@ -15,8 +15,22 @@ const eslintConfig = defineConfig([
     // Build artifacts / generated bundles — not hand-written source.
     "functions/lib/**",     // esbuild output of the Cloud Functions bundle
     "functions/node_modules/**",
+    "out-landing/**",       // static export of the landing site
     "tools/.cache-*.json",  // PokéAPI fetch caches
   ]),
+  {
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["warn", {
+        // `const { omitMe, ...rest } = obj` is how we strip a key (see ACHIEVEMENTS);
+        // the binding is unused ON PURPOSE and shouldn't be reported.
+        ignoreRestSiblings: true,
+        // Conventional opt-out for deliberately unused bindings.
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_",
+      }],
+    },
+  },
 ]);
 
 export default eslintConfig;
