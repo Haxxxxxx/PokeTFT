@@ -3,6 +3,7 @@
 import { memo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { FIELD, ALLY_ROW0, HEX_CLIP, hexToPixel, fieldPixelSize, rowsPixelHeight } from "@/game/engine/hex";
+import { boardSizeForLevel } from "@/game/config";
 import { useGame } from "@/game/store/gameStore";
 import { useGameLayout } from "./LayoutProvider";
 import { UnitChip } from "./UnitChip";
@@ -85,9 +86,19 @@ function HexCell({
           className="absolute flex items-end justify-center pointer-events-none"
           style={{ left: x - tileW / 2, top, width: tileW, height: tileH }}
         >
-          {/* Feet glow sits FLAT on the tilted ground — it reads as a shadow/pool
-              under the unit, so it must not be counter-rotated. Infinite GPU
-              animation, so only on your own interactive board. */}
+          {/* Contact shadow: an ellipse lying FLAT on the tilted ground. This is
+              what actually sells "standing on" rather than "floating above" —
+              so it must NOT be counter-rotated with the unit. */}
+          <span
+            className="absolute pointer-events-none unit-contact"
+            style={{
+              width: tileW * 0.56,
+              height: tileW * 0.2,
+              bottom: tileH * 0.22,
+            }}
+          />
+          {/* Feet glow also lies flat on the ground. Infinite GPU animation, so
+              only on your own interactive board. */}
           {interactive && <span className={`unit-glow ${ally ? "" : "enemy"}`} />}
           {/* Counter-rotate so the token stands upright on the raked plane.
               Anchored at the bottom edge so it looks planted in its hex rather
@@ -123,6 +134,7 @@ function BoardBase({
   const storeUnits = useGame((s) => s.units);
   const drops = useGame((s) => s.drops);
   const collectDrop = useGame((s) => s.collectDrop);
+  const level = useGame((s) => s.level);
 
   const tileW = layout.tile.w;
   const tileH = layout.tile.h;
@@ -145,6 +157,16 @@ function BoardBase({
   const pad = 14;
   const splitY = hexToPixel({ c: 0, r: ALLY_ROW0 }, tileW, tileH).y - tileH / 2 - yOffset;
 
+  // Platform thickness, proportional to the tile so the slab reads the same at
+  // every board size.
+  const wallT = Math.max(10, Math.round(tileW * 0.26));
+
+  // Board capacity, ghosted on the floor. Only on your OWN live board — on a
+  // scouted rival's board it would be their number shown over your context.
+  const capacity = boardSizeForLevel(level);
+  const boardCount = board.length;
+  const showCapacity = interactive && !units;
+
   return (
     <div
       className="relative arena-frame"
@@ -158,6 +180,9 @@ function BoardBase({
         perspectiveOrigin: "50% 50%",
       }}
     >
+      {/* Backdrop behind the arena — a lit horizon so the platform reads as
+          sitting IN something rather than floating on flat black. */}
+      <div className="absolute inset-0 arena-backdrop pointer-events-none" aria-hidden />
       <div
         className="absolute inset-0 arena-plane"
         style={{
@@ -165,16 +190,40 @@ function BoardBase({
           transformStyle: "preserve-3d",
         }}
       >
-        {/* Ground slab, drawn on the tilted plane under the hexes. */}
-        <div
-          className="absolute inset-0 rounded-2xl arena-ground"
-          style={{
-            background: "radial-gradient(118% 80% at 50% 92%, #223160 0%, #101c35 48%, #060b16 100%)",
-            boxShadow:
-              "inset 0 1px 0 rgba(148,163,184,0.10), inset 0 -34px 70px -32px rgba(56,189,248,0.22), 0 34px 70px -30px rgba(0,0,0,0.85)",
-            border: "1px solid rgba(148,163,184,0.16)",
-          }}
-        />
+        {/* The platform: a carved slab with real thickness. The three extruded
+            walls are what make it a raised arena instead of a flat tilted
+            rectangle — each is a face rotated out of the plane at an edge. */}
+        <div className="absolute inset-0 rounded-2xl arena-slab" style={{ transformStyle: "preserve-3d" }}>
+          <span
+            className="arena-wall arena-wall-front"
+            style={{ height: wallT, transformOrigin: "50% 0%", transform: "rotateX(-90deg)" }}
+            aria-hidden
+          />
+          <span
+            className="arena-wall arena-wall-side"
+            style={{ width: wallT, left: 0, transformOrigin: "100% 50%", transform: "rotateY(90deg)" }}
+            aria-hidden
+          />
+          <span
+            className="arena-wall arena-wall-side"
+            style={{ width: wallT, right: 0, transformOrigin: "0% 50%", transform: "rotateY(-90deg)" }}
+            aria-hidden
+          />
+        </div>
+
+        {/* Board capacity, ghosted large across the floor — TFT's "6/6". Lies on
+            the plane so it takes the rake with everything else. */}
+        {showCapacity && (
+          <div
+            className="absolute inset-0 grid place-items-center pointer-events-none select-none arena-capacity"
+            style={{ fontSize: Math.round(tileW * 1.15) }}
+            aria-hidden
+          >
+            <span className={boardCount >= capacity ? "is-full" : undefined}>
+              {boardCount}/{capacity}
+            </span>
+          </div>
+        )}
         <div className="absolute" style={{ left: pad, top: pad, width: innerW, height: innerH }}>
           {from === 0 && (
             <span className="absolute left-1/2 -translate-x-1/2 top-1 text-[9px] font-bold uppercase tracking-[0.18em] text-rose-300/30 pointer-events-none">

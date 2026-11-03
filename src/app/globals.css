@@ -380,14 +380,88 @@ body {
   transition: transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-.arena-ground {
-  transform: translateZ(-1px);
+/* Lit horizon behind the arena, so the platform reads as sitting IN a space
+   rather than floating on flat black. */
+.arena-backdrop {
+  background:
+    radial-gradient(120% 70% at 50% 18%, rgba(86, 130, 214, 0.18) 0%, transparent 62%),
+    radial-gradient(90% 50% at 50% 100%, rgba(56, 189, 248, 0.10) 0%, transparent 70%);
+  filter: blur(2px);
 }
 
-/* Hex tiles: a quick, cheap hover / drop-target response. Transitioning only
-   background + box-shadow keeps this off the layout path. */
+/* The platform's top face: carved stone, lit from the far edge. The layered
+   gradients stand in for a texture map — a soft sheen across the surface plus a
+   cooler pool toward the near edge, which is what gives it material. */
+.arena-slab {
+  transform: translateZ(-1px);
+  background:
+    linear-gradient(185deg, rgba(148, 183, 240, 0.10) 0%, transparent 38%),
+    radial-gradient(130% 85% at 50% 4%, rgba(120, 160, 230, 0.16) 0%, transparent 55%),
+    radial-gradient(118% 82% at 50% 96%, #22325f 0%, #111d38 46%, #070d1b 100%);
+  border: 1px solid rgba(160, 190, 240, 0.20);
+  box-shadow:
+    inset 0 1px 0 rgba(190, 215, 255, 0.16),
+    inset 0 -40px 80px -40px rgba(56, 189, 248, 0.26),
+    0 48px 90px -40px rgba(0, 0, 0, 0.9);
+}
+
+/* Extruded walls — the faces that give the slab real thickness. Each is rotated
+   out of the plane at one edge, so the platform has depth instead of being a
+   flat tilted rectangle. Darker than the top face, as a side in shadow. */
+.arena-wall {
+  position: absolute;
+  display: block;
+  background: linear-gradient(180deg, #16233f 0%, #0b1324 60%, #060a14 100%);
+  border: 1px solid rgba(140, 170, 220, 0.14);
+  border-top: none;
+}
+.arena-wall-front {
+  left: 0;
+  top: 100%;
+  width: 100%;
+  border-radius: 0 0 14px 14px;
+  box-shadow: inset 0 10px 22px -12px rgba(0, 0, 0, 0.9);
+}
+.arena-wall-side {
+  top: 0;
+  height: 100%;
+  background: linear-gradient(180deg, #121d35 0%, #090f1e 100%);
+}
+
+/* Board capacity, ghosted across the floor (TFT's "6/6"). */
+.arena-capacity {
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: rgba(197, 219, 255, 0.11);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+  line-height: 1;
+}
+.arena-capacity .is-full {
+  color: rgba(110, 231, 183, 0.16);
+}
+
+/* Hex tiles: stone surfaces with a lit rim, not flat fills. The gradients give
+   each tile a top highlight and a shaded lower half so the grid has relief.
+   Transitioning only background + box-shadow keeps hover off the layout path. */
 .hex-cell {
-  transition: background 140ms ease, box-shadow 140ms ease;
+  transition: background 140ms ease, box-shadow 140ms ease, filter 140ms ease;
+  background-image: linear-gradient(170deg, rgba(255, 255, 255, 0.075) 0%, transparent 46%);
+}
+.hex-cell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  clip-path: inherit;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0%, transparent 38%);
+  pointer-events: none;
+}
+
+/* Contact shadow pooled under a standing unit — the cue that actually sells
+   "planted on the ground" rather than "floating above it". */
+.unit-contact {
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.28) 45%, transparent 72%);
+  filter: blur(1.5px);
 }
 
 /* A unit standing on the raked plane. The counter-rotation itself is inline
