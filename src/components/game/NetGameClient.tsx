@@ -1391,7 +1391,10 @@ export function NetGameClient() {
         {/* Bottom bar: board controls + bench (centred), then the shop. Hidden for dedicated
             spectators (no econ) AND while scouting a rival (it's all YOUR controls — the centre
             shows the rival's board + bench instead, so your shop/bench would just be noise). */}
-        {!isSpectator && !spectating && <div className="flex flex-col items-center gap-2">
+        {/* Pinned to the height the layout engine budgeted. Left to grow with its
+            content, this strip stole space the arena had already been sized
+            against — which is what slid the bench slabs under the shop cards. */}
+        {!isSpectator && !spectating && <div className="shrink-0 min-h-0 flex flex-col items-center gap-1" style={{ height: L.shopH }}>
           {/* The bench now lives ON the platform (see Board's `withBench`), and the
               board count is ghosted across the arena floor, so only the auto-fill
               action still needs a home down here. */}
@@ -1410,7 +1413,7 @@ export function NetGameClient() {
               </button>
             );
           })()}
-          <div className="flex gap-3 w-full max-w-[1480px]">
+          <div className="flex-1 min-h-0 flex gap-3 w-full max-w-[1480px]">
             {/* Pension on the far LEFT and Sell on the far RIGHT — separated by the
                 whole shop so a drag-to-sell can't accidentally land in the Day Care. */}
             <PensionZone />

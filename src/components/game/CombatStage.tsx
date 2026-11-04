@@ -196,6 +196,8 @@ export function CombatStage({
   const TILE_H = layout.tile.h;
 
   const { w, h } = fieldPixelSize(TILE_W, TILE_H);
+  // Platform thickness, matching the planning board's.
+  const wallT = Math.max(10, Math.round(TILE_W * 0.26));
   const fi = Math.min(Math.floor(idx), last);
   const frac = idx - fi;
   const a = frames[fi];
@@ -271,17 +273,33 @@ export function CombatStage({
           Inline (multiplayer) pins the battlefield to the LEFT so it lines up
           pixel-for-pixel with the planning board; the recap overflows to the
           right into the reserved rail space. Fullscreen centers the pair. */}
-      <div className={`flex items-start gap-3 w-full ${inline ? "justify-start" : "justify-center"}`}>
+      {/* Centred in both modes now. This used to pin LEFT when inline so the
+          recap could spill into the 340px item rail — but that rail is gone
+          (details float on demand), so spilling put the recap on top of the
+          trainers list. The recap is an overlay below instead. */}
+      <div className="flex items-start justify-center w-full">
       <div
-        className="relative shrink-0 rounded-xl overflow-hidden"
+        className="relative shrink-0 arena-frame"
         style={{
-          width: w + 24, height: h + 24, padding: 12,
-          background: "radial-gradient(120% 90% at 50% 50%, #1a263f 0%, #0a1020 75%)",
-          border: "1px solid rgba(212,175,55,0.32)",
-          boxShadow: "inset 0 1px 0 rgba(231,198,107,0.1), inset 0 0 60px -30px rgba(212,175,55,0.5), 0 26px 70px -34px rgba(0,0,0,0.9)",
+          width: w + 28, height: h + 28, padding: 14,
+          perspective: `${layout.perspective}px`,
+          perspectiveOrigin: "50% 50%",
         }}
       >
-        <div className="absolute" style={{ left: 12, top: 12, width: w, height: h }}>
+        {/* Same raked platform as the planning board — combat was rendering a
+            flat grid while planning showed a 3D arena, which made the phase
+            flip look like two different games. */}
+        <div
+          className="absolute inset-0 arena-plane"
+          style={{ transform: `rotateX(${layout.tilt}deg)`, transformStyle: "preserve-3d" }}
+        >
+        <div className="absolute inset-0 rounded-2xl arena-slab" style={{ transformStyle: "preserve-3d" }}>
+          <span className="arena-wall arena-wall-front" style={{ height: wallT, transformOrigin: "50% 0%", transform: "rotateX(-90deg)" }} aria-hidden />
+          <span className="arena-wall arena-wall-side" style={{ width: wallT, left: 0, transformOrigin: "100% 50%", transform: "rotateY(90deg)" }} aria-hidden />
+          <span className="arena-wall arena-wall-side" style={{ width: wallT, right: 0, transformOrigin: "0% 50%", transform: "rotateY(-90deg)" }} aria-hidden />
+          <span className="arena-rail" aria-hidden />
+        </div>
+        <div className="absolute" style={{ left: 14, top: 14, width: w, height: h }}>
           <HexGrid />
 
           {/* Corpses (behind) */}
@@ -375,21 +393,27 @@ export function CombatStage({
             return <DamageNumber key={`dn-${fk}`} x={p.x} y={p.y} dmg={e.dmg} crit={e.crit} sup={e.sup} />;
           })}
         </div>
+        </div>
+      </div>
       </div>
 
+      {/* Recap as an OVERLAY pinned to the stage's own left edge, not a sibling
+          in the row. As a sibling it widened the layout and pushed itself over
+          the trainers rail once the old 340px item column was removed. */}
       {suppressRecap ? null : recapOpen ? (
-        <CombatRecapTabs units={a.units} label={t.cs_your_team} onClose={() => setRecapOpen(false)} />
+        <div className="absolute left-0 top-10 z-30 max-h-[78%] flex">
+          <CombatRecapTabs units={a.units} label={t.cs_your_team} onClose={() => setRecapOpen(false)} />
+        </div>
       ) : (
         <button
           onClick={() => setRecapOpen(true)}
           title={t.cs_show_recap}
-          className="gilded self-stretch w-7 shrink-0 rounded-xl flex flex-col items-center justify-center gap-1.5 text-amber-200/70 hover:text-amber-100 transition-colors"
+          className="gilded absolute left-0 top-10 z-30 w-7 h-32 rounded-xl flex flex-col items-center justify-center gap-1.5 text-amber-200/70 hover:text-amber-100 transition-colors"
         >
           <span><BarChart3 size={14} /></span>
           <span className="[writing-mode:vertical-rl] rotate-180 text-[9px] font-extrabold uppercase tracking-wider">{t.cs_recap}</span>
         </button>
       )}
-      </div>
 
       {/* Controls — floated at the bottom of the same box (keeps the field static). */}
       <div className="absolute bottom-0 inset-x-0 flex items-center justify-center gap-2 min-h-[40px]">
@@ -550,12 +574,28 @@ function CombatUnit({
   const hpBar = ally ? (low ? "#16a34a" : "#34d399") : (low ? "#dc2626" : "#fb7185");
   const lunging = lunge.dx !== 0 || lunge.dy !== 0; // mid-attack → thrust scale for impact
   const castScale = cast ? 1.16 : lunging ? 1.08 : 1; // cast wind-up pops bigger than an attack
+  // Sized from the live tile rather than the old hard-coded 78/82px, so combat
+  // units match the board they're standing on at every viewport.
+  const layout = useGameLayout();
+  const tilt = layout.tilt;
+  const W = Math.round(layout.tile.w * 1.2);
+  const H = Math.round(layout.tile.h * 1.2);
   // The sprite is the star: nearly planning-board size (78px) with team identity from a soft
   // back-glow + the feet ring rather than a hard disc, so it reads as a Pokémon, not a token.
   return (
     <div
       className="absolute"
-      style={{ left: x - 41, top: y - 57, width: 82, transform: `translate(${lunge.dx}px, ${lunge.dy}px) scale(${castScale})`, transition: "transform 80ms ease-out" }}
+      style={{
+        left: x - W / 2,
+        top: y - H * 0.7,
+        width: W,
+        // Counter-rotate out of the arena's rake so the unit stands upright on
+        // the tilted ground, exactly as on the planning board. Bars and sprite
+        // ride together, anchored at the feet.
+        transform: `translate(${lunge.dx}px, ${lunge.dy}px) rotateX(${-tilt}deg) scale(${castScale})`,
+        transformOrigin: "bottom center",
+        transition: "transform 80ms ease-out",
+      }}
     >
       {/* HP bar — team-coloured (green ally / red enemy), glossy fill, crisp dark frame. */}
       <div className={`h-[7px] w-full rounded-[3px] bg-black/80 overflow-hidden mb-[3px] ${low ? "animate-pulse" : ""}`} style={{ outline: "1px solid rgba(0,0,0,0.55)" }}>
@@ -566,8 +606,8 @@ function CombatUnit({
         <div className="h-full transition-[width] duration-100" style={{ width: `${manaFrac * 100}%`, background: manaFull ? "#bae6fd" : "#38bdf8" }} />
       </div>
       {/* Grounding "feet" ellipse — team-coloured, sits under the sprite. */}
-      <span className="absolute left-1/2 -translate-x-1/2 rounded-[50%] pointer-events-none" style={{ bottom: -2, width: 60, height: 15, background: `radial-gradient(ellipse at center, ${ring}77, transparent 72%)` }} />
-      <div className="relative mx-auto flex items-end justify-center" style={{ width: 78, height: 78 }}>
+      <span className="absolute left-1/2 -translate-x-1/2 rounded-[50%] pointer-events-none" style={{ bottom: -2, width: W * 0.74, height: W * 0.19, background: `radial-gradient(ellipse at center, ${ring}77, transparent 72%)` }} />
+      <div className="relative mx-auto flex items-end justify-center" style={{ width: W * 0.95, height: H * 0.95 }}>
         {/* Soft team aura behind the mon (stronger for mega) — replaces the hard ring disc. */}
         <span className="absolute inset-0 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle at 50% 60%, ${ring}${unit.mega ? "55" : "2e"}, transparent 66%)` }} />
         {/* Cast wind-up: a charging aura + an expanding ring in the move's colour, telegraphing
@@ -578,8 +618,8 @@ function CombatUnit({
         <img
           src={spriteUrl(unit.dex)}
           alt=""
-          width={78}
-          height={78}
+          width={Math.round(W * 1.5)}
+          height={Math.round(W * 1.5)}
           className="relative drop-shadow-[0_4px_5px_rgba(0,0,0,0.6)]"
           style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none", filter: cast ? `brightness(1.3) drop-shadow(0 0 11px ${cast})` : unit.disabled ? "brightness(1.25) saturate(0.4) drop-shadow(0 0 7px #7dd3fc)" : unit.burning ? "saturate(1.45) drop-shadow(0 0 7px #f97316)" : `drop-shadow(0 0 6px ${ring}88)` }}
           draggable={false}
