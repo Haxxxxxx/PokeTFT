@@ -16,25 +16,29 @@
  * unit; the point of the spike is the arena, the input model and the budget.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Instance, Instances, Environment, ContactShadows, Html } from "@react-three/drei";
 import { FIELD, FIELD_SIZE, HEX_R, cellToWorld, worldToCell, isAllyRow } from "./geometry";
+import { UnitModel, type ModelId } from "./UnitModel";
 
-type Unit = { id: string; c: number; r: number; color: string; tall: number };
+type Unit = { id: string; c: number; r: number; color: string; tall: number; model: ModelId };
 
 const ALLY_TINT = "#2ec98a";
 const ENEMY_TINT = "#f2607a";
 
-/** A starting board: six units on the ally half. */
+/** A starting board: six units on the ally half, mixing the sample models so
+ *  silhouette variety and per-model animation cost are both visible. */
 function initialUnits(): Unit[] {
   const palette = ["#64b5f6", "#ffb74d", "#ba68c8", "#4db6ac", "#e57373", "#aed581"];
+  const models: ModelId[] = ["fox", "duck", "brainstem", "fox", "duck", "fox"];
   return palette.map((color, i) => ({
     id: `u${i}`,
     c: 1 + (i % 5),
     r: 5 + Math.floor(i / 5),
     color,
     tall: 0.5 + ((i * 7) % 5) * 0.07,
+    model: models[i],
   }));
 }
 
@@ -89,20 +93,19 @@ function UnitMesh({
   const [x, , z] = cellToWorld(unit.c, unit.r);
   return (
     <group position={[x, 0.06, z]}>
+      {/* An invisible grab volume sized to the hex, so picking a unit up doesn't
+          depend on hitting an arbitrary bit of model geometry — a thin tail or a
+          raised wing would otherwise be a dead zone. */}
       <mesh
-        castShadow
-        position={[0, unit.tall / 2 + 0.06, 0]}
+        visible={false}
+        position={[0, 0.42, 0]}
         onPointerDown={(e) => { e.stopPropagation(); onGrab(unit.id, e); }}
       >
-        <capsuleGeometry args={[HEX_R * 0.34, unit.tall * 0.7, 6, 12]} />
-        <meshStandardMaterial
-          color={unit.color}
-          emissive={unit.color}
-          emissiveIntensity={dragging ? 0.55 : 0.12}
-          roughness={0.45}
-          metalness={0.18}
-        />
+        <cylinderGeometry args={[HEX_R * 0.78, HEX_R * 0.78, 0.9, 10]} />
       </mesh>
+      <Suspense fallback={null}>
+        <UnitModel id={unit.model} position={[0, 0, 0]} tint={unit.color} dragging={dragging} />
+      </Suspense>
     </group>
   );
 }
