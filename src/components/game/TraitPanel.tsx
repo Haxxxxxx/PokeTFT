@@ -105,11 +105,17 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
                   "3 › 5 › 7 › 9 › 11". The chain is the useful part: a bare
                   "3/5" hides how far the trait can still go, which is exactly
                   what you're deciding about when you look at this rail. */}
+              {/* Hexagonal frame, not a rounded square — TFT badges its traits
+                  in hexes, and that silhouette is a large part of why the rail
+                  reads as TFT at a glance. Clip-path on a wrapper so the inner
+                  fill carries the trait colour and the border survives. */}
               <span
-                style={{ background: active ? color : "transparent", borderColor: color, boxShadow: active ? `0 0 7px -1px ${color}` : "none" }}
-                className="w-6 h-6 rounded border flex items-center justify-center shrink-0"
+                className={`trait-hex shrink-0${active ? " is-active" : ""}`}
+                style={{ ["--trait" as string]: color }}
               >
-                <TraitGlyph traitKey={t.key} size={13} />
+                <span className="trait-hex-fill">
+                  <TraitGlyph traitKey={t.key} size={13} />
+                </span>
               </span>
               <span
                 className="w-4 shrink-0 text-center text-[13px] font-extrabold tabular-nums leading-none"

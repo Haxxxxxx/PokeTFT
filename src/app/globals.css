@@ -517,6 +517,39 @@ body {
     inset 0 16px 38px -20px rgba(0, 0, 0, 0.75);
 }
 
+/* Hexagonal trait badge (TFT's synergy frame).
+   Two nested clip-paths: the outer carries the coloured edge, the inner is
+   inset by a pixel to leave that edge visible. A border can't do this — a
+   clip-path crops the border away with everything else outside the shape. */
+.trait-hex {
+  --trait: #64748b;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 31px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  /* The OUTER hex is the coloured rim; the inner fill is always dark so that
+     rim stays visible. Inactive traits dim the whole badge rather than flipping
+     the fill — filling it with the trait colour made active and inactive look
+     identical, which is the opposite of what this rail is for. */
+  background: var(--trait);
+  opacity: 0.4;
+  transition: opacity 140ms ease;
+}
+.trait-hex.is-active {
+  opacity: 1;
+}
+.trait-hex-fill {
+  display: grid;
+  place-items: center;
+  width: calc(100% - 4px);
+  height: calc(100% - 4px);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background: #0a1020;
+  color: #e8f1ff;
+}
+
 /* Trainer portraits in the right rail — circular, ringed by standing. */
 .player-orb {
   background: #0a1020;
