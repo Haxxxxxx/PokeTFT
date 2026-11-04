@@ -80,7 +80,12 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
   // the tile. On the board we oversize it and let it break the hex — the same
   // reason TFT's champions overflow their cell — which is what makes a unit read
   // as a creature standing there rather than an icon sitting in a box.
-  const spriteSize = shape === "hex" ? Math.round(size * 1.34) : size - 6;
+  // 1.85x, not a modest bump. PokéAPI sprites are 96x96 frames where the
+  // creature occupies barely half the box, so the drawn pixels are roughly half
+  // whatever size we ask for. Scaling to the tile therefore renders a mon at
+  // ~50% of its hex — which is exactly what it looked like. We oversize to
+  // cancel that padding, and let the result break the cell upward.
+  const spriteSize = shape === "hex" ? Math.round(size * 1.85) : size - 6;
   const sprite = (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -130,7 +135,10 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
         <div className="absolute inset-x-0 bottom-0 flex items-end justify-center" style={{ overflow: "visible" }}>
           {sprite}
         </div>
-        <div className="absolute inset-x-0 flex justify-center pointer-events-none" style={{ top: -Math.round(size * 0.34) }}>
+        {/* Stars ride just above the sprite's crown. Derived from how far the
+            oversized sprite actually overflows the cell, so they track the
+            scale instead of drifting when it changes. */}
+        <div className="absolute inset-x-0 flex justify-center pointer-events-none" style={{ top: -(spriteSize - size) * 0.5 - 6 }}>
           <Stars star={unit.star} />
         </div>
         {costBadge}
