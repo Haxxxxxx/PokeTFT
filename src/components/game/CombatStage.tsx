@@ -627,7 +627,7 @@ function CombatUnit({
           fight each other: inset pins left AND right, then the width wins and
           the stack grows rightward from the left edge — which is exactly how
           the bars ended up floating off to the side of their unit. */}
-      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center" style={{ top: -Math.round(TH * 0.52) - 10 }}>
+      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center" style={{ top: -Math.round(TH * 0.32) - 8 }}>
       <div className={`h-[7px] rounded-[3px] bg-black/80 overflow-hidden mb-[3px] ${low ? "animate-pulse" : ""}`} style={{ outline: "1px solid rgba(0,0,0,0.55)", width: TW * 0.9 }}>
         <div className="h-full rounded-[3px] transition-[width] duration-100" style={{ width: `${hpFrac * 100}%`, background: hpBar, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 2px rgba(0,0,0,0.28)" }} />
       </div>
