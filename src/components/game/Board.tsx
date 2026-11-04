@@ -54,10 +54,15 @@ function HexCell({
   const { x, y } = hexToPixel({ c, r }, tileW, tileH);
   const top = y - tileH / 2 - yOffset;
 
-  // TFT draws hex outlines on YOUR half only while planning — the opponent's
-  // side is bare stone until their army lands on it for combat. Mirroring that
-  // is most of why the reference board reads as an arena with a playfield in
-  // it, rather than as a grid.
+  // Your half gets live, bright hexes; the enemy context rows get a bare
+  // outline at a fraction of the strength.
+  //
+  // TFT hides its enemy hexes entirely during planning, and we matched that at
+  // first — but TFT's far half is a painted scene worth looking at, and ours is
+  // flat stone. Hiding them there made a third of the arena read as dead space
+  // rather than as the other half of a playfield. A ghost outline fills it,
+  // keeps the spatial read of where the enemy will stand, and still leaves no
+  // doubt about which half is yours.
   const tint = {
     bg: isOver ? "rgba(52,211,153,0.3)" : "rgba(52,211,153,0.07)",
     ring: isOver ? "rgba(52,211,153,0.9)" : "rgba(52,211,153,0.26)",
@@ -66,21 +71,21 @@ function HexCell({
 
   return (
     <>
-      {ally && (
-        <div
-          ref={droppable ? setNodeRef : undefined}
-          className={`absolute hex-cell${isOver ? " is-over" : ""}`}
-          style={{
-            left: x - tileW / 2,
-            top,
-            width: tileW - 3,
-            height: tileH - 3,
-            clipPath: HEX_CLIP,
-            background: tint.bg,
-            boxShadow: `inset 0 0 0 1.5px ${tint.ring}, ${tint.glow}`,
-          }}
-        />
-      )}
+      <div
+        ref={droppable ? setNodeRef : undefined}
+        className={`absolute hex-cell${isOver ? " is-over" : ""}${ally ? "" : " is-enemy"}`}
+        style={{
+          left: x - tileW / 2,
+          top,
+          width: tileW - 3,
+          height: tileH - 3,
+          clipPath: HEX_CLIP,
+          background: ally ? tint.bg : "rgba(148,163,184,0.05)",
+          boxShadow: ally
+            ? `inset 0 0 0 1.5px ${tint.ring}, ${tint.glow}`
+            : "inset 0 0 0 1px rgba(170,196,236,0.2), inset 0 0 14px rgba(120,150,200,0.07)",
+        }}
+      />
       {unit && (
         <div
           className="absolute flex items-end justify-center pointer-events-none"

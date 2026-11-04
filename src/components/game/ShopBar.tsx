@@ -12,6 +12,7 @@ import { ECONOMY, COPIES_TO_STAR, SHOP_ODDS, MAX_LEVEL, XP_TO_REACH, type Cost }
 import { RerollIcon, SnowIcon, CoinIcon, InfoIcon, StarIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
 import { useT } from "@/lib/i18n";
+import { useGameLayout } from "./LayoutProvider";
 import { interest } from "@/game/engine/economy";
 import { sfx, playCry } from "@/lib/audio";
 
@@ -74,6 +75,11 @@ function ShopBarBase() {
   );
 
   const odds = SHOP_ODDS[Math.min(Math.max(1, level), 10)];
+  // Card art is sized from the shop strip's budgeted height so it fills the
+  // card at every density, and overflows the corner slightly so it reads as
+  // artwork bleeding off the card rather than a pasted-on icon.
+  const layout = useGameLayout();
+  const artSize = Math.round(layout.shopH * 1.08);
   // Level recap for the Buy XP control: progress toward the next level + cost.
   const atMax = level >= MAX_LEVEL;
   const xpBase = XP_TO_REACH[level];
@@ -221,13 +227,17 @@ function ShopBarBase() {
                   a vertical wash from the cost colour at the bottom up into the dark top. */}
               <span className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(180deg, #0b1020 0%, ${color}1f 60%, ${color}3d 100%)` }} />
               {/* Sprite as the card "art" on the right (TFT-style). */}
+              {/* Art scales with the shop strip instead of sitting at a fixed
+                  140px. The cards got considerably wider when the odds panel
+                  was compacted, and a fixed sprite left them looking empty —
+                  in the reference the champion art fills its card. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={spriteUrl(def.dex[Math.max(0, (own?.topStar ?? 1) - 1)])}
                 alt={def.name}
-                width={140}
-                height={140}
-                className="absolute right-0 bottom-0 pointer-events-none"
+                width={artSize}
+                height={artSize}
+                className="absolute -right-1 -bottom-1 pointer-events-none"
                 style={{ imageRendering: "pixelated" }}
                 draggable={false}
               />

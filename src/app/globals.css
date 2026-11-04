@@ -461,6 +461,12 @@ body {
   pointer-events: none;
 }
 
+/* Enemy context rows: outline only, no relief — present enough to read as
+   board, quiet enough that it's never mistaken for somewhere you can drop. */
+.hex-cell.is-enemy::after {
+  background: none;
+}
+
 /* Bench slabs set into the platform's near edge. Recessed rather than raised —
    inset shadow plus a darker fill reads as a socket cut into the stone, which
    is what makes the bench part of the arena instead of a tray sitting on it. */

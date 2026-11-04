@@ -536,11 +536,18 @@ const HexGrid = memo(function HexGrid() {
   const layout = useGameLayout();
   const TILE_W = layout.tile.w;
   const TILE_H = layout.tile.h;
+  // Combat floor is hex-PAVED STONE, not a team-tinted grid.
+  //
+  // TFT's fight view has no green/red lattice: the arena is neutral paving and
+  // the only coloured hexes are ability-area indicators. Team identity is read
+  // from the units themselves — their HP bar colour and feet ring — which is
+  // also why it stays legible when two armies are interleaved. Tinting every
+  // cell by owner competed with that and made the fight read as a board game
+  // rather than a battle.
   const cells = [];
   for (let r = 0; r < FIELD.rows; r++) {
     for (let c = 0; c < FIELD.cols; c++) {
       const p = hexToPixel({ c, r }, TILE_W, TILE_H);
-      const ally = r >= 4;
       cells.push(
         <div
           key={`${c}-${r}`}
@@ -548,8 +555,8 @@ const HexGrid = memo(function HexGrid() {
           style={{
             left: p.x - TILE_W / 2, top: p.y - TILE_H / 2, width: TILE_W - 3, height: TILE_H - 3,
             clipPath: HEX_CLIP,
-            background: ally ? "rgba(52,211,153,0.06)" : "rgba(251,113,133,0.06)",
-            boxShadow: `inset 0 0 0 1px ${ally ? "rgba(52,211,153,0.14)" : "rgba(251,113,133,0.14)"}`,
+            background: "rgba(170,196,236,0.045)",
+            boxShadow: "inset 0 0 0 1px rgba(170,196,236,0.16), inset 0 0 14px rgba(120,150,200,0.06)",
           }}
         />,
       );
@@ -585,10 +592,13 @@ function CombatUnit({
   const TH = layout.tile.h;
   /** Same 1.85x oversize as the board, to cancel PokéAPI sprite padding. */
   const S = Math.round(TW * 1.85);
-  /** How far the sprite overflows its cell upward — bars ride just above that. */
-  const overflow = (S - TH) / 2;
-  // The sprite is the star: nearly planning-board size (78px) with team identity from a soft
-  // back-glow + the feet ring rather than a hard disc, so it reads as a Pokémon, not a token.
+  // Bar placement is TILE-relative, not derived from the sprite box: PokéAPI
+  // frames carry wildly different amounts of transparent padding, so there's no
+  // consistent "crown" to measure from — anchoring to the image box left bars
+  // floating ~70px above small sprites.
+  //
+  // The sprite is the star: team identity comes from a soft back-glow and the
+  // feet ring rather than a hard disc, so it reads as a Pokémon, not a token.
   return (
     <div
       className="absolute flex items-end justify-center"
@@ -613,7 +623,11 @@ function CombatUnit({
         }}
       >
       {/* Bars, stacked just above the sprite's crown. */}
-      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: -overflow - 18, width: S }}>
+      {/* Centred on the unit explicitly. `inset-x-0` plus an explicit width
+          fight each other: inset pins left AND right, then the width wins and
+          the stack grows rightward from the left edge — which is exactly how
+          the bars ended up floating off to the side of their unit. */}
+      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center" style={{ top: -Math.round(TH * 0.52) - 10 }}>
       <div className={`h-[7px] rounded-[3px] bg-black/80 overflow-hidden mb-[3px] ${low ? "animate-pulse" : ""}`} style={{ outline: "1px solid rgba(0,0,0,0.55)", width: TW * 0.9 }}>
         <div className="h-full rounded-[3px] transition-[width] duration-100" style={{ width: `${hpFrac * 100}%`, background: hpBar, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 2px rgba(0,0,0,0.28)" }} />
       </div>
