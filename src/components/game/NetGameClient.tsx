@@ -1420,16 +1420,12 @@ export function NetGameClient() {
             <ShopSellDrop><ShopBar /></ShopSellDrop>
             <SellZone />
           </div>
-          {/* Shortcut hints live in-flow (scaled with the canvas) so they never
-              float over the shop. */}
-          {phase === "planning" && me?.alive && (
-            <div className="flex items-center gap-2 opacity-80">
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">{t.net_keys_label}</span>
-              <Kbd k="R" label={t.sh_reroll} />
-              <Kbd k="L" label="XP" />
-              <Kbd k="S" label={t.net_key_sell} />
-            </div>
-          )}
+          {/* The keyboard-hint strip used to sit in flow here, on the assumption
+              that the bottom block could grow to fit it. It can't any more — the
+              block is pinned to the height the layout engine budgeted, so the
+              strip overflowed and rendered ON TOP of the shop cards. It's also
+              not something TFT shows. The shortcuts still work; their discovery
+              belongs in How-to-play, not in a bar competing with the shop. */}
         </div>}
       </div>
       </div>
@@ -1597,14 +1593,6 @@ function FullscreenButton() {
   );
 }
 
-function Kbd({ k, label }: { k: string; label: string }) {
-  return (
-    <span className="flex items-center gap-1">
-      <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-600 text-[10px] font-bold text-slate-200 leading-none">{k}</kbd>
-      <span className="text-[10px] text-slate-400">{label}</span>
-    </span>
-  );
-}
 
 /** Transient feedback toast for rejected actions — fixed at the bottom-centre,
  *  auto-dismisses, re-triggers on a new `seq` (so repeated messages re-animate). */
