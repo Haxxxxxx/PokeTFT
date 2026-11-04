@@ -115,13 +115,22 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
         className={`relative select-none touch-none ${interactive ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${canEquipArmed ? "animate-pulse" : ""}`}
         title={title}
       >
-        <div
-          className="absolute inset-0 flex items-center justify-center"
-          style={{ clipPath: HEX_CLIP, background: "rgba(13,20,38,0.66)", boxShadow: `inset 0 0 0 1.5px ${ring}, inset 0 0 6px ${ring}33` }}
-        >
+        {/* A thin cost-coloured ring on the GROUND, behind the unit — not a
+            plate behind it. The old opaque hex fill made every unit read as an
+            icon in a box; in TFT the champion stands directly on the stone and
+            only its base ring touches the board. That fill also carried the hex
+            clip-path, which silently cropped the oversized sprite back to tile
+            size and cancelled the overflow entirely. */}
+        <span
+          className="absolute inset-0 unit-base pointer-events-none"
+          style={{ clipPath: HEX_CLIP, boxShadow: `inset 0 0 0 1.5px ${ring}aa, inset 0 0 10px ${ring}22` }}
+        />
+        {/* Sprite is oversized and bottom-anchored so it breaks the hex upward,
+            the way a standing figure would. Nothing here clips it. */}
+        <div className="absolute inset-x-0 bottom-0 flex items-end justify-center" style={{ overflow: "visible" }}>
           {sprite}
         </div>
-        <div className="absolute -top-1 inset-x-0 flex justify-center pointer-events-none">
+        <div className="absolute inset-x-0 flex justify-center pointer-events-none" style={{ top: -Math.round(size * 0.34) }}>
           <Stars star={unit.star} />
         </div>
         {costBadge}

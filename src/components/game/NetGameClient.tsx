@@ -1257,14 +1257,20 @@ export function NetGameClient() {
                     className={`flex items-center gap-2 px-1.5 py-1 rounded-lg cursor-pointer hover:bg-slate-700/50 ${p.uid === myUid ? "bg-slate-700/70 ring-1 ring-sky-500/50" : ""} ${spectate === p.uid ? "ring-1 ring-amber-400/70 bg-amber-500/10" : ""} ${isNm && p.alive ? "ring-1 ring-rose-600/50 bg-rose-950/20" : ""} ${!p.alive ? "opacity-40" : ""}`}
                   >
                     <span className="w-4 text-[10px] text-slate-500 font-bold text-center">{p.place ?? i + 1}</span>
-                    <span className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 overflow-hidden ${isNm ? "bg-rose-950/60 border border-rose-600/70 shadow-[0_0_10px_-2px_rgba(225,29,72,0.8)]" : "bg-black/40 border border-slate-700"}`}>
+                    {/* Circular portrait with a ranked ring — TFT's trainer rail.
+                        The ring colour carries standing (gold at the top, rose
+                        for a nightmare bot) so the rail is scannable without
+                        reading any numbers. */}
+                    <span
+                      className={`relative w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden player-orb ${isNm ? "is-nightmare" : (p.place ?? i + 1) === 1 ? "is-lead" : ""}`}
+                    >
                       {isNm ? <span className="text-[13px] leading-none">💀</span> : p.photoURL ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.photoURL} alt="" width={24} height={24} style={{ imageRendering: "pixelated" }} />
+                        <img src={p.photoURL} alt="" width={32} height={32} className="w-full h-full object-cover" style={{ imageRendering: "pixelated" }} />
                       ) : dex ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={spriteUrl(dex)} alt="" width={22} height={22} style={{ imageRendering: "pixelated" }} />
-                      ) : <span className="text-[9px] text-slate-600">{p.name.slice(0, 1).toUpperCase()}</span>}
+                        <img src={spriteUrl(dex)} alt="" width={26} height={26} style={{ imageRendering: "pixelated" }} />
+                      ) : <span className="text-[10px] font-bold text-slate-500">{p.name.slice(0, 1).toUpperCase()}</span>}
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className="flex items-center gap-1.5">

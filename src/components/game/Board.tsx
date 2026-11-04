@@ -54,33 +54,33 @@ function HexCell({
   const { x, y } = hexToPixel({ c, r }, tileW, tileH);
   const top = y - tileH / 2 - yOffset;
 
-  const tint = ally
-    ? {
-        bg: isOver ? "rgba(52,211,153,0.28)" : "rgba(52,211,153,0.07)",
-        ring: isOver ? "rgba(52,211,153,0.85)" : "rgba(52,211,153,0.22)",
-        glow: isOver ? "0 0 18px 2px rgba(52,211,153,0.45)" : "inset 0 0 9px rgba(52,211,153,0.08)",
-      }
-    : {
-        bg: "rgba(251,113,133,0.05)",
-        ring: "rgba(251,113,133,0.14)",
-        glow: "inset 0 0 8px rgba(251,113,133,0.06)",
-      };
+  // TFT draws hex outlines on YOUR half only while planning — the opponent's
+  // side is bare stone until their army lands on it for combat. Mirroring that
+  // is most of why the reference board reads as an arena with a playfield in
+  // it, rather than as a grid.
+  const tint = {
+    bg: isOver ? "rgba(52,211,153,0.3)" : "rgba(52,211,153,0.07)",
+    ring: isOver ? "rgba(52,211,153,0.9)" : "rgba(52,211,153,0.26)",
+    glow: isOver ? "0 0 22px 3px rgba(52,211,153,0.5)" : "inset 0 0 9px rgba(52,211,153,0.08)",
+  };
 
   return (
     <>
-      <div
-        ref={droppable ? setNodeRef : undefined}
-        className="absolute hex-cell"
-        style={{
-          left: x - tileW / 2,
-          top,
-          width: tileW - 3,
-          height: tileH - 3,
-          clipPath: HEX_CLIP,
-          background: tint.bg,
-          boxShadow: `inset 0 0 0 1.5px ${tint.ring}, ${tint.glow}`,
-        }}
-      />
+      {ally && (
+        <div
+          ref={droppable ? setNodeRef : undefined}
+          className={`absolute hex-cell${isOver ? " is-over" : ""}`}
+          style={{
+            left: x - tileW / 2,
+            top,
+            width: tileW - 3,
+            height: tileH - 3,
+            clipPath: HEX_CLIP,
+            background: tint.bg,
+            boxShadow: `inset 0 0 0 1.5px ${tint.ring}, ${tint.glow}`,
+          }}
+        />
+      )}
       {unit && (
         <div
           className="absolute flex items-end justify-center pointer-events-none"
@@ -256,6 +256,8 @@ function BoardBase({
             style={{ width: wallT, right: 0, transformOrigin: "0% 50%", transform: "rotateY(-90deg)" }}
             aria-hidden
           />
+          {/* Carved lip between the arena floor and its border. */}
+          <span className="arena-rail" aria-hidden />
         </div>
 
         {/* Board capacity, ghosted large across the floor — TFT's "6/6". Lies on
