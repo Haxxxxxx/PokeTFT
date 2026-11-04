@@ -147,8 +147,18 @@ const TIERS: Record<Density, Tier> = {
   full: { topH: 56, benchSlot: 92, shopH: 158, leftRail: 196, rightRail: 214, gap: 12, pad: 10, font: 1, railsAsDrawers: false, tilt: 24, perspective: 2100 },
 };
 
-/** Rows shown while planning when the full field can't fit: the ally half plus
- *  one enemy row of context, so you still see what you're lining up against. */
+/**
+ * Rows shown while PLANNING.
+ *
+ * Planning never needs all 8. Your units only ever occupy the bottom 4, so the
+ * enemy half is empty ground until combat — and unlike TFT, whose far half is a
+ * painted scene worth looking at, ours is bare. Rendering it in full spends a
+ * third of the board on nothing and shrinks the hexes you actually work in.
+ *
+ * So planning shows the ally half plus two rows of context by default, and
+ * drops to one when the viewport is tight. Combat still draws the full field.
+ */
+const PLANNING_CONTEXT_ROWS = 6;
 const WINDOWED_ROWS = 5;
 
 /**
@@ -208,6 +218,7 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
   const fromW = (availW - BOARD_CHROME) / FIELD_UNITS.w;
 
   const fullUnitsH = rowsPixelHeight(FIELD.rows, 1);
+  const contextUnitsH = rowsPixelHeight(PLANNING_CONTEXT_ROWS, 1);
   const windowUnitsH = rowsPixelHeight(WINDOWED_ROWS, 1);
 
   // Vertical chrome that is ALWAYS present: the top strip and the shop, with a
@@ -224,12 +235,13 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
     return (avail - fixed) / perTile;
   };
 
-  // Preferred arrangement: all 8 rows visible in both phases.
-  //   planning — field + bench slabs on the platform
-  //   combat   — field only (the fight view draws no bench)
+  // Preferred arrangement, solved for both phases at once so the tile is the
+  // same in each and the arena never changes scale mid-match:
+  //   planning — ally half + 2 context rows, plus bench slabs on the platform
+  //   combat   — the full 8-row field, no bench (the fight view draws none)
   const idealTile = Math.min(
     fromW,
-    tileFor(fullUnitsH, availH, true),
+    tileFor(contextUnitsH, availH, true),
     tileFor(fullUnitsH, availH, false),
   );
 
@@ -238,14 +250,14 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
   // to a density tier, so there's no cliff where the board suddenly halves.
   const windowed = idealTile < COMFORTABLE_TILE;
 
-  const planningRows = windowed ? WINDOWED_ROWS : FIELD.rows;
+  const planningRows = windowed ? WINDOWED_ROWS : PLANNING_CONTEXT_ROWS;
   const hideBottomInCombat = windowed;
 
   const fightAvail = hideBottomInCombat
     ? Math.max(80, vh - (topH + gap + pad * 2))
     : availH;
 
-  const planTile = tileFor(windowed ? windowUnitsH : fullUnitsH, availH, true);
+  const planTile = tileFor(windowed ? windowUnitsH : contextUnitsH, availH, true);
   const fightTile = tileFor(fullUnitsH, fightAvail, false);
 
   // Windowing is a RECOVERY, not a size bonus: it buys back a comfortable tile
