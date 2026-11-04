@@ -78,7 +78,7 @@ function SellZone() {
   return (
     <div
       ref={setNodeRef}
-      className={`w-[150px] shrink-0 flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed transition-all
+      className={`w-[92px] shrink-0 flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed transition-all
         ${isOver ? "border-rose-400 bg-rose-500/25 text-rose-100 scale-[1.03] shadow-[0_0_22px_-6px_rgba(244,63,94,0.7)]" : "border-slate-700/70 bg-slate-900/30 text-slate-500 hover:border-rose-700/60 hover:text-rose-300/80"}`}
     >
       <span className={`leading-none transition-transform ${isOver ? "scale-125" : ""}`}><Trash2 size={24} /></span>
@@ -100,7 +100,7 @@ function PensionZone() {
       <div
         ref={setNodeRef}
         title={t.net_pension_title(PENSION_COST, PENSION_ROUNDS)}
-        className={`w-[120px] shrink-0 flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed transition-all
+        className={`w-[84px] shrink-0 flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed transition-all
           ${isOver ? "border-emerald-400 bg-emerald-500/25 text-emerald-100 scale-[1.03]" : "border-[var(--panel-edge)] bg-black/25 text-amber-200/55 hover:border-emerald-700/60 hover:text-emerald-300/80"}`}
       >
         <span className={`leading-none ${isOver ? "scale-125" : ""}`}><PawIcon size={22} /></span>
@@ -110,7 +110,7 @@ function PensionZone() {
   }
   const def = getDef(pension.defId);
   return (
-    <div className="gilded w-[120px] shrink-0 flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5">
+    <div className="gilded w-[84px] shrink-0 flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5">
       <span className="text-[8px] uppercase tracking-wider text-amber-200/55 leading-none">{t.net_pension}</span>
       <div className="relative">
         {/* eslint-disable-next-line @next/next/no-img-element */}

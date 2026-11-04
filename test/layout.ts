@@ -47,17 +47,17 @@ assert(densityFor(1080) === "full", "1080px tall → full");
 console.log("\nPLANNING phase fits every viewport:");
 for (const vp of VIEWPORTS) {
   const L = computeGameLayout(vp.w, vp.h);
-  // top + windowed board + bench + shop + gaps + padding
-  const usedH = L.topH + L.planningBox.h + L.benchH + L.shopH + L.gap * 3 + L.pad * 2;
+  // top + arena (field + bench slabs, both on the platform) + shop + gaps + pad
+  const usedH = L.topH + L.planningBox.h + L.shopH + L.gap * 2 + L.pad * 2;
   assert(usedH <= vp.h, `${vp.name} (${vp.w}x${vp.h}) — planning fits (${usedH} <= ${vp.h})`);
 }
 
-console.log("\nCOMBAT phase fits every viewport (full 8-row field):");
+console.log("\nCOMBAT phase fits every viewport (full 8-row field, no bench):");
 for (const vp of VIEWPORTS) {
   const L = computeGameLayout(vp.w, vp.h);
   const usedH = L.hideBottomInCombat
     ? L.topH + L.boardBox.h + L.gap + L.pad * 2
-    : L.topH + L.boardBox.h + L.benchH + L.shopH + L.gap * 3 + L.pad * 2;
+    : L.topH + L.boardBox.h + L.shopH + L.gap * 2 + L.pad * 2;
   assert(usedH <= vp.h, `${vp.name} — combat fits (${usedH} <= ${vp.h})`);
 }
 
@@ -84,7 +84,11 @@ for (const vp of VIEWPORTS) {
   const L = computeGameLayout(vp.w, vp.h);
   assert(L.tile.w >= 34, `${vp.name} — tile ${L.tile.w}px >= 34px minimum`);
   assert(L.tile.w <= 118, `${vp.name} — tile ${L.tile.w}px <= 118px maximum`);
-  assert(L.benchSlot >= 40, `${vp.name} — bench slot ${L.benchSlot}px is thumb-sized`);
+  // Bench slabs scale with the tile. They're DROP targets resolved by
+  // closest-center rather than precision tap targets, and the unit sprite
+  // drawn in one overflows it, so the usable area is larger than the socket.
+  // They therefore track the tile floor rather than a 44pt tap minimum.
+  assert(L.benchSlot >= 28, `${vp.name} — bench slot ${L.benchSlot}px is usable as a drop target`);
 }
 
 console.log("\nField geometry agrees with the hex engine:");

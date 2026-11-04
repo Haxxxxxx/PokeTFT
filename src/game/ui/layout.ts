@@ -52,7 +52,9 @@ export type GameLayout = {
   hideBottomInCombat: boolean;
   /** Height of the top strip (round tracker + stage/round + timer). */
   topH: number;
-  /** Edge length of one bench slot, and the bench strip's total height. */
+  /** Edge length of one bench slot, and the bench strip's total height. The
+   *  strip is part of the ARENA (the slabs sit on the platform), not a separate
+   *  zone below it — `planningBox.h` already includes it. */
   benchSlot: number;
   benchH: number;
   /** Height of the shop strip (controls + 5 cards). */
@@ -136,9 +138,13 @@ const TIERS: Record<Density, Tier> = {
   // `perspective` here is only a FLOOR — the real value scales with the board
   // (see PERSPECTIVE_RATIO), because distortion depends on the ratio between
   // camera distance and subject size, not on an absolute pixel number.
+  // Rail widths are deliberately tight. Measured against the reference, TFT
+  // spends ~21% of screen width on both rails combined; ours were spending
+  // ~37%, and every pixel a rail takes is a pixel the board doesn't get. The
+  // rails hold short labels and small glyphs — they don't need the room.
   compact: { topH: 32, benchSlot: 44, shopH: 86, leftRail: 0, rightRail: 48, gap: 4, pad: 4, font: 0.8, railsAsDrawers: true, tilt: 17, perspective: 1500 },
-  medium: { topH: 48, benchSlot: 66, shopH: 128, leftRail: 188, rightRail: 188, gap: 8, pad: 8, font: 0.9, railsAsDrawers: false, tilt: 21, perspective: 1800 },
-  full: { topH: 56, benchSlot: 92, shopH: 158, leftRail: 260, rightRail: 300, gap: 12, pad: 10, font: 1, railsAsDrawers: false, tilt: 24, perspective: 2100 },
+  medium: { topH: 48, benchSlot: 66, shopH: 128, leftRail: 138, rightRail: 150, gap: 8, pad: 8, font: 0.9, railsAsDrawers: false, tilt: 21, perspective: 1800 },
+  full: { topH: 56, benchSlot: 92, shopH: 158, leftRail: 196, rightRail: 214, gap: 12, pad: 10, font: 1, railsAsDrawers: false, tilt: 24, perspective: 2100 },
 };
 
 /** Rows shown while planning when the full field can't fit: the ally half plus
@@ -150,7 +156,21 @@ const WINDOWED_ROWS = 5;
  * — past here the tokens are too small to drag confidently, so we'd rather
  * window the field and keep them big.
  */
-const COMFORTABLE_TILE = 52;
+const COMFORTABLE_TILE = 68;
+
+/**
+ * Bench geometry. The slabs sit ON the platform, spanning the field's width, so
+ * their size is DERIVED from that width rather than guessed as a ratio of the
+ * tile — at a guessed 0.82 the nine slabs plus gaps came out wider than the
+ * board they sit on. The strip's height is therefore part of the arena.
+ */
+const BENCH_SLOTS = 9;
+const BENCH_GAP = 4;
+const BENCH_PAD = 12;
+/** Slab edge per unit of tile: nine slabs share the field's 7.5-tile width. */
+const BENCH_TILE_RATIO = FIELD_UNITS.w / BENCH_SLOTS;
+/** Constant the gaps subtract from that span, folded into the tile solve. */
+const BENCH_GAP_OFFSET = ((BENCH_SLOTS - 1) * BENCH_GAP) / BENCH_SLOTS;
 
 export function densityFor(vh: number): Density {
   if (vh < 500) return "compact";
@@ -175,7 +195,9 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
   const tier = TIERS[density];
   const { topH, benchSlot, shopH, leftRail, rightRail, gap, pad, font, railsAsDrawers, tilt, perspective } = tier;
 
-  const benchH = benchHeightFor(benchSlot, pad);
+  // Placeholder; recomputed from the solved tile below, since the slabs are
+  // sized from it (they live on the platform).
+  let benchH = benchHeightFor(benchSlot, pad);
 
   // Horizontal: in drawer mode the traits rail costs nothing (it overlays), but
   // the slim player-avatar strip stays in flow on the right.
@@ -187,29 +209,44 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
 
   const fullUnitsH = rowsPixelHeight(FIELD.rows, 1);
   const windowUnitsH = rowsPixelHeight(WINDOWED_ROWS, 1);
-  const bottomH = benchH + shopH + gap * 2;
 
-  /** Largest tile that fits `rows` of field in `vh` minus the given chrome. */
-  const tileFor = (unitsH: number, chrome: number) =>
-    (Math.max(80, vh - chrome) - BOARD_CHROME) / (unitsH * TILE_ASPECT);
+  // Vertical chrome that is ALWAYS present: the top strip and the shop, with a
+  // gap on either side of the arena. The bench is deliberately NOT here — it
+  // renders on the platform, so its height belongs to the arena. Counting it
+  // both places (as this did) silently squeezed the board.
+  const chromeBase = topH + shopH + gap * 2 + pad * 2;
+  const availH = Math.max(80, vh - chromeBase);
 
-  // Preferred arrangement: all 8 rows visible in BOTH phases, bench and shop
-  // always on screen. The tile must satisfy planning and combat alike so the
-  // board never changes scale mid-match.
-  const idealChrome = topH + bottomH + gap + pad * 2;
-  const idealTile = Math.min(fromW, tileFor(fullUnitsH, idealChrome));
+  /** Largest tile fitting `rows` of field, plus the bench strip when shown. */
+  const tileFor = (unitsH: number, avail: number, withBench: boolean) => {
+    const fixed = BOARD_CHROME + (withBench ? BENCH_PAD - BENCH_GAP_OFFSET : 0);
+    const perTile = unitsH * TILE_ASPECT + (withBench ? BENCH_TILE_RATIO : 0);
+    return (avail - fixed) / perTile;
+  };
 
-  // If that would make the tokens too small to drag, reorganize instead of
-  // shrinking: window the field while planning, and let the bench and shop
-  // yield the screen during combat. This is adaptive rather than keyed to a
-  // density tier, so there's no cliff where the board suddenly halves.
+  // Preferred arrangement: all 8 rows visible in both phases.
+  //   planning — field + bench slabs on the platform
+  //   combat   — field only (the fight view draws no bench)
+  const idealTile = Math.min(
+    fromW,
+    tileFor(fullUnitsH, availH, true),
+    tileFor(fullUnitsH, availH, false),
+  );
+
+  // If that leaves the tokens too small to drag comfortably, reorganize instead
+  // of shrinking: window the field while planning. Adaptive rather than keyed
+  // to a density tier, so there's no cliff where the board suddenly halves.
   const windowed = idealTile < COMFORTABLE_TILE;
 
   const planningRows = windowed ? WINDOWED_ROWS : FIELD.rows;
   const hideBottomInCombat = windowed;
 
-  const planTile = tileFor(windowed ? windowUnitsH : fullUnitsH, topH + bottomH + gap + pad * 2);
-  const fightTile = tileFor(fullUnitsH, hideBottomInCombat ? topH + gap + pad * 2 : topH + bottomH + gap + pad * 2);
+  const fightAvail = hideBottomInCombat
+    ? Math.max(80, vh - (topH + gap + pad * 2))
+    : availH;
+
+  const planTile = tileFor(windowed ? windowUnitsH : fullUnitsH, availH, true);
+  const fightTile = tileFor(fullUnitsH, fightAvail, false);
 
   // Windowing is a RECOVERY, not a size bonus: it buys back a comfortable tile
   // and stops there. Without this cap a cramped viewport could hand out a larger
@@ -223,6 +260,15 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
 
   const field = fieldPixelSize(tileW, tileH);
   const planningH = rowsPixelHeight(planningRows, tileH);
+  // Bench slabs are sized from the solved tile, and their strip is part of the
+  // planning arena's height.
+  // Derived from the field's actual width so the row can never be wider than
+  // the platform. FLOOR, not round: the tile was solved against the exact
+  // ratio, so rounding up can push the arena a fraction past the viewport (it
+  // did — an iPad Pro overflowed by half a pixel).
+  const benchSlabSize = Math.floor((field.w - (BENCH_SLOTS - 1) * BENCH_GAP) / BENCH_SLOTS);
+  const benchStripH = benchSlabSize + BENCH_PAD;
+  benchH = benchStripH;
 
   return {
     density,
@@ -232,10 +278,11 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
     field,
     boardBox: { w: field.w + BOARD_CHROME, h: field.h + BOARD_CHROME },
     planningRows,
-    planningBox: { w: field.w + BOARD_CHROME, h: planningH + BOARD_CHROME },
+    // Includes the bench strip: during planning the arena IS field + slabs.
+    planningBox: { w: field.w + BOARD_CHROME, h: planningH + BOARD_CHROME + benchStripH },
     hideBottomInCombat,
     topH,
-    benchSlot,
+    benchSlot: benchSlabSize,
     benchH,
     shopH,
     leftRail,

@@ -82,26 +82,22 @@ function ShopBarBase() {
 
   return (
     <div className="flex items-stretch gap-2">
-      {/* Rarity drop-rate recap for the current level. */}
-      <div className="flex flex-col justify-center rounded-lg bg-slate-900/70 border border-slate-700/50 px-2 py-1.5 w-[118px] shrink-0">
-        <div className="text-[8px] uppercase tracking-wider text-slate-500 mb-1 text-center">{t.sh_odds} · Lv {level}</div>
-        <div className="flex flex-col gap-[3px]">
+      <div className="flex flex-col gap-1.5 justify-center pr-1 w-[150px] shrink-0">
+        {/* Shop odds as one inline row of coloured percentages, the way TFT
+            shows them. The old version was a 118px panel of five labelled bar
+            rows — a lot of width for information you glance at, and every pixel
+            here is a pixel the shop cards don't get. */}
+        <div className="flex items-center justify-between gap-0.5 px-0.5" title={`${t.sh_odds} · Lv ${level}`}>
           {odds.map((pct, idx) => {
             const c = COST_COLOR[(idx + 1) as Cost];
             return (
-              <div key={idx} className={`flex items-center gap-1 ${pct === 0 ? "opacity-35" : ""}`}>
-                <span className="text-[9px] font-extrabold w-2 text-center" style={{ color: c }}>{idx + 1}</span>
-                <span className="flex-1 h-2 rounded-full bg-slate-800 overflow-hidden">
-                  <span className="block h-full rounded-full transition-all" style={{ width: `${pct}%`, background: c }} />
-                </span>
-                <span className="text-[9px] tabular-nums text-slate-400 w-6 text-right">{pct}%</span>
-              </div>
+              <span key={idx} className={`flex items-center gap-[2px] ${pct === 0 ? "opacity-30" : ""}`}>
+                <span className="w-[5px] h-[5px] rounded-full shrink-0" style={{ background: c }} />
+                <span className="text-[9px] font-bold tabular-nums" style={{ color: pct === 0 ? "#64748b" : c }}>{pct}</span>
+              </span>
             );
           })}
         </div>
-      </div>
-
-      <div className="flex flex-col gap-1.5 justify-center pr-1 w-[140px] shrink-0">
         {/* Buy XP — with the level recap (current level + progress to the next) and
             the cost to level past it, so all the level info lives on the button. */}
         <button

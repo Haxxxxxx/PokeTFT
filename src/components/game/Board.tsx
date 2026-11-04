@@ -204,9 +204,12 @@ function BoardBase({
 
   // Bench slabs live ON the platform at its near edge (TFT puts them there), so
   // their height is part of the arena rather than a separate zone below it.
+  // Sizes come from the layout engine, which solved the tile WITH the bench
+  // strip included — computing them here independently would drift from that
+  // budget and overflow the arena.
   const benchSlots = withBench ? resolveBenchSlots(source) : [];
-  const benchSize = Math.round(Math.min(tileW * 0.82, (innerW - (BENCH_SIZE - 1) * 6) / BENCH_SIZE));
-  const benchStripH = withBench ? benchSize + 12 : 0;
+  const benchSize = layout.benchSlot;
+  const benchStripH = withBench ? layout.benchH : 0;
 
   // Board capacity, ghosted on the floor. Only on your OWN live board — on a
   // scouted rival's board it would be their number shown over your context.
@@ -342,7 +345,7 @@ function BoardBase({
         {withBench && (
           <div
             className="absolute flex items-end justify-center gap-1.5"
-            style={{ left: pad, top: pad + innerH, width: innerW, height: benchStripH }}
+            style={{ left: pad, top: pad + innerH, width: innerW, height: benchStripH, gap: 4 }}
           >
             {Array.from({ length: BENCH_SIZE }).map((_, i) => (
               <BenchSlab
