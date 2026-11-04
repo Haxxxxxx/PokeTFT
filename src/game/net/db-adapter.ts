@@ -24,17 +24,30 @@ export interface DbAdapter {
   ): Promise<{ committed: boolean; value: T | null }>;
 }
 
+/**
+ * Resolve a path to a ref, treating "" as the ROOT.
+ *
+ * `ref(db, "")` does not mean the root — the SDK validates the string and
+ * throws `path argument was an invalid path = ""`. The root is `ref(db)` with
+ * no second argument. This matters because a root-rooted multi-path update is
+ * the whole point of the interface: `applyRatingFor` writes leaderboard,
+ * history and results atomically via `update("", {...})`, and that call was
+ * throwing on EVERY game — so ratings, match history and the leaderboard were
+ * never persisted.
+ */
+const refAt = (path: string) => (path ? ref(db(), path) : ref(db()));
+
 /** Firebase Web-SDK implementation — the client default. */
 export const webDbAdapter: DbAdapter = {
   async get(path) {
-    const snap = await fbGet(ref(db(), path));
+    const snap = await fbGet(refAt(path));
     return snap.exists() ? snap.val() : null;
   },
   async update(path, value) {
-    await fbUpdate(ref(db(), path), value);
+    await fbUpdate(refAt(path), value);
   },
   async transaction(path, fn) {
-    const res = await runTransaction(ref(db(), path), (cur) => fn(cur) as unknown);
+    const res = await runTransaction(refAt(path), (cur) => fn(cur) as unknown);
     return { committed: res.committed, value: res.snapshot.exists() ? res.snapshot.val() : null };
   },
 };

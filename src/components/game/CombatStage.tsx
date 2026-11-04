@@ -574,40 +574,59 @@ function CombatUnit({
   const hpBar = ally ? (low ? "#16a34a" : "#34d399") : (low ? "#dc2626" : "#fb7185");
   const lunging = lunge.dx !== 0 || lunge.dy !== 0; // mid-attack → thrust scale for impact
   const castScale = cast ? 1.16 : lunging ? 1.08 : 1; // cast wind-up pops bigger than an attack
-  // Sized from the live tile rather than the old hard-coded 78/82px, so combat
-  // units match the board they're standing on at every viewport.
+  // Mirrors the planning board exactly: a cell-sized, bottom-aligned box with an
+  // oversized sprite standing in it. The previous version counter-rotated the
+  // WHOLE bar+sprite stack about its bottom edge while the sprite image was far
+  // larger than its box — the two offsets compounded and left the HP bars
+  // floating ~50px above the unit they belonged to.
   const layout = useGameLayout();
   const tilt = layout.tilt;
-  const W = Math.round(layout.tile.w * 1.2);
-  const H = Math.round(layout.tile.h * 1.2);
+  const TW = layout.tile.w;
+  const TH = layout.tile.h;
+  /** Same 1.85x oversize as the board, to cancel PokéAPI sprite padding. */
+  const S = Math.round(TW * 1.85);
+  /** How far the sprite overflows its cell upward — bars ride just above that. */
+  const overflow = (S - TH) / 2;
   // The sprite is the star: nearly planning-board size (78px) with team identity from a soft
   // back-glow + the feet ring rather than a hard disc, so it reads as a Pokémon, not a token.
   return (
     <div
-      className="absolute"
+      className="absolute flex items-end justify-center"
       style={{
-        left: x - W / 2,
-        top: y - H * 0.7,
-        width: W,
-        // Counter-rotate out of the arena's rake so the unit stands upright on
-        // the tilted ground, exactly as on the planning board. Bars and sprite
-        // ride together, anchored at the feet.
-        transform: `translate(${lunge.dx}px, ${lunge.dy}px) rotateX(${-tilt}deg) scale(${castScale})`,
-        transformOrigin: "bottom center",
+        left: x - TW / 2,
+        top: y - TH / 2,
+        width: TW,
+        height: TH,
+        transform: `translate(${lunge.dx}px, ${lunge.dy}px)`,
         transition: "transform 80ms ease-out",
       }}
     >
-      {/* HP bar — team-coloured (green ally / red enemy), glossy fill, crisp dark frame. */}
-      <div className={`h-[7px] w-full rounded-[3px] bg-black/80 overflow-hidden mb-[3px] ${low ? "animate-pulse" : ""}`} style={{ outline: "1px solid rgba(0,0,0,0.55)" }}>
+      {/* Counter-rotated so the unit stands upright on the raked ground, anchored
+          at its feet — the bars live INSIDE this, pinned relative to the sprite,
+          so they can never drift away from the unit they describe. */}
+      <div
+        className="relative"
+        style={{
+          transform: `rotateX(${-tilt}deg) scale(${castScale})`,
+          transformOrigin: "bottom center",
+          transition: "transform 80ms ease-out",
+        }}
+      >
+      {/* Bars, stacked just above the sprite's crown. */}
+      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: -overflow - 18, width: S }}>
+      <div className={`h-[7px] rounded-[3px] bg-black/80 overflow-hidden mb-[3px] ${low ? "animate-pulse" : ""}`} style={{ outline: "1px solid rgba(0,0,0,0.55)", width: TW * 0.9 }}>
         <div className="h-full rounded-[3px] transition-[width] duration-100" style={{ width: `${hpFrac * 100}%`, background: hpBar, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 2px rgba(0,0,0,0.28)" }} />
       </div>
       {/* Mana bar — glows + pulses when full (a cast is coming). */}
-      <div className={`h-[4px] w-[85%] mx-auto rounded-full bg-black/70 overflow-hidden mb-1 ${manaFull ? "animate-pulse" : ""}`} style={manaFull ? { boxShadow: "0 0 7px 1px #38bdf8dd" } : undefined}>
+      <div className={`h-[4px] rounded-full bg-black/70 overflow-hidden ${manaFull ? "animate-pulse" : ""}`} style={manaFull ? { boxShadow: "0 0 7px 1px #38bdf8dd", width: TW * 0.76 } : { width: TW * 0.76 }}>
         <div className="h-full transition-[width] duration-100" style={{ width: `${manaFrac * 100}%`, background: manaFull ? "#bae6fd" : "#38bdf8" }} />
       </div>
+      </div>
       {/* Grounding "feet" ellipse — team-coloured, sits under the sprite. */}
-      <span className="absolute left-1/2 -translate-x-1/2 rounded-[50%] pointer-events-none" style={{ bottom: -2, width: W * 0.74, height: W * 0.19, background: `radial-gradient(ellipse at center, ${ring}77, transparent 72%)` }} />
-      <div className="relative mx-auto flex items-end justify-center" style={{ width: W * 0.95, height: H * 0.95 }}>
+      <span className="absolute left-1/2 -translate-x-1/2 rounded-[50%] pointer-events-none" style={{ bottom: -2, width: TW * 0.6, height: TW * 0.17, background: `radial-gradient(ellipse at center, ${ring}77, transparent 72%)` }} />
+      {/* Box is the CELL; the sprite inside it is oversized and bottom-aligned,
+          so it breaks the cell upward exactly like a board unit. */}
+      <div className="relative mx-auto flex items-end justify-center" style={{ width: TW, height: TH }}>
         {/* Soft team aura behind the mon (stronger for mega) — replaces the hard ring disc. */}
         <span className="absolute inset-0 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle at 50% 60%, ${ring}${unit.mega ? "55" : "2e"}, transparent 66%)` }} />
         {/* Cast wind-up: a charging aura + an expanding ring in the move's colour, telegraphing
@@ -618,8 +637,8 @@ function CombatUnit({
         <img
           src={spriteUrl(unit.dex)}
           alt=""
-          width={Math.round(W * 1.5)}
-          height={Math.round(W * 1.5)}
+          width={S}
+          height={S}
           className="relative drop-shadow-[0_4px_5px_rgba(0,0,0,0.6)]"
           style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none", filter: cast ? `brightness(1.3) drop-shadow(0 0 11px ${cast})` : unit.disabled ? "brightness(1.25) saturate(0.4) drop-shadow(0 0 7px #7dd3fc)" : unit.burning ? "saturate(1.45) drop-shadow(0 0 7px #f97316)" : `drop-shadow(0 0 6px ${ring}88)` }}
           draggable={false}
@@ -630,6 +649,7 @@ function CombatUnit({
         )}
         {unit.disabled && <span className="absolute top-0 -left-1 text-sky-300 drop-shadow"><SnowIcon size={14} /></span>}
         {unit.burning && !unit.disabled && <span className="absolute top-0.5 -left-0.5 w-3 h-3 rounded-full bg-orange-500 shadow-[0_0_6px_2px_rgba(249,115,22,0.7)]" />}
+      </div>
       </div>
     </div>
   );
