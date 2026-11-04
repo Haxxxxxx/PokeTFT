@@ -75,9 +75,17 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
 
   const ring = megaReady ? "#f0abfc" : color;
   const title = megaReady ? `${def.stageNames[unit.star - 1]} · ${t.uc_mega_ready}` : `${def.stageNames[unit.star - 1]} · ${t.uc_click_details}`;
-  // Fill the token: the mon is the point, so let the sprite take nearly the whole cell (the
-  // hex token has no border to clear; the square chip leaves room for its 2px frame).
-  const spriteSize = shape === "hex" ? size - 2 : size - 6;
+  // Fill the token, then some. PokéAPI sprites carry a lot of transparent
+  // padding, so a sprite drawn at exactly the tile size reads much smaller than
+  // the tile. On the board we oversize it and let it break the hex — the same
+  // reason TFT's champions overflow their cell — which is what makes a unit read
+  // as a creature standing there rather than an icon sitting in a box.
+  // 1.85x, not a modest bump. PokéAPI sprites are 96x96 frames where the
+  // creature occupies barely half the box, so the drawn pixels are roughly half
+  // whatever size we ask for. Scaling to the tile therefore renders a mon at
+  // ~50% of its hex — which is exactly what it looked like. We oversize to
+  // cancel that padding, and let the result break the cell upward.
+  const spriteSize = shape === "hex" ? Math.round(size * 1.85) : size - 6;
   const sprite = (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -85,7 +93,7 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
       alt={def.name}
       width={spriteSize}
       height={spriteSize}
-      className="image-render-pixel pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
+      className={`image-render-pixel pointer-events-none ${shape === "hex" ? "unit-rim" : "drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"}`}
       style={{ imageRendering: "pixelated" }}
       draggable={false}
     />
@@ -112,13 +120,25 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
         className={`relative select-none touch-none ${interactive ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${canEquipArmed ? "animate-pulse" : ""}`}
         title={title}
       >
-        <div
-          className="absolute inset-0 flex items-center justify-center"
-          style={{ clipPath: HEX_CLIP, background: "rgba(13,20,38,0.66)", boxShadow: `inset 0 0 0 1.5px ${ring}, inset 0 0 6px ${ring}33` }}
-        >
+        {/* A thin cost-coloured ring on the GROUND, behind the unit — not a
+            plate behind it. The old opaque hex fill made every unit read as an
+            icon in a box; in TFT the champion stands directly on the stone and
+            only its base ring touches the board. That fill also carried the hex
+            clip-path, which silently cropped the oversized sprite back to tile
+            size and cancelled the overflow entirely. */}
+        <span
+          className="absolute inset-0 unit-base pointer-events-none"
+          style={{ clipPath: HEX_CLIP, boxShadow: `inset 0 0 0 1.5px ${ring}aa, inset 0 0 10px ${ring}22` }}
+        />
+        {/* Sprite is oversized and bottom-anchored so it breaks the hex upward,
+            the way a standing figure would. Nothing here clips it. */}
+        <div className="absolute inset-x-0 bottom-0 flex items-end justify-center" style={{ overflow: "visible" }}>
           {sprite}
         </div>
-        <div className="absolute -top-1 inset-x-0 flex justify-center pointer-events-none">
+        {/* Stars ride just above the sprite's crown. Derived from how far the
+            oversized sprite actually overflows the cell, so they track the
+            scale instead of drifting when it changes. */}
+        <div className="absolute inset-x-0 flex justify-center pointer-events-none" style={{ top: -(spriteSize - size) * 0.5 - 6 }}>
           <Stars star={unit.star} />
         </div>
         {costBadge}

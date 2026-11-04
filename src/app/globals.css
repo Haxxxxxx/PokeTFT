@@ -358,3 +358,262 @@ body {
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Arena — the 3D board.
+
+   The field is a plane raked away from the camera; every unit is counter-
+   rotated by the same angle so it stands upright on that plane instead of
+   lying flat on it. The tilt angle and perspective distance come from the
+   layout engine (density-aware), so these rules carry only the look, never
+   the geometry.
+   ──────────────────────────────────────────────────────────────────────── */
+
+.arena-frame {
+  /* Isolate the 3D context so the tilt can't leak into sibling HUD layers. */
+  isolation: isolate;
+}
+
+.arena-plane {
+  transform-style: preserve-3d;
+  will-change: transform;
+  transition: transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* Lit horizon behind the arena, so the platform reads as sitting IN a space
+   rather than floating on flat black. */
+.arena-backdrop {
+  background:
+    radial-gradient(120% 70% at 50% 18%, rgba(86, 130, 214, 0.18) 0%, transparent 62%),
+    radial-gradient(90% 50% at 50% 100%, rgba(56, 189, 248, 0.10) 0%, transparent 70%);
+  filter: blur(2px);
+}
+
+/* The platform's top face: carved stone, lit from the far edge. The layered
+   gradients stand in for a texture map — a soft sheen across the surface plus a
+   cooler pool toward the near edge, which is what gives it material. */
+.arena-slab {
+  transform: translateZ(-1px);
+  background:
+    /* Stone grain: two fine cross-hatched sweeps, barely there, so the floor
+       catches light unevenly instead of reading as a flat fill. */
+    repeating-linear-gradient(58deg, rgba(190, 215, 255, 0.022) 0 2px, transparent 2px 9px),
+    repeating-linear-gradient(-58deg, rgba(190, 215, 255, 0.018) 0 2px, transparent 2px 11px),
+    /* Key light from the FAR edge — the top of the raked plane. The old gradient
+       lit the near edge and let the far half fall to near-black, which made the
+       (correctly) hex-free enemy half read as a void instead of as floor. */
+    radial-gradient(135% 95% at 50% 8%, #3a5184 0%, #27395f 38%, #1a2744 68%, #121c33 100%);
+  border: 1px solid rgba(175, 205, 250, 0.26);
+  box-shadow:
+    inset 0 1px 0 rgba(205, 225, 255, 0.2),
+    inset 0 -40px 90px -46px rgba(56, 189, 248, 0.3),
+    0 48px 90px -40px rgba(0, 0, 0, 0.9);
+}
+
+/* Extruded walls — the faces that give the slab real thickness. Each is rotated
+   out of the plane at one edge, so the platform has depth instead of being a
+   flat tilted rectangle. Darker than the top face, as a side in shadow. */
+.arena-wall {
+  position: absolute;
+  display: block;
+  background: linear-gradient(180deg, #16233f 0%, #0b1324 60%, #060a14 100%);
+  border: 1px solid rgba(140, 170, 220, 0.14);
+  border-top: none;
+}
+.arena-wall-front {
+  left: 0;
+  top: 100%;
+  width: 100%;
+  border-radius: 0 0 14px 14px;
+  box-shadow: inset 0 10px 22px -12px rgba(0, 0, 0, 0.9);
+}
+.arena-wall-side {
+  top: 0;
+  height: 100%;
+  background: linear-gradient(180deg, #121d35 0%, #090f1e 100%);
+}
+
+/* Board capacity, ghosted across the floor (TFT's "6/6"). */
+.arena-capacity {
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: rgba(197, 219, 255, 0.11);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+  line-height: 1;
+}
+.arena-capacity .is-full {
+  color: rgba(110, 231, 183, 0.16);
+}
+
+/* Hex tiles: stone surfaces with a lit rim, not flat fills. The gradients give
+   each tile a top highlight and a shaded lower half so the grid has relief.
+   Transitioning only background + box-shadow keeps hover off the layout path. */
+.hex-cell {
+  transition: background 140ms ease, box-shadow 140ms ease, filter 140ms ease;
+  background-image: linear-gradient(170deg, rgba(255, 255, 255, 0.075) 0%, transparent 46%);
+}
+.hex-cell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  clip-path: inherit;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0%, transparent 38%);
+  pointer-events: none;
+}
+
+/* Enemy context rows: outline only, no relief — present enough to read as
+   board, quiet enough that it's never mistaken for somewhere you can drop. */
+.hex-cell.is-enemy::after {
+  background: none;
+}
+
+/* Bench slabs set into the platform's near edge. Recessed rather than raised —
+   inset shadow plus a darker fill reads as a socket cut into the stone, which
+   is what makes the bench part of the arena instead of a tray sitting on it. */
+.bench-slab {
+  border-radius: 7px;
+  /* Lit like the floor it's cut into, not a black hole in it: the socket still
+     reads recessed from the inset shadow, but it's clearly the same stone. */
+  background: linear-gradient(180deg, rgba(42, 60, 98, 0.8) 0%, rgba(25, 38, 66, 0.85) 100%);
+  border: 1px solid rgba(185, 212, 255, 0.26);
+  box-shadow:
+    inset 0 4px 10px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 0 rgba(205, 225, 255, 0.12);
+  transition: background 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+.bench-slab.is-over {
+  border-color: rgba(56, 189, 248, 0.85);
+  background: linear-gradient(180deg, rgba(14, 42, 71, 0.95) 0%, rgba(22, 56, 92, 0.85) 100%);
+  box-shadow:
+    inset 0 3px 9px rgba(0, 0, 0, 0.45),
+    0 0 16px -2px rgba(56, 189, 248, 0.55);
+}
+
+/* A unit's base ring, lying on the stone behind it. Carries the cost colour
+   without putting an opaque plate behind the sprite — TFT's champions stand on
+   the board, they don't sit in a tile. */
+.unit-base {
+  background: radial-gradient(ellipse at 50% 72%, rgba(10, 16, 32, 0.5) 0%, rgba(10, 16, 32, 0.16) 52%, transparent 76%);
+}
+
+/* The hex you're about to drop on. Brighter than hover elsewhere, because this
+   is the one piece of feedback that has to survive a 3D rake and a moving
+   cursor. */
+.hex-cell.is-over {
+  filter: brightness(1.25);
+}
+
+/* Stone railing around the playfield, inside the slab edge — the carved lip
+   that separates the arena floor from its border in the reference. */
+.arena-rail {
+  position: absolute;
+  inset: 5px;
+  border-radius: 16px;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px rgba(195, 220, 255, 0.3),
+    inset 0 0 0 7px rgba(10, 16, 32, 0.45),
+    inset 0 0 0 8px rgba(195, 220, 255, 0.16),
+    inset 0 16px 38px -20px rgba(0, 0, 0, 0.75);
+}
+
+/* Hexagonal trait badge (TFT's synergy frame).
+   Two nested clip-paths: the outer carries the coloured edge, the inner is
+   inset by a pixel to leave that edge visible. A border can't do this — a
+   clip-path crops the border away with everything else outside the shape. */
+.trait-hex {
+  --trait: #64748b;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 31px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  /* The OUTER hex is the coloured rim; the inner fill is always dark so that
+     rim stays visible. Inactive traits dim the whole badge rather than flipping
+     the fill — filling it with the trait colour made active and inactive look
+     identical, which is the opposite of what this rail is for. */
+  background: var(--trait);
+  opacity: 0.4;
+  transition: opacity 140ms ease;
+}
+.trait-hex.is-active {
+  opacity: 1;
+}
+.trait-hex-fill {
+  display: grid;
+  place-items: center;
+  width: calc(100% - 4px);
+  height: calc(100% - 4px);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background: #0a1020;
+  color: #e8f1ff;
+}
+
+/* Trainer portraits in the right rail — circular, ringed by standing. */
+.player-orb {
+  background: #0a1020;
+  box-shadow:
+    0 0 0 1.5px rgba(148, 163, 184, 0.45),
+    0 0 0 3px rgba(10, 16, 32, 0.9);
+}
+.player-orb.is-lead {
+  box-shadow:
+    0 0 0 1.5px var(--gold),
+    0 0 0 3px rgba(10, 16, 32, 0.9),
+    0 0 12px -2px rgba(212, 175, 55, 0.75);
+}
+.player-orb.is-nightmare {
+  background: #2b0712;
+  box-shadow:
+    0 0 0 1.5px rgba(225, 29, 72, 0.85),
+    0 0 0 3px rgba(10, 16, 32, 0.9),
+    0 0 12px -2px rgba(225, 29, 72, 0.8);
+}
+
+/* Rim light on board units. A stack of tight drop-shadows traces the sprite's
+   alpha edge, so the silhouette separates from the stone underneath it — the
+   cheapest stand-in for the lit edge a 3D model would get from the scene. The
+   last, softer shadow is the ambient occlusion back toward the ground. */
+.unit-rim {
+  filter:
+    drop-shadow(0 0 1px rgba(226, 240, 255, 0.85))
+    drop-shadow(0 0 2px rgba(150, 200, 255, 0.4))
+    drop-shadow(0 3px 4px rgba(0, 0, 0, 0.7));
+}
+
+/* Contact shadow pooled under a standing unit — the cue that actually sells
+   "planted on the ground" rather than "floating above it". */
+.unit-contact {
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.28) 45%, transparent 72%);
+  filter: blur(1.5px);
+}
+
+/* A unit standing on the raked plane. The counter-rotation itself is inline
+   (it must match the live tilt); this adds the grounding shadow and a settle
+   animation when a unit lands. */
+.unit-stand {
+  filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.55));
+  animation: unit-settle 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes unit-settle {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* Drawer slide-ins for the compact (phone) rails. */
+.drawer-in-left { animation: drawer-left 200ms cubic-bezier(0.22, 0.61, 0.36, 1); }
+.drawer-in-right { animation: drawer-right 200ms cubic-bezier(0.22, 0.61, 0.36, 1); }
+@keyframes drawer-left { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes drawer-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+/* Respect the OS reduced-motion setting: keep the 3D look (it's spatial, not
+   motion) but drop the animations that actually move things. */
+@media (prefers-reduced-motion: reduce) {
+  .arena-plane { transition: none; }
+  .unit-stand { animation: none; }
+  .drawer-in-left,
+  .drawer-in-right { animation: none; }
+}

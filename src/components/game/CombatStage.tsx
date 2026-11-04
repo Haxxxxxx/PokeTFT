@@ -5,7 +5,8 @@ import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 import { usePrefersReducedMotion } from "@/lib/useReducedMotion";
 import { sfx } from "@/lib/audio";
-import { hexToPixel, fieldPixelSize, hexDistance, FIELD, TILE, HEX_CLIP } from "@/game/engine/hex";
+import { hexToPixel, fieldPixelSize, hexDistance, FIELD, HEX_CLIP } from "@/game/engine/hex";
+import { useGameLayout } from "./LayoutProvider";
 import { TYPE_COLOR } from "@/game/ui";
 import { SnowIcon, SwordIcon, ShieldIcon } from "./icons";
 import { Leaf, BarChart3 } from "lucide-react";
@@ -33,8 +34,9 @@ function mirrorResult(r: CombatResult): CombatResult {
   };
 }
 
-const TILE_W = TILE.w;
-const TILE_H = TILE.h;
+/** Tile size is responsive now (see LayoutProvider) — each component that draws
+ *  on the field reads it from the layout and keeps the old local names, so the
+ *  geometry call sites below are unchanged. */
 const SIM_DT = 1 / 16;
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -189,7 +191,13 @@ export function CombatStage({
     if (wonRef.current) sfx.victory(); else sfx.defeat();
   }, [finished]);
 
+  const layout = useGameLayout();
+  const TILE_W = layout.tile.w;
+  const TILE_H = layout.tile.h;
+
   const { w, h } = fieldPixelSize(TILE_W, TILE_H);
+  // Platform thickness, matching the planning board's.
+  const wallT = Math.max(10, Math.round(TILE_W * 0.26));
   const fi = Math.min(Math.floor(idx), last);
   const frac = idx - fi;
   const a = frames[fi];
@@ -265,17 +273,33 @@ export function CombatStage({
           Inline (multiplayer) pins the battlefield to the LEFT so it lines up
           pixel-for-pixel with the planning board; the recap overflows to the
           right into the reserved rail space. Fullscreen centers the pair. */}
-      <div className={`flex items-start gap-3 w-full ${inline ? "justify-start" : "justify-center"}`}>
+      {/* Centred in both modes now. This used to pin LEFT when inline so the
+          recap could spill into the 340px item rail — but that rail is gone
+          (details float on demand), so spilling put the recap on top of the
+          trainers list. The recap is an overlay below instead. */}
+      <div className="flex items-start justify-center w-full">
       <div
-        className="relative shrink-0 rounded-xl overflow-hidden"
+        className="relative shrink-0 arena-frame"
         style={{
-          width: w + 24, height: h + 24, padding: 12,
-          background: "radial-gradient(120% 90% at 50% 50%, #1a263f 0%, #0a1020 75%)",
-          border: "1px solid rgba(212,175,55,0.32)",
-          boxShadow: "inset 0 1px 0 rgba(231,198,107,0.1), inset 0 0 60px -30px rgba(212,175,55,0.5), 0 26px 70px -34px rgba(0,0,0,0.9)",
+          width: w + 28, height: h + 28, padding: 14,
+          perspective: `${layout.perspective}px`,
+          perspectiveOrigin: "50% 50%",
         }}
       >
-        <div className="absolute" style={{ left: 12, top: 12, width: w, height: h }}>
+        {/* Same raked platform as the planning board — combat was rendering a
+            flat grid while planning showed a 3D arena, which made the phase
+            flip look like two different games. */}
+        <div
+          className="absolute inset-0 arena-plane"
+          style={{ transform: `rotateX(${layout.tilt}deg)`, transformStyle: "preserve-3d" }}
+        >
+        <div className="absolute inset-0 rounded-2xl arena-slab" style={{ transformStyle: "preserve-3d" }}>
+          <span className="arena-wall arena-wall-front" style={{ height: wallT, transformOrigin: "50% 0%", transform: "rotateX(-90deg)" }} aria-hidden />
+          <span className="arena-wall arena-wall-side" style={{ width: wallT, left: 0, transformOrigin: "100% 50%", transform: "rotateY(90deg)" }} aria-hidden />
+          <span className="arena-wall arena-wall-side" style={{ width: wallT, right: 0, transformOrigin: "0% 50%", transform: "rotateY(-90deg)" }} aria-hidden />
+          <span className="arena-rail" aria-hidden />
+        </div>
+        <div className="absolute" style={{ left: 14, top: 14, width: w, height: h }}>
           <HexGrid />
 
           {/* Corpses (behind) */}
@@ -369,21 +393,27 @@ export function CombatStage({
             return <DamageNumber key={`dn-${fk}`} x={p.x} y={p.y} dmg={e.dmg} crit={e.crit} sup={e.sup} />;
           })}
         </div>
+        </div>
+      </div>
       </div>
 
+      {/* Recap as an OVERLAY pinned to the stage's own left edge, not a sibling
+          in the row. As a sibling it widened the layout and pushed itself over
+          the trainers rail once the old 340px item column was removed. */}
       {suppressRecap ? null : recapOpen ? (
-        <CombatRecapTabs units={a.units} label={t.cs_your_team} onClose={() => setRecapOpen(false)} />
+        <div className="absolute left-0 top-10 z-30 max-h-[78%] flex">
+          <CombatRecapTabs units={a.units} label={t.cs_your_team} onClose={() => setRecapOpen(false)} />
+        </div>
       ) : (
         <button
           onClick={() => setRecapOpen(true)}
           title={t.cs_show_recap}
-          className="gilded self-stretch w-7 shrink-0 rounded-xl flex flex-col items-center justify-center gap-1.5 text-amber-200/70 hover:text-amber-100 transition-colors"
+          className="gilded absolute left-0 top-10 z-30 w-7 h-32 rounded-xl flex flex-col items-center justify-center gap-1.5 text-amber-200/70 hover:text-amber-100 transition-colors"
         >
           <span><BarChart3 size={14} /></span>
           <span className="[writing-mode:vertical-rl] rotate-180 text-[9px] font-extrabold uppercase tracking-wider">{t.cs_recap}</span>
         </button>
       )}
-      </div>
 
       {/* Controls — floated at the bottom of the same box (keeps the field static). */}
       <div className="absolute bottom-0 inset-x-0 flex items-center justify-center gap-2 min-h-[40px]">
@@ -503,11 +533,21 @@ function CombatRecapTabs({ units, label, onClose }: { units: FrameUnit[]; label:
 }
 
 const HexGrid = memo(function HexGrid() {
+  const layout = useGameLayout();
+  const TILE_W = layout.tile.w;
+  const TILE_H = layout.tile.h;
+  // Combat floor is hex-PAVED STONE, not a team-tinted grid.
+  //
+  // TFT's fight view has no green/red lattice: the arena is neutral paving and
+  // the only coloured hexes are ability-area indicators. Team identity is read
+  // from the units themselves — their HP bar colour and feet ring — which is
+  // also why it stays legible when two armies are interleaved. Tinting every
+  // cell by owner competed with that and made the fight read as a board game
+  // rather than a battle.
   const cells = [];
   for (let r = 0; r < FIELD.rows; r++) {
     for (let c = 0; c < FIELD.cols; c++) {
       const p = hexToPixel({ c, r }, TILE_W, TILE_H);
-      const ally = r >= 4;
       cells.push(
         <div
           key={`${c}-${r}`}
@@ -515,8 +555,8 @@ const HexGrid = memo(function HexGrid() {
           style={{
             left: p.x - TILE_W / 2, top: p.y - TILE_H / 2, width: TILE_W - 3, height: TILE_H - 3,
             clipPath: HEX_CLIP,
-            background: ally ? "rgba(52,211,153,0.06)" : "rgba(251,113,133,0.06)",
-            boxShadow: `inset 0 0 0 1px ${ally ? "rgba(52,211,153,0.14)" : "rgba(251,113,133,0.14)"}`,
+            background: "rgba(170,196,236,0.045)",
+            boxShadow: "inset 0 0 0 1px rgba(170,196,236,0.16), inset 0 0 14px rgba(120,150,200,0.06)",
           }}
         />,
       );
@@ -541,24 +581,66 @@ function CombatUnit({
   const hpBar = ally ? (low ? "#16a34a" : "#34d399") : (low ? "#dc2626" : "#fb7185");
   const lunging = lunge.dx !== 0 || lunge.dy !== 0; // mid-attack → thrust scale for impact
   const castScale = cast ? 1.16 : lunging ? 1.08 : 1; // cast wind-up pops bigger than an attack
-  // The sprite is the star: nearly planning-board size (78px) with team identity from a soft
-  // back-glow + the feet ring rather than a hard disc, so it reads as a Pokémon, not a token.
+  // Mirrors the planning board exactly: a cell-sized, bottom-aligned box with an
+  // oversized sprite standing in it. The previous version counter-rotated the
+  // WHOLE bar+sprite stack about its bottom edge while the sprite image was far
+  // larger than its box — the two offsets compounded and left the HP bars
+  // floating ~50px above the unit they belonged to.
+  const layout = useGameLayout();
+  const tilt = layout.tilt;
+  const TW = layout.tile.w;
+  const TH = layout.tile.h;
+  /** Same 1.85x oversize as the board, to cancel PokéAPI sprite padding. */
+  const S = Math.round(TW * 1.85);
+  // Bar placement is TILE-relative, not derived from the sprite box: PokéAPI
+  // frames carry wildly different amounts of transparent padding, so there's no
+  // consistent "crown" to measure from — anchoring to the image box left bars
+  // floating ~70px above small sprites.
+  //
+  // The sprite is the star: team identity comes from a soft back-glow and the
+  // feet ring rather than a hard disc, so it reads as a Pokémon, not a token.
   return (
     <div
-      className="absolute"
-      style={{ left: x - 41, top: y - 57, width: 82, transform: `translate(${lunge.dx}px, ${lunge.dy}px) scale(${castScale})`, transition: "transform 80ms ease-out" }}
+      className="absolute flex items-end justify-center"
+      style={{
+        left: x - TW / 2,
+        top: y - TH / 2,
+        width: TW,
+        height: TH,
+        transform: `translate(${lunge.dx}px, ${lunge.dy}px)`,
+        transition: "transform 80ms ease-out",
+      }}
     >
-      {/* HP bar — team-coloured (green ally / red enemy), glossy fill, crisp dark frame. */}
-      <div className={`h-[7px] w-full rounded-[3px] bg-black/80 overflow-hidden mb-[3px] ${low ? "animate-pulse" : ""}`} style={{ outline: "1px solid rgba(0,0,0,0.55)" }}>
+      {/* Counter-rotated so the unit stands upright on the raked ground, anchored
+          at its feet — the bars live INSIDE this, pinned relative to the sprite,
+          so they can never drift away from the unit they describe. */}
+      <div
+        className="relative"
+        style={{
+          transform: `rotateX(${-tilt}deg) scale(${castScale})`,
+          transformOrigin: "bottom center",
+          transition: "transform 80ms ease-out",
+        }}
+      >
+      {/* Bars, stacked just above the sprite's crown. */}
+      {/* Centred on the unit explicitly. `inset-x-0` plus an explicit width
+          fight each other: inset pins left AND right, then the width wins and
+          the stack grows rightward from the left edge — which is exactly how
+          the bars ended up floating off to the side of their unit. */}
+      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center" style={{ top: -Math.round(TH * 0.32) - 8 }}>
+      <div className={`h-[7px] rounded-[3px] bg-black/80 overflow-hidden mb-[3px] ${low ? "animate-pulse" : ""}`} style={{ outline: "1px solid rgba(0,0,0,0.55)", width: TW * 0.9 }}>
         <div className="h-full rounded-[3px] transition-[width] duration-100" style={{ width: `${hpFrac * 100}%`, background: hpBar, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 2px rgba(0,0,0,0.28)" }} />
       </div>
       {/* Mana bar — glows + pulses when full (a cast is coming). */}
-      <div className={`h-[4px] w-[85%] mx-auto rounded-full bg-black/70 overflow-hidden mb-1 ${manaFull ? "animate-pulse" : ""}`} style={manaFull ? { boxShadow: "0 0 7px 1px #38bdf8dd" } : undefined}>
+      <div className={`h-[4px] rounded-full bg-black/70 overflow-hidden ${manaFull ? "animate-pulse" : ""}`} style={manaFull ? { boxShadow: "0 0 7px 1px #38bdf8dd", width: TW * 0.76 } : { width: TW * 0.76 }}>
         <div className="h-full transition-[width] duration-100" style={{ width: `${manaFrac * 100}%`, background: manaFull ? "#bae6fd" : "#38bdf8" }} />
       </div>
+      </div>
       {/* Grounding "feet" ellipse — team-coloured, sits under the sprite. */}
-      <span className="absolute left-1/2 -translate-x-1/2 rounded-[50%] pointer-events-none" style={{ bottom: -2, width: 60, height: 15, background: `radial-gradient(ellipse at center, ${ring}77, transparent 72%)` }} />
-      <div className="relative mx-auto flex items-end justify-center" style={{ width: 78, height: 78 }}>
+      <span className="absolute left-1/2 -translate-x-1/2 rounded-[50%] pointer-events-none" style={{ bottom: -2, width: TW * 0.6, height: TW * 0.17, background: `radial-gradient(ellipse at center, ${ring}77, transparent 72%)` }} />
+      {/* Box is the CELL; the sprite inside it is oversized and bottom-aligned,
+          so it breaks the cell upward exactly like a board unit. */}
+      <div className="relative mx-auto flex items-end justify-center" style={{ width: TW, height: TH }}>
         {/* Soft team aura behind the mon (stronger for mega) — replaces the hard ring disc. */}
         <span className="absolute inset-0 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle at 50% 60%, ${ring}${unit.mega ? "55" : "2e"}, transparent 66%)` }} />
         {/* Cast wind-up: a charging aura + an expanding ring in the move's colour, telegraphing
@@ -569,8 +651,8 @@ function CombatUnit({
         <img
           src={spriteUrl(unit.dex)}
           alt=""
-          width={78}
-          height={78}
+          width={S}
+          height={S}
           className="relative drop-shadow-[0_4px_5px_rgba(0,0,0,0.6)]"
           style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none", filter: cast ? `brightness(1.3) drop-shadow(0 0 11px ${cast})` : unit.disabled ? "brightness(1.25) saturate(0.4) drop-shadow(0 0 7px #7dd3fc)" : unit.burning ? "saturate(1.45) drop-shadow(0 0 7px #f97316)" : `drop-shadow(0 0 6px ${ring}88)` }}
           draggable={false}
@@ -582,19 +664,26 @@ function CombatUnit({
         {unit.disabled && <span className="absolute top-0 -left-1 text-sky-300 drop-shadow"><SnowIcon size={14} /></span>}
         {unit.burning && !unit.disabled && <span className="absolute top-0.5 -left-0.5 w-3 h-3 rounded-full bg-orange-500 shadow-[0_0_6px_2px_rgba(249,115,22,0.7)]" />}
       </div>
+      </div>
     </div>
   );
 }
 
 function Corpse({ unit }: { unit: FrameUnit }) {
+  const layout = useGameLayout();
+  const TILE_W = layout.tile.w;
+  const TILE_H = layout.tile.h;
   const p = hexToPixel({ c: unit.c, r: unit.r }, TILE_W, TILE_H);
+  // Sprite + puff scale with the tile, so a corpse doesn't dwarf a 34px hex.
+  const sprite = Math.round(TILE_W * 0.44);
+  const puff = Math.round(TILE_W * 0.5);
   return (
     <>
       {/* One-shot dissipation puff at the moment of death (plays once on mount). */}
-      <span className="absolute pointer-events-none rounded-full combat-burst" style={{ left: p.x - 26, top: p.y - 26, width: 52, height: 52, background: "radial-gradient(circle, rgba(226,232,240,0.55), rgba(148,163,184,0) 70%)" }} />
-      <div key={unit.id} className="absolute pointer-events-none combat-die" style={{ left: p.x - 23, top: p.y - 23 }}>
+      <span className="absolute pointer-events-none rounded-full combat-burst" style={{ left: p.x - puff / 2, top: p.y - puff / 2, width: puff, height: puff, background: "radial-gradient(circle, rgba(226,232,240,0.55), rgba(148,163,184,0) 70%)" }} />
+      <div key={unit.id} className="absolute pointer-events-none combat-die" style={{ left: p.x - sprite / 2, top: p.y - sprite / 2 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={spriteUrl(unit.dex)} alt="" width={46} height={46} style={{ imageRendering: "pixelated", filter: "grayscale(1) brightness(0.6)" }} draggable={false} />
+        <img src={spriteUrl(unit.dex)} alt="" width={sprite} height={sprite} style={{ imageRendering: "pixelated", filter: "grayscale(1) brightness(0.6)" }} draggable={false} />
       </div>
     </>
   );

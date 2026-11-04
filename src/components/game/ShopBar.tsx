@@ -12,6 +12,8 @@ import { ECONOMY, COPIES_TO_STAR, SHOP_ODDS, MAX_LEVEL, XP_TO_REACH, type Cost }
 import { RerollIcon, SnowIcon, CoinIcon, InfoIcon, StarIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
 import { useT } from "@/lib/i18n";
+import { useGameLayout } from "./LayoutProvider";
+import { interest } from "@/game/engine/economy";
 import { sfx, playCry } from "@/lib/audio";
 
 /** Copies a unit instance is worth toward star-ups (1 / 3 / 9). */
@@ -73,6 +75,11 @@ function ShopBarBase() {
   );
 
   const odds = SHOP_ODDS[Math.min(Math.max(1, level), 10)];
+  // Card art is sized from the shop strip's budgeted height so it fills the
+  // card at every density, and overflows the corner slightly so it reads as
+  // artwork bleeding off the card rather than a pasted-on icon.
+  const layout = useGameLayout();
+  const artSize = Math.round(layout.shopH * 1.08);
   // Level recap for the Buy XP control: progress toward the next level + cost.
   const atMax = level >= MAX_LEVEL;
   const xpBase = XP_TO_REACH[level];
@@ -81,26 +88,22 @@ function ShopBarBase() {
 
   return (
     <div className="flex items-stretch gap-2">
-      {/* Rarity drop-rate recap for the current level. */}
-      <div className="flex flex-col justify-center rounded-lg bg-slate-900/70 border border-slate-700/50 px-2 py-1.5 w-[118px] shrink-0">
-        <div className="text-[8px] uppercase tracking-wider text-slate-500 mb-1 text-center">{t.sh_odds} · Lv {level}</div>
-        <div className="flex flex-col gap-[3px]">
+      <div className="flex flex-col gap-1.5 justify-center pr-1 w-[150px] shrink-0">
+        {/* Shop odds as one inline row of coloured percentages, the way TFT
+            shows them. The old version was a 118px panel of five labelled bar
+            rows — a lot of width for information you glance at, and every pixel
+            here is a pixel the shop cards don't get. */}
+        <div className="flex items-center justify-between gap-0.5 px-0.5" title={`${t.sh_odds} · Lv ${level}`}>
           {odds.map((pct, idx) => {
             const c = COST_COLOR[(idx + 1) as Cost];
             return (
-              <div key={idx} className={`flex items-center gap-1 ${pct === 0 ? "opacity-35" : ""}`}>
-                <span className="text-[9px] font-extrabold w-2 text-center" style={{ color: c }}>{idx + 1}</span>
-                <span className="flex-1 h-2 rounded-full bg-slate-800 overflow-hidden">
-                  <span className="block h-full rounded-full transition-all" style={{ width: `${pct}%`, background: c }} />
-                </span>
-                <span className="text-[9px] tabular-nums text-slate-400 w-6 text-right">{pct}%</span>
-              </div>
+              <span key={idx} className={`flex items-center gap-[2px] ${pct === 0 ? "opacity-30" : ""}`}>
+                <span className="w-[5px] h-[5px] rounded-full shrink-0" style={{ background: c }} />
+                <span className="text-[9px] font-bold tabular-nums" style={{ color: pct === 0 ? "#64748b" : c }}>{pct}</span>
+              </span>
             );
           })}
         </div>
-      </div>
-
-      <div className="flex flex-col gap-1.5 justify-center pr-1 w-[140px] shrink-0">
         {/* Buy XP — with the level recap (current level + progress to the next) and
             the cost to level past it, so all the level info lives on the button. */}
         <button
@@ -141,6 +144,27 @@ function ShopBarBase() {
         >
           <SnowIcon size={13} /> {frozen ? t.sh_frozen : t.sh_freeze}
         </button>
+      </div>
+
+      {/* Gold — sits between the level/reroll controls and the cards, so the
+          number you spend is right next to the things you spend it on and
+          aligned with the shop row (TFT puts it in exactly this spot). The
+          interest preview rides along, since interest is a function of this
+          number and players bank to the next breakpoint. */}
+      <div className="gilded flex flex-col items-center justify-center gap-0.5 px-3 rounded-lg shrink-0 min-w-[76px]">
+        <span className="inline-flex items-center gap-1.5 text-2xl font-extrabold text-amber-300 tabular-nums leading-none drop-shadow">
+          <CoinIcon size={20} />
+          {gold}
+        </span>
+        <span className="text-[9px] font-bold uppercase tracking-wide text-amber-200/50 leading-none">
+          {t.net_gold_label}
+        </span>
+        <span
+          title={t.net_interest_label}
+          className="mt-0.5 text-[10px] font-bold tabular-nums text-amber-200/75 leading-none"
+        >
+          +{interest(gold)}
+        </span>
       </div>
 
       <div className="flex gap-2 flex-1">
@@ -203,13 +227,17 @@ function ShopBarBase() {
                   a vertical wash from the cost colour at the bottom up into the dark top. */}
               <span className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(180deg, #0b1020 0%, ${color}1f 60%, ${color}3d 100%)` }} />
               {/* Sprite as the card "art" on the right (TFT-style). */}
+              {/* Art scales with the shop strip instead of sitting at a fixed
+                  140px. The cards got considerably wider when the odds panel
+                  was compacted, and a fixed sprite left them looking empty —
+                  in the reference the champion art fills its card. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={spriteUrl(def.dex[Math.max(0, (own?.topStar ?? 1) - 1)])}
                 alt={def.name}
-                width={140}
-                height={140}
-                className="absolute right-0 bottom-0 pointer-events-none"
+                width={artSize}
+                height={artSize}
+                className="absolute -right-1 -bottom-1 pointer-events-none"
                 style={{ imageRendering: "pixelated" }}
                 draggable={false}
               />

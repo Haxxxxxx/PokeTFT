@@ -71,7 +71,10 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
   const hovered = hover ? traits.find((t) => t.key === hover.key) : null;
 
   return (
-    <div className="gilded w-full h-full min-h-0 flex flex-col p-3 rounded-xl">
+    // max-h-full, not h-full: the panel should be as tall as its synergies, not
+    // a full-height box with a mostly-empty border around three traits. It still
+    // caps at the rail height and scrolls internally once the list gets long.
+    <div className="gilded w-full max-h-full min-h-0 flex flex-col p-3 rounded-xl">
       <h2 className="text-xs uppercase tracking-wide text-amber-200/60 mb-2 shrink-0">{tr.tp_synergies}</h2>
       {traits.length === 0 && <p className="text-xs text-slate-500">{tr.tp_place_mons}</p>}
       {/* Scrolls when the list gets long. */}
@@ -97,16 +100,51 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
               onKeyDown={(e) => { if (e.key === "Escape" && hover?.key === t.key) { cancelClose(); setHover(null); } }}
               className={`flex items-center gap-2 px-2 py-1 rounded-md cursor-help shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 ${active ? "bg-slate-800" : "bg-slate-900/40 opacity-60"}`}
             >
+              {/* Count in its own shaped badge, then the name, then the FULL
+                  breakpoint chain beneath it with the reached tiers lit — TFT's
+                  "3 › 5 › 7 › 9 › 11". The chain is the useful part: a bare
+                  "3/5" hides how far the trait can still go, which is exactly
+                  what you're deciding about when you look at this rail. */}
+              {/* Hexagonal frame, not a rounded square — TFT badges its traits
+                  in hexes, and that silhouette is a large part of why the rail
+                  reads as TFT at a glance. Clip-path on a wrapper so the inner
+                  fill carries the trait colour and the border survives. */}
               <span
-                style={{ background: active ? color : "transparent", borderColor: color, boxShadow: active ? `0 0 6px -1px ${color}` : "none" }}
-                className="w-6 h-6 rounded border flex items-center justify-center"
+                className={`trait-hex shrink-0${active ? " is-active" : ""}`}
+                style={{ ["--trait" as string]: color }}
               >
-                <TraitGlyph traitKey={t.key} size={13} />
+                <span className="trait-hex-fill">
+                  <TraitGlyph traitKey={t.key} size={13} />
+                </span>
               </span>
-              <span className="text-xs font-semibold flex-1">{t.label}</span>
-              {active && <span style={{ background: color }} className="text-[9px] font-bold px-1 rounded text-black/80">{t.tier}</span>}
-              {capped && !active && <span className="text-[8px] font-bold uppercase tracking-wide text-slate-600" title={`${tr.tp_cap_only} ${poolMax} ${tr.tp_cap_rest}`}>max {poolMax}</span>}
-              <span className="text-[11px] text-slate-400">{t.count}{nextBp ? `/${nextBp}` : " ✓"}</span>
+              <span
+                className="w-4 shrink-0 text-center text-[13px] font-extrabold tabular-nums leading-none"
+                style={{ color: active ? color : "#64748b" }}
+              >
+                {t.count}
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-xs font-semibold truncate leading-tight">{t.label}</span>
+                <span className="flex items-center gap-[3px] leading-none mt-0.5">
+                  {t.breakpoints.map((b, bi) => (
+                    <span key={b} className="flex items-center gap-[3px]">
+                      {bi > 0 && <span className="text-[7px] text-slate-700">›</span>}
+                      <span
+                        className="text-[9px] font-bold tabular-nums"
+                        style={{ color: t.count >= b ? color : "#475569" }}
+                      >
+                        {b}
+                      </span>
+                    </span>
+                  ))}
+                  {capped && !active && (
+                    <span className="ml-1 text-[8px] font-bold uppercase tracking-wide text-slate-600" title={`${tr.tp_cap_only} ${poolMax} ${tr.tp_cap_rest}`}>
+                      max {poolMax}
+                    </span>
+                  )}
+                  {!nextBp && <span className="ml-1 text-[9px] font-bold" style={{ color }}>✓</span>}
+                </span>
+              </span>
             </div>
           );
         })}

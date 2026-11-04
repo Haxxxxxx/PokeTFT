@@ -27,7 +27,19 @@ function buffTags(ids: string[], fr: boolean): { label: string; color: string }[
 
 /** The owned-augments HUD: compact glyph chips that expand into a detail panel showing
  *  each augment's tier, name, full effect, and the combined team buff currently in play. */
-export function AugmentsBar({ augments, lang }: { augments: string[]; lang: string }) {
+export function AugmentsBar({
+  augments,
+  lang,
+  variant = "chip",
+}: {
+  augments: string[];
+  lang: string;
+  /** "chip" — compact glyph row for a dense HUD strip.
+   *  "panel" — the standing bottom-left recap, where TFT keeps it: names always
+   *  readable without a click, because which augments you took is something you
+   *  re-read constantly while building a board. */
+  variant?: "chip" | "panel";
+}) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   // Portaled below (see comment there) — this popover needs a viewport-fixed anchor
@@ -43,9 +55,36 @@ export function AugmentsBar({ augments, lang }: { augments: string[]; lang: stri
         ref={btnRef}
         onClick={() => setOpen((v) => !v)}
         title={fr ? "Augmentations — cliquer pour les détails" : "Augments — click for details"}
-        className={`flex items-center gap-1 px-1 py-0.5 rounded-md border transition-colors ${open ? "border-violet-400 bg-violet-900/60" : "border-violet-500/40 bg-violet-900/30 hover:bg-violet-900/50"}`}
+        className={
+          variant === "panel"
+            ? `w-full text-left gilded rounded-xl px-2 py-1.5 transition-colors ${open ? "ring-1 ring-violet-400/70" : "hover:bg-white/[0.04]"}`
+            : `flex items-center gap-1 px-1 py-0.5 rounded-md border transition-colors ${open ? "border-violet-400 bg-violet-900/60" : "border-violet-500/40 bg-violet-900/30 hover:bg-violet-900/50"}`
+        }
       >
-        {augments.map((id, i) => {
+        {variant === "panel" && (
+          <>
+            <span className="block text-[9px] uppercase tracking-wider text-violet-200/60 font-bold mb-1">
+              {fr ? "Augmentations" : "Augments"}
+            </span>
+            <span className="flex flex-col gap-1">
+              {augments.map((id) => {
+                const a = AUGMENT_BY_ID[id];
+                const color = a ? AUGMENT_TIER_COLOR[a.tier] : "#a78bfa";
+                return (
+                  <span key={id} className="flex items-center gap-1.5 min-w-0">
+                    <span style={{ color, borderColor: `${color}66` }} className="w-5 h-5 shrink-0 rounded bg-black/40 border flex items-center justify-center">
+                      <AugmentGlyph id={id} size={11} />
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-200 truncate">
+                      {a ? (fr ? a.nameFr : a.name) : id}
+                    </span>
+                  </span>
+                );
+              })}
+            </span>
+          </>
+        )}
+        {variant === "chip" && augments.map((id, i) => {
           const a = AUGMENT_BY_ID[id];
           const color = a ? AUGMENT_TIER_COLOR[a.tier] : "#a78bfa";
           return (
