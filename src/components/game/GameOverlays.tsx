@@ -292,7 +292,7 @@ export function AugmentOverlay({
 }
 
 export function GameOverScreen({
-  players, myUid, me, meta, iWon, rankResult, lastFightRef, isHost, room, leave, doubleUp, gameTotals,
+  players, myUid, me, meta, iWon, rankResult, lastFightUnits, isHost, room, leave, doubleUp, gameTotals,
 }: {
   players: Record<string, RoomPlayer>;
   myUid: string;
@@ -300,7 +300,7 @@ export function GameOverScreen({
   meta: RoomMeta;
   iWon: boolean;
   rankResult: RankedResult | null;
-  lastFightRef: { current: FrameUnit[] | null };
+  lastFightUnits: FrameUnit[] | null;
   isHost: boolean;
   room: Room;
   leave: () => void;
@@ -326,7 +326,7 @@ export function GameOverScreen({
 
       {/* MVP of your final fight — top damage dealer, with tank/heal. */}
       {(() => {
-        const mine = lastFightRef.current;
+        const mine = lastFightUnits;
         if (!mine || !mine.length) return null;
         const mvp = [...mine].sort((a, b) => b.dmgDealt - a.dmgDealt)[0];
         if (!mvp || mvp.dmgDealt <= 0) return null;

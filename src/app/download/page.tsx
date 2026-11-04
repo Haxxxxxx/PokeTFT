@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { PokeballIcon } from "@/components/game/icons";
 import { isNativeShell } from "@/game/net/nativeShell";
 
@@ -43,6 +44,10 @@ const PLATFORMS: { id: OS; name: string; file: string; href: string; glyph: stri
 export default function DownloadPage() {
   const [os, setOs] = useState<OS>("other");
   const [native, setNative] = useState(false);
+  // Intentional post-mount detection: this page is statically exported, so both values
+  // MUST start at their server-rendered defaults and only resolve on the client, or the
+  // first paint hydration-mismatches. The cascading-render cost is one frame, once.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setOs(detectOS()); setNative(isNativeShell()); }, []);
 
   return (
@@ -63,9 +68,9 @@ export default function DownloadPage() {
           and the type chart is a combat layer. Play in your browser, or install the app.
         </p>
         {!native && (
-          <a href="/" className="inline-flex items-center gap-2 mt-6 px-6 py-3 rounded-xl font-bold text-[15px] bg-amber-500/95 hover:bg-amber-400 text-black transition-colors">
+          <Link href="/" className="inline-flex items-center gap-2 mt-6 px-6 py-3 rounded-xl font-bold text-[15px] bg-amber-500/95 hover:bg-amber-400 text-black transition-colors">
             ▶ Play in browser
-          </a>
+          </Link>
         )}
       </div>
 

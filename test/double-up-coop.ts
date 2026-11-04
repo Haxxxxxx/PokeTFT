@@ -22,7 +22,7 @@ function run() {
   // ── Sender side ──
   g().newGame(roster);
   useGame.setState({ gold: 8 });
-  const startBench = benchCount();
+  const _startBench = benchCount();
 
   console.log("Sender:");
   const spent = g().coopSpendGold(5);

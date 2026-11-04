@@ -152,6 +152,10 @@ function ShopSellDrop({ children }: { children: ReactNode }) {
 const AUG_REROLL_COST = 2;
 
 export function NetGameClient() {
+  // Declared first: effects far above the old declaration site read `t` (e.g. the
+  // last-fight recorder), which put it in the temporal dead zone at module-eval order.
+  // Safe at runtime (effects run after the body) but a real TDZ hazard on refactor.
+  const t = useT();
   const room = useRoom((s) => s.room);
   const myUid = useRoom((s) => s.myUid);
   const mySave = useRoom((s) => s.mySave);
@@ -339,7 +343,10 @@ export function NetGameClient() {
   }, [myUid, isSpectator]);
 
   const meta = room?.meta;
-  const players = room?.players ?? {};
+  // Memoized: the `?? {}` fallback minted a NEW empty object on every render, so every
+  // effect listing `players` (e.g. the spectator follow-target below) re-ran each render
+  // while the room had no players node yet.
+  const players = useMemo(() => room?.players ?? {}, [room?.players]);
   const me = myUid ? players[myUid] : undefined;
   // Keep the boot-veil readiness flag in a ref (read by the veil interval above).
   useEffect(() => { bootReadyRef.current = !!room && (!!me || isSpectator); }, [room, me, isSpectator]);
@@ -432,6 +439,10 @@ export function NetGameClient() {
       else if (t.kind === "unit") coopReceiveUnit(t.unit);
     });
     return unsub;
+    // Depends on rules.MODE, not the whole `rules` object: every RTDB snapshot hands us a
+    // fresh object identity, so listing `room.rules` would tear down and re-subscribe the
+    // partner mailbox on every room write. Only the mode can change what this does.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room?.code, myUid, isSpectator, room?.rules?.mode, coopReceiveGold, coopReceiveUnit]);
 
   // Push my board + economy snapshot to the room (debounced) — board for combat,
@@ -502,7 +513,10 @@ export function NetGameClient() {
 
   // Remember my LAST fight's units (with cumulative damage/tank/heal) so the end screen can
   // crown an MVP. My side is "ally" normally, "enemy" when the pairing flipped me.
-  const lastFightRef = useRef<FrameUnit[] | null>(null);
+  // STATE, not a ref: the game-over overlay reads this during render to crown an MVP.
+  // As a ref that read was a ref-during-render violation — the overlay could paint a
+  // stale (or missing) MVP card because mutating a ref schedules no re-render.
+  const [lastFightUnits, setLastFightUnits] = useState<FrameUnit[] | null>(null);
   // Both teams' final-frame stats, kept as STATE (read in render for the planning recap, so a
   // ref would be a "ref-during-render" violation) — and it shows the enemy team too, not just yours.
   const [lastFight, setLastFight] = useState<{ mine: FrameUnit[]; theirs: FrameUnit[]; oppName: string } | null>(null);
@@ -517,8 +531,8 @@ export function NetGameClient() {
     const mine = last.units.filter((u) => u.team === myTeam);
     const theirs = last.units.filter((u) => u.team !== myTeam);
     if (mine.length) {
-      lastFightRef.current = mine;
       // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLastFightUnits(mine);
       if (!myCombat.pve) setLastFight({ mine, theirs, oppName: myCombat.oppName ?? t.net_rival });
     }
     if (meta && mine.length) {
@@ -555,7 +569,14 @@ export function NetGameClient() {
   // Reroll: the first reroll of each slot is free, then AUG_REROLL_COST gold each. The nonce
   // re-rolls the (purely local) offering. Reset whenever a new slot opens.
   const [augReroll, setAugReroll] = useState(0);
-  useEffect(() => { setAugReroll(0); }, [augSlotNow]);
+  // Reset the reroll counter when a NEW augment slot opens, using React's
+  // "adjust state during render" pattern rather than an effect — an effect here
+  // rendered the stale offering for one frame and triggered a cascading render.
+  const [augRerollSlot, setAugRerollSlot] = useState(augSlotNow);
+  if (augRerollSlot !== augSlotNow) {
+    setAugRerollSlot(augSlotNow);
+    setAugReroll(0);
+  }
   const augOptions = useMemo(() => {
     if (augSlotNow == null) return [];
     const owned = new Set(useGame.getState().augments);
@@ -584,6 +605,10 @@ export function NetGameClient() {
       picks[0] = AUGMENT_BY_ID[sigId];
     }
     return picks;
+    // Same reason as the co-op subscription above: keyed on rules.MODE only. Depending on
+    // the whole `rules` object would re-roll the player's augment offer mid-pick every time
+    // any unrelated room field was written.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [augSlotNow, myUid, room?.rules?.mode, augReroll]);
 
   // Reroll the augment offer: first per slot is free, then AUG_REROLL_COST gold (button disabled if broke).
@@ -628,8 +653,6 @@ export function NetGameClient() {
       if (leader) setSpectate(leader.uid);
     }
   }, [me?.alive, spectate]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const t = useT();
 
   // Record every combat round into the timeline (one entry per round, dedup by key).
   // PvE rounds count too (win/loss vs wild Pokémon) so feedback starts at 1-1.
@@ -780,12 +803,15 @@ export function NetGameClient() {
       window.removeEventListener("pagehide", onHide);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [room?.code, myUid]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [room?.code, myUid]);  
 
   const [confirmLeave, setConfirmLeave] = useState(false);
   // Float-up text: "+X gold" or "−X HP" shown briefly near the HUD on econ events.
   const [floatText, setFloatText] = useState<string | null>(null);
-  const floatKey = useRef(0);
+  // STATE, not a ref: this is the React `key` that restarts the float-up animation.
+  // Read during render, so a ref both violated purity and could reuse a stale key —
+  // making two consecutive gold/HP ticks fail to replay the animation.
+  const [floatKey, setFloatKey] = useState(0);
   // Screen-flash: brief red glow on the board container when taking HP damage.
   const [boardFlash, setBoardFlash] = useState(false);
 
@@ -819,14 +845,14 @@ export function NetGameClient() {
     if (prevGoldRef.current !== null && gold > prevGoldRef.current) {
       sfx.goldGain();
       const diff = gold - prevGoldRef.current;
-      floatKey.current += 1;
+      setFloatKey((k) => k + 1);
       setFloatText(`+${diff}`);
       const id = setTimeout(() => setFloatText(null), 1200);
       prevGoldRef.current = gold;
       return () => clearTimeout(id);
     }
     prevGoldRef.current = gold;
-  }, [gold, isSpectator]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [gold, isSpectator]);  
 
   // HP damage SFX + screen-flash + float-up text: fire when the player's HP decreases.
   const prevHpRef = useRef<number | null>(null);
@@ -837,7 +863,7 @@ export function NetGameClient() {
       sfx.damage();
       setBoardFlash(true);
       const diff = prevHpRef.current - hp;
-      floatKey.current += 1;
+      setFloatKey((k) => k + 1);
       setFloatText(`−${diff} HP`);
       const id = setTimeout(() => { setBoardFlash(false); setFloatText(null); }, 1200);
       prevHpRef.current = hp;
@@ -1285,7 +1311,7 @@ export function NetGameClient() {
           <div className={`relative min-w-0 rounded-xl${boardFlash ? " screen-flash" : ""}`} style={{ height: CENTER_H }}>
             {/* Float-up text for HP damage or gold gain feedback. */}
             {floatText && (
-              <div key={floatKey.current} className={`float-up absolute top-4 left-1/2 -translate-x-1/2 z-30 text-sm font-extrabold drop-shadow pointer-events-none select-none ${floatText.startsWith("−") ? "text-rose-300" : "text-amber-300"}`}>
+              <div key={floatKey} className={`float-up absolute top-4 left-1/2 -translate-x-1/2 z-30 text-sm font-extrabold drop-shadow pointer-events-none select-none ${floatText.startsWith("−") ? "text-rose-300" : "text-amber-300"}`}>
                 {floatText}
               </div>
             )}
@@ -1452,7 +1478,7 @@ export function NetGameClient() {
       {gameOver && (
         <GameOverScreen
           players={players} myUid={myUid} me={me} meta={meta} iWon={iWon}
-          rankResult={rankResult} lastFightRef={lastFightRef} isHost={isHost}
+          rankResult={rankResult} lastFightUnits={lastFightUnits} isHost={isHost}
           room={room} leave={leave} doubleUp={doubleUp} gameTotals={gameTotals}
         />
       )}

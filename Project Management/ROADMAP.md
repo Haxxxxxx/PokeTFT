@@ -1,13 +1,27 @@
 # PokéTFT — Roadmap (features à implémenter)
 
-> Priorisé par impact sur l'expérience de jeu. Mise à jour : 2026-06-14.
+> Priorisé par impact sur l'expérience de jeu. Rédigé le 2026-06-14.
+>
+> ⚠️ **Ce document a pris du retard sur le code.** Audit du 2026-11-03 : toute la
+> « Priorité 1 » ci-dessous est **livrée**. Vérifié dans le code, pas dans les notes :
+> les buffs de synergies sont appliqués au combat (`engine/combat.ts:325-336`, via
+> `computeTraits` + `TRAITS_BY_KEY[].tiers[].buff`) et les objets le sont aussi
+> (`ITEM_EFFECT`, `engine/combat.ts:210-242`). Idem pour la persistance des
+> paramètres (`store/appStore.ts` utilise le middleware `persist`), le roster
+> complet (1025 entrées) et les tests automatisés (`npm test` — déterminisme du
+> combat, simulation 24 joueurs, flux Double Up).
+>
+> Les sections conservées ci-dessous servent d'historique. Avant de reprendre un
+> point, **vérifier dans le code** — ne pas se fier à son statut écrit ici.
 
 ---
 
-## Priorité 1 — Bloque l'équilibre du jeu
+## Priorité 1 — ~~Bloque l'équilibre du jeu~~ ✅ LIVRÉ (vérifié 2026-11-03)
 
-### Effets mécaniques des synergies
-**Statut** : affichage seul — aucun effet en combat  
+### ~~Effets mécaniques des synergies~~ ✅ IMPLÉMENTÉ
+**Statut au 2026-06-14** : affichage seul — aucun effet en combat  
+**Statut réel** : chaque palier de trait porte un `TraitBuff` concret, appliqué à
+l'initialisation du combat (scope `self` ou `team`).  
 **Fichiers cibles** : `src/game/engine/combat.ts`, `src/game/engine/synergies.ts`  
 **À implémenter** :
 - Fire 2/4/6 : brûlure sur ability (dégâts/sec sur la cible)
@@ -37,8 +51,10 @@
 - Legendary 2/3 : +15%/+30% dégâts élémentaires
 - Mythic 1 : +20% tous les stats, ignore immunités de type
 
-### Effets mécaniques des objets
-**Statut** : équipables mais aucun effet en combat  
+### ~~Effets mécaniques des objets~~ ✅ IMPLÉMENTÉ
+**Statut au 2026-06-14** : équipables mais aucun effet en combat  
+**Statut réel** : effets pilotés par la donnée (`ITEM_EFFECT`), appliqués à la
+construction du combattant, avec plafonnement des multiplicateurs cumulés.  
 **Fichier cible** : `src/game/engine/combat.ts` (init + résolution des attaques)  
 **À implémenter** :
 - Restes : +5% HP max par round
@@ -59,9 +75,9 @@
 **Description** : avant le premier round, afficher N Pokémon tirés aléatoirement du pool de la génération sélectionnée. Chaque joueur choisit 1 pick en serpentine ou simultané.  
 **Fichiers à créer** : `src/components/game/DraftScreen.tsx`, `src/game/store/draftStore.ts`
 
-### Persistance des paramètres
-**Statut** : langue/son/animations réinitialisés au rechargement  
-**Solution** : ajouter middleware `persist` (localStorage) dans `src/game/store/appStore.ts`
+### ~~Persistance des paramètres~~ ✅ IMPLÉMENTÉ
+**Statut au 2026-06-14** : langue/son/animations réinitialisés au rechargement  
+**Statut réel** : `src/game/store/appStore.ts` utilise `persist` + `createJSONStorage(localStorage)`.
 
 ### ~~Localisation partielle~~ ✅ IMPLÉMENTÉ
 ~FR/EN câblé sur welcome/lobby/topbar uniquement~  
@@ -96,30 +112,34 @@
 ### Responsive / mobile
 - UI conçue pour desktop large ; pas d'adaptation tactile
 
-### Tests automatisés
-- Aucun test unitaire (moteur combat, économie, combinaisons) ni test e2e (Playwright)
-- Suggestion : Jest pour les engines purs + Playwright pour les flux critiques (lobby → game → combat)
+### ~~Tests automatisés~~ ✅ PARTIELLEMENT IMPLÉMENTÉ
+**Statut réel** : suite headless `npm test` (tsx, sans framework) — déterminisme du
+combat, simulation 24 joueurs, flux Double Up + transferts co-op. Exécutée sur chaque
+PR depuis `.github/workflows/ci.yml`.
+**Reste à faire** : tests e2e (Playwright) sur le flux lobby → game → combat.
 
 ---
 
 ## Priorité 4 — Infrastructure & DevEx
 
-### Sécurité Firebase
-- Les règles RTDB sont actuellement ouvertes (`"read": true, "write": true`)
-- À sécuriser avec auth anonyme Firebase + règles par room code
-- Activer `signInAnonymously()` dans la console Firebase
+### ~~Sécurité Firebase~~ ✅ IMPLÉMENTÉ
+**Statut au 2026-06-14** : règles RTDB ouvertes (`"read": true, "write": true`)  
+**Statut réel** : `database.rules.json` (183 lignes) — tout est derrière `auth != null`,
+avec validation de forme et de bornes par champ, champs réservés à l'hôte, et écritures
+scopées par `$uid`. Durci sur plusieurs passes d'audit (PR #86 → #89).
 
-### Variables d'environnement
-- La config Firebase est hardcodée dans `firebase.ts` (clés publiques, pas de secrets)
-- À migrer dans `.env.local` + vérifier `.gitignore`
+### ~~Variables d'environnement~~ ✅ IMPLÉMENTÉ
+**Statut réel** : `firebase.ts` lit `NEXT_PUBLIC_FIREBASE_*` avec les valeurs du projet
+canonique en repli (identifiants publics, pas des secrets). `.env.example` fourni,
+`.env.local` ignoré par git.
 
 ### Rate-limiting et anti-cheat
 - Pas de validation serveur : un client peut écrire n'importe quelle valeur dans sa save
 - Solution long terme : Cloud Functions pour valider l'économie côté serveur
 
-### CI/CD
-- Pas de pipeline automatique ; les PR sont mergées manuellement
-- Suggestion : GitHub Actions pour `tsc --noEmit` + lint sur chaque PR
+### ~~CI/CD~~ ✅ IMPLÉMENTÉ
+**Statut réel** : `.github/workflows/ci.yml` — lint, `tsc --noEmit`, `npm test` et
+build de production sur chaque push `main` et chaque PR.
 
 ### Nettoyage des rooms Firebase
 - Les rooms ne sont jamais supprimées après la partie
