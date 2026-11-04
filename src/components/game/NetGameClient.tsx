@@ -1183,7 +1183,6 @@ export function NetGameClient() {
           {doubleUp && partner && (
             <CoopPanel code={room.code} myUid={myUid} partner={{ uid: partner.uid, name: partner.name, hp: partner.hp, alive: partner.alive }} lang={lang} />
           )}
-          <AugmentsBar augments={augments} lang={lang} />
 
           {/* Phase + timer — isolated so it ticks on its own without re-rendering
               the whole game tree every 250ms (the old global tick caused jank). */}
@@ -1234,9 +1233,14 @@ export function NetGameClient() {
             <div className="min-h-0 flex flex-col">
               <TraitPanel units={spectateUnits ?? undefined} />
             </div>
-            {!isSpectator && phase !== "combat" && !spectating && (
-              <div className="shrink-0 mt-auto"><ItemsPanel /></div>
-            )}
+            {/* Bottom of the rail, TFT's corner: the item stash, then the
+                augment recap under it. Both are things you re-read constantly
+                while building, so they get a standing home rather than a HUD
+                chip you have to click. */}
+            <div className="shrink-0 mt-auto flex flex-col gap-2">
+              {!isSpectator && phase !== "combat" && !spectating && <ItemsPanel />}
+              {!isSpectator && <AugmentsBar augments={augments} lang={lang} variant="panel" />}
+            </div>
           </div>
           )}
 
