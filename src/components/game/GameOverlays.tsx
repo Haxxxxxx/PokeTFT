@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode, type Dispatch, type SetStateAction } from "react";
-import { getDef, spriteUrl, hasDef } from "@/game/data/mons";
+import { getDef, hasDef } from "@/game/data/mons";
 import { serverNow } from "@/game/net/serverTime";
 import { markCarouselPicked, returnToLobby } from "@/game/net/match";
 import { rankOf, type RankedResult } from "@/game/net/users";
@@ -20,6 +20,7 @@ import { sfx } from "@/lib/audio";
 import type { FrameUnit } from "@/game/engine/combat";
 import type { Room, RoomPlayer, RoomMeta } from "@/game/net/roomStore";
 import type { UnitInstance, PokeType } from "@/game/types";
+import { PokemonModelPreview } from "./PokemonModelPreview";
 
 const ITEM_DEF_BY_ID = Object.fromEntries(ITEM_POOL.map((i) => [i.id, i]));
 
@@ -204,8 +205,7 @@ export function CarouselOverlay({
                 name={def.name}
                 cost={def.cost}
                 types={def.types as PokeType[]}
-                // eslint-disable-next-line @next/next/no-img-element
-                art={<img src={spriteUrl(def.dex[0])} alt={def.name} width={88} height={88} style={{ imageRendering: "pixelated" }} draggable={false} />}
+                art={<PokemonModelPreview dex={def.dex[0]} alt={def.name} width={88} height={88} />}
               />
             );
           })}
@@ -336,8 +336,7 @@ export function GameOverScreen({
         return (
           <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10">
             <div className="rounded-lg bg-black/30 border border-amber-500/40 p-1 shrink-0 relative">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={spriteUrl(mvp.dex)} alt="" width={44} height={44} style={{ imageRendering: "pixelated" }} />
+              <PokemonModelPreview dex={mvp.dex} alt={mvp.name} width={44} height={44} />
               <span className="absolute -top-1.5 -left-1.5 text-sm">⭐</span>
             </div>
             <div className="min-w-0">
@@ -426,8 +425,7 @@ export function GameOverScreen({
                         const def = getDef(u.defId);
                         return (
                           <span key={u.iid} title={`${def.name} ★${u.star}`} className="relative w-7 h-7 rounded bg-black/40 border border-slate-700/70 flex items-center justify-center shrink-0">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={spriteUrl(def.dex[u.star - 1])} alt="" width={24} height={24} style={{ imageRendering: "pixelated" }} draggable={false} />
+                            <PokemonModelPreview dex={def.dex[u.star - 1]} alt={def.stageNames[u.star - 1]} width={24} height={24} />
                             {u.star > 1 && <span className="absolute -top-1 -right-1 text-[7px] font-extrabold text-amber-300 bg-slate-900/90 rounded px-0.5 leading-tight">{u.star}★</span>}
                           </span>
                         );

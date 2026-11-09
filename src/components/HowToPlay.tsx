@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useAppStore } from "@/game/store/appStore";
-import { spriteUrl } from "@/game/data/mons";
 import { Coins, Hexagon, Swords, Sparkles, Keyboard, Gamepad2, type LucideIcon } from "lucide-react";
+import { PokemonModelPreview } from "@/components/game/PokemonModelPreview";
 
 type Slide = { icon: LucideIcon; dex: number; accent: string; title: { en: string; fr: string }; body: { en: string; fr: string } };
 
@@ -75,8 +75,7 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
           <span className="absolute top-3 left-4 text-[10px] uppercase tracking-widest text-slate-500 font-bold">{lang === "fr" ? "Comment jouer" : "How to play"} · {i + 1}/{SLIDES.length}</span>
           <div className="relative">
             <span className="absolute inset-0 rounded-full blur-2xl" style={{ background: `${s.accent}44` }} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={spriteUrl(s.dex)} alt="" width={96} height={96} className="relative" style={{ imageRendering: "pixelated" }} />
+            <PokemonModelPreview dex={s.dex} alt="" width={96} height={96} className="relative" />
             <span className="absolute -bottom-1 -right-1 drop-shadow bg-slate-900/80 rounded-full p-1" style={{ color: s.accent }}><s.icon size={20} /></span>
           </div>
         </div>

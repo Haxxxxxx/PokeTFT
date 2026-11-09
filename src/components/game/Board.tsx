@@ -1,15 +1,67 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useCallback, useState } from "react";
+import dynamic from "next/dynamic";
 import { useDroppable } from "@dnd-kit/core";
 import { FIELD, ALLY_ROW0, HEX_CLIP, hexToPixel, fieldPixelSize, rowsPixelHeight } from "@/game/engine/hex";
 import { boardSizeForLevel } from "@/game/config";
-import { useGame, BENCH_SIZE, resolveBenchSlots } from "@/game/store/gameStore";
+import { getDef } from "@/game/data/mons";
+import { TYPE_COLOR } from "@/game/ui";
+import { hasUsable3DModel } from "@/game/data/model-availability";
+import { useGame, BENCH_SIZE, PENSION_COST, PENSION_ROUNDS, resolveBenchSlots } from "@/game/store/gameStore";
+import { HEX_W } from "@/lab/arena3d/geometry";
+import type { ModelId } from "@/lab/arena3d/UnitModel";
 import { useGameLayout } from "./LayoutProvider";
 import { UnitChip } from "./UnitChip";
 import { ItemGlyph } from "./ItemGlyph";
+import { PokemonModelPreview } from "./PokemonModelPreview";
+import { PawIcon } from "./icons";
 import { useT } from "@/lib/i18n";
 import type { UnitInstance } from "@/game/types";
+
+const Board3DModels = dynamic(
+  () => import("./Board3DModels").then((module) => module.Board3DModels),
+  { ssr: false, loading: () => null },
+);
+
+function modelForUnit(unit: UnitInstance): number {
+  const def = getDef(unit.defId);
+  return def.dex[Math.max(0, Math.min(2, unit.star - 1))];
+}
+
+function modelKey(iid: string, model: ModelId): string {
+  return `${iid}:${model}`;
+}
+
+function projectArenaPoint(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  tilt: number,
+  perspective: number,
+): [number, number, number] {
+  const [screenX, screenY] = projectArenaScreenPoint(x, y, width, height, tilt, perspective);
+  return [screenX - width / 2, height / 2 - screenY, 0];
+}
+
+function projectArenaScreenPoint(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  tilt: number,
+  perspective: number,
+): [number, number, number] {
+  const dx = x - width / 2;
+  const dy = y - height / 2;
+  const angle = (tilt * Math.PI) / 180;
+  const depth = dy * Math.sin(angle);
+  const scale = perspective / (perspective - depth);
+  const screenX = width / 2 + dx * scale;
+  const screenY = height / 2 + dy * Math.cos(angle) * scale;
+  return [screenX, screenY, scale];
+}
 
 /**
  * The arena.
@@ -40,10 +92,10 @@ function rowRange(rows: number): { from: number; to: number } {
 }
 
 function HexCell({
-  c, r, unit, interactive, tileW, tileH, yOffset, tilt,
+  c, r, interactive, tileW, tileH, yOffset,
 }: {
-  c: number; r: number; unit?: UnitInstance; interactive: boolean;
-  tileW: number; tileH: number; yOffset: number; tilt: number;
+  c: number; r: number; interactive: boolean;
+  tileW: number; tileH: number; yOffset: number;
 }) {
   // `r` is a FIELD row (0..7). Droppable cells are the bottom 4 rows; their
   // local board coordinate is `r - ALLY_ROW0` (0..3), matching the store.
@@ -69,6 +121,8 @@ function HexCell({
     glow: isOver ? "0 0 22px 3px rgba(52,211,153,0.5)" : "inset 0 0 9px rgba(52,211,153,0.08)",
   };
 
+  // Collision uses the registered rects, not hit testing; let pointer events reach
+  // unit chips rendered as overlapping siblings on the transformed plane.
   return (
     <>
       <div
@@ -80,46 +134,13 @@ function HexCell({
           width: tileW - 3,
           height: tileH - 3,
           clipPath: HEX_CLIP,
+          pointerEvents: "none",
           background: ally ? tint.bg : "rgba(148,163,184,0.05)",
           boxShadow: ally
             ? `inset 0 0 0 1.5px ${tint.ring}, ${tint.glow}`
             : "inset 0 0 0 1px rgba(170,196,236,0.2), inset 0 0 14px rgba(120,150,200,0.07)",
         }}
       />
-      {unit && (
-        <div
-          className="absolute flex items-end justify-center pointer-events-none"
-          style={{ left: x - tileW / 2, top, width: tileW, height: tileH }}
-        >
-          {/* Contact shadow: an ellipse lying FLAT on the tilted ground. This is
-              what actually sells "standing on" rather than "floating above" —
-              so it must NOT be counter-rotated with the unit. */}
-          <span
-            className="absolute pointer-events-none unit-contact"
-            style={{
-              width: tileW * 0.56,
-              height: tileW * 0.2,
-              bottom: tileH * 0.22,
-            }}
-          />
-          {/* Feet glow also lies flat on the ground. Infinite GPU animation, so
-              only on your own interactive board. */}
-          {interactive && <span className={`unit-glow ${ally ? "" : "enemy"}`} />}
-          {/* Counter-rotate so the token stands upright on the raked plane.
-              Anchored at the bottom edge so it looks planted in its hex rather
-              than hovering above it. Upper rows paint above lower rows. */}
-          <div
-            className="pointer-events-auto relative unit-stand"
-            style={{
-              zIndex: FIELD.rows - r,
-              transform: `rotateX(${-tilt}deg)`,
-              transformOrigin: "bottom center",
-            }}
-          >
-            <UnitChip unit={unit} size={tileW - 6} interactive={interactive} shape="hex" />
-          </div>
-        </div>
-      )}
     </>
   );
 }
@@ -128,10 +149,9 @@ function HexCell({
  *  — which is the point: in TFT the bench is part of the platform, not a
  *  separate widget floating beneath it. */
 function BenchSlab({
-  index, unit, interactive, canDeploy, size, tilt,
+  index, size, occupied,
 }: {
-  index: number; unit: UnitInstance | null; interactive: boolean; canDeploy: boolean;
-  size: number; tilt: number;
+  index: number; size: number; occupied: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `bench-${index}` });
   return (
@@ -140,18 +160,66 @@ function BenchSlab({
       className={`relative shrink-0 flex items-end justify-center bench-slab${isOver ? " is-over" : ""}`}
       style={{ width: size, height: size }}
     >
-      {unit && (
+      {occupied && (
+        <span
+          className="absolute pointer-events-none unit-contact"
+          style={{ width: size * 0.56, height: size * 0.18, bottom: size * 0.1 }}
+        />
+      )}
+    </div>
+  );
+}
+
+function PensionDock({ interactive }: { interactive: boolean }) {
+  const pension = useGame((state) => state.pension);
+  const collectPension = useGame((state) => state.collectPension);
+  const { setNodeRef, isOver } = useDroppable({
+    id: "pension",
+    disabled: !interactive || !!pension,
+  });
+  const t = useT();
+  const ready = !!pension && pension.roundsLeft <= 0;
+  const def = pension ? getDef(pension.defId) : null;
+  const dex = pension && def ? def.dex[Math.max(0, Math.min(2, pension.star - 1))] : null;
+  const typeColor = def ? TYPE_COLOR[def.types[0]] : "#d6a64f";
+
+  return (
+    <div
+      ref={setNodeRef}
+      title={!pension ? t.net_pension_title(PENSION_COST, PENSION_ROUNDS) : undefined}
+      className={`absolute right-2 top-[18%] z-30 flex w-[76px] flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-transparent p-1.5 text-center transition-all
+        ${isOver ? "scale-105 border-emerald-300 bg-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.35)]" : "bg-transparent shadow-none"}
+        ${!pension && interactive ? "border-dashed text-amber-100/70" : "text-slate-100"}`}
+    >
+      <span className="text-[8px] font-extrabold uppercase tracking-wider text-amber-200/75">{t.net_pension}</span>
+      {pension && def && dex !== null ? (
         <>
-          <span
-            className="absolute pointer-events-none unit-contact"
-            style={{ width: size * 0.56, height: size * 0.18, bottom: size * 0.1 }}
-          />
-          <div
-            className="relative unit-stand"
-            style={{ transform: `rotateX(${-tilt}deg)`, transformOrigin: "bottom center" }}
-          >
-            <UnitChip unit={unit} size={size - 8} interactive={interactive} canDeploy={canDeploy} />
+          <div className="relative grid h-14 w-full place-items-center rounded-lg" style={{ background: `radial-gradient(circle, ${typeColor}55, transparent 72%)` }}>
+            <PokemonModelPreview
+              dex={dex}
+              alt={`${def.name} in the Pokémon Pension`}
+              width={56}
+              height={56}
+              className={ready ? "" : "opacity-85"}
+            />
+            {!ready && <span className="absolute inset-0 grid place-items-center text-sm font-extrabold text-amber-100 drop-shadow-[0_1px_3px_rgba(0,0,0,1)]">{pension.roundsLeft}</span>}
           </div>
+          {ready ? (
+            <button
+              type="button"
+              onClick={collectPension}
+              className="w-full rounded-md bg-emerald-400 px-1 py-1 text-[9px] font-extrabold leading-none text-slate-950 hover:bg-emerald-300"
+            >
+              {t.net_pension_collect}
+            </button>
+          ) : (
+            <span className="text-[8px] font-bold leading-tight text-amber-100/80">{t.net_pension_rounds(pension.roundsLeft)}</span>
+          )}
+        </>
+      ) : (
+        <>
+          <span className={`leading-none text-amber-200/80 transition-transform ${isOver ? "scale-125" : ""}`}><PawIcon size={22} /></span>
+          <span className="text-[8px] leading-tight text-slate-400">{interactive ? `Drop · ${PENSION_COST} ◉` : "Empty"}</span>
         </>
       )}
     </div>
@@ -185,10 +253,19 @@ function BoardBase({
   const tileW = layout.tile.w;
   const tileH = layout.tile.h;
   const tilt = layout.tilt;
+  const [loadedModels, setLoadedModels] = useState<Set<string>>(() => new Set());
+  const handleModelReady = useCallback((key: string) => {
+    setLoadedModels((loaded) => {
+      if (loaded.has(key)) return loaded;
+      return new Set(loaded).add(key);
+    });
+  }, []);
+  const handleModelError = useCallback((key: string, error: Error) => {
+    console.error(`3D model ${key} failed to load; keeping its 2D sprite visible.`, error);
+  }, []);
 
   const source = units ?? storeUnits;
   const board = source.filter((u) => u.pos !== null);
-  const unitAt = (c: number, r: number) => board.find((u) => u.pos?.[0] === c && u.pos?.[1] === r - ALLY_ROW0);
   const showDrops = interactive && !units;
 
   const shownRows = Math.min(FIELD.rows, Math.max(1, rows ?? FIELD.rows));
@@ -215,6 +292,51 @@ function BoardBase({
   const benchSlots = withBench ? resolveBenchSlots(source) : [];
   const benchSize = layout.benchSlot;
   const benchStripH = withBench ? layout.benchH : 0;
+  const frameW = innerW + pad * 2;
+  const frameH = innerH + benchStripH + pad * 2;
+
+  const boardModels = board.flatMap((unit) => {
+    if (!unit.pos) return [];
+    const [c, localR] = unit.pos;
+    const { x, y } = hexToPixel({ c, r: localR + ALLY_ROW0 }, tileW, tileH);
+    const model = modelForUnit(unit);
+    return [{
+      key: modelKey(unit.iid, model),
+      model,
+      position: projectArenaPoint(
+        pad + x,
+        pad + y - yOffset,
+        frameW,
+        frameH,
+        tilt,
+        layout.perspective,
+      ),
+      scale: tileW / HEX_W,
+    }];
+  });
+  const models = [...boardModels];
+  if (withBench) {
+    const benchWidth = BENCH_SIZE * benchSize + (BENCH_SIZE - 1) * 4;
+    const benchStartX = pad + (innerW - benchWidth) / 2;
+    benchSlots.forEach((unit, index) => {
+      if (!unit) return;
+      const model = modelForUnit(unit);
+      if (!hasUsable3DModel(model)) return;
+      models.push({
+        key: modelKey(unit.iid, model),
+        model,
+        position: projectArenaPoint(
+          benchStartX + index * (benchSize + 4) + benchSize / 2,
+          pad + innerH + benchStripH,
+          frameW,
+          frameH,
+          tilt,
+          layout.perspective,
+        ),
+        scale: (benchSize - 8) / HEX_W,
+      });
+    });
+  }
 
   // Board capacity, ghosted on the floor. Only on your OWN live board — on a
   // scouted rival's board it would be their number shown over your context.
@@ -227,7 +349,7 @@ function BoardBase({
       className="relative arena-frame"
       style={{
         width: innerW + pad * 2,
-        height: innerH + benchStripH + pad * 2,
+        height: frameH,
         padding: pad,
         perspective: `${layout.perspective}px`,
         // Centered: an off-center origin skews the rake so one half of the
@@ -307,14 +429,37 @@ function BoardBase({
                 key={`${c}-${r}`}
                 c={c}
                 r={r}
-                unit={r >= ALLY_ROW0 ? unitAt(c, r) : undefined}
                 interactive={interactive}
                 tileW={tileW}
                 tileH={tileH}
                 yOffset={yOffset}
-                tilt={tilt}
               />
             ));
+          })}
+          {board.map((unit) => {
+            if (!unit.pos) return null;
+            const [c, localR] = unit.pos;
+            const r = localR + ALLY_ROW0;
+            const { x, y } = hexToPixel({ c, r }, tileW, tileH);
+            return (
+              <div
+                key={`ground-${unit.iid}`}
+                className="absolute flex items-end justify-center pointer-events-none"
+                style={{
+                  left: x - tileW / 2,
+                  top: y - tileH / 2 - yOffset,
+                  width: tileW,
+                  height: tileH,
+                  zIndex: r,
+                }}
+              >
+                <span
+                  className="absolute pointer-events-none unit-contact"
+                  style={{ width: tileW * 0.56, height: tileW * 0.2, bottom: tileH * 0.22 }}
+                />
+                {interactive && <span className="unit-glow" />}
+              </div>
+            );
           })}
           {/* Loot drops — stand upright like units so they stay readable. */}
           {showDrops && drops.map((d) => {
@@ -356,16 +501,106 @@ function BoardBase({
               <BenchSlab
                 key={i}
                 index={i}
-                unit={benchSlots[i] ?? null}
-                interactive={benchInteractive}
-                canDeploy={benchCanDeploy}
                 size={benchSize}
-                tilt={tilt}
+                occupied={!!benchSlots[i]}
               />
             ))}
           </div>
         )}
       </div>
+      <div className="pointer-events-none absolute inset-0 z-20">
+        {board.map((unit) => {
+          if (!unit.pos) return null;
+          const [c, localR] = unit.pos;
+          const model = modelForUnit(unit);
+          if (!hasUsable3DModel(model)) return [];
+          const { x, y } = hexToPixel({ c, r: localR + ALLY_ROW0 }, tileW, tileH);
+          const [screenX, screenBottom, scale] = projectArenaScreenPoint(
+            pad + x,
+            pad + y + tileH / 2 - yOffset,
+            frameW,
+            frameH,
+            tilt,
+            layout.perspective,
+          );
+          const size = tileW - 6;
+          return (
+            <div
+              key={unit.iid}
+              className="pointer-events-auto absolute"
+              style={{
+                left: screenX - size / 2,
+                top: screenBottom - size,
+                width: size,
+                height: size,
+                transform: `scale(${scale})`,
+                transformOrigin: "bottom center",
+                zIndex: localR + ALLY_ROW0,
+              }}
+            >
+              <UnitChip
+                unit={unit}
+                size={size}
+                interactive={interactive}
+                shape="hex"
+                showModel={false}
+                showSprite={!loadedModels.has(modelKey(unit.iid, model)) || !hasUsable3DModel(model)}
+                dragHitArea
+              />
+            </div>
+          );
+        })}
+        {withBench && benchSlots.map((unit, index) => {
+          if (!unit) return null;
+          const benchWidth = BENCH_SIZE * benchSize + (BENCH_SIZE - 1) * 4;
+          const benchStartX = pad + (innerW - benchWidth) / 2;
+          const size = benchSize - 8;
+          const model = modelForUnit(unit);
+          const [screenX, screenBottom, scale] = projectArenaScreenPoint(
+            benchStartX + index * (benchSize + 4) + benchSize / 2,
+            pad + innerH + benchStripH,
+            frameW,
+            frameH,
+            tilt,
+            layout.perspective,
+          );
+          return (
+            <div
+              key={unit.iid}
+              className="pointer-events-auto absolute"
+              style={{
+                left: screenX - size / 2,
+                top: screenBottom - size,
+                width: size,
+                height: size,
+                zIndex: 30,
+                transform: `scale(${scale})`,
+                transformOrigin: "bottom center",
+              }}
+            >
+              <UnitChip
+                unit={unit}
+                size={size}
+                interactive={benchInteractive}
+                canDeploy={benchCanDeploy}
+                shape="hex"
+                showModel={false}
+                showSprite={!loadedModels.has(modelKey(unit.iid, model)) || !hasUsable3DModel(model)}
+                dragHitArea
+              />
+            </div>
+          );
+        })}
+      </div>
+      <Board3DModels
+        models={models}
+        height={frameH}
+        perspective={layout.perspective}
+        animationMode="board"
+        onReady={handleModelReady}
+        onError={handleModelError}
+      />
+      {withBench && !units && <PensionDock interactive={interactive} />}
     </div>
   );
 }

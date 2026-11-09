@@ -87,7 +87,7 @@ function ShopBarBase() {
   const xpCur = xp - xpBase;
 
   return (
-    <div className="flex items-stretch gap-2">
+    <div className="flex min-w-0 items-stretch gap-2">
       <div className="flex flex-col gap-1.5 justify-center pr-1 w-[150px] shrink-0">
         {/* Shop odds as one inline row of coloured percentages, the way TFT
             shows them. The old version was a 118px panel of five labelled bar
@@ -167,7 +167,7 @@ function ShopBarBase() {
         </span>
       </div>
 
-      <div className="flex gap-2 flex-1">
+      <div className="flex min-w-0 gap-2 flex-1">
         {shop.map((defId, i) => {
           const key = `${i}-${rerollTick}`;
           const popOverlay = popFx?.slot === i ? (
@@ -181,7 +181,7 @@ function ShopBarBase() {
             return (
               <div
                 key={key}
-                className="shop-deal-in relative flex-1 self-stretch min-h-[120px] rounded-lg border border-slate-700/50 bg-slate-900/30 overflow-hidden"
+                className="shop-deal-in relative min-w-0 min-h-0 flex-1 self-stretch rounded-lg border border-slate-700/50 bg-slate-900/30 overflow-hidden"
                 style={{ animationDelay: `${i * 40}ms` }}
               >
                 {popOverlay}
@@ -192,6 +192,9 @@ function ShopBarBase() {
           const color = COST_COLOR[def.cost];
           const affordable = gold >= def.cost;
           const own = owned.get(defId);
+          const starIndex = Math.max(0, (own?.topStar ?? 1) - 1);
+          const cardTypes = def.typesByStar?.[starIndex] ?? def.types;
+          const mainTypeColor = TYPE_COLOR[cardTypes[0]];
 
           // Star-up progress toward the next tier.
           const copies = own?.copies ?? 0;
@@ -216,7 +219,7 @@ function ShopBarBase() {
               }}
               disabled={!affordable}
               style={{ borderColor: `${color}aa`, boxShadow: own ? `inset 0 0 0 1.5px ${color}` : undefined, animationDelay: `${i * 40}ms` }}
-              className="shop-deal-in group relative flex-1 self-stretch min-h-[148px] overflow-hidden rounded-lg border hover:brightness-125 disabled:opacity-50 transition"
+              className="shop-deal-in group relative min-w-0 min-h-0 flex-1 self-stretch overflow-hidden rounded-lg border hover:brightness-125 disabled:opacity-50 transition"
             >
               {popOverlay}
               {/* One-from-star: a separate pulsing overlay (not a class on the button
@@ -225,21 +228,25 @@ function ShopBarBase() {
               {oneFromStar && <span className="star-pulse absolute inset-0 pointer-events-none rounded-lg" />}
               {/* Cost-coloured card body (TFT-style): the WHOLE card carries the rarity tint —
                   a vertical wash from the cost colour at the bottom up into the dark top. */}
-              <span className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(180deg, #0b1020 0%, ${color}1f 60%, ${color}3d 100%)` }} />
-              {/* Sprite as the card "art" on the right (TFT-style). */}
+              <span className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse at 78% 58%, ${mainTypeColor}55 0%, ${mainTypeColor}20 36%, transparent 72%), linear-gradient(180deg, #0b1020 0%, ${color}1f 60%, ${color}3d 100%)` }} />
+              {/* Shop units stay 2D; the main type drives the card's art glow. */}
               {/* Art scales with the shop strip instead of sitting at a fixed
                   140px. The cards got considerably wider when the odds panel
                   was compacted, and a fixed sprite left them looking empty —
                   in the reference the champion art fills its card. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={spriteUrl(def.dex[Math.max(0, (own?.topStar ?? 1) - 1)])}
-                alt={def.name}
-                width={artSize}
-                height={artSize}
-                className="absolute -right-1 -bottom-1 pointer-events-none"
-                style={{ imageRendering: "pixelated" }}
+                src={spriteUrl(def.dex[starIndex])}
+                alt=""
+                aria-hidden
                 draggable={false}
+                className="absolute -right-1 -bottom-1 h-auto max-h-full max-w-full object-contain pointer-events-none"
+                style={{
+                  width: `min(${artSize}px, 100%)`,
+                  aspectRatio: "1 / 1",
+                  imageRendering: "pixelated",
+                  filter: `drop-shadow(0 0 14px ${mainTypeColor}88)`,
+                }}
               />
               {/* Left-to-right legibility scrim so the traits/name read over the art. */}
               <span className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(90deg, rgba(9,13,24,0.92) 30%, rgba(9,13,24,0.45) 60%, rgba(9,13,24,0) 100%)" }} />
@@ -265,7 +272,7 @@ function ShopBarBase() {
                     {nextThreshold !== null ? `${copies}/${nextThreshold}` : t.sh_max}
                   </span>
                 )}
-                {def.types.map((tt) => (
+                {cardTypes.map((tt) => (
                   <TraitChip key={tt} traitKey={tt} label={TRAITS_BY_KEY[tt]?.label ?? tt} color={TYPE_COLOR[tt as PokeType]} active={activeTraits.has(tt)} />
                 ))}
                 {def.roles.map((r) => (

@@ -7,9 +7,10 @@ import { computeTraits } from "@/game/engine/synergies";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { TYPE_COLOR, COST_COLOR } from "@/game/ui";
 import { TraitGlyph } from "./TraitGlyph";
-import { getDef, spriteUrl } from "@/game/data/mons";
+import { getDef } from "@/game/data/mons";
 import { EMBLEM_TRAIT } from "@/game/data/itemPool";
 import { useT } from "@/lib/i18n";
+import { PokemonModelPreview } from "./PokemonModelPreview";
 
 import type { UnitInstance } from "@/game/types";
 
@@ -215,8 +216,7 @@ function TraitTooltip({ t, top, left, members, board, onEnter, onLeave }: { t: T
                   style={{ borderColor: COST_COLOR[d.cost] }}
                   className={`relative w-10 h-10 rounded-md border bg-black/40 flex items-center justify-center overflow-hidden transition-transform hover:scale-110 hover:z-10 ${owned ? "" : "opacity-45 grayscale"}`}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={spriteUrl(d.dex[0])} alt={d.name} width={36} height={36} style={{ imageRendering: "pixelated" }} loading="lazy" draggable={false} />
+                  <PokemonModelPreview dex={d.dex[0]} alt={d.name} width={36} height={36} />
                   {owned && <span className="absolute inset-x-0 bottom-0 h-[2px]" style={{ background: color }} />}
                 </span>
               );

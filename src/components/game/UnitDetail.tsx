@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useUi } from "@/game/store/uiStore";
 import { useGame } from "@/game/store/gameStore";
 import { useAppStore } from "@/game/store/appStore";
-import { getDef, spriteUrl, archetypeOf, castEffectOf, typesForStar, type Archetype } from "@/game/data/mons";
+import { getDef, archetypeOf, castEffectOf, typesForStar, type Archetype } from "@/game/data/mons";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { ITEM_POOL, RARITY_COLOR } from "@/game/data/itemPool";
 import { ITEM_EFFECT } from "@/game/data/items";
@@ -19,6 +19,7 @@ import {
 } from "./icons";
 import { useT } from "@/lib/i18n";
 import { playCry } from "@/lib/audio";
+import { PokemonModelPreview } from "./PokemonModelPreview";
 
 /** Copy + accent for each signature cast flavour, shown on the ability card. */
 const CAST_EFFECT_META: Record<Exclude<CastEffect, "nuke">, { color: string; label: { en: string; fr: string }; desc: { en: string; fr: string } }> = {
@@ -144,8 +145,7 @@ function Card() {
       {/* Header */}
       <div className="flex items-start gap-3 p-3 border-b border-white/5" style={{ background: `linear-gradient(105deg, ${color}1f, transparent 70%)` }}>
         <div style={{ borderColor: `${color}99` }} className="rounded-xl border bg-black/30 p-1 shrink-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={spriteUrl(def.dex[i])} alt={def.name} width={56} height={56} style={{ imageRendering: "pixelated" }} />
+          <PokemonModelPreview dex={def.dex[i]} alt={def.stageNames[i]} width={56} height={56} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
@@ -245,8 +245,7 @@ function Card() {
         return (
         <div className="mx-3 mb-3 p-2.5 rounded-lg border border-fuchsia-500/40 bg-fuchsia-500/10 flex items-start gap-3">
           <div className="rounded-lg bg-black/30 p-1 border border-fuchsia-500/40 shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={spriteUrl(mf.megaDex)} alt="" width={44} height={44} style={{ imageRendering: "pixelated" }} />
+            <PokemonModelPreview dex={mf.megaDex} alt={mf.name} width={44} height={44} />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 text-fuchsia-200 text-xs font-bold flex-wrap">

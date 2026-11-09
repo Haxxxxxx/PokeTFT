@@ -1,8 +1,10 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
+import { hasUsable3DModel } from "@/game/data/model-availability";
 import { usePrefersReducedMotion } from "@/lib/useReducedMotion";
 import { sfx } from "@/lib/audio";
 import { hexToPixel, fieldPixelSize, hexDistance, FIELD, HEX_CLIP } from "@/game/engine/hex";
@@ -11,8 +13,38 @@ import { TYPE_COLOR } from "@/game/ui";
 import { SnowIcon, SwordIcon, ShieldIcon } from "./icons";
 import { Leaf, BarChart3 } from "lucide-react";
 import { serverNow } from "@/game/net/serverTime";
+import type { BoardModel } from "./Board3DModels";
+import type { ModelId } from "@/lab/arena3d/UnitModel";
+import { HEX_W } from "@/lab/arena3d/geometry";
 import type { CombatResult, FrameUnit, CombatEvent } from "@/game/engine/combat";
 import type { PokeType } from "@/game/types";
+
+const Board3DModels = dynamic(
+  () => import("./Board3DModels").then((module) => module.Board3DModels),
+  { ssr: false, loading: () => null },
+);
+
+function projectArenaPoint(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  tilt: number,
+  perspective: number,
+): [number, number, number] {
+  const dx = x - width / 2;
+  const dy = y - height / 2;
+  const angle = (tilt * Math.PI) / 180;
+  const depth = dy * Math.sin(angle);
+  const scale = perspective / (perspective - depth);
+  const screenX = width / 2 + dx * scale;
+  const screenY = height / 2 + dy * Math.cos(angle) * scale;
+  return [screenX - width / 2, height / 2 - screenY, 0];
+}
+
+function combatModelKey(unitId: string, dex: number): string {
+  return `${unitId}:${dex}`;
+}
 
 /** Mirror a replay through the field centre (180° rotation) and swap teams, so
  *  the "enemy"-side player of a shared canonical sim still sees THEIR team at the
@@ -237,6 +269,58 @@ export function CombatStage({
     return { aMap, bMap, recentFx, recentHit, facing };
   }, [fi, frames, a, b]);
 
+  const [loadedModels, setLoadedModels] = useState<Set<string>>(() => new Set());
+  const handleModelReady = useCallback((key: string) => {
+    setLoadedModels((loaded) => loaded.has(key) ? loaded : new Set(loaded).add(key));
+  }, []);
+  const handleModelError = useCallback((key: string, error: Error) => {
+    console.error(`Combat model ${key} failed to load; keeping its sprite visible.`, error);
+  }, []);
+  const combatModels = useMemo<BoardModel[]>(() => {
+    const models: BoardModel[] = [];
+    for (const unit of a.units) {
+      const next = bMap.get(unit.id) ?? unit;
+      const model: ModelId = unit.dex;
+      const from = hexToPixel({ c: unit.c, r: unit.r }, TILE_W, TILE_H);
+      const to = hexToPixel({ c: next.c, r: next.r }, TILE_W, TILE_H);
+      let x = lerp(from.x, to.x, frac);
+      let y = lerp(from.y, to.y, frac);
+      const attack = a.events.find((event) => event.kind === "attack" && event.from === unit.id);
+      const actionKey = attack?.kind === "attack" ? `${fi}:${attack.to}` : undefined;
+      if (attack?.kind === "attack") {
+        const target = aMap.get(attack.to);
+        if (target) {
+          const point = hexToPixel({ c: target.c, r: target.r }, TILE_W, TILE_H);
+          const dx = point.x - x;
+          const dy = point.y - y;
+          const distance = Math.hypot(dx, dy) || 1;
+          x += (dx / distance) * 13;
+          y += (dy / distance) * 13;
+        }
+      }
+      const rotationY = unit.team === "enemy" ? Math.PI : 0;
+      const position = (x: number, y: number) => projectArenaPoint(
+        14 + x,
+        14 + y,
+        w + 28,
+        h + 28,
+        layout.tilt,
+        layout.perspective,
+      );
+      if ((unit.alive || next.alive) && hasUsable3DModel(model)) {
+        models.push({
+          key: combatModelKey(unit.id, model),
+          model,
+          position: position(x, y),
+          scale: TILE_W / HEX_W,
+          rotationY,
+          actionKey,
+        });
+      }
+    }
+    return models;
+  }, [a, aMap, bMap, fi, frac, h, layout.perspective, layout.tilt, TILE_H, TILE_W, w]);
+
   const aliveAlly = a.units.filter((u) => u.team === "ally" && u.alive).length;
   const aliveEnemy = a.units.filter((u) => u.team === "enemy" && u.alive).length;
 
@@ -345,6 +429,7 @@ export function CombatStage({
                 flash={hitThisFrame ? `${fi}-${u.id}` : null}
                 cast={castColor}
                 faceLeft={(facing.get(u.id) ?? u.c) < u.c}
+                showSprite={!loadedModels.has(combatModelKey(u.id, u.dex)) || !hasUsable3DModel(u.dex)}
               />
             );
           })}
@@ -394,6 +479,14 @@ export function CombatStage({
           })}
         </div>
         </div>
+        <Board3DModels
+          models={combatModels}
+          height={h + 28}
+          perspective={layout.perspective}
+          animationMode="combat"
+          onReady={handleModelReady}
+          onError={handleModelError}
+        />
       </div>
       </div>
 
@@ -566,10 +659,11 @@ const HexGrid = memo(function HexGrid() {
 });
 
 function CombatUnit({
-  unit, x, y, hpFrac, manaFrac, lunge, flash, cast, faceLeft,
+  unit, x, y, hpFrac, manaFrac, lunge, flash, cast, faceLeft, showSprite,
 }: {
   unit: FrameUnit; x: number; y: number; hpFrac: number; manaFrac: number;
   lunge: { dx: number; dy: number }; flash: string | null; cast: string | null; faceLeft: boolean;
+  showSprite: boolean;
 }) {
   const ally = unit.team === "ally";
   const ring = unit.mega ? "#f0abfc" : ally ? "#34d399" : "#fb7185";
@@ -647,16 +741,18 @@ function CombatUnit({
             the ability the instant before it fires. */}
         {cast && <span className="absolute inset-0 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle, ${cast}88, transparent 62%)` }} />}
         {cast && <span className="absolute inset-[-7px] rounded-full pointer-events-none combat-cast" style={{ border: `3px solid ${cast}`, boxShadow: `0 0 18px 3px ${cast}` }} />}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={spriteUrl(unit.dex)}
-          alt=""
-          width={S}
-          height={S}
-          className="relative drop-shadow-[0_4px_5px_rgba(0,0,0,0.6)]"
-          style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none", filter: cast ? `brightness(1.3) drop-shadow(0 0 11px ${cast})` : unit.disabled ? "brightness(1.25) saturate(0.4) drop-shadow(0 0 7px #7dd3fc)" : unit.burning ? "saturate(1.45) drop-shadow(0 0 7px #f97316)" : `drop-shadow(0 0 6px ${ring}88)` }}
-          draggable={false}
-        />
+        {showSprite && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={spriteUrl(unit.dex)}
+            alt=""
+            width={S}
+            height={S}
+            className="relative drop-shadow-[0_4px_5px_rgba(0,0,0,0.6)]"
+            style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none", filter: cast ? `brightness(1.3) drop-shadow(0 0 11px ${cast})` : unit.disabled ? "brightness(1.25) saturate(0.4) drop-shadow(0 0 7px #7dd3fc)" : unit.burning ? "saturate(1.45) drop-shadow(0 0 7px #f97316)" : `drop-shadow(0 0 6px ${ring}88)` }}
+            draggable={false}
+          />
+        )}
         {flash && <span key={flash} className="absolute inset-0 combat-hitflash" style={{ background: "radial-gradient(circle, #fff, #ffffff00 70%)" }} />}
         {unit.mega && (
           <span className="absolute top-0 -right-1 text-[9px] font-bold bg-fuchsia-500 text-black rounded px-0.5 leading-tight shadow">M</span>

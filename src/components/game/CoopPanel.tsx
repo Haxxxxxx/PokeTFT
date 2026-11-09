@@ -5,9 +5,10 @@ import { createPortal } from "react-dom";
 import { useGame } from "@/game/store/gameStore";
 import { syncBoard } from "@/game/net/match";
 import { sendGold, sendUnit } from "@/game/net/coop";
-import { getDef, spriteUrl } from "@/game/data/mons";
+import { getDef } from "@/game/data/mons";
 import { Users, Coins, Send } from "lucide-react";
 import { useAnchoredPopover } from "@/lib/useAnchoredPopover";
+import { PokemonModelPreview } from "./PokemonModelPreview";
 
 /** Double Up co-op controls: hand gold or a bench unit to your partner. The "help your
  *  partner when you finish early" flow — once your board's set, ship your spares over.
@@ -94,8 +95,7 @@ export function CoopPanel({ code, myUid, partner, lang }: {
                     const def = getDef(u.defId);
                     return (
                       <div key={u.iid} className="flex items-center gap-2 p-1.5 rounded-lg border border-slate-700/60 bg-slate-800/40">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={spriteUrl(def.dex[u.star - 1])} alt="" width={26} height={26} style={{ imageRendering: "pixelated" }} />
+                        <PokemonModelPreview dex={def.dex[u.star - 1]} alt={def.stageNames[u.star - 1]} width={26} height={26} />
                         <div className="min-w-0 flex-1">
                           <div className="text-[11px] font-bold text-slate-200 truncate">{def.stageNames[u.star - 1]}</div>
                           <div className="text-[9px] text-amber-300/80">{"★".repeat(u.star)}{u.items?.length ? ` · ${u.items.length} ${fr ? "objet" : "item"}${u.items.length > 1 ? "s" : ""}` : ""}</div>
