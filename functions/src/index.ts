@@ -36,16 +36,41 @@ const adb = getDatabase();
 const REGION = "europe-west1"; // match your Cloud Run/Functions region
 
 // ── Route match.ts's DB access to firebase-admin (the Phase-0 adapter seam). ──
+
+/**
+ * Root is `ref()` with NO argument — `ref("")` THROWS.
+ *
+ * This is the server-side twin of the client bug fixed earlier, and it was
+ * believed not to exist here ("firebase-admin's ref('') resolves to root").
+ * It does not. Production telemetry from a finished match recorded, in
+ * games/<code>/ratingFailures:
+ *
+ *   "child failed: path argument was an invalid path = \"\". Paths must be
+ *    non-empty strings and can't contain \".\", \"#\", \"$\", \"[\", or \"]\""
+ *
+ * applyRatingFor() finishes with a single root-level multi-path update
+ * (`update("", {...})`) carrying the player's leaderboard row, their match
+ * history row and games/<code>/results/<uid>. Every one of those was thrown
+ * away. The rating transaction itself targets a non-empty path and succeeded,
+ * so `rated/<uid>` showed `ratingApplied: true` while `results` stayed null —
+ * LP was applied internally but the player's end screen had nothing to read
+ * and no history row ever appeared.
+ *
+ * Note line ~280 already used the correct `adb.ref()` form, so the right
+ * spelling was in this file the whole time.
+ */
+const adminRefAt = (path: string) => (path ? adb.ref(path) : adb.ref());
+
 setDbAdapter({
   async get(path) {
-    const s = await adb.ref(path).get();
+    const s = await adminRefAt(path).get();
     return s.exists() ? s.val() : null;
   },
   async update(path, value) {
-    await adb.ref(path).update(value);
+    await adminRefAt(path).update(value);
   },
   async transaction(path, fn) {
-    const res = await adb.ref(path).transaction((cur) => fn(cur) as unknown);
+    const res = await adminRefAt(path).transaction((cur) => fn(cur) as unknown);
     return { committed: res.committed, value: res.snapshot.exists() ? res.snapshot.val() : null };
   },
 });
