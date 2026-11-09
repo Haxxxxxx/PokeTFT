@@ -14,6 +14,8 @@ export type AppSettings = {
    *  and lit in a 3D arena) instead of the CSS board. Opt-in while it beds in —
    *  the CSS board stays the default and the fallback. */
   board3d: boolean;
+  /** Render units as 3D models instead of sprites (see models3d note in OptionsMenu). */
+  models3d: boolean;
 };
 
 export type AppStore = {
@@ -39,6 +41,7 @@ export const useAppStore = create<AppStore>()(
         soundEnabled: true,
         volume: 0.7,
         board3d: false,
+        models3d: false,
       },
       setSettings: (update) => set((s) => ({ settings: { ...s.settings, ...update } })),
       profileOpen: false,

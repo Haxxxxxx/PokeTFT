@@ -47,3 +47,8 @@ next-env.d.ts
 # PokeAPI fetch caches for tools/gen-moves.mjs (regenerable)
 tools/.cache-*.json
 meta-seed.json
+
+# Firebase emulator logs (npm run test:rules)
+*-debug.log
+firebase-debug.log
+database-debug.log

@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { DndContext, DragEndEvent, PointerSensor, TouchSensor, closestCenter, MeasuringStrategy, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
-import { useGame, PENSION_COST, PENSION_ROUNDS, resolveBenchSlots } from "@/game/store/gameStore";
+import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, PointerSensor, TouchSensor, closestCenter, MeasuringStrategy, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
+import { useGame, resolveBenchSlots } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS, CAROUSEL_MS } from "@/game/net/match";
 import { simulate, type FrameUnit } from "@/game/engine/combat";
-import { getDef, spriteUrl, hasDef, archetypeOf } from "@/game/data/mons";
+import { getDef, hasDef, archetypeOf } from "@/game/data/mons";
 import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, modeTeamBuff, modeSignatureAugment, getMode, pickMonoType, isDoubleUp, isNuzlocke, isHyperRoll, isLegendaryClash } from "@/game/data/gameModes";
 import { streakGold, roundKind, advanceRound, boardSizeForLevel, cumulativeRound } from "@/game/config";
 import { serializeBoard, saveGhost, type GhostUnit } from "@/game/net/ghost";
@@ -47,6 +47,7 @@ import { TraitGlyph } from "./TraitGlyph";
 import { Board3D } from "./Board3D";
 import { useGameLayout } from "./LayoutProvider";
 import { UnitChip } from "./UnitChip";
+import { PokemonModelPreview } from "./PokemonModelPreview";
 import { ShopBar } from "./ShopBar";
 import { TraitPanel } from "./TraitPanel";
 import { UnitDetail } from "./UnitDetail";
@@ -86,47 +87,6 @@ function SellZone() {
     >
       <span className={`leading-none transition-transform ${isOver ? "scale-125" : ""}`}><Trash2 size={24} /></span>
       <span className="text-[10px] font-extrabold uppercase tracking-wider text-center leading-tight px-2">{t.sh_drag_sell}</span>
-    </div>
-  );
-}
-
-/** Pokémon Pension (Day Care): drop a ★ mon in to train it into a ★★ over a few
- *  rounds, then collect it. One slot; costs gold; the mon is away while training. */
-function PensionZone() {
-  const pension = useGame((s) => s.pension);
-  const collect = useGame((s) => s.collectPension);
-  const { setNodeRef, isOver } = useDroppable({ id: "pension" });
-  const t = useT();
-  const ready = !!pension && pension.roundsLeft <= 0;
-  if (!pension) {
-    return (
-      <div
-        ref={setNodeRef}
-        title={t.net_pension_title(PENSION_COST, PENSION_ROUNDS)}
-        className={`w-[84px] shrink-0 flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed transition-all
-          ${isOver ? "border-emerald-400 bg-emerald-500/25 text-emerald-100 scale-[1.03]" : "border-[var(--panel-edge)] bg-black/25 text-amber-200/55 hover:border-emerald-700/60 hover:text-emerald-300/80"}`}
-      >
-        <span className={`leading-none ${isOver ? "scale-125" : ""}`}><PawIcon size={22} /></span>
-        <span className="text-[9px] font-extrabold uppercase tracking-wider text-center leading-tight px-1">{t.net_pension}</span>
-      </div>
-    );
-  }
-  const def = getDef(pension.defId);
-  return (
-    <div className="gilded w-[84px] shrink-0 flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5">
-      <span className="text-[8px] uppercase tracking-wider text-amber-200/55 leading-none">{t.net_pension}</span>
-      <div className="relative">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={spriteUrl(def.dex[0])} alt={def.name} width={44} height={44} style={{ imageRendering: "pixelated" }} className={ready ? "" : "opacity-80"} draggable={false} />
-        {!ready && <span className="absolute inset-0 flex items-center justify-center text-sm font-extrabold text-amber-200 drop-shadow">{pension.roundsLeft}</span>}
-      </div>
-      {ready ? (
-        <button onClick={collect} className="px-2 py-0.5 rounded-md bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-extrabold leading-none">
-          {t.net_pension_collect}
-        </button>
-      ) : (
-        <span className="text-[9px] font-bold text-amber-200/70 leading-none">{t.net_pension_rounds(pension.roundsLeft)}</span>
-      )}
     </div>
   );
 }
@@ -193,6 +153,7 @@ export function NetGameClient() {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 140, tolerance: 8 } }),
   );
+  const [draggedUnit, setDraggedUnit] = useState<UnitInstance | null>(null);
   const lastRoundKey = useRef<string | null>(null);
   // "none" until local econ is first hydrated; "fresh" = we fell back to a new game
   // (priv save hadn't arrived yet), "save" = restored from the synced save. Lets a
@@ -890,7 +851,13 @@ export function NetGameClient() {
     : phase === "over" ? t.net_phase_over
     : t.net_phase_planning;
 
+  function onDragStart(e: DragStartEvent) {
+    const iid = String(e.active.id);
+    setDraggedUnit(useGame.getState().units.find((unit) => unit.iid === iid) ?? null);
+  }
+
   function onDragEnd(e: DragEndEvent) {
+    setDraggedUnit(null);
     // Bench management + selling stay available during combat (no effect on the
     // frozen, already-resolved fight). Board placement is locked while fighting.
     if (phase !== "planning" && phase !== "combat") return;
@@ -990,7 +957,9 @@ export function NetGameClient() {
   return (
     <DndContext
       sensors={sensors}
+      onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      onDragCancel={() => setDraggedUnit(null)}
       // closestCenter, not the default rectIntersection: the arena is a
       // 3D-tilted plane, and getBoundingClientRect() on a transformed element
       // returns the PROJECTED axis-aligned box. Those projected boxes overlap
@@ -1001,6 +970,21 @@ export function NetGameClient() {
       // viewport now, so cached rects from a previous size would be stale.
       measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
     >
+      {/* Keep the moving unit in viewport coordinates. Translating a draggable
+          inside the perspective-transformed arena skews its motion with the floor. */}
+      <DragOverlay
+        style={{ pointerEvents: "none" }}
+        dropAnimation={null}
+      >
+        {draggedUnit && (
+          <UnitChip
+            unit={draggedUnit}
+            size={draggedUnit.pos === null ? L.benchSlot - 8 : L.tile.w - 6}
+            interactive={false}
+            shape={draggedUnit.pos === null ? "square" : "hex"}
+          />
+        )}
+      </DragOverlay>
       <Toasts />
       {/* Concede / forfeit confirm */}
       {confirmLeave && (
@@ -1279,8 +1263,7 @@ export function NetGameClient() {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={p.photoURL} alt="" width={32} height={32} className="w-full h-full object-cover" style={{ imageRendering: "pixelated" }} />
                       ) : dex ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={spriteUrl(dex)} alt="" width={26} height={26} style={{ imageRendering: "pixelated" }} />
+                        <PokemonModelPreview dex={dex} alt={p.name} width={26} height={26} />
                       ) : <span className="text-[10px] font-bold text-slate-500">{p.name.slice(0, 1).toUpperCase()}</span>}
                     </span>
                     <span className="flex-1 min-w-0">
@@ -1386,6 +1369,7 @@ export function NetGameClient() {
                 ) : (
                   <Board
                     withBench
+                    rows={L.planningRows}
                     // TFT lets you shop and sell during a fight; only the board
                     // is locked, so the bench stays live in both phases.
                     benchInteractive={(phase === "planning" || phase === "combat") && (!spectate || spectate === myUid)}
@@ -1442,9 +1426,7 @@ export function NetGameClient() {
             );
           })()}
           <div className="flex-1 min-h-0 flex gap-3 w-full max-w-[1480px]">
-            {/* Pension on the far LEFT and Sell on the far RIGHT — separated by the
-                whole shop so a drag-to-sell can't accidentally land in the Day Care. */}
-            <PensionZone />
+            {/* Pension is docked to the board; keep selling beside the shop. */}
             <ShopSellDrop><ShopBar /></ShopSellDrop>
             <SellZone />
           </div>
@@ -1557,8 +1539,7 @@ function FightRecap({ data, onClose }: { data: { mine: FrameUnit[]; theirs: Fram
         {sorted.length === 0 && <div className="text-[10px] text-slate-600 text-center py-2">—</div>}
         {sorted.map((u) => (
           <div key={u.id} className={`flex items-center gap-1.5 ${u.alive ? "" : "opacity-50"}`}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={spriteUrl(u.dex)} alt="" width={20} height={20} style={{ imageRendering: "pixelated" }} />
+            <PokemonModelPreview dex={u.dex} alt="" width={20} height={20} />
             <div className="flex-1 h-2 rounded-full bg-slate-800 overflow-hidden min-w-0">
               <div className="h-full rounded-full" style={{ width: `${(val(u) / max) * 100}%`, background: active.color }} />
             </div>

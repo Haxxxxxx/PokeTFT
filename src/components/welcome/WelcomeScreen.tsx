@@ -16,7 +16,7 @@ import { NewsModal, hasUnseenNews, markNewsSeen } from "@/components/NewsModal";
 import { PokeballIcon } from "@/components/game/icons";
 import { isNativeShell } from "@/game/net/nativeShell";
 import { Swords, Trophy, Megaphone, AlertTriangle, Download, Users, Zap, Star, Shield } from "lucide-react";
-import { spriteUrl } from "@/game/data/mons";
+import { PokemonModelPreview } from "@/components/game/PokemonModelPreview";
 import { useT } from "@/lib/i18n";
 
 const GEN_NAMES = ["", "Kanto", "Johto", "Hoenn", "Sinnoh", "Unova", "Kalos", "Alola", "Galar", "Paldea"];
@@ -47,6 +47,7 @@ export function WelcomeScreen() {
   const status = useRoom((s) => s.status);
   const netError = useRoom((s) => s.error);
   const profile = useAuth((s) => s.profile);
+  const user = useAuth((s) => s.user);
   const signOut = useAuth((s) => s.signOut);
   const setProfileOpen = useAppStore((s) => s.setProfileOpen);
   const setLeaderboardOpen = useAppStore((s) => s.setLeaderboardOpen);
@@ -88,7 +89,8 @@ export function WelcomeScreen() {
     } catch { /* ignore */ }
   }, []);
 
-  const name = (profile?.username ?? "").trim();
+  const guestName = user?.isAnonymous ? `Guest-${user.uid.slice(0, 4)}` : "";
+  const name = (profile?.username || guestName).trim();
   const canProceed = name.length > 0;
   const busy = status === "connecting";
 
@@ -160,9 +162,8 @@ export function WelcomeScreen() {
             {/* Decorative floating mons */}
             <div className="absolute inset-0 pointer-events-none select-none">
               {heroMons.map((m, i) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={i} src={spriteUrl(m.dex)} alt="" width={m.size} height={m.size}
-                  className="absolute hero-float" style={{ left: m.x, top: m.y, width: m.size, ["--r" as string]: `${m.rot}deg`, imageRendering: "pixelated", opacity: 0.13, filter: "saturate(1.3) drop-shadow(0 0 18px rgba(212,175,55,0.22))", animationDelay: `${i * 0.6}s` }} />
+                <PokemonModelPreview key={i} dex={m.dex} alt="" width={m.size} height={m.size}
+                  className="absolute hero-float" style={{ left: m.x, top: m.y, width: m.size, ["--r" as string]: `${m.rot}deg`, opacity: 0.13, filter: "saturate(1.3) drop-shadow(0 0 18px rgba(212,175,55,0.22))", animationDelay: `${i * 0.6}s` }} />
               ))}
             </div>
 
@@ -197,6 +198,14 @@ export function WelcomeScreen() {
                   className="w-full py-3 rounded-xl font-bold text-[15px] tracking-wide bg-amber-500/95 hover:bg-amber-400 text-black disabled:opacity-30 transition-colors">
                   {busy ? "…" : <span className="inline-flex items-center justify-center gap-2"><Swords size={17} /> {t.w_create_btn}</span>}
                 </button>
+                {!canProceed && (
+                  <button
+                    onClick={() => setEditProfile(true)}
+                    className="text-[11px] font-semibold text-amber-300/80 hover:text-amber-200"
+                  >
+                    {lang === "fr" ? "Définir un nom d'utilisateur pour commencer" : "Set a username to start"}
+                  </button>
+                )}
 
                 {/* Live game browser — find + join an open game without a code. */}
                 <div className="w-full">

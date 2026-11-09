@@ -11,6 +11,7 @@ import { HEX_CLIP } from "@/game/engine/hex";
 import { crispSize } from "@/game/ui/pixel";
 import { StarIcon, MegaIcon } from "./icons";
 import { ItemGlyph } from "./ItemGlyph";
+import { PokemonModelPreview } from "./PokemonModelPreview";
 import type { UnitInstance } from "@/game/types";
 
 /** Small icons of the items a unit is holding, pinned to the token corner. */
@@ -104,7 +105,7 @@ export function Stars({ star }: { star: number }) {
   );
 }
 
-export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true, shape = "square" }: { unit: UnitInstance; size?: number; interactive?: boolean; canDeploy?: boolean; shape?: "square" | "hex" }) {
+export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true, shape = "square", showSprite = true, showModel = true, dragHitArea = false, tilt = 0 }: { unit: UnitInstance; size?: number; interactive?: boolean; canDeploy?: boolean; shape?: "square" | "hex"; showSprite?: boolean; showModel?: boolean; dragHitArea?: boolean; tilt?: number }) {
   const t = useT();
   const def = getDef(unit.defId);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: unit.iid, disabled: !interactive });
@@ -154,12 +155,24 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
   // their neighbours cover one, which is what made the board look mushy.
   // Capped at 2.1x the cell: snapping is unbounded on its own, and on the
   // smallest tiles the nearest whole multiple is several times the hex.
+  //
+  // The same figure sizes the 3D model, so a model and a sprite occupy the
+  // identical footprint and toggling between them cannot shift the layout.
   const spriteSize = shape === "hex" ? crispSize(size * 1.85, size * 2.1) : size - 6;
-  const sprite = (
+  const sprite = showModel ? (
+    <PokemonModelPreview
+      dex={dex}
+      alt={def.stageNames[unit.star - 1]}
+      width={spriteSize}
+      height={spriteSize}
+      className={shape === "hex" ? "unit-rim" : "drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"}
+    />
+  ) : (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={spriteUrl(dex)}
-      alt={def.name}
+      alt=""
+      aria-hidden
       width={spriteSize}
       height={spriteSize}
       className={`image-render-pixel pointer-events-none ${shape === "hex" ? "unit-rim" : "drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"}`}
@@ -167,12 +180,48 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
       draggable={false}
     />
   );
-
-  // Tiny cost number — a colorblind-safe backup for the cost-COLOUR ring (so rarity reads
-  // without relying on the green/blue/purple/gold hue alone).
+  const dragHitbox = interactive && dragHitArea ? (
+    <span
+      className="absolute z-20"
+      style={{ left: 0, right: 0, top: -size * 0.85, bottom: 0, pointerEvents: "auto" }}
+      aria-hidden
+    />
+  ) : null;
   const costBadge = (
     <span className="absolute -bottom-0.5 -left-0.5 z-10 text-[8px] font-extrabold leading-none px-[3px] py-px rounded pointer-events-none"
       style={{ background: color, color: "#0b1020", boxShadow: "0 0 0 1px rgba(0,0,0,0.4)" }}>{def.cost}</span>
+  );
+  const visual = (
+    <div
+      className="pointer-events-none absolute inset-0"
+      style={{ transform: `rotateX(${-tilt}deg)`, transformOrigin: "bottom center" }}
+    >
+      {shape === "hex" ? (
+        <>
+          <span
+            className="absolute inset-0 unit-base"
+            style={{ clipPath: HEX_CLIP, boxShadow: `inset 0 0 0 1.5px ${ring}aa, inset 0 0 10px ${ring}22` }}
+          />
+          <div className="absolute inset-x-0 bottom-0 flex items-end justify-center" style={{ overflow: "visible" }}>
+            {showSprite && sprite}
+          </div>
+          <div className="absolute inset-x-0 flex justify-center" style={{ top: -(spriteSize - size) * 0.5 - 6 }}>
+            <Stars star={unit.star} />
+          </div>
+          {costBadge}
+          <ItemPips items={heldItems} megaReady={megaReady} unitSize={size} />
+        </>
+      ) : (
+        <>
+          {showSprite && sprite}
+          <div className="absolute top-0 left-0 right-0">
+            <Stars star={unit.star} />
+          </div>
+          {costBadge}
+          <ItemPips items={heldItems} megaReady={megaReady} unitSize={size} />
+        </>
+      )}
+    </div>
   );
 
   // Hex token (on the board) — the colored token follows the hexagonal cell.
@@ -189,29 +238,8 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
         className={`relative select-none touch-none ${interactive ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${canEquipArmed ? "animate-pulse" : ""}`}
         title={title}
       >
-        {/* A thin cost-coloured ring on the GROUND, behind the unit — not a
-            plate behind it. The old opaque hex fill made every unit read as an
-            icon in a box; in TFT the champion stands directly on the stone and
-            only its base ring touches the board. That fill also carried the hex
-            clip-path, which silently cropped the oversized sprite back to tile
-            size and cancelled the overflow entirely. */}
-        <span
-          className="absolute inset-0 unit-base pointer-events-none"
-          style={{ clipPath: HEX_CLIP, boxShadow: `inset 0 0 0 1.5px ${ring}aa, inset 0 0 10px ${ring}22` }}
-        />
-        {/* Sprite is oversized and bottom-anchored so it breaks the hex upward,
-            the way a standing figure would. Nothing here clips it. */}
-        <div className="absolute inset-x-0 bottom-0 flex items-end justify-center" style={{ overflow: "visible" }}>
-          {sprite}
-        </div>
-        {/* Stars ride just above the sprite's crown. Derived from how far the
-            oversized sprite actually overflows the cell, so they track the
-            scale instead of drifting when it changes. */}
-        <div className="absolute inset-x-0 flex justify-center pointer-events-none" style={{ top: -(spriteSize - size) * 0.5 - 6 }}>
-          <Stars star={unit.star} />
-        </div>
-        {costBadge}
-        <ItemPips items={heldItems} megaReady={megaReady} unitSize={size} />
+        {dragHitbox}
+        {visual}
       </div>
     );
   }
@@ -235,12 +263,8 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
         ${canEquipArmed ? "ring-2 ring-fuchsia-400 animate-pulse" : ""}`}
       title={title}
     >
-      {sprite}
-      <div className="absolute top-0 left-0 right-0">
-        <Stars star={unit.star} />
-      </div>
-      {costBadge}
-      <ItemPips items={heldItems} megaReady={megaReady} unitSize={size} />
+      {dragHitbox}
+      {visual}
     </div>
   );
 }
