@@ -507,6 +507,7 @@ export const useRoom = create<RoomState>((setState, getState) => ({
   leave: () => {
     const { code, myUid, room, spectator } = getState();
     if (unsub) { unsub(); unsub = null; }
+    if (unsubPresence) { unsubPresence(); unsubPresence = null; }
     if (privUnsub) { privUnsub(); privUnsub = null; }
     if (privWatchdog) { clearTimeout(privWatchdog); privWatchdog = null; }
     // Spectator detach: we never wrote anything (no player node, no presence, no
@@ -521,10 +522,22 @@ export const useRoom = create<RoomState>((setState, getState) => ({
       const phase = room?.meta?.phase;
       const iAmHost = room?.meta?.hostUid === myUid;
       const inMatch = phase === "planning" || phase === "combat" || phase === "carousel";
-      if (iAmHost && inMatch) {
-        // Host quit mid-match → force-end for EVERYONE. Write an authoritative over
-        // state every client observes (endedByHost flags the banner), rather than
-        // dropping our node and letting the game limp on under a migrated host.
+      // A host forfeiting mid-match used to force-end the game for EVERYONE:
+      // `phase: "over"` stopped the Cloud Tasks chain dead, so endCombat never
+      // ran, and the other seven players got no placement, no LP and no history
+      // row — the winner included. That was the right call under the old
+      // host-authoritative loop, where the host really did drive the match. It
+      // stopped being right when serverDriven landed: the host is now just
+      // whoever created the lobby and has no runtime role, so killing the match
+      // is pure collateral damage — and quitting a losing game is the single
+      // most common mid-match action there is.
+      //
+      // Now the host leaves like anyone else. `concede` has already written
+      // their placement, and maybeClaimHost migrates the (vestigial) host flag.
+      // The force-end is kept ONLY for a match with no other humans left to
+      // play it out, where limping on would leave an orphan game.
+      const humansRemain = otherHumans.length > 0;
+      if (iAmHost && inMatch && !humansRemain) {
         update(ref(db(), `games/${code}/meta`), { phase: "over", endedByHost: true, updatedAt: serverTimestamp() }).catch(onWriteErr);
         remove(ref(db(), `lobbies/${code}`)).catch(() => {});
       } else {
@@ -532,6 +545,8 @@ export const useRoom = create<RoomState>((setState, getState) => ({
         // all AND we're not mid-match. Otherwise just drop our own node (a backgrounded
         // human shows connected:false — deleting on that would nuke a live game).
         const safeToDelete = otherHumans.length === 0 && (phase === "lobby" || phase === "over" || !phase);
+        // (otherHumans === 0 is required, so a departing host can never delete a
+        //  room that other humans are still playing in.)
         if (safeToDelete) remove(roomRef(code)).catch(onWriteErr);
         else remove(ref(db(), `games/${code}/players/${myUid}`)).catch(onWriteErr);
         if (iAmHost || otherHumans.length === 0) remove(ref(db(), `lobbies/${code}`)).catch(() => {});
@@ -592,9 +607,47 @@ function subscribe(code: string, uid: string, setState: (p: Partial<RoomState>) 
     if (s.code === code && s.mySave === undefined) setState({ mySave: null });
   }, 15000);
   subscribeRoomNode(code, setState);
-  // mark ourselves connected (in case of rejoin) — swallow transient
-  // permission/offline rejections so they don't surface as unhandled rejections.
-  update(ref(db(), `games/${code}/players/${uid}`), { connected: true }).catch(onWriteErr);
+  watchPresence(code, uid);
+}
+
+/** Tears down the `.info/connected` subscription, if one is attached. */
+let unsubPresence: (() => void) | null = null;
+
+/**
+ * Keep `players/{uid}/connected` true for as long as we are actually online.
+ *
+ * Every `connected: true` write in this file used to happen exactly ONCE, at
+ * attach time, with an `onDisconnect(...).set(false)` registered beside it. The
+ * Firebase SDK re-arms registered onDisconnect operations on every reconnect,
+ * so `connected` was flipped to false on EVERY socket drop — a backgrounded
+ * mobile tab, a wifi-to-cellular handoff, a laptop waking — and nothing ever
+ * set it back for the rest of the session.
+ *
+ * That single stale flag was load-bearing in four places:
+ *   - the trainer rail showed a live player as "(offline)" forever;
+ *   - maybeClaimHost() treated the real host as unhealthy and every client fell
+ *     into the migration branch on every tick;
+ *   - its "any humans left?" count excluded the blipped player — in a lobby
+ *     where every remaining human had blipped once, that reached zero and fired
+ *     the ABANDON branch, ending a live match and inventing placements;
+ *   - join() counted lobby fullness by `connected`, so a blipped member freed
+ *     their slot, a 9th player joined, and `place: 9` then failed the rules
+ *     validate (1..8) — rejecting the whole atomic endCombat update and wedging
+ *     the round loop in a retry loop.
+ *
+ * Subscribing to `.info/connected` fixes it at the source: on every (re)connect
+ * we re-assert presence and re-arm the disconnect hook.
+ */
+function watchPresence(code: string, uid: string) {
+  unsubPresence?.();
+  const connRef = ref(db(), ".info/connected");
+  unsubPresence = onValue(connRef, (snap) => {
+    if (snap.val() !== true) return; // offline: the onDisconnect op handles it
+    const node = ref(db(), `games/${code}/players/${uid}/connected`);
+    // Re-arm FIRST so a drop between these two writes still marks us offline.
+    onDisconnect(node).set(false).catch(() => {});
+    update(ref(db(), `games/${code}/players/${uid}`), { connected: true }).catch(onWriteErr);
+  });
 }
 
 /** The shared games/{code} onValue listener (used by both players and spectators).

@@ -19,14 +19,13 @@ import { AugmentsBar } from "./AugmentsBar";
 import { CoopPanel } from "./CoopPanel";
 import { finishCarouselEarly, callConcede } from "@/game/net/serverGame";
 import { subscribeTransfers } from "@/game/net/coop";
-import { recordUltimateBotWin, claimRankedResult, type RankedResult } from "@/game/net/users";
+import { recordUltimateBotWin, type RankedResult } from "@/game/net/users";
 import { ref as dbRef, onValue } from "firebase/database";
 import { db } from "@/game/net/firebase";
 import { Trash2, Eye, Maximize, Minimize, AlertTriangle, BarChart3 } from "lucide-react";
 import { AUGMENTS, augmentSlot, teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID, tailoredAugmentPicks } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
 import { useUi } from "@/game/store/uiStore";
-import { useAuth } from "@/game/net/authStore";
 import { makeRng, hashStr } from "@/game/engine/rng";
 import { itemsArray, normalizeUnit } from "@/game/net/rtdb-utils";
 import { CarouselOverlay, AugmentOverlay, GameOverScreen } from "./GameOverlays";
@@ -731,16 +730,11 @@ export function NetGameClient() {
     const unsub = onValue(dbRef(db(), `games/${serverResultCode}/results/${myUid}`), (snap) => {
       if (!snap.exists()) return;
       const r = snap.val() as { delta: number; rating: number; prevRating: number };
+      // Display only. The rating and leaderboard rows are written server-side by
+      // applyRatingFor() with admin rights; the client used to mirror them here,
+      // which both duplicated the authoritative write and could clobber a newer
+      // rating with a stale snapshot.
       setRankResult({ delta: r.delta, rating: r.rating, prevRating: r.prevRating });
-      // Self-write: apply the host-written result to our own user profile so LP and
-      // leaderboard stay current even in client-host-loop fallback mode.
-      const profile = useAuth.getState().profile;
-      if (profile?.username) {
-        claimRankedResult(myUid, serverResultCode, r, {
-          username: profile.username,
-          photoURL: profile.photoURL,
-        }).catch(() => {});
-      }
     });
     return unsub;
   }, [serverResultCode, myUid]);
@@ -1112,7 +1106,7 @@ export function NetGameClient() {
 
         {/* Top HUD bar: stat chips, then the phase/timer segment + controls.
             (The stage badge lives next to the timeline above.) */}
-        <div className="relative z-30 gilded flex items-center gap-2.5 px-3.5 py-2 rounded-xl">
+        <div className="relative z-30 gilded flex items-center gap-2.5 px-3.5 py-2 rounded-xl min-w-0 max-w-full">
           {(() => {
             // The HUD economy reflects whoever's board you're looking at: a scouted rival → their
             // now-public econ (lobby chose full transparency); else your own live numbers.
@@ -1720,7 +1714,12 @@ function PhaseTimer({ phase, phaseLabel, deadline, totalMs, resolvingLabel }: { 
   const isUrgentWindow = useTimerUrgent(deadline);
   const urgent = !resolving && phase !== "combat" && isUrgentWindow;
   return (
-    <div className="flex-1 min-w-[220px] flex flex-col gap-1 px-2">
+    // min-w was a hard 220px, which in a non-wrapping flex row pushed the host
+    // badge and the options/fullscreen/quit controls past the right edge below
+    // ~1024px wide. An ancestor clips, so that content was not merely off-screen
+    // but UNREACHABLE — you could not scroll to it. It now compresses on small
+    // viewports and only claims 220px once there is room for it.
+    <div className="flex-1 min-w-0 lg:min-w-[220px] flex flex-col gap-1 px-2">
       <div className="flex justify-between items-baseline">
         <span className={`text-xs font-bold uppercase tracking-wide ${resolving ? "text-amber-300 animate-pulse" : urgent ? "text-rose-300 timer-urgent" : phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{resolving ? resolvingLabel : phaseLabel}</span>
         <span className={`text-sm font-bold tabular-nums ${urgent ? "text-rose-300 timer-urgent" : "text-slate-200"}`}>

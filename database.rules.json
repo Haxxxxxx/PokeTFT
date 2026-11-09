@@ -22,7 +22,11 @@
         "photoURL":        { ".read": "auth != null", ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length <= 512" },
         "online":          { ".read": "auth != null", ".write": "auth != null && $uid === auth.uid" },
         "currentGame":     { ".read": "auth != null", ".write": "auth != null && $uid === auth.uid" },
-        "rating":          { ".read": "auth != null", ".write": "auth != null && $uid === auth.uid" },
+        // SERVER-ONLY. Was self-writable with no validate, so any signed-in user (a guest included) could
+        // set their own rating to anything from the console without playing a game. The Admin SDK
+        // bypasses rules, so Cloud Functions remain the only writer; a client-host fallback no longer
+        // writes it and pruneStale's repair sweep heals the gap.
+        "rating":          { ".read": "auth != null", ".write": false },
         "createdAt":       { ".write": "auth != null && $uid === auth.uid && !data.exists()" },
         "ultimateBotWins": { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000 && (!data.exists() ? newData.val() <= 1 : newData.val() === data.val() + 1)" },
         "history": {
@@ -59,10 +63,12 @@
       }
     },
     "leaderboard": {
+      // SERVER-ONLY for the same reason as users/$uid/rating: a self-write with no validate let anyone
+      // publish an arbitrary rating, username and photoURL to the public board.
       ".read": "auth != null",
       ".indexOn": ["rating"],
       "$uid": {
-        ".write": "auth != null && $uid === auth.uid"
+        ".write": false
       }
     },
     "priv": {
@@ -90,7 +96,11 @@
         ".write": "auth != null && (!data.exists() || (!newData.exists() && data.child('meta/hostUid').val() === auth.uid))",
 
         "meta": {
-          ".write": "auth != null && (!data.parent().child('meta/hostUid').exists() || data.parent().child('meta/hostUid').val() === auth.uid || (newData.child('hostUid').val() === auth.uid && (!data.child('hostBeat').exists() || data.child('hostBeat').val() < now - 3000)))",
+          // The takeover branch additionally requires the claimant to be a player in this game. Without
+          // that check ANY signed-in user could seize host of any game whose heartbeat was >3s stale —
+          // which, since hostBeat only refreshes at phase transitions, is most of the time — and then write
+          // combat, placements and rating claims.
+          ".write": "auth != null && (!data.parent().child('meta/hostUid').exists() || data.parent().child('meta/hostUid').val() === auth.uid || (newData.child('hostUid').val() === auth.uid && data.parent().child('players').child(auth.uid).exists() && (!data.child('hostBeat').exists() || data.child('hostBeat').val() < now - 3000)))",
           "phase": { ".validate": "newData.val().matches(/^(lobby|planning|combat|carousel|over)$/)" },
           "stage": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 50" },
           "round": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 12" }
@@ -138,8 +148,23 @@
 
         "players": {
           "$uid": {
-            ".write": "auth != null && ($uid === auth.uid || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)",
-            "name":  { ".validate": "newData.isString() && newData.val().length <= 24" },
+            // A parent .write CASCADES to the whole subtree and a child rule cannot revoke it — so while this
+            // node granted a blanket self-write, every per-field rule below (hp, alive, place, streak) was
+            // dead code and a player could set their own HP to 500 or resurrect themselves. The self grant is
+            // now deletion-only (leaving the game); each field is granted explicitly.
+            // Three distinct self-grants, deliberately narrow:
+            //   create  — joining writes the whole node in one set(), and a set() can only be
+            //             authorised at the node or an ancestor. Gated to the lobby so a player
+            //             cannot delete and re-create their node mid-match with inflated stats.
+            //   delete  — leaving the game.
+            // Anything else routes to the per-field rules below.
+            ".write": "auth != null && (root.child('games').child($code).child('meta/hostUid').val() === auth.uid || ($uid === auth.uid && !data.exists() && root.child('games').child($code).child('meta/phase').val() === 'lobby') || ($uid === auth.uid && !newData.exists()))",
+            "uid":       { ".write": "auth != null && ($uid === auth.uid && !data.exists())" },
+            "name":  { ".write": "auth != null && ($uid === auth.uid || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)", ".validate": "newData.isString() && newData.val().length <= 24" },
+            "photoURL":  { ".write": "auth != null && ($uid === auth.uid || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
+            "isHost":    { ".write": "auth != null && (($uid === auth.uid && !data.exists()) || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
+            "connected": { ".write": "auth != null && ($uid === auth.uid || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
+            "ready":     { ".write": "auth != null && ($uid === auth.uid || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)" },
             "hp": {
               ".write": "auth != null && (root.child('games').child($code).child('meta/hostUid').val() === auth.uid || ($uid === auth.uid && newData.val() === 0))",
               ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500"
@@ -164,17 +189,25 @@
               ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 32)"
             },
             "carouselPicked": {
+              ".write": "auth != null && ($uid === auth.uid || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)",
               ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)"
             },
-            "level": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10" },
-            "gold":  { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 999)" },
-            "board": { ".validate": "!newData.exists() || !newData.hasChild('40')" },
-            "bench": { ".validate": "!newData.exists() || !newData.hasChild('40')" },
-            "teamId": { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 4)" },
+            "level": { ".write": "auth != null && ($uid === auth.uid || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)", ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10" },
+            "gold":  { ".write": "auth != null && ($uid === auth.uid || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)", ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 999)" },
+            "board": { ".write": "auth != null && ($uid === auth.uid || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)", ".validate": "!newData.exists() || !newData.hasChild('40')" },
+            "bench": { ".write": "auth != null && ($uid === auth.uid || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)", ".validate": "!newData.exists() || !newData.hasChild('40')" },
+            "teamId": { ".write": "auth != null && ($uid === auth.uid || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)", ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 4)" },
             "augments": {
+              ".write": "auth != null && ($uid === auth.uid || root.child('games').child($code).child('meta/hostUid').val() === auth.uid)",
               ".validate": "!newData.exists() || !newData.hasChild('3')",
               "$i": { ".validate": "newData.isString() && newData.val().length <= 24" }
-            }
+            },
+            // isBot and botDifficulty are HOST-ONLY: they are read for control flow (bot boards are
+            // host-generated, bots are excluded from the host pool and from the carousel-ready gate, and the
+            // Functions refuse kickoff/concede for them), so a player who could set isBot on themselves got a
+            // free host-drafted board every round.
+            "isBot": { ".write": "auth != null && root.child('games').child($code).child('meta/hostUid').val() === auth.uid" },
+            "botDifficulty": { ".write": "auth != null && root.child('games').child($code).child('meta/hostUid').val() === auth.uid" }
           }
         }
       }
