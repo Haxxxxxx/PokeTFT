@@ -59,6 +59,21 @@ export function parseModelPoseMap(raw: string): Record<number, ModelPose> {
   return parsed as Record<number, ModelPose>;
 }
 
+/**
+ * Facing applied to every model that has no explicit rotation of its own.
+ *
+ * Models arrive from the asset pipeline facing straight down the camera axis,
+ * which reads as a mugshot rather than a creature standing on a board — the
+ * sprites they sit beside are all three-quarter views. Every reviewed entry
+ * that set a rotation set exactly this one, so it is a property of the whole
+ * asset set, not of any species: making it the default fixes the facing for
+ * all 967 models at once instead of asking a human to type the same number
+ * nine hundred times.
+ *
+ * A species that genuinely needs a different angle still overrides it below.
+ */
+export const DEFAULT_MODEL_ROTATION: [number, number, number] = [0, -(34 * Math.PI) / 180, 0];
+
 export const MODEL_POSES: Record<number, ModelPose> = {
   1: {
     reviewed: true,
@@ -74,6 +89,10 @@ export const MODEL_POSES: Record<number, ModelPose> = {
   },
   123: {
     reviewed: true,
+    // Explicitly zero: this stance was reviewed and accepted BEFORE
+    // DEFAULT_MODEL_ROTATION existed, so it must keep facing front rather than
+    // silently inherit the new default.
+    rotation: [0, 0, 0],
     bones: {
       LArm: [0, 0, -(50 * Math.PI) / 180],
       RArm: [0, 0, (50 * Math.PI) / 180],

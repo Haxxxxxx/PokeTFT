@@ -13,6 +13,7 @@ import {
   MODEL_POSES_UPDATED_EVENT,
   mergeModelPose,
   parseModelPoseMap,
+  DEFAULT_MODEL_ROTATION,
   type ModelPose,
 } from "@/game/data/model-poses";
 
@@ -411,7 +412,7 @@ export function UnitModel({
   }, [actions, idleAnimation, invalidate, poseEditing]);
 
   return (
-    <group ref={group} position={position} rotation={pose?.rotation ?? [0, 0, 0]}>
+    <group ref={group} position={position} rotation={pose?.rotation ?? DEFAULT_MODEL_ROTATION}>
       <group ref={motionGroup}>
         <primitive object={model} />
       </group>
