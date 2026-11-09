@@ -125,6 +125,29 @@ export type FrameUnit = {
 };
 
 /**
+ * Normalise a transported `unitItems` map back to real arrays.
+ *
+ * Firebase RTDB stores arrays as index-keyed objects, so a map that crossed the
+ * wire can arrive as {id: {0:"x",1:"y"}} — `.length` is undefined and `.map`
+ * throws. The current netcode re-simulates from the transported BOARDS rather
+ * than shipping a CombatResult, so nothing on today's path mangles this map;
+ * this is defence in depth against that changing, and it is exported so the
+ * renderer and its test exercise the SAME function rather than two copies that
+ * can drift.
+ */
+export function normaliseUnitItems(
+  raw: Record<string, unknown> | undefined | null,
+): Record<string, string[]> {
+  if (!raw) return {};
+  const out: Record<string, string[]> = {};
+  for (const [id, v] of Object.entries(raw)) {
+    const arr = Array.isArray(v) ? v : v ? Object.values(v as Record<string, string>) : [];
+    if (arr.length) out[id] = arr as string[];
+  }
+  return out;
+}
+
+/**
  * What a cast actually covers, for the renderer.
  *
  * This is NOT the same as Move["shape"]. castAbility() branches on

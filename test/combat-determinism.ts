@@ -7,7 +7,7 @@
  * VIEW, so the underlying winner must match — never swap. This guards against any
  * regression that would make fights resolve differently across screens.
  */
-import { simulate, type CombatResult } from "../src/game/engine/combat";
+import { simulate, normaliseUnitItems, type CombatResult } from "../src/game/engine/combat";
 import { generateBoard } from "../src/game/engine/enemy";
 import { teamBuffForAugments } from "../src/game/data/augments";
 
@@ -178,15 +178,10 @@ let itemPass = 0, itemFail = 0;
     (v as string[]).forEach((x, i) => { o[i] = x; });
     mangled[id] = JSON.parse(JSON.stringify(o));
   }
-  const coerce = (raw: Record<string, unknown>) => {
-    const out: Record<string, string[]> = {};
-    for (const [id, v] of Object.entries(raw)) {
-      const arr = Array.isArray(v) ? v : v ? Object.values(v as Record<string, string>) : [];
-      if (arr.length) out[id] = arr as string[];
-    }
-    return out;
-  };
-  const back = coerce(mangled);
+  // The PRODUCTION function, not a local copy of it — a test that re-declares
+  // the logic can only prove the copy works, and would keep passing while the
+  // real coercion regressed.
+  const back = normaliseUnitItems(mangled);
   const same = JSON.stringify(back) === JSON.stringify(res.unitItems);
   if (same) itemPass++; else { itemFail++; console.error(`unitItems FAIL: coercion lost data\n  before ${JSON.stringify(res.unitItems)}\n  after  ${JSON.stringify(back)}`); }
 }

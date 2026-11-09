@@ -653,6 +653,12 @@ body {
    out, so it reads as "this is about to be hit" rather than as a static tint
    on the paving — a constant fill competes with the units standing on it. */
 .combat-area {
+  /* Opacity lives HERE, not on the element's style attribute. It used to be
+     inline, and an inline declaration outranks an author stylesheet rule — so
+     the reduced-motion override below silently never applied and those users
+     got the animated value anyway. (The animated path worked only because the
+     CSS-animation cascade origin outranks inline.) */
+  opacity: 0.16;
   animation: combat-area 520ms ease-out forwards;
 }
 @keyframes combat-area {
@@ -688,12 +694,21 @@ body {
   will-change: transform;
 }
 /* Two layers at different sizes/speeds give parallax without a third element. */
+/* A tiled layer only loops seamlessly if the animation translates by a whole
+   multiple of its tile in BOTH axes — and one transform cannot satisfy two
+   differently-sized tiles at once. The first version drifted by (38px,-150px)
+   across a 190x150 tile AND a 265x215 tile, so neither axis lined up on either
+   layer and the drift visibly snapped back every cycle, on the planning board,
+   which is where most of the game is spent.
+   Both layers now use ONE tile size each and translate by exactly that tile.
+   Variety comes from a second gradient offset WITHIN the same tile, which costs
+   nothing and keeps the loop exact. */
 .arena-dust::before {
   background-image:
     radial-gradient(circle, rgba(200,222,255,0.5) 0.7px, transparent 1.4px),
     radial-gradient(circle, rgba(190,215,255,0.33) 0.6px, transparent 1.3px);
-  background-size: 190px 150px, 265px 215px;
-  background-position: 0 0, 90px 70px;
+  background-size: 190px 150px, 190px 150px;
+  background-position: 0 0, 95px 74px;
   animation: arena-dust-a 34s linear infinite;
 }
 .arena-dust::after {
@@ -703,11 +718,11 @@ body {
 }
 @keyframes arena-dust-a {
   from { transform: translate3d(0, 0, 0); }
-  to   { transform: translate3d(38px, -150px, 0); }
+  to   { transform: translate3d(190px, -150px, 0); }
 }
 @keyframes arena-dust-b {
   from { transform: translate3d(0, 0, 0); }
-  to   { transform: translate3d(-46px, -290px, 0); }
+  to   { transform: translate3d(-340px, -290px, 0); }
 }
 @media (prefers-reduced-motion: reduce) {
   .arena-dust { display: none; }

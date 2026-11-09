@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 import { usePrefersReducedMotion } from "@/lib/useReducedMotion";
@@ -14,7 +14,7 @@ import { TYPE_COLOR } from "@/game/ui";
 import { SnowIcon, SwordIcon, ShieldIcon } from "./icons";
 import { Leaf, BarChart3 } from "lucide-react";
 import { serverNow } from "@/game/net/serverTime";
-import { abilityCells } from "@/game/engine/combat";
+import { abilityCells, normaliseUnitItems } from "@/game/engine/combat";
 import type { CombatResult, Frame, FrameUnit, CombatEvent, CastShape } from "@/game/engine/combat";
 import type { PokeType } from "@/game/types";
 
@@ -38,10 +38,9 @@ function mirrorResult(r: CombatResult): CombatResult {
   };
 }
 
-/** Stable empties — a new [] or {} per render would change identity every frame
- *  and defeat the memoised unit rows. */
+/** Stable empty — a new [] per render would change identity every frame and
+ *  defeat the memoised unit rows. */
 const EMPTY_ITEMS: string[] = [];
-const EMPTY_ITEM_MAP: Record<string, string[]> = {};
 
 /** Tile size is responsive now (see LayoutProvider) — each component that draws
  *  on the field reads it from the layout and keeps the old local names, so the
@@ -210,16 +209,10 @@ export function CombatStage({
   // `.map` throws, mid-fight, only for the non-host clients. toCombatant()
   // already guards the same hazard on `u.items`; this is the same trap one
   // level up.
-  const unitItems = useMemo(() => {
-    const raw = result.unitItems;
-    if (!raw) return EMPTY_ITEM_MAP;
-    const out: Record<string, string[]> = {};
-    for (const [id, v] of Object.entries(raw)) {
-      const arr = Array.isArray(v) ? v : v ? Object.values(v as Record<string, string>) : [];
-      if (arr.length) out[id] = arr;
-    }
-    return out;
-  }, [result]);
+  const unitItems = useMemo(
+    () => normaliseUnitItems(result.unitItems as Record<string, unknown> | undefined),
+    [result],
+  );
   const TILE_W = layout.tile.w;
   const TILE_H = layout.tile.h;
 
@@ -645,23 +638,26 @@ const AbilityCells = memo(function AbilityCells({ frames, fi }: { frames: Frame[
   }
   if (recent.length === 0) return null;
 
-  // Positions come from the CURRENT frame: a unit that moved since the cast
-  // should not drag its indicator along, but a target that died must not make
-  // the indicator vanish — so fall back to the casting frame's snapshot.
-  const now = frames[fi];
-
   return (
     <>
       {recent.map(({ f, i, e }) => {
+        // EVERY part of the cell set is read from the frame the cast FIRED on.
+        // That is the board state the engine resolved the ability against, so
+        // it is the only snapshot that can describe what actually got hit.
+        //
+        // Reading the target from the CURRENT frame instead (an earlier version
+        // of this) was wrong twice over: the indicator dragged along behind a
+        // target that had since stepped away, and — because the own-team filter
+        // below still used the cast frame — the two halves of the set were
+        // computed from different boards, so it could tint a hex an ally had
+        // since moved onto, which is exactly what the filter exists to prevent.
         const frame = frames[f];
-        const byId = new Map((now ?? frame).units.map((u) => [u.id, u]));
-        const target = byId.get(e.to) ?? frame.units.find((u) => u.id === e.to);
+        const byId = new Map(frame.units.map((u) => [u.id, u]));
+        const target = byId.get(e.to);
         if (!target) return null;
         const colour = TYPE_COLOR[e.moveType] ?? "#a78bfa";
-        const casterTeam = byId.get(e.from)?.team ?? frame.units.find((u) => u.id === e.from)?.team;
+        const casterTeam = byId.get(e.from)?.team;
 
-        // Membership is judged on the frame the cast FIRED on — that is the
-        // board state the engine resolved against.
         const cells =
           e.shape === "blast"
             ? frame.units.filter((u) => u.alive && u.team !== casterTeam).map((u) => ({ c: u.c, r: u.r }))
@@ -670,25 +666,36 @@ const AbilityCells = memo(function AbilityCells({ frames, fi }: { frames: Frame[
                   !frame.units.some((u) => u.alive && u.team === casterTeam && u.c === cell.c && u.r === cell.r),
               );
 
-        return cells.map((cell, j) => {
-          const p = hexToPixel(cell, TILE_W, TILE_H);
-          return (
-            <div
-              key={`fx-${f}-${i}-${j}`}
-              className="absolute pointer-events-none combat-area"
-              style={{
-                left: p.x - TILE_W / 2,
-                top: p.y - TILE_H / 2,
-                width: TILE_W - 3,
-                height: TILE_H - 3,
-                clipPath: HEX_CLIP,
-                background: colour,
-                opacity: 0.42,
-                boxShadow: `inset 0 0 0 2px ${colour}`,
-              }}
-            />
-          );
-        });
+        // Fragment with an explicit key, NOT a bare returned array. React
+        // reconciles a nested array by its position in the parent's children
+        // and wraps it in a KEYLESS fiber, so the inner keys only match within
+        // whichever slot the array happens to occupy. As soon as the oldest
+        // cast fell out of the hold window every surviving cast shifted down a
+        // slot, its inner keys stopped matching, and all of its cells were
+        // destroyed and recreated — restarting the fade from zero. That is the
+        // precise flicker the hold window was added to remove.
+        return (
+          <Fragment key={`fx-${f}-${i}`}>
+            {cells.map((cell, j) => {
+              const p = hexToPixel(cell, TILE_W, TILE_H);
+              return (
+                <div
+                  key={j}
+                  className="absolute pointer-events-none combat-area"
+                  style={{
+                    left: p.x - TILE_W / 2,
+                    top: p.y - TILE_H / 2,
+                    width: TILE_W - 3,
+                    height: TILE_H - 3,
+                    clipPath: HEX_CLIP,
+                    background: colour,
+                    boxShadow: `inset 0 0 0 2px ${colour}`,
+                  }}
+                />
+              );
+            })}
+          </Fragment>
+        );
       })}
     </>
   );

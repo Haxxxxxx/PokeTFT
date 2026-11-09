@@ -84,10 +84,15 @@ export function Stars({ star }: { star: number }) {
   const colour = STAR_TIER[Math.min(3, Math.max(1, star)) as 1 | 2 | 3];
   return (
     <div
-      className="flex justify-center items-center gap-px -mt-1 leading-none mx-auto rounded-full px-1"
+      // The plate is NOT conditional on tier. Dropping it for 1-star (and
+      // losing the old `drop-shadow` with it) left a bronze glyph sitting
+      // directly on the sprite with nothing behind it — effectively invisible
+      // on a bright mon like Pikachu or Jolteon, which the previous flat amber
+      // + shadow had handled fine.
+      className="flex justify-center items-center gap-px -mt-1 leading-none mx-auto rounded-full px-1 drop-shadow"
       style={{
         color: colour,
-        background: star > 1 ? "rgba(6,10,22,0.72)" : "transparent",
+        background: "rgba(6,10,22,0.72)",
         boxShadow: star > 2 ? `0 0 7px -1px ${colour}` : undefined,
         width: "fit-content",
       }}
