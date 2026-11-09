@@ -14,7 +14,7 @@
  * the same hex math, just a different projection.
  */
 
-import { useMemo } from "react";
+import { Suspense, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Instance, Instances, Html, ContactShadows } from "@react-three/drei";
 import { FIELD, FIELD_SIZE, HEX_R, cellToWorld, isAllyRow } from "@/game/ui/hex3d";
@@ -137,7 +137,25 @@ export function CombatField3D({
           const target = aMap.get(e.to);
           if (!target) return null;
           const colour = TYPE_COLOR[e.moveType] ?? "#a78bfa";
-          return abilityCells({ c: target.c, r: target.r }, e.shape).map((cell, j) => {
+          const casterTeam = aMap.get(e.from)?.team;
+
+          // A blast ignores the move's shape and hits EVERY living enemy, so the
+          // only honest indicator is those units' own hexes — a geometric area
+          // would be flatly wrong. Everything else uses the engine's own
+          // abilityCells, minus the cells the caster's OWN side stands on:
+          // castAbility filters by team, so those can never be hit and lighting
+          // them up reads as damage that never lands. (The caster's half can't
+          // simply be clipped off: units advance across the midline during a
+          // fight, so an enemy may well be standing in it.)
+          const cells =
+            e.shape === "blast"
+              ? a.units.filter((u) => u.alive && u.team !== casterTeam).map((u) => ({ c: u.c, r: u.r }))
+              : abilityCells({ c: target.c, r: target.r }, e.shape).filter(
+                  (cell) =>
+                    !a.units.some((u) => u.alive && u.team === casterTeam && u.c === cell.c && u.r === cell.r),
+                );
+
+          return cells.map((cell, j) => {
             const p = cellToWorld(cell.c, cell.r);
             return (
               <mesh
@@ -168,13 +186,19 @@ export function CombatField3D({
           const tint = u.burning ? "#ff9a5c" : u.disabled ? "#9fd8ff" : undefined;
           return (
             <group key={u.id} position={p}>
-              <SpriteUnit
-                dex={u.dex}
-                star={u.star}
-                position={[0, 0, 0]}
-                flash={hitThisFrame.has(u.id)}
-                tint={tint}
-              />
+              {/* Per-unit boundary. SpriteUnit suspends on its texture, and
+                  with only the Canvas's own boundary ONE cold sprite blanked
+                  the whole scene — platform, floor and every other unit —
+                  until it resolved, which is the opening of the fight. */}
+              <Suspense fallback={null}>
+                <SpriteUnit
+                  dex={u.dex}
+                  star={u.star}
+                  position={[0, 0, 0]}
+                  flash={hitThisFrame.has(u.id)}
+                  tint={tint}
+                />
+              </Suspense>
               <group position={[0, 1.25, 0]}>
                 <Bars hp={hp} mana={mana} ally={u.team === "ally"} low={hp <= 0.25} />
               </group>
@@ -216,7 +240,9 @@ export function CombatField3D({
 
         {/* Fallen units stay on the field, dimmed, as in the CSS view. */}
         {a.units.filter((u) => !u.alive && !bMap.get(u.id)?.alive).map((u) => (
-          <SpriteUnit key={`dead-${u.id}`} dex={u.dex} star={u.star} position={cellToWorld(u.c, u.r)} dimmed />
+          <Suspense key={`dead-${u.id}`} fallback={null}>
+            <SpriteUnit dex={u.dex} star={u.star} position={cellToWorld(u.c, u.r)} dimmed />
+          </Suspense>
         ))}
 
         <ContactShadows position={[0, 0.06, 0]} opacity={0.42} scale={FIELD_SIZE.w * 1.5} blur={2.4} far={2.2} />

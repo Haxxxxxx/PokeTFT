@@ -10,8 +10,10 @@
  * exactly the cells it should, and that nothing silently widens or narrows it.
  */
 
-import { abilityCells } from "../src/game/engine/combat";
+import { abilityCells, simulate } from "../src/game/engine/combat";
 import { FIELD, neighbors, hexKey } from "../src/game/engine/hex";
+import { UNITS, castEffectOf } from "../src/game/data/mons";
+import type { UnitInstance } from "../src/game/types";
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
@@ -77,6 +79,53 @@ console.log("\nEvery shape stays on the board, from every cell:");
   }
   assert(ok, "no off-board or duplicated cells anywhere on the grid");
   assert(widest <= FIELD.rows, `widest area is ${widest} cells — bounded, so an indicator can't flood the board`);
+}
+
+console.log("\nA blast cast reports itself as a blast:");
+{
+  /*
+   * castAbility() checks castEffect === "blast" BEFORE it ever looks at the
+   * move's shape, and that branch hits EVERY living enemy on the board. The
+   * cast event used to carry the move's nominal shape regardless, so a blast
+   * caster with a "single" move told the renderer to light one hex while the
+   * engine nuked the whole enemy side. The event has to name the branch that
+   * actually ran, or the indicator is lying about real damage.
+   */
+  const blasters = UNITS.filter((u) => castEffectOf(u) === "blast");
+  assert(blasters.length > 0, `roster has blast casters to test (${blasters.length})`);
+
+  const mk = (defId: string, iid: string, pos: [number, number]): UnitInstance =>
+    ({ iid, defId, star: 1, pos, items: [] }) as UnitInstance;
+
+  // Combatant ids are `${team}-${iid}`, so sides are told apart by that prefix.
+  const isAlly = (id: string) => id.startsWith("ally-");
+
+  // Three blasters a side-width apart vs three non-blast foes: enough bodies that
+  // the casters live to reach full mana, and spread enough that a shape-based
+  // indicator would visibly disagree with who actually takes damage.
+  const blaster = blasters[0];
+  const foe = UNITS.find((u) => castEffectOf(u) !== "blast")!;
+  const allies = [mk(blaster.id, "A1", [1, 3]), mk(blaster.id, "A2", [3, 3]), mk(blaster.id, "A3", [5, 3])];
+  const enemies = [mk(foe.id, "E1", [1, 0]), mk(foe.id, "E2", [5, 0]), mk(foe.id, "E3", [3, 1])];
+
+  const res = simulate(allies, enemies);
+  const casts = res.frames.flatMap((f) => f.events).filter((e) => e.kind === "cast");
+  const mine = casts.filter((e) => e.kind === "cast" && isAlly(e.from));
+  const theirs = casts.filter((e) => e.kind === "cast" && !isAlly(e.from));
+
+  assert(mine.length > 0, `the blast casters actually cast during the fight (${mine.length}x)`);
+  assert(
+    mine.every((e) => e.kind === "cast" && e.shape === "blast"),
+    "every cast from a blast caster carries shape 'blast', not the move's nominal shape",
+  );
+
+  // And the converse: non-blast casters must NOT claim to be blasts, or the
+  // renderer would light the whole enemy team for a single-target hit.
+  assert(theirs.length > 0, `the non-blast side also cast, so the converse is really exercised (${theirs.length}x)`);
+  assert(
+    theirs.every((e) => e.kind === "cast" && e.shape !== "blast"),
+    "non-blast casters never report 'blast'",
+  );
 }
 
 if (failures) {

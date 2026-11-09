@@ -86,6 +86,7 @@ export type Dict = {
   sh_freeze: string;
   sh_frozen: string;
   sh_drag_sell: string;
+  ud_sell: string;
   sh_view_details: string;
   sh_max: string;
   sh_odds: string;
@@ -320,6 +321,7 @@ export const FR: Dict = {
   sh_freeze: "Geler",
   sh_frozen: "Gelé",
   sh_drag_sell: "Glisser pour vendre",
+  ud_sell: "Vendre",
   sh_view_details: "Voir les détails",
   sh_max: "MAX",
   sh_odds: "Chances",
@@ -530,6 +532,7 @@ export const EN: Dict = {
   sh_freeze: "Freeze",
   sh_frozen: "Frozen",
   sh_drag_sell: "Drag here to sell",
+  ud_sell: "Sell",
   sh_view_details: "View details",
   sh_max: "MAX",
   sh_odds: "Odds",

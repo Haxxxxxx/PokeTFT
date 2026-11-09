@@ -22,6 +22,7 @@ import { Suspense, useCallback, useMemo, useState } from "react";
 import { Canvas, type ThreeEvent } from "@react-three/fiber";
 import { Instance, Instances, ContactShadows } from "@react-three/drei";
 import { useGame, BENCH_SIZE, resolveBenchSlots } from "@/game/store/gameStore";
+import { useUi } from "@/game/store/uiStore";
 import { getDef } from "@/game/data/mons";
 import { boardSizeForLevel } from "@/game/config";
 import { FIELD, FIELD_SIZE, HEX_R, cellToWorld, worldToCell, isAllyRow, ALLY_ROW0 } from "@/game/ui/hex3d";
@@ -104,26 +105,42 @@ function Scene({
   // dims), and a ref read during render is both a purity violation and a stale
   // read — the same bug the CSS board had.
   const [drag, setDrag] = useState<Drag>(null);
+  // Picking a unit up also inspects it, exactly as the DOM board's UnitChip
+  // does. Without this the 3D board had NO route into the detail panel, which
+  // is where held items, live stats and the Sell button live — and the S
+  // sell hotkey reads the inspected unit, so selling was unreachable too.
+  const setInspect = useUi((st) => st.setInspect);
 
   const board = units.filter((u) => u.pos !== null);
   const bench = resolveBenchSlots(units);
   const benchW = FIELD_SIZE.w / BENCH_SIZE;
 
-  /** Map a ground hit to whichever drop target it lands on. */
+  // Content spans the field plus the bench strip in front of it; shifting the
+  // group back by half that span centres the WHOLE arena on the origin, so the
+  // camera frames both without the bench falling out of shot.
+  const centreZ = -((BENCH_Z + HEX_R * 0.6) - FIELD_SIZE.h / 2) / 2;
+
+  /**
+   * Map a ground hit to whichever drop target it lands on.
+   *
+   * ThreeEvent.point is in WORLD space, but the whole arena — including the
+   * input plane — lives inside a group translated by centreZ, and both
+   * worldToCell() and the bench test expect board-local coordinates. Feeding
+   * the raw world z in shifted every drop by 0.58 of a row: it always rounded
+   * a row short, the back rank could never be filled at all (it mapped onto
+   * the enemy half and was silently rejected), and the bench strip sat just
+   * outside its own hit test, so units could not be returned to the bench.
+   */
   const readTarget = useCallback((e: ThreeEvent<PointerEvent>) => {
-    const { x, z } = e.point;
+    const x = e.point.x;
+    const z = e.point.z - centreZ;
     if (z > FIELD_SIZE.h / 2 + HEX_R * 0.4) {
       const i = Math.floor((x + FIELD_SIZE.w / 2) / benchW);
       return i >= 0 && i < BENCH_SIZE ? ({ kind: "bench", i } as const) : null;
     }
     const cell = worldToCell(x, z);
     return cell ? ({ kind: "cell", ...cell } as const) : null;
-  }, [benchW]);
-
-  // Content spans the field plus the bench strip in front of it; shifting the
-  // group back by half that span centres the WHOLE arena on the origin, so the
-  // camera frames both without the bench falling out of shot.
-  const centreZ = -((BENCH_Z + HEX_R * 0.6) - FIELD_SIZE.h / 2) / 2;
+  }, [benchW, centreZ]);
 
   return (
     <group position={[0, 0, centreZ]}>
@@ -147,6 +164,7 @@ function Scene({
           <group
             key={u.iid}
             onPointerDown={(e) => {
+              setInspect(u.defId, u.star, u.iid);
               if (!interactive) return;
               e.stopPropagation();
               (e.target as Element | null)?.setPointerCapture?.(e.pointerId);
@@ -171,6 +189,7 @@ function Scene({
           <group
             key={u.iid}
             onPointerDown={(e) => {
+              setInspect(u.defId, u.star, u.iid);
               if (!interactive) return;
               e.stopPropagation();
               (e.target as Element | null)?.setPointerCapture?.(e.pointerId);
@@ -208,7 +227,12 @@ function Scene({
           setHoverBench(null);
           if (d) onCommit(d, readTarget(e));
         }}
-        onPointerLeave={() => { setHoverCell(null); setHoverBench(null); }}
+        // Releasing OFF the plane (over the shop, the sell zone, outside the
+        // canvas) means this handler never sees pointerup. Without clearing the
+        // drag here it stayed armed, and the player's next tap anywhere on the
+        // board silently teleported that earlier unit to wherever they tapped.
+        onPointerLeave={() => { setHoverCell(null); setHoverBench(null); setDrag(null); }}
+        onPointerCancel={() => { setHoverCell(null); setHoverBench(null); setDrag(null); }}
       >
         <planeGeometry args={[FIELD_SIZE.w * 2, FIELD_SIZE.h * 2.4]} />
         <meshBasicMaterial visible={false} />

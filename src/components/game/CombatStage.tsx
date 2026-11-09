@@ -13,7 +13,7 @@ import { TYPE_COLOR } from "@/game/ui";
 import { SnowIcon, SwordIcon, ShieldIcon } from "./icons";
 import { Leaf, BarChart3 } from "lucide-react";
 import { serverNow } from "@/game/net/serverTime";
-import type { CombatResult, FrameUnit, CombatEvent } from "@/game/engine/combat";
+import type { CombatResult, FrameUnit, CombatEvent, CastShape } from "@/game/engine/combat";
 import type { PokeType } from "@/game/types";
 
 /** Mirror a replay through the field centre (180° rotation) and swap teams, so
@@ -726,10 +726,29 @@ function DamageNumber({ x, y, dmg, crit, sup }: { x: number; y: number; dmg: num
  *   · line   → a beam from the caster through the target
  *   · single → a focused impact burst on the target
  *  A super-effective hit (eff>1) flares brighter. */
-function AbilityFx({ x, y, tx, ty, moveType, shape, eff }: { x: number; y: number; tx: number; ty: number; moveType: PokeType; shape: "single" | "splash" | "line"; eff: number }) {
+function AbilityFx({ x, y, tx, ty, moveType, shape, eff }: { x: number; y: number; tx: number; ty: number; moveType: PokeType; shape: CastShape; eff: number }) {
   const color = TYPE_COLOR[moveType] ?? "#a78bfa";
   const sup = eff > 1;        // super-effective → a bigger, brighter, double-ring hit
   const boost = sup ? 1.5 : 1;
+
+  // A blast hits every living enemy at once. It must NOT fall through to the
+  // single-target burst — that drew one small pop on one unit while the whole
+  // enemy side took damage. A wide shockwave from the caster is the read.
+  if (shape === "blast") {
+    const s = 220 * boost;
+    return (
+      <>
+        <span
+          className="absolute pointer-events-none rounded-full combat-cast"
+          style={{ left: x - s / 2, top: y - s / 2, width: s, height: s, border: `${sup ? 4 : 3}px solid ${color}`, boxShadow: `0 0 26px 4px ${color}aa` }}
+        />
+        <span
+          className="absolute pointer-events-none rounded-full combat-burst"
+          style={{ left: x - 60, top: y - 60, width: 120, height: 120, background: `radial-gradient(circle, ${sup ? "#fff" : color}, ${color}00 70%)` }}
+        />
+      </>
+    );
+  }
   // Super-effective flare: a second, wider shockwave ring + a white core, so type advantage
   // reads instantly during the fight.
   const supRing = sup ? (

@@ -121,9 +121,21 @@ export type FrameUnit = {
   disabled: boolean;
 };
 
+/**
+ * What a cast actually covers, for the renderer.
+ *
+ * This is NOT the same as Move["shape"]. castAbility() branches on
+ * castEffect === "blast" FIRST and hits every living enemy on the board,
+ * ignoring the move's shape entirely — so a blast caster whose move happens to
+ * be "single" used to emit shape: "single" and the indicator lit one hex while
+ * the engine nuked the whole enemy team. Carrying "blast" explicitly keeps the
+ * event honest about which branch ran.
+ */
+export type CastShape = Move["shape"] | "blast";
+
 export type CombatEvent =
   | { kind: "attack"; from: string; to: string }
-  | { kind: "cast"; from: string; to: string; moveType: PokeType; eff: number; shape: Move["shape"]; move: string }
+  | { kind: "cast"; from: string; to: string; moveType: PokeType; eff: number; shape: CastShape; move: string }
   | { kind: "hit"; to: string; dmg: number; crit?: boolean; sup?: boolean }
   | { kind: "death"; id: string };
 
@@ -577,7 +589,9 @@ function castAbility(caster: Combatant, target: Combatant, units: Combatant[], e
   const i = caster.star - 1;
   const base = caster.move.power[i] * caster.apMult;
   const eff = effectiveness(caster.move.type, target.types);
-  events.push({ kind: "cast", from: caster.id, to: target.id, moveType: caster.move.type, eff, shape: caster.move.shape, move: caster.move.name });
+  // Report the branch that ACTUALLY runs below, not the move's nominal shape.
+  const castShape: CastShape = caster.castEffect === "blast" ? "blast" : caster.move.shape;
+  events.push({ kind: "cast", from: caster.id, to: target.id, moveType: caster.move.type, eff, shape: castShape, move: caster.move.name });
 
   const hitOne = (victim: Combatant, mult = 1) => {
     const e = effectiveness(caster.move.type, victim.types);

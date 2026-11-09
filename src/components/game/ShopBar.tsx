@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useGame } from "@/game/store/gameStore";
 import { useUi } from "@/game/store/uiStore";
 import { getDef, spriteUrl } from "@/game/data/mons";
@@ -311,7 +311,7 @@ function TraitChip({
       title={gains ? `${label} — buying this levels it up` : active ? `${label} (active)` : label}
       style={
         gains
-          ? { background: color, color: "#0b1020", boxShadow: `0 0 10px -1px ${color}` }
+          ? ({ background: color, color: "#0b1020", "--trait-glow": color } as CSSProperties)
           : active
             ? { background: `${color}cc`, color: "#0b1020" }
             : { color: "#e2e8f0" }

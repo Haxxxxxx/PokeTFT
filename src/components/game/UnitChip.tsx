@@ -117,7 +117,9 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
   // multiple of that 96px source. Nearest-neighbour upscaling is only clean at
   // integer multiples — at 1.72x some source pixels cover two screen pixels and
   // their neighbours cover one, which is what made the board look mushy.
-  const spriteSize = shape === "hex" ? crispSize(size * 1.85) : size - 6;
+  // Capped at 2.1x the cell: snapping is unbounded on its own, and on the
+  // smallest tiles the nearest whole multiple is several times the hex.
+  const spriteSize = shape === "hex" ? crispSize(size * 1.85, size * 2.1) : size - 6;
   const sprite = (
     // eslint-disable-next-line @next/next/no-img-element
     <img
