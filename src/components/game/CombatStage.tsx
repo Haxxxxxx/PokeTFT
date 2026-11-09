@@ -1,19 +1,21 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
 import { usePrefersReducedMotion } from "@/lib/useReducedMotion";
 import { sfx } from "@/lib/audio";
 import { hexToPixel, fieldPixelSize, hexDistance, FIELD, HEX_CLIP } from "@/game/engine/hex";
 import { useGameLayout } from "./LayoutProvider";
+import { ItemPips } from "./UnitChip";
 import { CombatField3D } from "./CombatField3D";
 import { useAppStore } from "@/game/store/appStore";
 import { TYPE_COLOR } from "@/game/ui";
 import { SnowIcon, SwordIcon, ShieldIcon } from "./icons";
 import { Leaf, BarChart3 } from "lucide-react";
 import { serverNow } from "@/game/net/serverTime";
-import type { CombatResult, FrameUnit, CombatEvent, CastShape } from "@/game/engine/combat";
+import { abilityCells, normaliseUnitItems } from "@/game/engine/combat";
+import type { CombatResult, Frame, FrameUnit, CombatEvent, CastShape } from "@/game/engine/combat";
 import type { PokeType } from "@/game/types";
 
 /** Mirror a replay through the field centre (180° rotation) and swap teams, so
@@ -35,6 +37,10 @@ function mirrorResult(r: CombatResult): CombatResult {
     })),
   };
 }
+
+/** Stable empty — a new [] per render would change identity every frame and
+ *  defeat the memoised unit rows. */
+const EMPTY_ITEMS: string[] = [];
 
 /** Tile size is responsive now (see LayoutProvider) — each component that draws
  *  on the field reads it from the layout and keeps the old local names, so the
@@ -195,6 +201,18 @@ export function CombatStage({
 
   const layout = useGameLayout();
   const board3d = useAppStore((st) => st.settings.board3d);
+  // Older fights were persisted before unitItems existed; default it so a
+  // stored replay from a previous version still renders.
+  // Coerced, not just defaulted. Firebase RTDB stores arrays as index-keyed
+  // objects and hands them back that way, so `unitItems[id]` can arrive as
+  // {0:"x",1:"y"} rather than an array — `.length` is then undefined and
+  // `.map` throws, mid-fight, only for the non-host clients. toCombatant()
+  // already guards the same hazard on `u.items`; this is the same trap one
+  // level up.
+  const unitItems = useMemo(
+    () => normaliseUnitItems(result.unitItems as Record<string, unknown> | undefined),
+    [result],
+  );
   const TILE_W = layout.tile.w;
   const TILE_H = layout.tile.h;
 
@@ -243,6 +261,24 @@ export function CombatStage({
   const aliveAlly = a.units.filter((u) => u.team === "ally" && u.alive).length;
   const aliveEnemy = a.units.filter((u) => u.team === "enemy" && u.alive).length;
 
+  // Side strength as a fraction of what that side STARTED with. hpFrac is all a
+  // frame carries (no maxHp), so this is unit-weighted rather than HP-weighted
+  // — it tracks "how much army is left standing", which is what the bar is for.
+  // Baseline MUST come from `result`, not `rawResult`: mirrorResult() swaps the
+  // team labels for a flipped player, so a baseline taken from the unmirrored
+  // frames would be compared against the opposite side and the two bars would
+  // read inverted for exactly half the players.
+  const startStrength = useMemo(() => {
+    const f0 = result.frames[0];
+    const sum = (team: string) =>
+      f0 ? f0.units.filter((u) => u.team === team).reduce((n, u) => n + u.hpFrac, 0) : 0;
+    return { ally: sum("ally"), enemy: sum("enemy") };
+  }, [result]);
+  const liveSum = (team: string) =>
+    a.units.filter((u) => u.team === team && u.alive).reduce((n, u) => n + u.hpFrac, 0);
+  const allyStrength = startStrength.ally > 0 ? Math.min(1, liveSum("ally") / startStrength.ally) : 0;
+  const enemyStrength = startStrength.enemy > 0 ? Math.min(1, liveSum("enemy") / startStrength.enemy) : 0;
+
   return (
     <div className={inline
       ? "absolute inset-0 flex items-center justify-center"
@@ -257,6 +293,20 @@ export function CombatStage({
         <span className="tabular-nums text-emerald-300">{aliveAlly}</span>
         <span className={a.overtime ? "text-rose-400 animate-pulse" : "text-slate-500"}>{a.overtime ? t.cs_overtime : t.cs_vs}</span>
         <span className={`inline-flex items-center gap-1 truncate ${pve ? "text-emerald-300" : "text-rose-300"}`}>{pve && <Leaf size={13} />}{opponentName} <span className="tabular-nums">{aliveEnemy}</span></span>
+      </div>
+
+      {/* Army strength. Survivor counts alone hide the shape of a fight: 4v4
+          reads as even whether both sides are untouched or yours is four
+          slivers. TFT pairs the opponent with a strength bar for exactly this
+          reason. Weighted by remaining health across the side's starting
+          roster, so it falls as units are chipped, not only as they die. */}
+      <div className="flex items-center gap-1.5 w-[260px] max-w-full mb-0.5" aria-hidden>
+        <div className="flex-1 h-[5px] rounded-full bg-black/70 overflow-hidden flex justify-end">
+          <div className="h-full rounded-full transition-[width] duration-200" style={{ width: `${allyStrength * 100}%`, background: "#34d399" }} />
+        </div>
+        <div className="flex-1 h-[5px] rounded-full bg-black/70 overflow-hidden">
+          <div className="h-full rounded-full transition-[width] duration-200" style={{ width: `${enemyStrength * 100}%`, background: pve ? "#34d399" : "#fb7185" }} />
+        </div>
       </div>
 
       {a.overtime && <span className="text-[9px] font-extrabold text-rose-400 animate-pulse tracking-wider mt-0.5">{t.cs_overtime}</span>}
@@ -292,7 +342,7 @@ export function CombatStage({
         }}
       >
         {board3d && (
-          <CombatField3D a={a} b={b} frac={frac} size={{ w: w + 28, h: h + 28 }} />
+          <CombatField3D a={a} b={b} frac={frac} size={{ w: w + 28, h: h + 28 }} unitItems={unitItems} />
         )}
         {!board3d && (<>
         {/* Same raked platform as the planning board — combat was rendering a
@@ -307,9 +357,19 @@ export function CombatStage({
           <span className="arena-wall arena-wall-side" style={{ width: wallT, left: 0, transformOrigin: "100% 50%", transform: "rotateY(90deg)" }} aria-hidden />
           <span className="arena-wall arena-wall-side" style={{ width: wallT, right: 0, transformOrigin: "0% 50%", transform: "rotateY(-90deg)" }} aria-hidden />
           <span className="arena-rail" aria-hidden />
+          <span className="arena-dust" aria-hidden />
         </div>
         <div className="absolute" style={{ left: 14, top: 14, width: w, height: h }}>
           <HexGrid />
+
+          {/* Ability areas. TFT tints hexes in exactly one place — the cells an
+              ability is about to hit — and it is a large part of why its fights
+              read. This existed only in the WebGL field, which is opt-in and
+              off by default, so the single highest-value readability cue in the
+              game was invisible to most players. Same engine source
+              (abilityCells) and the same truth rules as the 3D field, so the
+              two renderers cannot disagree about what gets hit. */}
+          <AbilityCells frames={frames} fi={fi} />
 
           {/* Corpses (behind) */}
           {a.units.filter((u) => !u.alive && !(bMap.get(u.id)?.alive)).map((u) => (
@@ -354,6 +414,7 @@ export function CombatStage({
                 flash={hitThisFrame ? `${fi}-${u.id}` : null}
                 cast={castColor}
                 faceLeft={(facing.get(u.id) ?? u.c) < u.c}
+                items={unitItems[u.id] ?? EMPTY_ITEMS}
               />
             );
           })}
@@ -542,6 +603,104 @@ function CombatRecapTabs({ units, label, onClose }: { units: FrameUnit[]; label:
   );
 }
 
+/**
+ * The hexes a cast is about to hit, painted on the floor under the units.
+ *
+ * Mirrors CombatField3D exactly:
+ *  - a `blast` ignores the move's shape and hits EVERY living enemy, so its
+ *    cells are those units' own hexes — a geometric area would be plain wrong;
+ *  - every other shape uses the engine's own abilityCells(), minus the cells
+ *    the caster's OWN side stands on, since castAbility filters by team and
+ *    those can never be hit.
+ * The caster's half is deliberately NOT clipped: units advance across the
+ * midline during a fight, so an enemy may well be standing in it.
+ */
+/** How many sim frames a telegraph stays on screen. */
+const AREA_HOLD_FRAMES = 8;
+
+const AbilityCells = memo(function AbilityCells({ frames, fi }: { frames: Frame[]; fi: number }) {
+  const layout = useGameLayout();
+  const TILE_W = layout.tile.w;
+  const TILE_H = layout.tile.h;
+
+  // Cast events live on ONE frame, and a frame is SIM_DT (62.5ms) of wall time.
+  // Rendering only the current frame's casts made each telegraph appear and
+  // unmount within a single frame — far too brief to read, and it cut the fade
+  // animation off before it started. So we gather the casts from a short window
+  // of recent frames and key them by their frame, which keeps each element
+  // mounted as the window slides and lets its animation play out in full.
+  const start = Math.max(0, fi - AREA_HOLD_FRAMES + 1);
+  const recent: { f: number; i: number; e: Extract<CombatEvent, { kind: "cast" }> }[] = [];
+  for (let f = start; f <= fi; f++) {
+    const fr = frames[f];
+    if (!fr) continue;
+    fr.events.forEach((e, i) => { if (e.kind === "cast") recent.push({ f, i, e }); });
+  }
+  if (recent.length === 0) return null;
+
+  return (
+    <>
+      {recent.map(({ f, i, e }) => {
+        // EVERY part of the cell set is read from the frame the cast FIRED on.
+        // That is the board state the engine resolved the ability against, so
+        // it is the only snapshot that can describe what actually got hit.
+        //
+        // Reading the target from the CURRENT frame instead (an earlier version
+        // of this) was wrong twice over: the indicator dragged along behind a
+        // target that had since stepped away, and — because the own-team filter
+        // below still used the cast frame — the two halves of the set were
+        // computed from different boards, so it could tint a hex an ally had
+        // since moved onto, which is exactly what the filter exists to prevent.
+        const frame = frames[f];
+        const byId = new Map(frame.units.map((u) => [u.id, u]));
+        const target = byId.get(e.to);
+        if (!target) return null;
+        const colour = TYPE_COLOR[e.moveType] ?? "#a78bfa";
+        const casterTeam = byId.get(e.from)?.team;
+
+        const cells =
+          e.shape === "blast"
+            ? frame.units.filter((u) => u.alive && u.team !== casterTeam).map((u) => ({ c: u.c, r: u.r }))
+            : abilityCells({ c: target.c, r: target.r }, e.shape).filter(
+                (cell) =>
+                  !frame.units.some((u) => u.alive && u.team === casterTeam && u.c === cell.c && u.r === cell.r),
+              );
+
+        // Fragment with an explicit key, NOT a bare returned array. React
+        // reconciles a nested array by its position in the parent's children
+        // and wraps it in a KEYLESS fiber, so the inner keys only match within
+        // whichever slot the array happens to occupy. As soon as the oldest
+        // cast fell out of the hold window every surviving cast shifted down a
+        // slot, its inner keys stopped matching, and all of its cells were
+        // destroyed and recreated — restarting the fade from zero. That is the
+        // precise flicker the hold window was added to remove.
+        return (
+          <Fragment key={`fx-${f}-${i}`}>
+            {cells.map((cell, j) => {
+              const p = hexToPixel(cell, TILE_W, TILE_H);
+              return (
+                <div
+                  key={j}
+                  className="absolute pointer-events-none combat-area"
+                  style={{
+                    left: p.x - TILE_W / 2,
+                    top: p.y - TILE_H / 2,
+                    width: TILE_W - 3,
+                    height: TILE_H - 3,
+                    clipPath: HEX_CLIP,
+                    background: colour,
+                    boxShadow: `inset 0 0 0 2px ${colour}`,
+                  }}
+                />
+              );
+            })}
+          </Fragment>
+        );
+      })}
+    </>
+  );
+});
+
 const HexGrid = memo(function HexGrid() {
   const layout = useGameLayout();
   const TILE_W = layout.tile.w;
@@ -576,10 +735,12 @@ const HexGrid = memo(function HexGrid() {
 });
 
 function CombatUnit({
-  unit, x, y, hpFrac, manaFrac, lunge, flash, cast, faceLeft,
+  unit, x, y, hpFrac, manaFrac, lunge, flash, cast, faceLeft, items,
 }: {
   unit: FrameUnit; x: number; y: number; hpFrac: number; manaFrac: number;
   lunge: { dx: number; dy: number }; flash: string | null; cast: string | null; faceLeft: boolean;
+  /** Held item ids, constant for the fight (CombatResult.unitItems). */
+  items: string[];
 }) {
   const ally = unit.team === "ally";
   const ring = unit.mega ? "#f0abfc" : ally ? "#34d399" : "#fb7185";
@@ -646,6 +807,16 @@ function CombatUnit({
         <div className="h-full transition-[width] duration-100" style={{ width: `${manaFrac * 100}%`, background: manaFull ? "#bae6fd" : "#38bdf8" }} />
       </div>
       </div>
+      {/* Held items, under the feet exactly as on the planning board. Drawn
+          OUTSIDE the counter-rotated sprite stack would tilt them with the
+          board; inside it they stay upright and legible at every tilt tier. */}
+      {items.length > 0 && (
+        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none" style={{ bottom: -Math.round(TW * 0.18), width: TW }}>
+          <div className="relative" style={{ height: 1 }}>
+            <ItemPips items={items} megaReady={unit.mega} unitSize={TW} />
+          </div>
+        </div>
+      )}
       {/* Grounding "feet" ellipse — team-coloured, sits under the sprite. */}
       <span className="absolute left-1/2 -translate-x-1/2 rounded-[50%] pointer-events-none" style={{ bottom: -2, width: TW * 0.6, height: TW * 0.17, background: `radial-gradient(ellipse at center, ${ring}77, transparent 72%)` }} />
       {/* Box is the CELL; the sprite inside it is oversized and bottom-aligned,

@@ -21,6 +21,7 @@ import { FIELD, FIELD_SIZE, HEX_R, cellToWorld, isAllyRow } from "@/game/ui/hex3
 import { TYPE_COLOR } from "@/game/ui";
 import { SpriteUnit } from "./SpriteUnit";
 import { ArenaPlatform } from "./ArenaPlatform";
+import { ItemPips } from "./UnitChip";
 import { abilityCells, type Frame, type FrameUnit } from "@/game/engine/combat";
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -67,13 +68,15 @@ function Bars({ hp, mana, ally, low }: { hp: number; mana: number; ally: boolean
 }
 
 export function CombatField3D({
-  a, b, frac, size,
+  a, b, frac, size, unitItems,
 }: {
   a: Frame;
   b: Frame;
   frac: number;
   /** Pixel footprint to occupy — matches the CSS field so the shell is stable. */
   size: { w: number; h: number };
+  /** Held items per combatant id (CombatResult.unitItems), constant per fight. */
+  unitItems: Record<string, string[]>;
 }) {
   const bMap = useMemo(() => new Map(b.units.map((u) => [u.id, u])), [b]);
   const aMap = useMemo(() => new Map(a.units.map((u) => [u.id, u])), [a]);
@@ -186,6 +189,13 @@ export function CombatField3D({
           const tint = u.burning ? "#ff9a5c" : u.disabled ? "#9fd8ff" : undefined;
           return (
             <group key={u.id} position={p}>
+              {(unitItems[u.id]?.length ?? 0) > 0 && (
+                <Html position={[0, 0.02, 0.34]} center distanceFactor={7} style={{ pointerEvents: "none" }}>
+                  <div style={{ position: "relative", width: 40, height: 1 }}>
+                    <ItemPips items={unitItems[u.id]} megaReady={u.mega} unitSize={40} />
+                  </div>
+                </Html>
+              )}
               {/* Per-unit boundary. SpriteUnit suspends on its texture, and
                   with only the Canvas's own boundary ONE cold sprite blanked
                   the whole scene — platform, floor and every other unit —

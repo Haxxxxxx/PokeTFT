@@ -23,7 +23,13 @@ import type { UnitInstance } from "@/game/types";
  * unit like TFT's, in dark frames so they read against both the sprite and the
  * stone, and they scale with the tile instead of staying fixed.
  */
-function ItemPips({ items, megaReady, unitSize }: { items: string[]; megaReady: boolean; unitSize: number }) {
+/**
+ * Exported so the COMBAT renderers draw held items identically to the planning
+ * board. They had no item display at all — `FrameUnit` didn't even carry the
+ * ids — so which item a carry held became invisible the moment a fight started,
+ * which is exactly when it matters most.
+ */
+export function ItemPips({ items, megaReady, unitSize }: { items: string[]; megaReady: boolean; unitSize: number }) {
   const t = useT();
   if (items.length === 0) return null;
   const box = Math.max(13, Math.round(unitSize * 0.26));
@@ -59,9 +65,38 @@ function ItemPips({ items, megaReady, unitSize }: { items: string[]; megaReady: 
   );
 }
 
+/**
+ * Star tier, drawn in the TIER's colour on a dark plate.
+ *
+ * It was a flat amber row at every tier, so 1★ and 3★ differed only by how
+ * many tiny glyphs you counted — on a crowded board that is not a readable
+ * difference. Bronze/silver/gold matches the ring colours the 3D units already
+ * use, so a unit's tier reads the same way in both renderers. Silver is cooled
+ * deliberately: a neutral grey reads as plain white against the plate.
+ */
+const STAR_TIER = {
+  1: "#c8761f",
+  2: "#9fb6d4",
+  3: "#ffc21e",
+} as const;
+
 export function Stars({ star }: { star: number }) {
+  const colour = STAR_TIER[Math.min(3, Math.max(1, star)) as 1 | 2 | 3];
   return (
-    <div className="flex justify-center gap-px -mt-1 leading-none text-amber-300 drop-shadow">
+    <div
+      // The plate is NOT conditional on tier. Dropping it for 1-star (and
+      // losing the old `drop-shadow` with it) left a bronze glyph sitting
+      // directly on the sprite with nothing behind it — effectively invisible
+      // on a bright mon like Pikachu or Jolteon, which the previous flat amber
+      // + shadow had handled fine.
+      className="flex justify-center items-center gap-px -mt-1 leading-none mx-auto rounded-full px-1 drop-shadow"
+      style={{
+        color: colour,
+        background: "rgba(6,10,22,0.72)",
+        boxShadow: star > 2 ? `0 0 7px -1px ${colour}` : undefined,
+        width: "fit-content",
+      }}
+    >
       {Array.from({ length: star }).map((_, i) => (
         <StarIcon key={i} size={9} />
       ))}
