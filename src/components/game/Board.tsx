@@ -266,6 +266,7 @@ function BoardBase({
           />
           {/* Carved lip between the arena floor and its border. */}
           <span className="arena-rail" aria-hidden />
+          <span className="arena-dust" aria-hidden />
         </div>
 
         {/* Board capacity, ghosted large across the floor — TFT's "6/6". Lies on

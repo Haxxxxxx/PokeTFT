@@ -144,5 +144,53 @@ let augPass = 0, augFail = 0;
 }
 console.log(`${augPass}/${augPass + augFail} augment fold order-independence + cap`);
 
-if (fail > 0 || netFail > 0 || ordFail > 0 || buffFail > 0 || augFail > 0) { console.error("\n❌ combat parity broken"); process.exit(1); }
+// --- unitItems survives the RTDB mangling -------------------------------------
+// CombatResult.unitItems feeds the combat renderers' item pips. Its VALUES are
+// arrays, and RTDB turns arrays into index-keyed objects — so a client reading a
+// fight back can get {0:"x",1:"y"} where the renderer expects an array. That
+// kills `.length` and `.map` mid-fight, for non-host clients only, which is the
+// hardest possible place to notice it. The stage coerces; this pins the shape
+// the coercion has to handle.
+let itemPass = 0, itemFail = 0;
+{
+  const withItems = generateBoard(6, 5, 4242).map((u, i) =>
+    i < 2 ? { ...u, items: ["item-a", "item-b"] } : u);
+  const foes = generateBoard(6, 5, 9191);
+  const res = simulate(withItems as never, foes as never);
+
+  const carriers = Object.keys(res.unitItems);
+  if (carriers.length === 0) { itemFail++; console.error("unitItems FAIL: no carriers recorded"); }
+  else itemPass++;
+
+  // Every recorded entry must be a real array of ids before transport.
+  const shapeOk = Object.values(res.unitItems).every((v) => Array.isArray(v) && v.every((x) => typeof x === "string"));
+  if (shapeOk) itemPass++; else { itemFail++; console.error("unitItems FAIL: not string[] pre-transport"); }
+
+  // Units holding nothing must NOT be in the map — it is sent per fight, and
+  // padding it with empty arrays is payload for no information.
+  const noEmpties = Object.values(res.unitItems).every((v) => v.length > 0);
+  if (noEmpties) itemPass++; else { itemFail++; console.error("unitItems FAIL: empty entries present"); }
+
+  // Now mangle it the way RTDB does and confirm the stage's coercion recovers it.
+  const mangled: Record<string, unknown> = {};
+  for (const [id, v] of Object.entries(res.unitItems)) {
+    const o: Record<string, string> = {};
+    (v as string[]).forEach((x, i) => { o[i] = x; });
+    mangled[id] = JSON.parse(JSON.stringify(o));
+  }
+  const coerce = (raw: Record<string, unknown>) => {
+    const out: Record<string, string[]> = {};
+    for (const [id, v] of Object.entries(raw)) {
+      const arr = Array.isArray(v) ? v : v ? Object.values(v as Record<string, string>) : [];
+      if (arr.length) out[id] = arr as string[];
+    }
+    return out;
+  };
+  const back = coerce(mangled);
+  const same = JSON.stringify(back) === JSON.stringify(res.unitItems);
+  if (same) itemPass++; else { itemFail++; console.error(`unitItems FAIL: coercion lost data\n  before ${JSON.stringify(res.unitItems)}\n  after  ${JSON.stringify(back)}`); }
+}
+console.log(`${itemPass}/${itemPass + itemFail} unitItems shape + RTDB round-trip`);
+
+if (fail > 0 || netFail > 0 || ordFail > 0 || buffFail > 0 || augFail > 0 || itemFail > 0) { console.error("\n❌ combat parity broken"); process.exit(1); }
 console.log("✅ combat is deterministic, order-independent, flip-parity holds, and survives the RTDB round-trip");

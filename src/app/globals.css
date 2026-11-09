@@ -648,3 +648,82 @@ body {
   .drawer-in-left,
   .drawer-in-right { animation: none; }
 }
+
+/* Ability-area telegraph (2D combat field). The cell fades up fast and eases
+   out, so it reads as "this is about to be hit" rather than as a static tint
+   on the paving — a constant fill competes with the units standing on it. */
+.combat-area {
+  animation: combat-area 520ms ease-out forwards;
+}
+@keyframes combat-area {
+  0%   { opacity: 0; transform: scale(0.82); }
+  28%  { opacity: 0.5; transform: scale(1); }
+  100% { opacity: 0.16; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .combat-area { animation: none; opacity: 0.32; }
+}
+
+/* Ambient motion.
+   The arena read as a still photograph: nothing in the scene ever moved during
+   planning, which is most of the time you spend looking at it. TFT's board has
+   constant low-level life (drifting motes, water, light). This is the cheapest
+   honest version — a few slow-drifting specks on a single compositor-friendly
+   layer, no JS, no per-frame work, and nothing that competes with the units.
+   Transform/opacity only, so it stays on the GPU. */
+.arena-dust {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 1;
+}
+.arena-dust::before,
+.arena-dust::after {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background-repeat: repeat;
+  will-change: transform;
+}
+/* Two layers at different sizes/speeds give parallax without a third element. */
+.arena-dust::before {
+  background-image:
+    radial-gradient(circle, rgba(200,222,255,0.5) 0.7px, transparent 1.4px),
+    radial-gradient(circle, rgba(190,215,255,0.33) 0.6px, transparent 1.3px);
+  background-size: 190px 150px, 265px 215px;
+  background-position: 0 0, 90px 70px;
+  animation: arena-dust-a 34s linear infinite;
+}
+.arena-dust::after {
+  background-image: radial-gradient(circle, rgba(225,238,255,0.4) 1px, transparent 2px);
+  background-size: 340px 290px;
+  animation: arena-dust-b 53s linear infinite;
+}
+@keyframes arena-dust-a {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(38px, -150px, 0); }
+}
+@keyframes arena-dust-b {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-46px, -290px, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .arena-dust { display: none; }
+}
+
+/* Star-up badge pulse. Uses an explicit light halo rather than currentColor:
+   the badge sets a dark text colour to stay readable on bronze/silver/gold, so
+   a currentColor glow would render near-black — the same trap the trait-gain
+   chip fell into. */
+.shop-star-up {
+  animation: shop-star-up 1.4s ease-in-out infinite;
+}
+@keyframes shop-star-up {
+  0%, 100% { box-shadow: 0 0 8px -1px rgba(255,255,255,0.75); }
+  50%      { box-shadow: 0 0 14px 2px rgba(255,255,255,0.95); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shop-star-up { animation: none; }
+}

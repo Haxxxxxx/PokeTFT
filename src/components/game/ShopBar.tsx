@@ -275,9 +275,33 @@ function ShopBarBase() {
               {/* Traits with icons, stacked top-left. */}
               <div className="absolute top-2.5 left-2 z-10 flex flex-col items-start gap-1">
                 {own && (
-                  <span className="inline-flex items-center gap-0.5 rounded bg-emerald-500/90 px-1 text-[8px] font-extrabold text-black leading-none py-[2px]">
-                    {own.topStar > 1 && <StarIcon size={7} />}
-                    {nextThreshold !== null ? `${copies}/${nextThreshold}` : t.sh_max}
+                  /* One copy from a star-up is the single most consequential
+                     thing a shop card can tell you, and it was whispering it in
+                     an 8px chip identical to "2/9". When the next buy completes
+                     the tier it now says so outright, in the tier's own colour
+                     with the target star — matching the ▲ language the trait
+                     chips already use for "this purchase changes something". */
+                  <span
+                    className={
+                      oneFromStar
+                        ? "inline-flex items-center gap-0.5 rounded px-1.5 text-[10px] font-extrabold text-black leading-none py-[3px] ring-1 ring-white/80 shop-star-up"
+                        : "inline-flex items-center gap-0.5 rounded bg-emerald-500/90 px-1 text-[8px] font-extrabold text-black leading-none py-[2px]"
+                    }
+                    style={oneFromStar ? { background: nextThreshold === COPIES_TO_STAR[3] ? "#ffc21e" : "#9fb6d4" } : undefined}
+                    title={oneFromStar ? t.sh_one_from_star : undefined}
+                  >
+                    {oneFromStar ? (
+                      <>
+                        <StarIcon size={9} />
+                        {nextThreshold === COPIES_TO_STAR[3] ? 3 : 2}
+                        <span aria-hidden>&#9650;</span>
+                      </>
+                    ) : (
+                      <>
+                        {own.topStar > 1 && <StarIcon size={7} />}
+                        {nextThreshold !== null ? `${copies}/${nextThreshold}` : t.sh_max}
+                      </>
+                    )}
                   </span>
                 )}
                 {def.types.map((tt) => (

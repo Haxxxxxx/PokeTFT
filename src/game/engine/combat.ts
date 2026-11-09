@@ -67,6 +67,9 @@ type Combatant = {
   /** Ability-power multiplier (Mega boosts this). */
   apMult: number;
   mega: boolean;
+  /** Held item ids. Fixed for the whole fight — carried so the renderers can
+   *  draw them without the client having to re-derive an enemy's inventory. */
+  items: string[];
   pos: Hex;
   atkCd: number;
   moveCd: number;
@@ -151,6 +154,14 @@ export type CombatResult = {
   survivorDamage: number;
   frames: Frame[];
   duration: number;
+  /**
+   * Held items per combatant id, for the renderers.
+   *
+   * Deliberately NOT on FrameUnit: items cannot change during a fight, so
+   * repeating them in every frame would multiply them by the frame count in
+   * the RTDB payload for data that is constant. One map, sent once.
+   */
+  unitItems: Record<string, string[]>;
 };
 
 /** A team-wide combat buff (from combat augments). Applied to every unit on the side
@@ -304,6 +315,7 @@ function toCombatant(u: UnitInstance, team: Team, buff?: TeamBuff): Combatant {
     manaPerAttack: Math.min(15, manaPerAtk),
     apMult,
     mega: !!mega,
+    items,
     pos,
     atkCd: 0,
     moveCd: 0,
@@ -729,5 +741,8 @@ function finalize(units: Combatant[], frames: Frame[], duration: number): Combat
 
   const survivors = winningUnits.length;
   const survivorDamage = winningUnits.reduce((s, u) => s + survivorWeight(u), 0);
-  return { winner, survivors, survivorDamage, frames, duration };
+  const unitItems: Record<string, string[]> = {};
+  for (const u of units) if (u.items.length) unitItems[u.id] = u.items;
+
+  return { winner, survivors, survivorDamage, frames, duration, unitItems };
 }
