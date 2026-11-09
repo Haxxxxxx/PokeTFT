@@ -70,6 +70,19 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
   const cancelClose = () => { if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; } };
   const hovered = hover ? traits.find((t) => t.key === hover.key) : null;
 
+  // Active synergies always listed in full, then as many partials as fit
+  // comfortably, and only the genuine overflow collapses into a tray.
+  //
+  // The first version trayed EVERY single-carrier trait, which emptied the
+  // whole panel on a one-unit board — worse than the clutter it was fixing.
+  // TFT does list partials (its own rail shows 1/2 rows); the tray is for the
+  // late-game tail, when a wide board touches a dozen traits at once.
+  const INLINE_PARTIALS = 6;
+  const active = traits.filter((t) => t.tier > 0);
+  const partial = traits.filter((t) => t.tier === 0);
+  const shown = [...active, ...partial.slice(0, INLINE_PARTIALS)];
+  const tray = partial.slice(INLINE_PARTIALS);
+
   return (
     // max-h-full, not h-full: the panel should be as tall as its synergies, not
     // a full-height box with a mostly-empty border around three traits. It still
@@ -79,7 +92,7 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
       {traits.length === 0 && <p className="text-xs text-slate-500">{tr.tp_place_mons}</p>}
       {/* Scrolls when the list gets long. */}
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-1.5 pr-0.5">
-        {traits.map((t) => {
+        {shown.map((t) => {
           const color = (TYPE_COLOR as Record<string, string>)[t.key] ?? "#64748b";
           const active = t.tier > 0;
           const nextBp = t.breakpoints.find((b) => b > t.count);
@@ -149,6 +162,33 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
           );
         })}
       </div>
+      {tray.length > 0 && (
+        <div className="shrink-0 mt-2 pt-2 border-t border-white/[0.07] flex flex-wrap items-center gap-1">
+          {tray.slice(0, 8).map((t) => {
+            const color = (TYPE_COLOR as Record<string, string>)[t.key] ?? "#64748b";
+            const next = t.breakpoints.find((b) => b > t.count) ?? t.breakpoints[0];
+            return (
+              <span
+                key={t.key}
+                title={`${t.label} ${t.count}/${next}`}
+                className="trait-hex trait-hex-sm shrink-0"
+                style={{ ["--trait" as string]: color }}
+              >
+                <span className="trait-hex-fill">
+                  <TraitGlyph traitKey={t.key} size={10} />
+                </span>
+              </span>
+            );
+          })}
+          {tray.length > 8 && (
+            <span className="text-[10px] font-bold text-slate-500 tabular-nums">+{tray.length - 8}</span>
+          )}
+          <span className="ml-auto text-[9px] font-bold uppercase tracking-wide text-slate-600">
+            {tray.length}
+          </span>
+        </div>
+      )}
+
       {hovered && hover && createPortal(
         <TraitTooltip t={hovered} top={hover.top} left={hover.left} members={membersFor(hovered.key)} board={board} onEnter={cancelClose} onLeave={scheduleClose} />,
         document.body,

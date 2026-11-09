@@ -517,6 +517,20 @@ body {
     inset 0 16px 38px -20px rgba(0, 0, 0, 0.75);
 }
 
+/* A shop trait that buying would level up. Pulses the ring rather than the
+   whole chip, so the label stays readable while the cue still catches the eye
+   across five cards. */
+.shop-trait-gain {
+  animation: trait-gain 1.5s ease-in-out infinite;
+}
+@keyframes trait-gain {
+  0%, 100% { box-shadow: 0 0 10px -1px currentColor; }
+  50% { box-shadow: 0 0 16px 1px currentColor; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shop-trait-gain { animation: none; }
+}
+
 /* Hexagonal trait badge (TFT's synergy frame).
    Two nested clip-paths: the outer carries the coloured edge, the inner is
    inset by a pixel to leave that edge visible. A border can't do this — a
@@ -538,6 +552,18 @@ body {
   transition: opacity 140ms ease;
 }
 .trait-hex.is-active {
+  opacity: 1;
+}
+/* Tray variant: same badge, smaller, for the collapsed long tail. */
+.trait-hex.trait-hex-sm {
+  width: 20px;
+  height: 22px;
+  opacity: 0.55;
+}
+/* Scouting variant: tiny, for an opponent's live synergies in the player rail. */
+.trait-hex.trait-hex-xs {
+  width: 13px;
+  height: 15px;
   opacity: 1;
 }
 .trait-hex-fill {

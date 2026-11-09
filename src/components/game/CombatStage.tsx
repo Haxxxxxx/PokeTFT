@@ -7,6 +7,8 @@ import { usePrefersReducedMotion } from "@/lib/useReducedMotion";
 import { sfx } from "@/lib/audio";
 import { hexToPixel, fieldPixelSize, hexDistance, FIELD, HEX_CLIP } from "@/game/engine/hex";
 import { useGameLayout } from "./LayoutProvider";
+import { CombatField3D } from "./CombatField3D";
+import { useAppStore } from "@/game/store/appStore";
 import { TYPE_COLOR } from "@/game/ui";
 import { SnowIcon, SwordIcon, ShieldIcon } from "./icons";
 import { Leaf, BarChart3 } from "lucide-react";
@@ -192,6 +194,7 @@ export function CombatStage({
   }, [finished]);
 
   const layout = useGameLayout();
+  const board3d = useAppStore((st) => st.settings.board3d);
   const TILE_W = layout.tile.w;
   const TILE_H = layout.tile.h;
 
@@ -281,11 +284,17 @@ export function CombatStage({
       <div
         className="relative shrink-0 arena-frame"
         style={{
-          width: w + 28, height: h + 28, padding: 14,
-          perspective: `${layout.perspective}px`,
-          perspectiveOrigin: "50% 50%",
+          width: w + 28, height: h + 28, padding: board3d ? 0 : 14,
+          // The CSS field needs a perspective ancestor; the canvas brings its
+          // own camera and must NOT be inside a rotated plane, or it gets
+          // skewed and drawn on top of a second, redundant arena.
+          ...(board3d ? {} : { perspective: `${layout.perspective}px`, perspectiveOrigin: "50% 50%" }),
         }}
       >
+        {board3d && (
+          <CombatField3D a={a} b={b} frac={frac} size={{ w: w + 28, h: h + 28 }} />
+        )}
+        {!board3d && (<>
         {/* Same raked platform as the planning board — combat was rendering a
             flat grid while planning showed a 3D arena, which made the phase
             flip look like two different games. */}
@@ -394,6 +403,7 @@ export function CombatStage({
           })}
         </div>
         </div>
+        </>)}
       </div>
       </div>
 

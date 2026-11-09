@@ -42,6 +42,10 @@ function asUnits(u: unknown): UnitInstance[] {
   return (Array.isArray(u) ? u : Object.values(u as Record<string, UnitInstance>)).map(normalizeUnit);
 }
 import { Board } from "./Board";
+import { computeTraits } from "@/game/engine/synergies";
+import { TYPE_COLOR } from "@/game/ui";
+import { TraitGlyph } from "./TraitGlyph";
+import { Board3D } from "./Board3D";
 import { useGameLayout } from "./LayoutProvider";
 import { UnitChip } from "./UnitChip";
 import { ShopBar } from "./ShopBar";
@@ -166,6 +170,7 @@ export function NetGameClient() {
   const pickAugment = useGame((s) => s.pickAugment);
   const augments = useGame((s) => s.augments);
   const lang = useAppStore((s) => s.settings.language);
+  const board3d = useAppStore((s) => s.settings.board3d);
   const buyXp = useGame((s) => s.buyXp);
   const reroll = useGame((s) => s.reroll);
   const moveToBoard = useGame((s) => s.moveToBoard);
@@ -1251,8 +1256,16 @@ export function NetGameClient() {
             <h2 className="text-[10px] uppercase tracking-wider text-amber-200/55 px-1 mb-1.5">{t.net_trainers(aliveCount)}</h2>
             <div className="flex flex-col gap-1">
               {ladder.map((p, i) => {
-                const dex = asBoard(p.board)[0] ? getDef(asBoard(p.board)[0].defId).dex[asBoard(p.board)[0].star - 1] : null;
+                const pBoard = asBoard(p.board);
+                const dex = pBoard[0] ? getDef(pBoard[0].defId).dex[pBoard[0].star - 1] : null;
                 const isNm = p.botDifficulty === "nightmare";
+                // Their strongest live synergies. Boards are public in this
+                // lobby (the rules chose full transparency), and TFT puts the
+                // same cue here — it turns the rail from a list of names into
+                // actual scouting you can act on without opening each board.
+                const topTraits = computeTraits(pBoard)
+                  .filter((tr) => tr.tier > 0)
+                  .slice(0, 3);
                 return (
                   <div
                     key={p.uid}
@@ -1283,6 +1296,22 @@ export function NetGameClient() {
                         </span>
                         {/* Scouting: rivals' levels are public (TFT-style). */}
                         <span className="shrink-0 text-[8px] font-bold px-1 rounded bg-slate-700/80 text-slate-300 leading-tight tabular-nums">{t.net_lv}{p.level ?? 1}</span>
+                        {topTraits.length > 0 && (
+                          <span className="shrink-0 flex items-center gap-[2px]">
+                            {topTraits.map((tr) => (
+                              <span
+                                key={tr.key}
+                                title={`${tr.label} ${tr.count}`}
+                                className="trait-hex trait-hex-xs"
+                                style={{ ["--trait" as string]: (TYPE_COLOR as Record<string, string>)[tr.key] ?? "#64748b" }}
+                              >
+                                <span className="trait-hex-fill">
+                                  <TraitGlyph traitKey={tr.key} size={8} />
+                                </span>
+                              </span>
+                            ))}
+                          </span>
+                        )}
                       </span>
                       <span className="flex items-center gap-1">
                         <span className="flex-1 h-1.5 rounded-full bg-slate-700 overflow-hidden">
@@ -1355,6 +1384,11 @@ export function NetGameClient() {
                     syncWindowMs={COMBAT_MS}
                     onResolve={() => {}}
                   />
+                ) : board3d ? (
+                  // HD-2D board (opt-in). Drag is handled natively inside the
+                  // canvas and committed through the same store actions, so the
+                  // two boards are interchangeable from the game's point of view.
+                  <Board3D interactive={phase === "planning" && (!spectate || spectate === myUid)} />
                 ) : (
                   <Board
                     withBench
