@@ -20,15 +20,22 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Instance, Instances, Environment, ContactShadows, Html } from "@react-three/drei";
 import { FIELD, FIELD_SIZE, HEX_R, cellToWorld, worldToCell, isAllyRow } from "@/game/ui/hex3d";
-import { UnitModel, type ModelId } from "./UnitModel";
 import { SpriteUnit } from "@/components/game/SpriteUnit";
 
-type Unit = { id: string; c: number; r: number; color: string; tall: number; model: ModelId; dex: number; star: 1 | 2 | 3 };
+type Unit = { id: string; c: number; r: number; color: string; tall: number; dex: number; star: 1 | 2 | 3 };
 
-/** Which representation the board draws. The spike's real question isn't "can
- *  we render 3D models" (it can) — it's which of these looks better with the
- *  art we ACTUALLY have, so both are rendered side by side on demand. */
-type UnitMode = "sprite" | "model";
+/**
+ * The spike answered its question: R3F renders rigged, animated glTF fine, at a
+ * trivial budget, with working drag. What it also showed is that SPRITES are
+ * both the safer and the more complete option for this roster — we have all
+ * 1,025 of them and no licensed source of Pokémon models exists.
+ *
+ * So the model-comparison mode and its sample assets are gone. They were ~3.3MB
+ * of glTF whose own licence note said they must not reach a release build, and
+ * `public/` ships wholesale in the static export — merging them would have put
+ * them on the CDN. The findings live in the git history and PACK-STRATEGY.md;
+ * the assets don't need to.
+ */
 
 const ALLY_TINT = "#2ec98a";
 const ENEMY_TINT = "#f2607a";
@@ -37,7 +44,6 @@ const ENEMY_TINT = "#f2607a";
  *  silhouette variety and per-model animation cost are both visible. */
 function initialUnits(): Unit[] {
   const palette = ["#64b5f6", "#ffb74d", "#ba68c8", "#4db6ac", "#e57373", "#aed581"];
-  const models: ModelId[] = ["fox", "duck", "brainstem", "fox", "duck", "fox"];
   // Recognisable silhouettes at a range of shapes/sizes, so the sprite mode is
   // judged on real roster art rather than on whichever mon happens to be cute.
   const dex = [6, 9, 25, 94, 149, 143]; // Charizard, Blastoise, Pikachu, Gengar, Dragonite, Snorlax
@@ -49,7 +55,6 @@ function initialUnits(): Unit[] {
     r: 5 + Math.floor(i / 5),
     color,
     tall: 0.5 + ((i * 7) % 5) * 0.07,
-    model: models[i],
     dex: dex[i],
     star: stars[i],
   }));
@@ -97,11 +102,11 @@ function HexFloor({ hovered }: { hovered: { c: number; r: number } | null }) {
   );
 }
 
-/** A unit on the board, drawn either as a billboarded sprite or a glTF model. */
+/** A unit on the board, drawn as a billboarded sprite. */
 function UnitMesh({
-  unit, dragging, mode, onGrab,
+  unit, dragging, onGrab,
 }: {
-  unit: Unit; dragging: boolean; mode: UnitMode;
+  unit: Unit; dragging: boolean;
   onGrab: (id: string, e: ThreeEvent<PointerEvent>) => void;
 }) {
   const [x, , z] = cellToWorld(unit.c, unit.r);
@@ -118,11 +123,7 @@ function UnitMesh({
         <cylinderGeometry args={[HEX_R * 0.78, HEX_R * 0.78, 0.9, 10]} />
       </mesh>
       <Suspense fallback={null}>
-        {mode === "sprite" ? (
-          <SpriteUnit dex={unit.dex} star={unit.star} position={[0, 0, 0]} dimmed={dragging} />
-        ) : (
-          <UnitModel id={unit.model} position={[0, 0, 0]} tint={unit.color} dragging={dragging} />
-        )}
+        <SpriteUnit dex={unit.dex} star={unit.star} position={[0, 0, 0]} dimmed={dragging} />
       </Suspense>
     </group>
   );
@@ -223,7 +224,7 @@ function Stats() {
   );
 }
 
-function Scene({ mode }: { mode: UnitMode }) {
+function Scene() {
   const [units, setUnits] = useState<Unit[]>(initialUnits);
   const [hover, setHover] = useState<{ c: number; r: number } | null>(null);
   const [drag, setDrag] = useState<string | null>(null);
@@ -270,7 +271,7 @@ function Scene({ mode }: { mode: UnitMode }) {
       <group rotation={[0, 0, 0]}>
         <HexFloor hovered={hover} />
         {units.map((u) => (
-          <UnitMesh key={u.id} unit={u} dragging={drag === u.id} mode={mode} onGrab={onGrab} />
+          <UnitMesh key={u.id} unit={u} dragging={drag === u.id} onGrab={onGrab} />
         ))}
         <Ground onHover={setHover} onDrop={onDrop} />
         <ContactShadows position={[0, 0.07, 0]} opacity={0.5} scale={FIELD_SIZE.w * 1.4} blur={2.2} far={2} />
@@ -282,9 +283,6 @@ function Scene({ mode }: { mode: UnitMode }) {
 }
 
 export function Arena3D() {
-  // Sprites are the DEFAULT: they're the representation we actually have art
-  // for across the whole roster, so that's the one worth judging first.
-  const [mode, setMode] = useState<UnitMode>("sprite");
   return (
     <div className="fixed inset-0 bg-[#070c17]">
       <Canvas
@@ -299,27 +297,11 @@ export function Arena3D() {
         gl={{ antialias: true, preserveDrawingBuffer: true }}
       >
         <color attach="background" args={["#070c17"]} />
-        <Scene mode={mode} />
+        <Scene />
       </Canvas>
       <div className="absolute left-4 top-4 text-[11px] leading-relaxed text-slate-400">
         <div className="font-bold text-slate-200">Arena 3D · spike</div>
         <div className="pointer-events-none">drag a unit onto a teal hex</div>
-        <div className="mt-2 inline-flex rounded-lg overflow-hidden border border-white/15">
-          {(["sprite", "model"] as UnitMode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`px-2.5 py-1 text-[11px] font-bold capitalize transition-colors ${
-                mode === m ? "bg-amber-400 text-black" : "bg-white/[0.06] text-slate-300 hover:bg-white/[0.12]"
-              }`}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-        <div className="pointer-events-none mt-1 text-[10px] text-slate-500 max-w-[220px]">
-          sprite = the 1,025 we already have · model = sample glTF
-        </div>
       </div>
     </div>
   );
