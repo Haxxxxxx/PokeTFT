@@ -193,26 +193,23 @@ export async function recordGameResult(uid: string, code: string, r: Omit<GameRe
 /** Client self-write: apply the LP result the host wrote to games/{code}/results/{uid}.
  *  Idempotent via users/{uid}/appliedGames/{code} — safe to call on reconnect or retry.
  *  Only writes self-owned nodes so it works under RTDB self-write rules. */
-export async function claimRankedResult(
-  uid: string,
-  code: string,
-  result: { delta: number; rating: number; prevRating: number },
-  snapshot: { username: string; photoURL?: string | null },
-): Promise<void> {
-  // Idempotency: skip if already applied for this game.
-  const claimRef = ref(db(), `users/${uid}/appliedGames/${code}`);
-  const already = await get(claimRef);
-  if (already.exists()) return;
-  await set(claimRef, true).catch(() => {});
-  await update(ref(db(), `users/${uid}`), {
-    rating: result.rating,
-  }).catch(() => {});
-  await set(ref(db(), `leaderboard/${uid}`), {
-    username: snapshot.username,
-    rating: result.rating,
-    photoURL: snapshot.photoURL ?? null,
-  }).catch(() => {});
-}
+/*
+ * claimRankedResult() was removed.
+ *
+ * It mirrored the server-written games/{code}/results/{uid} row into
+ * users/{uid}/rating and leaderboard/{uid} from the CLIENT. Both of those are
+ * now server-only in the rules, and applyRatingFor() — which runs in Cloud
+ * Functions with admin rights — already writes both, so this was duplicating
+ * the authoritative write rather than adding anything.
+ *
+ * It also carried the same silent-loss shape that the ref(db,"") bug had: it
+ * consumed its idempotency claim (appliedGames/{code}) BEFORE attempting the
+ * writes, and swallowed each failure individually — so a claim that landed
+ * while the rating write failed could never be retried by anything. And its
+ * `update(users/{uid}, {rating})` was an absolute overwrite from a snapshot
+ * taken when the game ended, so a player who finished another game in between
+ * (two tabs, or a late results listener) had the newer rating clobbered.
+ */
 
 /** Read a player's recent finished games, newest first. */
 export async function getHistory(uid: string, limit = 50): Promise<GameResult[]> {
