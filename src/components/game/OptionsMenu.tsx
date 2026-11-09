@@ -57,6 +57,26 @@ export function OptionsMenu() {
             <span>{t.o_sound}</span>
             <span>{settings.soundEnabled ? t.o_on : t.o_off}</span>
           </button>
+          {/* HD-2D board. Opt-in: the CSS board remains the default and the
+              fallback while this beds in. */}
+          <button
+            onClick={() => setSettings({ board3d: !settings.board3d })}
+            className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${settings.board3d ? "bg-sky-950/40 border border-sky-700/50 text-sky-300" : "bg-slate-800 border border-slate-700 text-slate-400"}`}
+          >
+            <span>Plateau 3D <span className="opacity-60">(beta)</span></span>
+            <span>{settings.board3d ? t.o_on : t.o_off}</span>
+          </button>
+          {/* Pokémon 3D models. Opt-in while the pose map is reviewed — one
+              species of 967 is done, models come from a third-party GitHub repo
+              rather than a production CDN, and the model canvas currently
+              occludes the combat HP bars. */}
+          <button
+            onClick={() => setSettings({ models3d: !settings.models3d })}
+            className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${settings.models3d ? "bg-fuchsia-950/40 border border-fuchsia-700/50 text-fuchsia-300" : "bg-slate-800 border border-slate-700 text-slate-400"}`}
+          >
+            <span>Modèles 3D <span className="opacity-60">(alpha)</span></span>
+            <span>{settings.models3d ? t.o_on : t.o_off}</span>
+          </button>
           {/* Language */}
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-semibold text-slate-400">{t.o_language}</span>

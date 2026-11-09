@@ -90,6 +90,22 @@ const main = async () => {
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
 
+  // Opt into the HD-2D board before the app boots, by writing the persisted
+  // settings key directly — the toggle lives behind an in-match menu, which is
+  // several clicks deep and not what this harness is testing.
+  if (process.env.BOARD3D === "1") {
+    await page.addInitScript(() => {
+      try {
+        const k = "poketft_settings";
+        const cur = JSON.parse(localStorage.getItem(k) ?? '{"state":{"settings":{}},"version":0}');
+        cur.state = cur.state ?? { settings: {} };
+        cur.state.settings = { ...(cur.state.settings ?? {}), board3d: true };
+        localStorage.setItem(k, JSON.stringify(cur));
+      } catch { /* private mode — fall back to the CSS board */ }
+    });
+    console.log("  (HD-2D board enabled)");
+  }
+
   console.log(`→ ${URL}`);
   await page.goto(URL, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(3500);
@@ -106,7 +122,15 @@ const main = async () => {
   // Host a game. The button is just "Créer".
   const hosted = await clickButton(page, /^\s*(cr[ée]er|create)\b/i, 8000);
   console.log(hosted ? "  hosted a game" : "  ⚠️ could not find the create button");
-  await page.waitForTimeout(3500);
+  // Hosting can land on a multi-step pre-lobby (mode picker, then rules) before
+  // the salon itself. Walk any "Continue" steps until the lobby appears.
+  for (let i = 0; i < 3; i++) {
+    await page.waitForTimeout(1200);
+    if (!(await clickButton(page, /^\s*(continuer|continue|suivant)\b/i, 2500))) break;
+    console.log("  advanced a pre-lobby step");
+  }
+
+  await page.waitForTimeout(3000);
   await dismissOverlays(page);
   await shoot(page, "02-lobby");
 
@@ -128,10 +152,13 @@ const main = async () => {
 
   // Combat: the planning timer is 30s, so wait it out and shoot mid-fight.
   console.log("  waiting for combat…");
-  await page.waitForTimeout(32000);
-  await shoot(page, "04-combat");
-  await page.waitForTimeout(6000);
-  await shoot(page, "05-combat-late");
+  await page.waitForTimeout(31000);
+  // Several frames across the fight: a cast only fires at full mana, so a
+  // single capture is a coin flip on whether ability effects are on screen.
+  for (let i = 0; i < 6; i++) {
+    await shoot(page, `04-combat-${String(i).padStart(2, "0")}`);
+    await page.waitForTimeout(2200);
+  }
 
   if (errors.length) {
     console.log(`\n⚠️  ${errors.length} console error(s):`);

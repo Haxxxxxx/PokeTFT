@@ -9,7 +9,8 @@ import { getDef } from "@/game/data/mons";
 import { TYPE_COLOR } from "@/game/ui";
 import { hasUsable3DModel } from "@/game/data/model-availability";
 import { useGame, BENCH_SIZE, PENSION_COST, PENSION_ROUNDS, resolveBenchSlots } from "@/game/store/gameStore";
-import { HEX_W } from "@/lab/arena3d/geometry";
+import { useAppStore } from "@/game/store/appStore";
+import { HEX_W } from "@/game/ui/hex3d";
 import type { ModelId } from "@/lab/arena3d/UnitModel";
 import { useGameLayout } from "./LayoutProvider";
 import { UnitChip } from "./UnitChip";
@@ -245,6 +246,7 @@ function BoardBase({
 }) {
   const t = useT();
   const layout = useGameLayout();
+  const models3d = useAppStore((st) => st.settings.models3d);
   const storeUnits = useGame((s) => s.units);
   const drops = useGame((s) => s.drops);
   const collectDrop = useGame((s) => s.collectDrop);
@@ -388,6 +390,7 @@ function BoardBase({
           />
           {/* Carved lip between the arena floor and its border. */}
           <span className="arena-rail" aria-hidden />
+          <span className="arena-dust" aria-hidden />
         </div>
 
         {/* Board capacity, ghosted large across the floor — TFT's "6/6". Lies on
@@ -543,7 +546,7 @@ function BoardBase({
                 size={size}
                 interactive={interactive}
                 shape="hex"
-                showModel={false}
+                showModel={models3d}
                 showSprite={!loadedModels.has(modelKey(unit.iid, model)) || !hasUsable3DModel(model)}
                 dragHitArea
               />
@@ -584,7 +587,7 @@ function BoardBase({
                 interactive={benchInteractive}
                 canDeploy={benchCanDeploy}
                 shape="hex"
-                showModel={false}
+                showModel={models3d}
                 showSprite={!loadedModels.has(modelKey(unit.iid, model)) || !hasUsable3DModel(model)}
                 dragHitArea
               />
@@ -592,14 +595,26 @@ function BoardBase({
           );
         })}
       </div>
-      <Board3DModels
-        models={models}
-        height={frameH}
-        perspective={layout.perspective}
-        animationMode="board"
-        onReady={handleModelReady}
-        onError={handleModelError}
-      />
+      {/* 3D models are OFF by default (settings.models3d). Three reasons, all
+          from the model work's own notes:
+            - the baked pose map has ONE species reviewed out of 967, so most of
+              the roster would render in an unreviewed stance;
+            - every client would fetch models from a third-party GitHub repo over
+              raw.githubusercontent.com, which is not a production CDN;
+            - the model canvas sits above the unit DOM, so a tall model occludes
+              the combat HP/mana bars.
+          The pipeline is complete and ships here; flipping the default is a
+          one-line change once the poses have been reviewed. */}
+      {models3d && (
+        <Board3DModels
+          models={models}
+          height={frameH}
+          perspective={layout.perspective}
+          animationMode="board"
+          onReady={handleModelReady}
+          onError={handleModelError}
+        />
+      )}
       {withBench && !units && <PensionDock interactive={interactive} />}
     </div>
   );

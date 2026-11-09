@@ -10,6 +10,12 @@ export type AppSettings = {
   soundEnabled: boolean;
   /** Master volume 0..1 (scales music + SFX). */
   volume: number;
+  /** Render the planning board in WebGL (HD-2D: the same sprites, billboarded
+   *  and lit in a 3D arena) instead of the CSS board. Opt-in while it beds in —
+   *  the CSS board stays the default and the fallback. */
+  board3d: boolean;
+  /** Render units as 3D models instead of sprites (see models3d note in OptionsMenu). */
+  models3d: boolean;
 };
 
 export type AppStore = {
@@ -34,6 +40,8 @@ export const useAppStore = create<AppStore>()(
         language: "fr",
         soundEnabled: true,
         volume: 0.7,
+        board3d: false,
+        models3d: false,
       },
       setSettings: (update) => set((s) => ({ settings: { ...s.settings, ...update } })),
       profileOpen: false,

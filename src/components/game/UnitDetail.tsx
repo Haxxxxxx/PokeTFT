@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useUi } from "@/game/store/uiStore";
 import { useGame } from "@/game/store/gameStore";
+import { sellValue } from "@/game/engine/economy";
 import { useAppStore } from "@/game/store/appStore";
 import { getDef, archetypeOf, castEffectOf, typesForStar, type Archetype } from "@/game/data/mons";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
@@ -104,6 +105,7 @@ function Card() {
   const lang = useAppStore((s) => s.settings.language);
   const inspect = useUi((s) => s.inspect)!;
   const clear = useUi((s) => s.clearInspect);
+  const sell = useGame((st) => st.sell);
   // The inspected mon's held items (if it's an owned instance) drive the LIVE stats
   // below, so the panel reflects what the mon actually fights with.
   const heldUnit = useGame((st) => (inspect.iid ? st.units.find((u) => u.iid === inspect.iid) : undefined));
@@ -172,6 +174,21 @@ function Card() {
             ))}
           </div>
         </div>
+        {/* Selling used to be reachable ONLY by dragging onto the shop's sell
+            zone (a dnd-kit droppable) or by the S hotkey, which itself needs a
+            unit inspected. The 3D board handles its drags natively and never
+            starts a dnd-kit drag, so on that board neither route existed and an
+            owned unit could not be sold at all. An explicit button here works
+            in both renderers and doesn't depend on knowing a hotkey. */}
+        {heldUnit && (
+          <button
+            onClick={() => { sell(heldUnit.iid); clear(); }}
+            className="shrink-0 inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-bold text-amber-200 bg-amber-500/10 ring-1 ring-amber-400/40 hover:bg-amber-500/20 transition-colors"
+          >
+            {t.ud_sell}
+            <span className="inline-flex items-center gap-0.5"><CoinIcon size={10} />{sellValue(heldUnit.defId, heldUnit.star)}</span>
+          </button>
+        )}
         <button onClick={clear} aria-label={t.a_close} className="text-slate-500 hover:text-white transition-colors shrink-0">
           <CloseIcon size={16} />
         </button>

@@ -1,10 +1,10 @@
 "use client";
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useGame } from "@/game/store/gameStore";
 import { useUi } from "@/game/store/uiStore";
 import { getDef, spriteUrl } from "@/game/data/mons";
-import { computeTraits } from "@/game/engine/synergies";
+import { computeTraits, traitGainsFor } from "@/game/engine/synergies";
 import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import { TraitGlyph } from "./TraitGlyph";
@@ -70,9 +70,24 @@ function ShopBarBase() {
 
   const t = useT();
   const owned = ownedByDef(units);
+  const boardUnits = units.filter((u) => u.pos !== null);
   const activeTraits = new Set(
-    computeTraits(units.filter((u) => u.pos !== null)).filter((t) => t.tier > 0).map((t) => t.key),
+    computeTraits(boardUnits).filter((t) => t.tier > 0).map((t) => t.key),
   );
+
+  // Which synergies each offered unit would activate or step up. This is the
+  // question you're actually asking every reroll, and reading it off a list of
+  // trait names means doing the arithmetic by hand each time.
+  const gainsByDef = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const defId of shop) {
+      if (!defId || m.has(defId)) continue;
+      m.set(defId, new Set(traitGainsFor(defId, boardUnits).map((g) => g.key)));
+    }
+    return m;
+    // Board identity changes on every placement; shop changes on every roll.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shop, units]);
 
   const odds = SHOP_ODDS[Math.min(Math.max(1, level), 10)];
   // Card art is sized from the shop strip's budgeted height so it fills the
@@ -267,16 +282,42 @@ function ShopBarBase() {
               {/* Traits with icons, stacked top-left. */}
               <div className="absolute top-2.5 left-2 z-10 flex flex-col items-start gap-1">
                 {own && (
-                  <span className="inline-flex items-center gap-0.5 rounded bg-emerald-500/90 px-1 text-[8px] font-extrabold text-black leading-none py-[2px]">
-                    {own.topStar > 1 && <StarIcon size={7} />}
-                    {nextThreshold !== null ? `${copies}/${nextThreshold}` : t.sh_max}
+                  /* One copy from a star-up is the single most consequential
+                     thing a shop card can tell you, and it was whispering it in
+                     an 8px chip identical to "2/9". When the next buy completes
+                     the tier it now says so outright, in the tier's own colour
+                     with the target star — matching the ▲ language the trait
+                     chips already use for "this purchase changes something". */
+                  <span
+                    className={
+                      oneFromStar
+                        ? "inline-flex items-center gap-0.5 rounded px-1.5 text-[10px] font-extrabold text-black leading-none py-[3px] ring-1 ring-white/80 shop-star-up"
+                        : "inline-flex items-center gap-0.5 rounded bg-emerald-500/90 px-1 text-[8px] font-extrabold text-black leading-none py-[2px]"
+                    }
+                    style={oneFromStar ? { background: nextThreshold === COPIES_TO_STAR[3] ? "#ffc21e" : "#9fb6d4" } : undefined}
+                    title={oneFromStar ? t.sh_one_from_star : undefined}
+                  >
+                    {oneFromStar ? (
+                      <>
+                        <StarIcon size={9} />
+                        {nextThreshold === COPIES_TO_STAR[3] ? 3 : 2}
+                        <span aria-hidden>&#9650;</span>
+                      </>
+                    ) : (
+                      <>
+                        {own.topStar > 1 && <StarIcon size={7} />}
+                        {nextThreshold !== null ? `${copies}/${nextThreshold}` : t.sh_max}
+                      </>
+                    )}
                   </span>
                 )}
+                {/* cardTypes (the displayed star's typing) from the model work,
+                    with main's trait-gain flag — both sides mattered here. */}
                 {cardTypes.map((tt) => (
-                  <TraitChip key={tt} traitKey={tt} label={TRAITS_BY_KEY[tt]?.label ?? tt} color={TYPE_COLOR[tt as PokeType]} active={activeTraits.has(tt)} />
+                  <TraitChip key={tt} traitKey={tt} label={TRAITS_BY_KEY[tt]?.label ?? tt} color={TYPE_COLOR[tt as PokeType]} active={activeTraits.has(tt)} gains={gainsByDef.get(def.id)?.has(tt)} />
                 ))}
                 {def.roles.map((r) => (
-                  <TraitChip key={r} traitKey={r} label={TRAITS_BY_KEY[r]?.label ?? r} color="#94a3b8" active={activeTraits.has(r)} />
+                  <TraitChip key={r} traitKey={r} label={TRAITS_BY_KEY[r]?.label ?? r} color="#94a3b8" active={activeTraits.has(r)} gains={gainsByDef.get(def.id)?.has(r)} />
                 ))}
               </div>
 
@@ -291,15 +332,32 @@ function ShopBarBase() {
   );
 }
 
-function TraitChip({ label, color, active, traitKey }: { label: string; color: string; active: boolean; traitKey: string }) {
+function TraitChip({
+  label, color, active, traitKey, gains,
+}: {
+  label: string; color: string; active: boolean; traitKey: string;
+  /** Buying this unit would activate or step up this synergy. */
+  gains?: boolean;
+}) {
   return (
     <span
-      title={active ? `${label} (active)` : label}
-      style={active ? { background: `${color}cc`, color: "#0b1020" } : { color: "#e2e8f0" }}
-      className={`inline-flex items-center gap-1 text-[13px] leading-none px-2 py-[3px] rounded font-bold whitespace-nowrap backdrop-blur-sm ${active ? "ring-1 ring-white/70" : "bg-slate-950/60"}`}
+      title={gains ? `${label} — buying this levels it up` : active ? `${label} (active)` : label}
+      style={
+        gains
+          ? ({ background: color, color: "#0b1020", "--trait-glow": color } as CSSProperties)
+          : active
+            ? { background: `${color}cc`, color: "#0b1020" }
+            : { color: "#e2e8f0" }
+      }
+      className={`inline-flex items-center gap-1 text-[13px] leading-none px-2 py-[3px] rounded font-bold whitespace-nowrap backdrop-blur-sm ${
+        gains ? "ring-2 ring-white shop-trait-gain" : active ? "ring-1 ring-white/70" : "bg-slate-950/60"
+      }`}
     >
       <TraitGlyph traitKey={traitKey} size={12} />
       {label}
+      {/* An explicit arrow, not just a brighter chip: colour alone is the one
+          cue a colour-blind player can't use, and this is a decision prompt. */}
+      {gains && <span aria-hidden className="text-[11px] leading-none">▲</span>}
     </span>
   );
 }
