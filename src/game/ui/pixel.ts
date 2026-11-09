@@ -37,9 +37,38 @@ export const SPRITE_SOURCE = 96;
  * @param maxSize  the largest size that still reads correctly in the layout
  * @param source   source edge length (defaults to the mon sprite's 96)
  */
+/**
+ * How far above the requested size a snapped size may land before the snap is
+ * abandoned. Integer multiples of a 96px source are coarse: near a ~104px tile
+ * the only choices are 96 (0.98x the cell) or 192 (1.96x), so rounding to the
+ * NEAREST multiple could round UP to almost double the intended size. That is
+ * the "mons too big" reported from play — a crisper sprite is not worth a unit
+ * rendered half again as large as it should be, so past this margin we take the
+ * exact size and accept slightly softer upscaling.
+ */
+/**
+ * How far a snapped size may stray from the requested one, in either
+ * direction, before the snap is abandoned.
+ *
+ * Integer multiples of a 96px source are coarse. Rounding to the NEAREST
+ * multiple sounds safe but is not: near a ~104px tile the choices are 96 or
+ * 192, so a unit could render at 125% of its intended size (the "mons too big"
+ * reported from play) or, one tile size later, at 63% of it. Both were
+ * happening at different tiles, which is also why unit scale looked
+ * inconsistent as the board resized.
+ *
+ * Within this margin a snapped size is pixel-exact and close enough to right.
+ * Outside it, correct size wins and we accept slightly softer upscaling — a
+ * crisper sprite is never worth a unit drawn a third too large or too small.
+ */
+const SNAP_TOLERANCE = 0.1;
+
 export function crispSize(desired: number, maxSize: number, source: number = SPRITE_SOURCE): number {
-  const snapped = Math.max(1, Math.round(desired / source)) * source;
-  if (snapped <= maxSize) return snapped;
-  const fitted = Math.floor(maxSize / source) * source;
-  return fitted >= source ? fitted : Math.round(desired);
+  const cap = Math.max(1, maxSize);
+  const target = Math.min(desired, cap);
+  const snapped = Math.max(1, Math.round(target / source)) * source;
+  const within = Math.abs(snapped - target) <= target * SNAP_TOLERANCE;
+  if (within && snapped <= cap) return snapped;
+  return Math.round(target);
 }
+
