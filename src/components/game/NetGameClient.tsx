@@ -700,16 +700,25 @@ export function NetGameClient() {
     return unsub;
   }, [serverResultCode, myUid]);
 
-  // Auto-concede when the user actually LEAVES mid-game (closes the tab, navigates away)
-  // while still alive — so history/LP get recorded near-instantly instead of waiting up
-  // to 30 min for pruneStale's fallback sweep. pagehide fires on tab close, navigation
-  // and bfcache freeze, so it forfeits right away. visibilitychange=hidden ALSO fires on
-  // ordinary mobile backgrounding (switching apps, a phone call, locking the screen for
-  // a second) — treating that as an immediate forfeit would eliminate players out of
-  // their match just for tabbing away briefly, so it only starts a grace timer and is
-  // cancelled if the tab comes back before the timer fires. Both are best-effort (the
-  // request may be cut by the browser); pruneStale is the guaranteed fallback.
-  const backgroundGraceMs = 20_000;
+  // Auto-concede ONLY when the page is really going away.
+  //
+  // This previously also forfeited on `visibilitychange: hidden` after a 20s
+  // grace. Live telemetry of a real match showed exactly what that costs: the
+  // player was eliminated 6s into stage 1-1 with `hp 100 → 0` — and again
+  // during a PLANNING phase, where no damage can be dealt at all — because
+  // they had alt-tabbed more than 20 seconds earlier. Tabbing away to look
+  // something up ended the match.
+  //
+  // The only thing that path bought was recording LP sooner than pruneStale's
+  // sweep would. Forfeiting a live game to speed up a bookkeeping write is a
+  // bad trade, so backgrounding no longer concedes at all: `connected` already
+  // goes false via onDisconnect while the player is away, and pruneStale is
+  // the guaranteed fallback for a genuinely abandoned game.
+  //
+  // `pagehide` with persisted === false means the page is actually being
+  // unloaded (tab closed, navigated away) — that IS abandonment, and still
+  // forfeits immediately. persisted === true is a bfcache freeze: the page can
+  // come back, so it is left alone.
   useEffect(() => {
     const code = room?.code;
     if (!code || !myUid) return;
@@ -722,19 +731,14 @@ export function NetGameClient() {
       recordedRef.current = code;
       callConcede(code).catch(() => {});
     };
-    let graceTimer: ReturnType<typeof setTimeout> | null = null;
-    const clearGrace = () => { if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; } };
-    const onHide = () => { clearGrace(); tryAutoForfeit(); };
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden") { clearGrace(); graceTimer = setTimeout(tryAutoForfeit, backgroundGraceMs); }
-      else clearGrace(); // came back before the grace period elapsed — not abandonment
+    const onHide = (e: PageTransitionEvent) => {
+      // A frozen/bfcached page is coming back; only a real unload is abandonment.
+      if (e.persisted) return;
+      tryAutoForfeit();
     };
     window.addEventListener("pagehide", onHide);
-    document.addEventListener("visibilitychange", onVisibility);
     return () => {
-      clearGrace();
       window.removeEventListener("pagehide", onHide);
-      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [room?.code, myUid]);  
 
