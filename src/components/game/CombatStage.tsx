@@ -7,11 +7,13 @@ import { usePrefersReducedMotion } from "@/lib/useReducedMotion";
 import { sfx } from "@/lib/audio";
 import { hexToPixel, fieldPixelSize, hexDistance, FIELD, HEX_CLIP } from "@/game/engine/hex";
 import { useGameLayout } from "./LayoutProvider";
+import { CombatField3D } from "./CombatField3D";
+import { useAppStore } from "@/game/store/appStore";
 import { TYPE_COLOR } from "@/game/ui";
 import { SnowIcon, SwordIcon, ShieldIcon } from "./icons";
 import { Leaf, BarChart3 } from "lucide-react";
 import { serverNow } from "@/game/net/serverTime";
-import type { CombatResult, FrameUnit, CombatEvent } from "@/game/engine/combat";
+import type { CombatResult, FrameUnit, CombatEvent, CastShape } from "@/game/engine/combat";
 import type { PokeType } from "@/game/types";
 
 /** Mirror a replay through the field centre (180° rotation) and swap teams, so
@@ -192,6 +194,7 @@ export function CombatStage({
   }, [finished]);
 
   const layout = useGameLayout();
+  const board3d = useAppStore((st) => st.settings.board3d);
   const TILE_W = layout.tile.w;
   const TILE_H = layout.tile.h;
 
@@ -281,11 +284,17 @@ export function CombatStage({
       <div
         className="relative shrink-0 arena-frame"
         style={{
-          width: w + 28, height: h + 28, padding: 14,
-          perspective: `${layout.perspective}px`,
-          perspectiveOrigin: "50% 50%",
+          width: w + 28, height: h + 28, padding: board3d ? 0 : 14,
+          // The CSS field needs a perspective ancestor; the canvas brings its
+          // own camera and must NOT be inside a rotated plane, or it gets
+          // skewed and drawn on top of a second, redundant arena.
+          ...(board3d ? {} : { perspective: `${layout.perspective}px`, perspectiveOrigin: "50% 50%" }),
         }}
       >
+        {board3d && (
+          <CombatField3D a={a} b={b} frac={frac} size={{ w: w + 28, h: h + 28 }} />
+        )}
+        {!board3d && (<>
         {/* Same raked platform as the planning board — combat was rendering a
             flat grid while planning showed a 3D arena, which made the phase
             flip look like two different games. */}
@@ -394,6 +403,7 @@ export function CombatStage({
           })}
         </div>
         </div>
+        </>)}
       </div>
       </div>
 
@@ -716,10 +726,29 @@ function DamageNumber({ x, y, dmg, crit, sup }: { x: number; y: number; dmg: num
  *   · line   → a beam from the caster through the target
  *   · single → a focused impact burst on the target
  *  A super-effective hit (eff>1) flares brighter. */
-function AbilityFx({ x, y, tx, ty, moveType, shape, eff }: { x: number; y: number; tx: number; ty: number; moveType: PokeType; shape: "single" | "splash" | "line"; eff: number }) {
+function AbilityFx({ x, y, tx, ty, moveType, shape, eff }: { x: number; y: number; tx: number; ty: number; moveType: PokeType; shape: CastShape; eff: number }) {
   const color = TYPE_COLOR[moveType] ?? "#a78bfa";
   const sup = eff > 1;        // super-effective → a bigger, brighter, double-ring hit
   const boost = sup ? 1.5 : 1;
+
+  // A blast hits every living enemy at once. It must NOT fall through to the
+  // single-target burst — that drew one small pop on one unit while the whole
+  // enemy side took damage. A wide shockwave from the caster is the read.
+  if (shape === "blast") {
+    const s = 220 * boost;
+    return (
+      <>
+        <span
+          className="absolute pointer-events-none rounded-full combat-cast"
+          style={{ left: x - s / 2, top: y - s / 2, width: s, height: s, border: `${sup ? 4 : 3}px solid ${color}`, boxShadow: `0 0 26px 4px ${color}aa` }}
+        />
+        <span
+          className="absolute pointer-events-none rounded-full combat-burst"
+          style={{ left: x - 60, top: y - 60, width: 120, height: 120, background: `radial-gradient(circle, ${sup ? "#fff" : color}, ${color}00 70%)` }}
+        />
+      </>
+    );
+  }
   // Super-effective flare: a second, wider shockwave ring + a white core, so type advantage
   // reads instantly during the fight.
   const supRing = sup ? (

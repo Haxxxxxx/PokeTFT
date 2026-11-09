@@ -14,7 +14,7 @@ import { ITEM_EFFECT } from "../data/items";
 import { computeTraits } from "./synergies";
 import { TRAITS_BY_KEY } from "../data/traits";
 import { makeRng, type Rng } from "./rng";
-import { allyToField, enemyToField, neighbors, hexDistance, hexKey, type Hex } from "./hex";
+import { allyToField, enemyToField, neighbors, hexDistance, hexKey, FIELD, type Hex } from "./hex";
 
 const STATUS_TICKS = 24; // ~1.5s of stun/freeze (16 ticks/sec)
 const BURN_TICKS = 48;   // ~3s of burn
@@ -103,6 +103,8 @@ export type FrameUnit = {
   id: string;
   team: Team;
   dex: number;
+  /** Star tier 1..3 — drives the bronze/silver/gold base glow in the renderer. */
+  star: 1 | 2 | 3;
   c: number;
   r: number;
   hpFrac: number;
@@ -119,9 +121,21 @@ export type FrameUnit = {
   disabled: boolean;
 };
 
+/**
+ * What a cast actually covers, for the renderer.
+ *
+ * This is NOT the same as Move["shape"]. castAbility() branches on
+ * castEffect === "blast" FIRST and hits every living enemy on the board,
+ * ignoring the move's shape entirely — so a blast caster whose move happens to
+ * be "single" used to emit shape: "single" and the indicator lit one hex while
+ * the engine nuked the whole enemy team. Carrying "blast" explicitly keeps the
+ * event honest about which branch ran.
+ */
+export type CastShape = Move["shape"] | "blast";
+
 export type CombatEvent =
   | { kind: "attack"; from: string; to: string }
-  | { kind: "cast"; from: string; to: string; moveType: PokeType; eff: number; shape: Move["shape"]; move: string }
+  | { kind: "cast"; from: string; to: string; moveType: PokeType; eff: number; shape: CastShape; move: string }
   | { kind: "hit"; to: string; dmg: number; crit?: boolean; sup?: boolean }
   | { kind: "death"; id: string };
 
@@ -357,6 +371,23 @@ function applyTraitBuffs(units: Combatant[], board: UnitInstance[], team: Team) 
   }
 }
 
+/**
+ * The cells an ability covers — the single source of truth for both the damage
+ * resolution below AND the renderer's area indicator.
+ *
+ * These MUST agree: an indicator that lights hexes the ability doesn't actually
+ * hit is worse than no indicator, because it teaches the player something
+ * false. Exporting it keeps them from drifting apart.
+ */
+export function abilityCells(target: Hex, shape: Move["shape"]): Hex[] {
+  if (shape === "splash") return [target, ...neighbors(target)];
+  if (shape === "line") {
+    // The target's whole column — the ability carries on through the rank.
+    return Array.from({ length: FIELD.rows }, (_, r) => ({ c: target.c, r }));
+  }
+  return [target];
+}
+
 function snapshot(units: Combatant[], t: number, events: CombatEvent[]): Frame {
   return {
     t,
@@ -366,6 +397,7 @@ function snapshot(units: Combatant[], t: number, events: CombatEvent[]): Frame {
       id: u.id,
       team: u.team,
       dex: u.dex,
+      star: u.star,
       c: u.pos.c,
       r: u.pos.r,
       hpFrac: u.maxHp > 0 ? Math.max(0, u.hp / u.maxHp) : 0, // guard maxHp=0 → no NaN in the rendered bar
@@ -557,7 +589,9 @@ function castAbility(caster: Combatant, target: Combatant, units: Combatant[], e
   const i = caster.star - 1;
   const base = caster.move.power[i] * caster.apMult;
   const eff = effectiveness(caster.move.type, target.types);
-  events.push({ kind: "cast", from: caster.id, to: target.id, moveType: caster.move.type, eff, shape: caster.move.shape, move: caster.move.name });
+  // Report the branch that ACTUALLY runs below, not the move's nominal shape.
+  const castShape: CastShape = caster.castEffect === "blast" ? "blast" : caster.move.shape;
+  events.push({ kind: "cast", from: caster.id, to: target.id, moveType: caster.move.type, eff, shape: castShape, move: caster.move.name });
 
   const hitOne = (victim: Combatant, mult = 1) => {
     const e = effectiveness(caster.move.type, victim.types);
@@ -591,15 +625,11 @@ function castAbility(caster: Combatant, target: Combatant, units: Combatant[], e
     }
   } else {
     hitOne(target);
-    if (caster.move.shape === "splash") {
-      const around = new Set(neighbors(target.pos).map(hexKey));
+    if (caster.move.shape === "splash" || caster.move.shape === "line") {
+      // Same cells the renderer lights up — see abilityCells.
+      const area = new Set(abilityCells(target.pos, caster.move.shape).map(hexKey));
       for (const v of units) {
-        if (v.alive && v.team !== caster.team && v.id !== target.id && around.has(hexKey(v.pos))) hitOne(v);
-      }
-    } else if (caster.move.shape === "line") {
-      // Hit enemies sharing the target's column behind it.
-      for (const v of units) {
-        if (v.alive && v.team !== caster.team && v.id !== target.id && v.pos.c === target.pos.c) hitOne(v);
+        if (v.alive && v.team !== caster.team && v.id !== target.id && area.has(hexKey(v.pos))) hitOne(v);
       }
     }
   }

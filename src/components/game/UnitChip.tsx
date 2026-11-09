@@ -8,20 +8,52 @@ import { useGame } from "@/game/store/gameStore";
 import { useT } from "@/lib/i18n";
 import { MEGA_STONE, canMega, isMegaActive } from "@/game/data/mega";
 import { HEX_CLIP } from "@/game/engine/hex";
+import { crispSize } from "@/game/ui/pixel";
 import { StarIcon, MegaIcon } from "./icons";
 import { ItemGlyph } from "./ItemGlyph";
 import type { UnitInstance } from "@/game/types";
 
 /** Small icons of the items a unit is holding, pinned to the token corner. */
-function ItemPips({ items, megaReady }: { items: string[]; megaReady: boolean }) {
+/**
+ * Held items, as a row of framed pips centred under the unit.
+ *
+ * They used to be bare 10px glyphs crammed into the bottom-right corner, which
+ * at board scale is unreadable and easy to miss entirely — and which item a
+ * carry is holding is a thing you check constantly. Now they sit under the
+ * unit like TFT's, in dark frames so they read against both the sprite and the
+ * stone, and they scale with the tile instead of staying fixed.
+ */
+function ItemPips({ items, megaReady, unitSize }: { items: string[]; megaReady: boolean; unitSize: number }) {
   const t = useT();
   if (items.length === 0) return null;
+  const box = Math.max(13, Math.round(unitSize * 0.26));
+  const glyph = Math.round(box * 0.72);
   return (
-    <div className="absolute bottom-0.5 right-0.5 flex gap-px pointer-events-none">
-      {items.map((id, i) => id === MEGA_STONE ? (
-        <span key={i} className={megaReady ? "text-fuchsia-300" : "text-slate-400"} title={t.it_mega_stone}><MegaIcon size={11} /></span>
-      ) : (
-        <span key={i} className="text-slate-200 drop-shadow" title={id}><ItemGlyph id={id} size={10} /></span>
+    <div
+      className="absolute left-1/2 -translate-x-1/2 flex items-center pointer-events-none"
+      style={{ bottom: -Math.round(box * 0.3), gap: Math.max(1, Math.round(box * 0.1)) }}
+    >
+      {items.map((id, i) => (
+        <span
+          key={i}
+          title={id === MEGA_STONE ? t.it_mega_stone : id}
+          // A held Mega Stone and an ARMED one are different states: armed
+          // means this mon can actually mega-evolve. Keeping them visually
+          // apart matters, since holding one on a mon that can't use it is a
+          // mistake worth seeing.
+          className={`grid place-items-center rounded-[3px] border ${
+            id !== MEGA_STONE
+              ? "text-slate-100 border-white/25 bg-slate-950/85"
+              : megaReady
+                ? "text-fuchsia-100 border-fuchsia-300 bg-fuchsia-900/90 animate-pulse"
+                : "text-fuchsia-200/50 border-fuchsia-400/30 bg-slate-950/85"
+          }`}
+          style={{ width: box, height: box, boxShadow: "0 1px 3px rgba(0,0,0,0.8)" }}
+        >
+          {id === MEGA_STONE
+            ? <MegaIcon size={glyph} />
+            : <ItemGlyph id={id} size={glyph} />}
+        </span>
       ))}
     </div>
   );
@@ -80,12 +112,14 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
   // the tile. On the board we oversize it and let it break the hex — the same
   // reason TFT's champions overflow their cell — which is what makes a unit read
   // as a creature standing there rather than an icon sitting in a box.
-  // 1.85x, not a modest bump. PokéAPI sprites are 96x96 frames where the
-  // creature occupies barely half the box, so the drawn pixels are roughly half
-  // whatever size we ask for. Scaling to the tile therefore renders a mon at
-  // ~50% of its hex — which is exactly what it looked like. We oversize to
-  // cancel that padding, and let the result break the cell upward.
-  const spriteSize = shape === "hex" ? Math.round(size * 1.85) : size - 6;
+  // Oversized to cancel the sprite's transparent padding (a 96x96 frame where
+  // the creature occupies barely half the box), then SNAPPED to a whole
+  // multiple of that 96px source. Nearest-neighbour upscaling is only clean at
+  // integer multiples — at 1.72x some source pixels cover two screen pixels and
+  // their neighbours cover one, which is what made the board look mushy.
+  // Capped at 2.1x the cell: snapping is unbounded on its own, and on the
+  // smallest tiles the nearest whole multiple is several times the hex.
+  const spriteSize = shape === "hex" ? crispSize(size * 1.85, size * 2.1) : size - 6;
   const sprite = (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -142,7 +176,7 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
           <Stars star={unit.star} />
         </div>
         {costBadge}
-        <ItemPips items={heldItems} megaReady={megaReady} />
+        <ItemPips items={heldItems} megaReady={megaReady} unitSize={size} />
       </div>
     );
   }
@@ -171,7 +205,7 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
         <Stars star={unit.star} />
       </div>
       {costBadge}
-      <ItemPips items={heldItems} megaReady={megaReady} />
+      <ItemPips items={heldItems} megaReady={megaReady} unitSize={size} />
     </div>
   );
 }

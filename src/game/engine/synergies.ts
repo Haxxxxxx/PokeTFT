@@ -11,6 +11,33 @@ export type ActiveTrait = {
   breakpoints: number[];
 };
 
+/** A synergy that buying a given unit would push over a breakpoint. */
+export type TraitGain = { key: string; label: string; from: number; to: number; count: number };
+
+/**
+ * Which traits would ACTIVATE or step up a tier if this def joined the board.
+ *
+ * This is the question a player is actually asking while scanning the shop, and
+ * reading it off a list of trait names means doing the arithmetic yourself
+ * every reroll. Note that traits count DISTINCT defs, so buying a unit already
+ * on the board gains nothing here — which is exactly the trap worth surfacing.
+ *
+ * Computed by simulating the board with the unit added and diffing tiers, so it
+ * can't drift from the real synergy rules the way a reimplementation would.
+ */
+export function traitGainsFor(defId: string, boardUnits: UnitInstance[]): TraitGain[] {
+  const before = new Map(computeTraits(boardUnits).map((t) => [t.key, t]));
+  const preview: UnitInstance = { iid: "__preview__", defId, star: 1, pos: [0, 0], items: [] };
+  const after = computeTraits([...boardUnits, preview]);
+
+  const gains: TraitGain[] = [];
+  for (const t of after) {
+    const prevTier = before.get(t.key)?.tier ?? 0;
+    if (t.tier > prevTier) gains.push({ key: t.key, label: t.label, from: prevTier, to: t.tier, count: t.count });
+  }
+  return gains;
+}
+
 /** Counts each trait across DISTINCT board units (TFT counts unique units, not copies). */
 export function computeTraits(boardUnits: UnitInstance[]): ActiveTrait[] {
   const counts = new Map<string, number>();

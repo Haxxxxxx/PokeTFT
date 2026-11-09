@@ -19,10 +19,23 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Instance, Instances, Environment, ContactShadows, Html } from "@react-three/drei";
-import { FIELD, FIELD_SIZE, HEX_R, cellToWorld, worldToCell, isAllyRow } from "./geometry";
-import { UnitModel, type ModelId } from "./UnitModel";
+import { FIELD, FIELD_SIZE, HEX_R, cellToWorld, worldToCell, isAllyRow } from "@/game/ui/hex3d";
+import { SpriteUnit } from "@/components/game/SpriteUnit";
 
-type Unit = { id: string; c: number; r: number; color: string; tall: number; model: ModelId };
+type Unit = { id: string; c: number; r: number; color: string; tall: number; dex: number; star: 1 | 2 | 3 };
+
+/**
+ * The spike answered its question: R3F renders rigged, animated glTF fine, at a
+ * trivial budget, with working drag. What it also showed is that SPRITES are
+ * both the safer and the more complete option for this roster — we have all
+ * 1,025 of them and no licensed source of Pokémon models exists.
+ *
+ * So the model-comparison mode and its sample assets are gone. They were ~3.3MB
+ * of glTF whose own licence note said they must not reach a release build, and
+ * `public/` ships wholesale in the static export — merging them would have put
+ * them on the CDN. The findings live in the git history and PACK-STRATEGY.md;
+ * the assets don't need to.
+ */
 
 const ALLY_TINT = "#2ec98a";
 const ENEMY_TINT = "#f2607a";
@@ -31,14 +44,19 @@ const ENEMY_TINT = "#f2607a";
  *  silhouette variety and per-model animation cost are both visible. */
 function initialUnits(): Unit[] {
   const palette = ["#64b5f6", "#ffb74d", "#ba68c8", "#4db6ac", "#e57373", "#aed581"];
-  const models: ModelId[] = ["fox", "duck", "brainstem", "fox", "duck", "fox"];
+  // Recognisable silhouettes at a range of shapes/sizes, so the sprite mode is
+  // judged on real roster art rather than on whichever mon happens to be cute.
+  const dex = [6, 9, 25, 94, 149, 143]; // Charizard, Blastoise, Pikachu, Gengar, Dragonite, Snorlax
+  // Two of each tier, so bronze/silver/gold can be compared side by side.
+  const stars: (1 | 2 | 3)[] = [1, 1, 2, 2, 3, 3];
   return palette.map((color, i) => ({
     id: `u${i}`,
     c: 1 + (i % 5),
     r: 5 + Math.floor(i / 5),
     color,
     tall: 0.5 + ((i * 7) % 5) * 0.07,
-    model: models[i],
+    dex: dex[i],
+    star: stars[i],
   }));
 }
 
@@ -84,11 +102,12 @@ function HexFloor({ hovered }: { hovered: { c: number; r: number } | null }) {
   );
 }
 
-/** A placeholder unit. Stands upright; swap the mesh for a glTF model later. */
+/** A unit on the board, drawn as a billboarded sprite. */
 function UnitMesh({
   unit, dragging, onGrab,
 }: {
-  unit: Unit; dragging: boolean; onGrab: (id: string, e: ThreeEvent<PointerEvent>) => void;
+  unit: Unit; dragging: boolean;
+  onGrab: (id: string, e: ThreeEvent<PointerEvent>) => void;
 }) {
   const [x, , z] = cellToWorld(unit.c, unit.r);
   return (
@@ -104,7 +123,7 @@ function UnitMesh({
         <cylinderGeometry args={[HEX_R * 0.78, HEX_R * 0.78, 0.9, 10]} />
       </mesh>
       <Suspense fallback={null}>
-        <UnitModel id={unit.model} position={[0, 0, 0]} tint={unit.color} dragging={dragging} />
+        <SpriteUnit dex={unit.dex} star={unit.star} position={[0, 0, 0]} dimmed={dragging} />
       </Suspense>
     </group>
   );
@@ -280,9 +299,9 @@ export function Arena3D() {
         <color attach="background" args={["#070c17"]} />
         <Scene />
       </Canvas>
-      <div className="pointer-events-none absolute left-4 top-4 text-[11px] leading-relaxed text-slate-400">
+      <div className="absolute left-4 top-4 text-[11px] leading-relaxed text-slate-400">
         <div className="font-bold text-slate-200">Arena 3D · spike</div>
-        <div>drag a capsule onto a teal hex</div>
+        <div className="pointer-events-none">drag a unit onto a teal hex</div>
       </div>
     </div>
   );
