@@ -3,7 +3,7 @@
 import { useDraggable } from "@dnd-kit/core";
 import { getDef, spriteUrl } from "@/game/data/mons";
 import { relativeModelScale } from "@/game/data/model-scale";
-import { spriteArt } from "@/game/ui/sprite-art";
+import { spriteArt, spriteBoxFor } from "@/game/ui/sprite-art";
 import { COST_COLOR } from "@/game/ui";
 import { useUi } from "@/game/store/uiStore";
 import { useGame } from "@/game/store/gameStore";
@@ -165,10 +165,12 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
   // models use — so a Rattata no longer occupies a Charizard's footprint. The
   // 2.1x cap still bounds it: without one, a large mon covers its neighbours'
   // hexes, which is what made the board look mushy.
+  // Sized so the VISIBLE ART lands at a consistent fraction of the cell, not
+  // so the padded frame does. See spriteBoxFor().
   const rel = relativeModelScale(dex);
   const spriteSize = shape === "hex"
-    ? crispSize(Math.min(size * 1.85 * rel, size * 2.1), size * 2.1)
-    : Math.round((size - 6) * rel);
+    ? crispSize(spriteBoxFor(dex, size, rel), size * 3.2)
+    : Math.round(spriteBoxFor(dex, size - 6, rel));
   const sprite = showModel ? (
     <PokemonModelPreview
       dex={dex}
