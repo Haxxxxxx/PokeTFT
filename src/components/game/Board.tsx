@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useDroppable } from "@dnd-kit/core";
 import { FIELD, ALLY_ROW0, HEX_CLIP, hexToPixel, fieldPixelSize, rowsPixelHeight } from "@/game/engine/hex";
@@ -8,8 +8,9 @@ import { boardSizeForLevel } from "@/game/config";
 import { getDef } from "@/game/data/mons";
 import { TYPE_COLOR } from "@/game/ui";
 import { hasUsable3DModel } from "@/game/data/model-availability";
-import { useGame, BENCH_SIZE, PENSION_COST, PENSION_ROUNDS, resolveBenchSlots } from "@/game/store/gameStore";
+import { useGame, BENCH_SIZE, PENSION_COST, PENSION_ROUNDS, PENSION_OVERDUE_LIMIT, resolveBenchSlots } from "@/game/store/gameStore";
 import { useAppStore } from "@/game/store/appStore";
+import { useModelReady, markModelReady, markModelFailed } from "@/game/data/model-ready";
 import { HEX_W } from "@/game/ui/hex3d";
 import type { ModelId } from "@/lab/arena3d/UnitModel";
 import { useGameLayout } from "./LayoutProvider";
@@ -179,7 +180,13 @@ function PensionDock({ interactive }: { interactive: boolean }) {
     disabled: !interactive || !!pension,
   });
   const t = useT();
+  // A matured mon now returns to the bench on its own (see nextRound). So the
+  // only way one is still sitting here READY is that the bench was full when it
+  // tried — which is a problem the player has to act on, not a reward waiting
+  // to be claimed. It is styled as a warning, and it says how long they have.
   const ready = !!pension && pension.roundsLeft <= 0;
+  const blocked = ready && (pension?.overdue ?? 0) > 0;
+  const fightsLeft = pension ? Math.max(0, PENSION_OVERDUE_LIMIT - (pension.overdue ?? 0) + 1) : 0;
   const def = pension ? getDef(pension.defId) : null;
   const dex = pension && def ? def.dex[Math.max(0, Math.min(2, pension.star - 1))] : null;
   const typeColor = def ? TYPE_COLOR[def.types[0]] : "#d6a64f";
@@ -189,7 +196,7 @@ function PensionDock({ interactive }: { interactive: boolean }) {
       ref={setNodeRef}
       title={!pension ? t.net_pension_title(PENSION_COST, PENSION_ROUNDS) : undefined}
       className={`absolute right-2 top-[18%] z-30 flex w-[76px] flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-transparent p-1.5 text-center transition-all
-        ${isOver ? "scale-105 border-emerald-300 bg-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.35)]" : "bg-transparent shadow-none"}
+        ${isOver ? "scale-105 border-emerald-300 bg-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.35)]" : blocked ? "border-rose-400/70 bg-rose-950/45 shadow-[0_0_18px_rgba(244,63,94,0.3)]" : "bg-transparent shadow-none"}
         ${!pension && interactive ? "border-dashed text-gold-100/70" : "text-slate-100"}`}
     >
       <span className="text-[8px] font-extrabold uppercase tracking-wider text-gold-200/75">{t.net_pension}</span>
@@ -206,13 +213,22 @@ function PensionDock({ interactive }: { interactive: boolean }) {
             {!ready && <span className="absolute inset-0 grid place-items-center text-sm font-extrabold text-gold-100 drop-shadow-[0_1px_3px_rgba(0,0,0,1)]">{pension.roundsLeft}</span>}
           </div>
           {ready ? (
-            <button
-              type="button"
-              onClick={collectPension}
-              className="w-full rounded-md bg-emerald-400 px-1 py-1 text-[9px] font-extrabold leading-none text-slate-950 hover:bg-emerald-300"
-            >
-              {t.net_pension_collect}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={collectPension}
+                className={`w-full rounded-md px-1 py-1 text-[9px] font-extrabold leading-none text-slate-950 ${
+                  blocked ? "bg-rose-400 hover:bg-rose-300" : "bg-emerald-400 hover:bg-emerald-300"
+                }`}
+              >
+                {t.net_pension_collect}
+              </button>
+              {blocked && (
+                <span className="text-[8px] font-bold leading-tight text-rose-300">
+                  {t.net_pension_blocked} · {t.net_pension_autosell(fightsLeft)}
+                </span>
+              )}
+            </>
           ) : (
             <span className="text-[8px] font-bold leading-tight text-gold-100/80">{t.net_pension_rounds(pension.roundsLeft)}</span>
           )}
@@ -255,14 +271,16 @@ function BoardBase({
   const tileW = layout.tile.w;
   const tileH = layout.tile.h;
   const tilt = layout.tilt;
-  const [loadedModels, setLoadedModels] = useState<Set<string>>(() => new Set());
-  const handleModelReady = useCallback((key: string) => {
-    setLoadedModels((loaded) => {
-      if (loaded.has(key)) return loaded;
-      return new Set(loaded).add(key);
-    });
+  // Readiness lives in a shared, model-keyed store rather than in this
+  // component's state. Held locally it died with the mount and was keyed by
+  // unit instance, so planning and combat could never share a loaded model —
+  // which is why the fight dropped back to 2D sprites. See model-ready.ts.
+  const modelReady = useModelReady();
+  const handleModelReady = useCallback((_key: string, model: ModelId) => {
+    markModelReady(model);
   }, []);
-  const handleModelError = useCallback((key: string, error: Error) => {
+  const handleModelError = useCallback((key: string, model: ModelId, error: Error) => {
+    markModelFailed(model);
     console.error(`3D model ${key} failed to load; keeping its 2D sprite visible.`, error);
   }, []);
 
@@ -547,7 +565,7 @@ function BoardBase({
                 interactive={interactive}
                 shape="hex"
                 showModel={models3d}
-                showSprite={!loadedModels.has(modelKey(unit.iid, model)) || !hasUsable3DModel(model)}
+                showSprite={!modelReady(model) || !hasUsable3DModel(model)}
                 dragHitArea
               />
             </div>
@@ -588,7 +606,7 @@ function BoardBase({
                 canDeploy={benchCanDeploy}
                 shape="hex"
                 showModel={models3d}
-                showSprite={!loadedModels.has(modelKey(unit.iid, model)) || !hasUsable3DModel(model)}
+                showSprite={!modelReady(model) || !hasUsable3DModel(model)}
                 dragHitArea
               />
             </div>

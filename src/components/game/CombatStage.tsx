@@ -12,6 +12,7 @@ import { useGameLayout } from "./LayoutProvider";
 import { ItemPips } from "./UnitChip";
 import { CombatField3D } from "./CombatField3D";
 import { useAppStore } from "@/game/store/appStore";
+import { useModelReady, markModelReady, markModelFailed } from "@/game/data/model-ready";
 import { TYPE_COLOR } from "@/game/ui";
 import { SnowIcon, SwordIcon, ShieldIcon } from "./icons";
 import { Leaf, BarChart3 } from "lucide-react";
@@ -293,11 +294,15 @@ export function CombatStage({
     return { aMap, bMap, recentFx, recentHit, facing };
   }, [fi, frames, a, b]);
 
-  const [loadedModels, setLoadedModels] = useState<Set<string>>(() => new Set());
-  const handleModelReady = useCallback((key: string) => {
-    setLoadedModels((loaded) => loaded.has(key) ? loaded : new Set(loaded).add(key));
+  // Shared with the board — see model-ready.ts. Previously this set started
+  // empty on EVERY combat mount, so the fight began in 2D sprites regardless of
+  // what the planning phase had already loaded.
+  const modelReady = useModelReady();
+  const handleModelReady = useCallback((_key: string, model: ModelId) => {
+    markModelReady(model);
   }, []);
-  const handleModelError = useCallback((key: string, error: Error) => {
+  const handleModelError = useCallback((key: string, model: ModelId, error: Error) => {
+    markModelFailed(model);
     console.error(`Combat model ${key} failed to load; keeping its sprite visible.`, error);
   }, []);
   const combatModels = useMemo<BoardModel[]>(() => {
@@ -501,7 +506,7 @@ export function CombatStage({
                 flash={hitThisFrame ? `${fi}-${u.id}` : null}
                 cast={castColor}
                 faceLeft={(facing.get(u.id) ?? u.c) < u.c}
-                showSprite={!models3d || !loadedModels.has(combatModelKey(u.id, u.dex)) || !hasUsable3DModel(u.dex)}
+                showSprite={!models3d || !modelReady(u.dex) || !hasUsable3DModel(u.dex)}
                 items={unitItems[u.id] ?? EMPTY_ITEMS}
               />
             );

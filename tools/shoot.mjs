@@ -93,17 +93,25 @@ const main = async () => {
   // Opt into the HD-2D board before the app boots, by writing the persisted
   // settings key directly — the toggle lives behind an in-match menu, which is
   // several clicks deep and not what this harness is testing.
-  if (process.env.BOARD3D === "1") {
-    await page.addInitScript(() => {
+  // BOARD3D=1 opts into the HD-2D board; MODELS3D=1 swaps sprites for 3D
+  // models. Both are written straight into the persisted settings key because
+  // the toggles live behind an in-match menu several clicks deep.
+  const wantBoard3d = process.env.BOARD3D === "1";
+  const wantModels3d = process.env.MODELS3D === "1";
+  if (wantBoard3d || wantModels3d) {
+    await page.addInitScript(([board3d, models3d]) => {
       try {
         const k = "poketft_settings";
         const cur = JSON.parse(localStorage.getItem(k) ?? '{"state":{"settings":{}},"version":0}');
         cur.state = cur.state ?? { settings: {} };
-        cur.state.settings = { ...(cur.state.settings ?? {}), board3d: true };
+        const next = { ...(cur.state.settings ?? {}) };
+        if (board3d) next.board3d = true;
+        if (models3d) next.models3d = true;
+        cur.state.settings = next;
         localStorage.setItem(k, JSON.stringify(cur));
-      } catch { /* private mode — fall back to the CSS board */ }
-    });
-    console.log("  (HD-2D board enabled)");
+      } catch { /* private mode — fall back to the defaults */ }
+    }, [wantBoard3d, wantModels3d]);
+    console.log(`  (${[wantBoard3d && "HD-2D board", wantModels3d && "3D models"].filter(Boolean).join(" + ")} enabled)`);
   }
 
   console.log(`→ ${URL}`);

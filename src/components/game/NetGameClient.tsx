@@ -25,6 +25,7 @@ import { db } from "@/game/net/firebase";
 import { Trash2, Eye, Maximize, Minimize, AlertTriangle, BarChart3 } from "lucide-react";
 import { AUGMENTS, augmentSlot, teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID, tailoredAugmentPicks } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
+import { Button } from "@/components/ui/Button";
 import { useUi } from "@/game/store/uiStore";
 import { makeRng, hashStr } from "@/game/engine/rng";
 import { itemsArray, normalizeUnit } from "@/game/net/rtdb-utils";
@@ -1410,23 +1411,32 @@ export function NetGameClient() {
         {/* Pinned to the height the layout engine budgeted. Left to grow with its
             content, this strip stole space the arena had already been sized
             against — which is what slid the bench slabs under the shop cards. */}
-        {!isSpectator && !spectating && <div className="shrink-0 min-h-0 flex flex-col items-center gap-1" style={{ height: L.shopH }}>
+        {!isSpectator && !spectating && <div className="relative shrink-0 min-h-0 flex flex-col items-center" style={{ height: L.shopH }}>
           {/* The bench now lives ON the platform (see Board's `withBench`), and the
               board count is ghosted across the arena floor, so only the auto-fill
-              action still needs a home down here. */}
+              action still needs a home down here.
+
+              It FLOATS above the strip rather than sitting in flow. This block is
+              pinned to the height the layout engine budgeted, so an in-flow button
+              took its space out of the shop underneath: the moment the board grew
+              a slot and you had an unplaced mon, the button appeared and the whole
+              shop dropped to make room, then jumped back when you placed one. A
+              transient hint must not resize the thing you are aiming at. */}
           {(() => {
             const boardCount = units.filter((u) => u.pos !== null).length;
             const benchCount = units.length - boardCount;
             const full = boardCount >= boardSizeForLevel(level);
             if (phase !== "planning" || benchCount === 0 || full) return null;
             return (
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={fillBoard}
                 title={t.net_board_fill_title}
-                className="self-center px-3 py-1 rounded-md bg-emerald-700/80 hover:bg-emerald-600 text-[11px] font-bold text-white leading-none"
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-panel whitespace-nowrap shadow-lg shadow-black/40"
               >
                 {t.net_board_fill}
-              </button>
+              </Button>
             );
           })()}
           <div className="flex-1 min-h-0 flex gap-3 w-full max-w-[1480px]">

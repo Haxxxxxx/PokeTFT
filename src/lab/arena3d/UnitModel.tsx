@@ -16,6 +16,7 @@ import {
   DEFAULT_MODEL_ROTATION,
   type ModelPose,
 } from "@/game/data/model-poses";
+import { relativeModelScale } from "@/game/data/model-scale";
 
 export type ModelId = number | "fox" | "duck" | "brainstem";
 
@@ -242,7 +243,12 @@ export function UnitModel({
     if (!Number.isFinite(size.y) || size.y <= 1e-6) {
       throw new Error(`3D model ${id} has invalid geometry bounds.`);
     }
-    const heightScale = MODEL_TARGET_HEIGHT / size.y;
+    // Relative size, not a flat normalise. Scaling purely by
+    // MODEL_TARGET_HEIGHT / size.y makes every species render at an identical
+    // height, which is why small mons looked oversized: a Rattata was drawn as
+    // tall as a Charizard. relativeModelScale() reintroduces the ordering from
+    // the species' real height, compressed into a range a hex can show.
+    const heightScale = (MODEL_TARGET_HEIGHT * relativeModelScale(id)) / size.y;
     const widthScale = fitToWidth == null ? 1 : Math.min(1, fitToWidth / (size.x * heightScale));
     c.scale.setScalar(heightScale * widthScale);
 
