@@ -18,7 +18,7 @@ export function SignInScreen({ overlayMode, onClose }: { overlayMode?: boolean; 
     else signUpEmail(email, pw);
   };
 
-  const inputCls = "w-full bg-white/[0.03] border border-white/10 rounded-lg px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50 transition-colors";
+  const inputCls = "w-full bg-white/[0.03] border border-white/10 rounded-lg px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-gold-500/50 transition-colors";
 
   const content = (
     <>
@@ -34,7 +34,7 @@ export function SignInScreen({ overlayMode, onClose }: { overlayMode?: boolean; 
       <div className="flex items-center gap-3 text-[11px] uppercase tracking-widest text-slate-600"><span className="flex-1 h-px bg-slate-800" />{t.a_or}<span className="flex-1 h-px bg-slate-800" /></div>
 
       {mode === "signin" && user?.isAnonymous && (
-        <p className="text-[11px] text-amber-400 text-center bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 leading-snug">
+        <p className="text-[11px] text-gold-400 text-center bg-gold-500/10 border border-gold-500/20 rounded-lg px-3 py-2 leading-snug">
           {t.a_guest_signin_warn}
         </p>
       )}
@@ -43,7 +43,7 @@ export function SignInScreen({ overlayMode, onClose }: { overlayMode?: boolean; 
         <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder={t.a_email} className={inputCls} />
         <input value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} type="password" placeholder={t.a_password} className={inputCls} />
         <button onClick={submit} disabled={busy || !email.trim() || pw.length < 6}
-          className="w-full py-2.5 rounded-lg font-bold text-[13px] bg-amber-500/90 hover:bg-amber-400 text-black disabled:opacity-40 transition-colors">
+          className="w-full py-2.5 rounded-lg font-bold text-[13px] bg-gold-500/90 hover:bg-gold-400 text-black disabled:opacity-40 transition-colors">
           {busy ? "…" : mode === "signin" ? t.a_signin : t.a_create_account}
         </button>
         <div className="flex items-center justify-between">
@@ -51,7 +51,7 @@ export function SignInScreen({ overlayMode, onClose }: { overlayMode?: boolean; 
             {mode === "signin" ? t.a_no_account : t.a_have_account}
           </button>
           {mode === "signin" && (
-            <button onClick={() => resetPassword(email)} disabled={busy} className="text-[11px] text-slate-500 hover:text-amber-300 transition-colors">
+            <button onClick={() => resetPassword(email)} disabled={busy} className="text-[11px] text-slate-500 hover:text-gold-300 transition-colors">
               {t.a_forgot}
             </button>
           )}
@@ -87,7 +87,7 @@ export function SignInScreen({ overlayMode, onClose }: { overlayMode?: boolean; 
 
   if (overlayMode) {
     return (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-5" onClick={onClose}>
+      <div className="fixed inset-0 z-gate flex items-center justify-center bg-black/80 backdrop-blur-sm p-5" onClick={onClose}>
         <div className="w-full max-w-[348px] panel rounded-xl px-7 py-8 flex flex-col gap-5 relative" onClick={(e) => e.stopPropagation()}>
           {onClose && (
             <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 text-xl leading-none">×</button>

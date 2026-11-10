@@ -110,10 +110,10 @@ export function WelcomeScreen() {
           <span className="font-extrabold tracking-tight text-xl drop-shadow-[0_0_12px_rgba(212,175,55,0.3)]">Poké<span className="gild-text">TFT</span></span>
         </div>
         <div className="flex items-center gap-4">
-          <button onClick={() => setLeaderboardOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-amber-300 uppercase tracking-wide"><Trophy size={13} /> {lang === "fr" ? "Classement" : "Ranks"}</button>
+          <button onClick={() => setLeaderboardOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-gold-300 uppercase tracking-wide"><Trophy size={13} /> {lang === "fr" ? "Classement" : "Ranks"}</button>
           <button onClick={openNews} aria-label={lang === "fr" ? "Nouveautés" : "What's new"} className="relative inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-emerald-300 uppercase tracking-wide"><Megaphone size={13} /> {lang === "fr" ? "Actus" : "News"}{unseenNews && <span className="absolute -top-1 -right-2 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}</button>
           <button onClick={() => setHowTo(true)} className="text-xs font-bold text-slate-400 hover:text-sky-300 uppercase tracking-wide">{t.w_how_to_play}</button>
-          {showGetApp && <a href="/download" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/8 text-xs font-bold text-amber-400 hover:text-amber-300 hover:border-amber-400/60 hover:bg-amber-500/12 uppercase tracking-wide transition-colors"><Download size={13} /> {lang === "fr" ? "Télécharger" : "Get app"}</a>}
+          {showGetApp && <a href="/download" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gold-500/40 bg-gold-500/8 text-xs font-bold text-gold-400 hover:text-gold-300 hover:border-gold-400/60 hover:bg-gold-500/12 uppercase tracking-wide transition-colors"><Download size={13} /> {lang === "fr" ? "Télécharger" : "Get app"}</a>}
           {/* Profile chip */}
           <div className="flex items-center gap-2.5 pl-3 border-l border-slate-800">
             <span className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0">
@@ -123,9 +123,9 @@ export function WelcomeScreen() {
                 : <span className="text-sm font-extrabold text-slate-500">{(name || "?").slice(0, 1).toUpperCase()}</span>}
             </span>
             <div className="flex flex-col leading-tight">
-              <span className="text-sm font-bold text-amber-300">{profile?.username}</span>
+              <span className="text-sm font-bold text-gold-300">{profile?.username}</span>
               <span className="flex gap-2 text-[10px]">
-                <button onClick={() => setProfileOpen(true)} className="text-amber-400 hover:text-amber-300 font-semibold">{t.w_profile}</button>
+                <button onClick={() => setProfileOpen(true)} className="text-gold-400 hover:text-gold-300 font-semibold">{t.w_profile}</button>
                 <button onClick={() => setEditProfile(true)} className="text-sky-400 hover:text-sky-300">Edit</button>
                 <button onClick={signOut} className="text-slate-500 hover:text-rose-400">Sign out</button>
               </span>
@@ -138,15 +138,15 @@ export function WelcomeScreen() {
       {invites.length > 0 && (
         <div className="w-full max-w-[940px] mx-auto px-4 sm:px-6 pt-3 flex flex-col gap-2">
           {invites.map((inv) => (
-            <div key={inv.code} className="panel rounded-xl px-4 py-2.5 flex items-center gap-3 border-amber-500/25">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+            <div key={inv.code} className="panel rounded-xl px-4 py-2.5 flex items-center gap-3 border-gold-500/25">
+              <span className="w-2 h-2 rounded-full bg-gold-400 animate-pulse shrink-0" />
               <span className="flex-1 min-w-0 text-[13px] text-slate-200 truncate">
-                <span className="font-bold text-amber-300">{inv.from}</span> {lang === "fr" ? "vous invite à jouer" : "invited you to a game"}
+                <span className="font-bold text-gold-300">{inv.from}</span> {lang === "fr" ? "vous invite à jouer" : "invited you to a game"}
               </span>
               <button
                 onClick={() => { if (canProceed) join(inv.code, name); if (myUid) { clearInvite(myUid, inv.code); clearInvitePlaceholder(inv.code, myUid); } }}
                 disabled={!canProceed || busy}
-                className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-[12px] font-bold disabled:opacity-40"
+                className="px-3.5 py-1.5 rounded-lg bg-gold-500 hover:bg-gold-400 text-black text-[12px] font-bold disabled:opacity-40"
               >{lang === "fr" ? "Rejoindre" : "Join"}</button>
               <button onClick={() => { if (myUid) { clearInvite(myUid, inv.code); clearInvitePlaceholder(inv.code, myUid); } }} className="text-slate-500 hover:text-slate-300 text-lg leading-none px-1">×</button>
             </div>
@@ -179,7 +179,7 @@ export function WelcomeScreen() {
 
             {/* Feature highlights strip */}
             <div className="flex flex-wrap justify-center gap-2 relative z-10">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full gilded text-[11px] font-bold text-amber-300/90 tracking-wide">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full gilded text-[11px] font-bold text-gold-300/90 tracking-wide">
                 <Star size={11} /> 206 Pokémon · Gen I–IX
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full gilded text-[11px] font-bold text-sky-300/90 tracking-wide">
@@ -195,13 +195,13 @@ export function WelcomeScreen() {
 
             <div className="flex flex-col items-center gap-3 w-full max-w-sm">
                 <button data-testid="create-game" onClick={handleCreate} disabled={!canProceed || busy}
-                  className="w-full py-3 rounded-xl font-bold text-[15px] tracking-wide bg-amber-500/95 hover:bg-amber-400 text-black disabled:opacity-30 transition-colors">
+                  className="w-full py-3 rounded-xl font-bold text-[15px] tracking-wide bg-gold-500/95 hover:bg-gold-400 text-black disabled:opacity-30 transition-colors">
                   {busy ? "…" : <span className="inline-flex items-center justify-center gap-2"><Swords size={17} /> {t.w_create_btn}</span>}
                 </button>
                 {!canProceed && (
                   <button
                     onClick={() => setEditProfile(true)}
-                    className="text-[11px] font-semibold text-amber-300/80 hover:text-amber-200"
+                    className="text-[11px] font-semibold text-gold-300/80 hover:text-gold-200"
                   >
                     {lang === "fr" ? "Définir un nom d'utilisateur pour commencer" : "Set a username to start"}
                   </button>

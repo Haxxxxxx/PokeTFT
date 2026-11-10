@@ -30,7 +30,7 @@ export class ErrorBoundary extends Component<Props, State> {
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center">
         <div className="text-2xl font-extrabold text-rose-400">Something went wrong</div>
         <p className="text-sm text-slate-400 max-w-md">The game hit an unexpected error. Reloading usually fixes it — your game may still be live, just rejoin with the same code.</p>
-        <button onClick={this.reset} className="px-6 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold">
+        <button onClick={this.reset} className="px-6 py-2 rounded-lg bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold">
           Reload
         </button>
       </div>

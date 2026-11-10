@@ -47,7 +47,7 @@ export function FriendsPanel() {
     <div className="panel w-full flex flex-col gap-3 rounded-xl p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">{t.fr_title}</h2>
-        {profile?.username && <span className="text-[11px] text-slate-500">{t.fr_you} <span className="text-amber-300 font-semibold">{profile.username}</span></span>}
+        {profile?.username && <span className="text-[11px] text-slate-500">{t.fr_you} <span className="text-gold-300 font-semibold">{profile.username}</span></span>}
       </div>
 
       {isGuest ? (
@@ -60,7 +60,7 @@ export function FriendsPanel() {
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && add()}
               placeholder={t.fr_add_ph}
-              className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500"
+              className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-gold-500"
             />
             <button onClick={add} className="px-3 py-2 rounded-lg bg-sky-700 hover:bg-sky-600 text-xs font-bold text-white">{t.fr_add}</button>
           </div>
@@ -79,7 +79,7 @@ export function FriendsPanel() {
                     <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-900 ${f.online ? "bg-emerald-400" : "bg-slate-600"}`} />
                   </span>
                   <span className="flex-1 min-w-0">
-                    <span className="block text-sm font-semibold text-slate-200 truncate group-hover:text-amber-200">{f.username || "—"}</span>
+                    <span className="block text-sm font-semibold text-slate-200 truncate group-hover:text-gold-200">{f.username || "—"}</span>
                     <span className="text-[10px] text-slate-500">{f.currentGame ? `${t.fr_in_game} ${f.currentGame}` : f.online ? t.fr_online : t.fr_offline}</span>
                   </span>
                 </button>

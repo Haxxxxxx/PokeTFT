@@ -76,10 +76,10 @@ export function FirstMatchCoach() {
     // Vertically centred on the left rail's empty middle, NOT bottom-left: down
     // there it covered the Pension, the level-up and the reroll — the exact
     // controls its own checklist is telling a first-time player to use.
-    <div className="coach-in fixed left-3 top-1/2 -translate-y-1/2 z-[60] w-[240px] rounded-xl border border-amber-500/30 bg-slate-950/92 backdrop-blur shadow-xl shadow-black/40 p-3">
+    <div className="coach-in fixed left-3 top-1/2 -translate-y-1/2 z-panel w-[240px] rounded-xl border border-gold-500/30 bg-slate-950/92 backdrop-blur shadow-xl shadow-black/40 p-3">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-amber-400"><GraduationCap size={16} /></span>
-        <span className="text-[11px] font-extrabold uppercase tracking-wide text-amber-200 flex-1">
+        <span className="text-gold-400"><GraduationCap size={16} /></span>
+        <span className="text-[11px] font-extrabold uppercase tracking-wide text-gold-200 flex-1">
           {lang === "fr" ? "Premiers pas" : "First steps"}
         </span>
         <button onClick={finish} aria-label={lang === "fr" ? "Passer" : "Skip"} title={lang === "fr" ? "Passer" : "Skip"} className="text-slate-500 hover:text-slate-300"><X size={14} /></button>
@@ -100,7 +100,7 @@ export function FirstMatchCoach() {
       </ul>
 
       {allDone && (
-        <button onClick={finish} className="mt-2.5 w-full py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-[11px] font-extrabold">
+        <button onClick={finish} className="mt-2.5 w-full py-1.5 rounded-lg bg-gold-500 hover:bg-gold-400 text-black text-[11px] font-extrabold">
           {lang === "fr" ? "Compris, à moi de jouer !" : "Got it — I'm ready!"}
         </button>
       )}

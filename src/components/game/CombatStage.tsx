@@ -369,7 +369,7 @@ export function CombatStage({
   return (
     <div className={inline
       ? "absolute inset-0 flex items-center justify-center"
-      : "fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"}>
+      : "fixed inset-0 z-screen flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"}>
       {/* Combat chrome (scoreboard + timer) FLOATS at the top so the battlefield
           stays vertically centered in the exact same box as the planning board —
           the layout never shifts between phases. */}
@@ -401,9 +401,9 @@ export function CombatStage({
       {/* Pre-fight stare-down bar — fills 0→full over PREFIGHT_MS, then the fight rolls. */}
       {preview < 1 && !finished && (
         <div className="flex flex-col items-center gap-1 mt-0.5 w-[240px]">
-          <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-amber-200/80 animate-pulse">{t.cs_get_ready}</span>
+          <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-gold-200/80 animate-pulse">{t.cs_get_ready}</span>
           <div className="h-1.5 w-full rounded-full bg-black/50 overflow-hidden" style={{ outline: "1px solid rgba(212,175,55,0.3)" }}>
-            <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-300" style={{ width: `${preview * 100}%`, transition: "width 80ms linear" }} />
+            <div className="h-full rounded-full bg-gradient-to-r from-gold-500 to-gold-300" style={{ width: `${preview * 100}%`, transition: "width 80ms linear" }} />
           </div>
         </div>
       )}
@@ -587,7 +587,7 @@ export function CombatStage({
         <button
           onClick={() => setRecapOpen(true)}
           title={t.cs_show_recap}
-          className="gilded absolute left-0 top-10 z-30 w-7 h-32 rounded-xl flex flex-col items-center justify-center gap-1.5 text-amber-200/70 hover:text-amber-100 transition-colors"
+          className="gilded absolute left-0 top-10 z-30 w-7 h-32 rounded-xl flex flex-col items-center justify-center gap-1.5 text-gold-200/70 hover:text-gold-100 transition-colors"
         >
           <span><BarChart3 size={14} /></span>
           <span className="[writing-mode:vertical-rl] rotate-180 text-[9px] font-extrabold uppercase tracking-wider">{t.cs_recap}</span>
@@ -606,12 +606,12 @@ export function CombatStage({
               <button
                 key={sp}
                 onClick={() => setSpeed(sp)}
-                className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-colors ${speed === sp ? "bg-amber-500/90 text-black border-amber-400" : "bg-black/30 border-[var(--panel-edge)] text-amber-100/70 hover:text-amber-50"}`}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-colors ${speed === sp ? "bg-gold-500/90 text-black border-gold-400" : "bg-black/30 border-[var(--panel-edge)] text-gold-100/70 hover:text-gold-50"}`}
               >
                 {sp}x
               </button>
             ))}
-            <button onClick={() => { setIdx(last); setFinished(true); }} className="px-3 py-1 rounded-md bg-black/30 border border-[var(--panel-edge)] text-amber-100/70 hover:text-amber-50 text-xs font-semibold ml-2">
+            <button onClick={() => { setIdx(last); setFinished(true); }} className="px-3 py-1 rounded-md bg-black/30 border border-[var(--panel-edge)] text-gold-100/70 hover:text-gold-50 text-xs font-semibold ml-2">
               Skip →
             </button>
           </>
@@ -647,7 +647,7 @@ export function CombatStage({
             ) : (
               <button
                 onClick={() => onResolve(won, result.winner === "enemy" ? result.survivors : 0)}
-                className="px-6 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold"
+                className="px-6 py-2 rounded-lg bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold"
               >
                 {t.cs_continue}
               </button>
@@ -679,7 +679,7 @@ function CombatRecapTabs({ units, label, onClose }: { units: FrameUnit[]; label:
   return (
     <div className="gilded w-[210px] shrink-0 rounded-xl p-2 self-stretch">
       <div className="flex items-center justify-between mb-1.5 px-0.5">
-        <span className="text-[9px] uppercase tracking-wider text-amber-200/55">{label}</span>
+        <span className="text-[9px] uppercase tracking-wider text-gold-200/55">{label}</span>
         <button onClick={onClose} title={t.cs_hide_recap} aria-label={t.cs_hide_recap} className="text-slate-500 hover:text-slate-200 text-xs leading-none">✕</button>
       </div>
       <div className="flex gap-1 mb-2">
@@ -688,7 +688,7 @@ function CombatRecapTabs({ units, label, onClose }: { units: FrameUnit[]; label:
             key={tb.key}
             onClick={() => setTab(tb.key)}
             style={tab === tb.key ? { background: tb.color, color: "#0b1020" } : undefined}
-            className={`flex-1 text-[10px] font-extrabold py-1 rounded-md border transition-colors ${tab === tb.key ? "border-transparent" : "bg-black/30 border-[var(--panel-edge)] text-amber-100/60 hover:text-amber-50"}`}
+            className={`flex-1 text-[10px] font-extrabold py-1 rounded-md border transition-colors ${tab === tb.key ? "border-transparent" : "bg-black/30 border-[var(--panel-edge)] text-gold-100/60 hover:text-gold-50"}`}
           >
             {tb.label}
           </button>

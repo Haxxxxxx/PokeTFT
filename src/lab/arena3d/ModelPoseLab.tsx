@@ -377,7 +377,7 @@ export function ModelPoseLab() {
                   needsRig: !pose.needsRig,
                   reviewed: undefined,
                 }))}
-                className={`rounded px-3 py-2 text-sm font-semibold ${currentPose.needsRig ? "bg-amber-400 text-slate-950" : "bg-slate-700 text-white hover:bg-slate-600"}`}
+                className={`rounded px-3 py-2 text-sm font-semibold ${currentPose.needsRig ? "bg-gold-400 text-slate-950" : "bg-slate-700 text-white hover:bg-slate-600"}`}
               >
                 {currentPose.needsRig ? "Needs rig · undo" : "Mark as needing custom rig"}
               </button>
@@ -449,7 +449,7 @@ export function ModelPoseLab() {
                   })}
             </select>
             {!currentModelLoaded && !error && <p className="mt-1 text-xs text-slate-400">Loading this model and its rig…</p>}
-            {currentModelLoaded && boneNames.length === 0 && <p className="mt-1 text-xs text-amber-300">This asset has no usable skeleton, so it cannot bend at joints. It can only be rotated as a whole; bending it requires a custom rig.</p>}
+            {currentModelLoaded && boneNames.length === 0 && <p className="mt-1 text-xs text-gold-300">This asset has no usable skeleton, so it cannot bend at joints. It can only be rotated as a whole; bending it requires a custom rig.</p>}
             {boneNames.length > 0 && <p className="mt-1 text-xs text-slate-500">Bones are grouped by likely body part. Select one, then drag its rotation gizmo on the model.</p>}
           </section>
         </div>

@@ -90,6 +90,52 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* -- Brand gold, as a real Tailwind ramp -----------------------------------
+   The app had TWO golds: the brand gold defined above (--gold #d4af37, used by
+   .btn-primary/.gild-text/.panel-hero) and Tailwind's amber, which 252 class
+   names reached for instead because the brand gold was not available as a
+   utility. The two are visibly different -- amber is hotter and more orange --
+   so the same "gold" read differently on almost every screen.
+
+   This ramp passes through the three brand values that already existed
+   (#f4e3a1 at 200, --gold-bright at 300, --gold at 500, --gold-dim at 700),
+   so `text-gold-300` is now the same colour as .text-gold rather than an
+   approximation of it. Luminance is kept close to the amber step it replaces,
+   so swapping amber-N -> gold-N tightens the palette instead of repainting it. */
+@theme {
+  --color-gold-50: #fdf8e7;
+  --color-gold-100: #faf0c8;
+  --color-gold-200: #f4e3a1;
+  --color-gold-300: #e7c66b;
+  --color-gold-400: #d9b44f;
+  --color-gold-500: #d4af37;
+  --color-gold-600: #b2912a;
+  --color-gold-700: #8a6d1f;
+  --color-gold-800: #5e4a15;
+  --color-gold-900: #3a2d0d;
+  --color-gold-950: #211a07;
+}
+
+/* -- Stacking ladder --------------------------------------------------------
+   Every overlay in the app used to pick its own number: z-50 for sixteen
+   different things, then an ad-hoc climb through 55, 60, 70, 80, 100, 140 and
+   200. Nothing recorded which was meant to sit above which, so ordering was
+   decided by whoever edited last -- RankInfoModal shared z-50 with the
+   ProfileScreen that opens it, and only won because it mounts later.
+
+   The layers below are named for what actually occupies them, and the order is
+   a claim about the product: a tooltip must clear the dialog it describes; the
+   boot veil must cover a dialog still mounted underneath it; a toast must stay
+   readable over a blocking state, because that is usually where it is
+   reporting the error from. Use these names, never a raw number. */
+.z-screen  { z-index: 50; }   /* full-screen takeovers + in-match HUD chrome */
+.z-panel   { z-index: 60; }   /* popovers and slide-overs anchored to a screen */
+.z-modal   { z-index: 80; }   /* dialogs -- always above the screen beneath */
+.z-tooltip { z-index: 90; }   /* tooltips -- must clear the dialog they explain */
+.z-overlay { z-index: 100; }  /* blocking state: orientation gate, boot veil */
+.z-toast   { z-index: 140; }  /* transient notices -- visible over a block */
+.z-gate    { z-index: 200; }  /* auth gate -- above everything */  /* auth gate -- above everything */
+
 body {
   background: var(--background);
   color: var(--foreground);

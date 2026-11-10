@@ -37,9 +37,9 @@ export function OrientationGate() {
   if (!blocked) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-5 bg-slate-950 px-8 text-center">
+    <div className="fixed inset-0 z-overlay flex flex-col items-center justify-center gap-5 bg-slate-950 px-8 text-center">
       <div className="relative">
-        <Smartphone size={64} className="text-amber-400 rotate-90 drop-shadow-[0_0_18px_rgba(212,175,55,0.4)]" />
+        <Smartphone size={64} className="text-gold-400 rotate-90 drop-shadow-[0_0_18px_rgba(212,175,55,0.4)]" />
         <RotateCcw size={26} className="absolute -top-3 -right-4 text-sky-300 animate-spin" style={{ animationDuration: "3s" }} />
       </div>
       <div>

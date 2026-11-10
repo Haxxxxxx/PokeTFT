@@ -35,7 +35,7 @@ export function LeaderboardScreen() {
           <button onClick={() => setLeaderboardOpen(false)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.07] border border-white/[0.06] text-sm font-bold text-slate-200">
             <ArrowLeft size={15} /> {tr("Back", "Retour")}
           </button>
-          <h1 className="text-lg font-bold text-amber-200 inline-flex items-center gap-2"><Trophy size={18} className="text-amber-400" /> {tr("Leaderboard", "Classement")}</h1>
+          <h1 className="text-lg font-bold text-gold-200 inline-flex items-center gap-2"><Trophy size={18} className="text-gold-400" /> {tr("Leaderboard", "Classement")}</h1>
           <button onClick={() => setShowInfo(true)} aria-label={tr("How ranks work", "Fonctionnement des rangs")} className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.07] border border-white/[0.06] text-xs font-bold text-slate-300">
             <HelpCircle size={14} /> {tr("Ranks", "Rangs")}
           </button>
@@ -57,7 +57,7 @@ export function LeaderboardScreen() {
                 const rank = rankOf(r.rating);
                 const me = r.uid === myUid;
                 return (
-                  <button key={r.uid} onClick={() => openUserProfile(r.uid)} className={`w-full text-left flex items-center gap-3 px-2.5 py-2 rounded-lg border transition-colors ${me ? "bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/15" : "bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.05]"}`}>
+                  <button key={r.uid} onClick={() => openUserProfile(r.uid)} className={`w-full text-left flex items-center gap-3 px-2.5 py-2 rounded-lg border transition-colors ${me ? "bg-gold-500/10 border-gold-500/30 hover:bg-gold-500/15" : "bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.05]"}`}>
                     <span className="w-7 text-center font-extrabold text-sm tabular-nums" style={{ color: rankColor(i) }}>{i + 1}</span>
                     <span className="w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.06] flex items-center justify-center overflow-hidden shrink-0">
                       {r.photoURL ? (
@@ -66,7 +66,7 @@ export function LeaderboardScreen() {
                       ) : <span className="text-xs font-bold text-slate-500">{r.username.slice(0, 1).toUpperCase()}</span>}
                     </span>
                     <span className="flex-1 min-w-0">
-                      <span className={`block text-[13px] font-bold truncate ${me ? "text-amber-300" : "text-slate-200"}`}>{r.username}</span>
+                      <span className={`block text-[13px] font-bold truncate ${me ? "text-gold-300" : "text-slate-200"}`}>{r.username}</span>
                       <span className="text-[10px] font-bold" style={{ color: rank.color }}>{rank.label}</span>
                     </span>
                     <span className="text-right shrink-0">

@@ -146,7 +146,7 @@ export function CarouselOverlay({
   if (!opts) return null;
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto"
+      className="fixed inset-0 z-screen overflow-y-auto"
       style={revealBoard
         ? { background: "transparent" }
         : { background: "radial-gradient(58% 58% at 50% 38%, rgba(146,64,14,0.32), rgba(2,6,23,0.93))", backdropFilter: "blur(7px)" }}
@@ -163,7 +163,7 @@ export function CarouselOverlay({
       <div className="celebrate-pop flex flex-col items-center">
         <div className="flex items-center gap-2.5 mb-1">
           <span><Sparkles size={24} /></span>
-          <h2 className="text-2xl font-extrabold text-amber-300 tracking-tight">{t.net_carousel_title}</h2>
+          <h2 className="text-2xl font-extrabold text-gold-300 tracking-tight">{t.net_carousel_title}</h2>
         </div>
         {(() => {
           // Comeback cue: mirrors the server's below-median-HP reward boost so the
@@ -182,7 +182,7 @@ export function CarouselOverlay({
             ? t.net_carousel_picked_waiting(waiting)
             : t.net_carousel_picked_round;
         })() : t.net_carousel_pick_free}</p>
-        <div className="text-[11px] tabular-nums font-bold text-amber-200/70 mt-0.5 mb-5"><Countdown deadline={meta.deadline} />s</div>
+        <div className="text-[11px] tabular-nums font-bold text-gold-200/70 mt-0.5 mb-5"><Countdown deadline={meta.deadline} />s</div>
       {!picked && (() => {
         // A unit pick needs a free bench slot; items/Mega go to the inventory.
         const benchFull = units.filter((u) => u.pos === null).length >= BENCH_SIZE;
@@ -239,7 +239,7 @@ export function AugmentOverlay({
   const lang = useAppStore((s) => s.settings.language);
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto"
+      className="fixed inset-0 z-screen overflow-y-auto"
       style={revealBoard
         ? { background: "transparent" }
         : { background: "radial-gradient(58% 58% at 50% 38%, rgba(76,29,149,0.4), rgba(2,6,23,0.93))", backdropFilter: "blur(7px)" }}
@@ -282,7 +282,7 @@ export function AugmentOverlay({
           {t.net_augment_reroll}
           {augRerollCost === 0
             ? <span className="text-[10px] text-emerald-300 font-extrabold uppercase">{t.net_augment_free}</span>
-            : <span className="inline-flex items-center gap-0.5 text-amber-300"><CoinIcon size={11} />{augRerollCost}</span>}
+            : <span className="inline-flex items-center gap-0.5 text-gold-300"><CoinIcon size={11} />{augRerollCost}</span>}
         </button>
       </div>
       </div>
@@ -315,8 +315,8 @@ export function GameOverScreen({
     ? <TrophyIcon size={18} style={{ color: place === 1 ? "#fbbf24" : place === 2 ? "#cbd5e1" : "#d97706" }} />
     : `#${place}`);
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm gap-5 p-4">
-      <div className={`celebrate-pop flex flex-col items-center gap-2 ${iWon ? "text-amber-300" : "text-slate-200"}`}>
+    <div className="fixed inset-0 z-screen flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm gap-5 p-4">
+      <div className={`celebrate-pop flex flex-col items-center gap-2 ${iWon ? "text-gold-300" : "text-slate-200"}`}>
         {iWon && <TrophyIcon size={52} />}
         <div className="text-4xl font-extrabold">{iWon ? t.net_victory : t.net_gameover}</div>
         {meta?.endedByHost
@@ -334,14 +334,14 @@ export function GameOverScreen({
         const topHeal = [...mine].sort((a, b) => b.healed - a.healed)[0];
         const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${Math.round(n)}`);
         return (
-          <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10">
-            <div className="rounded-lg bg-black/30 border border-amber-500/40 p-1 shrink-0 relative">
+          <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-gold-500/40 bg-gold-500/10">
+            <div className="rounded-lg bg-black/30 border border-gold-500/40 p-1 shrink-0 relative">
               <PokemonModelPreview dex={mvp.dex} alt={mvp.name} width={44} height={44} />
               <span className="absolute -top-1.5 -left-1.5 text-sm">⭐</span>
             </div>
             <div className="min-w-0">
-              <div className="text-[9px] uppercase tracking-wide text-amber-200/70 font-bold">{t.net_mvp_label}</div>
-              <div className="text-sm font-extrabold text-amber-200 truncate">{mvp.name}</div>
+              <div className="text-[9px] uppercase tracking-wide text-gold-200/70 font-bold">{t.net_mvp_label}</div>
+              <div className="text-sm font-extrabold text-gold-200 truncate">{mvp.name}</div>
               <div className="flex items-center gap-2.5 mt-0.5 text-[10px] font-bold">
                 <span className="text-rose-300" title={t.net_mvp_damage}>⚔ {fmt(mvp.dmgDealt)}</span>
                 {topTank && topTank.dmgTaken > 0 && <span className="text-sky-300" title={t.net_mvp_tanked}>🛡 {fmt(topTank.dmgTaken)} ({topTank.name.split(" ")[0]})</span>}
@@ -402,7 +402,7 @@ export function GameOverScreen({
             return (
               <div
                 key={p.uid}
-                className={`flex items-center gap-3 px-3 py-2 rounded-xl border ${first ? "bg-amber-500/10 border-amber-500/50" : "bg-slate-900/70 border-slate-700/50"} ${isMe ? "ring-1 ring-sky-500/60" : ""}`}
+                className={`flex items-center gap-3 px-3 py-2 rounded-xl border ${first ? "bg-gold-500/10 border-gold-500/50" : "bg-slate-900/70 border-slate-700/50"} ${isMe ? "ring-1 ring-sky-500/60" : ""}`}
               >
                 <span className="w-8 text-center text-lg font-extrabold tabular-nums shrink-0">{medal(p.place ?? 99)}</span>
                 <span className="w-9 h-9 rounded-md bg-black/40 border border-slate-700 flex items-center justify-center shrink-0 overflow-hidden">
@@ -412,7 +412,7 @@ export function GameOverScreen({
                     : <span className="text-xs text-slate-500">{p.name.slice(0, 1).toUpperCase()}</span>}
                 </span>
                 <div className="w-[120px] shrink-0 min-w-0">
-                  <div className={`text-sm font-bold truncate ${first ? "text-amber-300" : isMe ? "text-sky-300" : "text-slate-200"}`}>{p.name}</div>
+                  <div className={`text-sm font-bold truncate ${first ? "text-gold-300" : isMe ? "text-sky-300" : "text-slate-200"}`}>{p.name}</div>
                   <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
                     <span>{Math.max(0, p.hp)} HP</span>
                     {doubleUp && p.teamId != null && <span className="px-1 rounded bg-emerald-900/50 border border-emerald-600/40 text-emerald-300 font-bold">{t.net_team_label} {p.teamId + 1}</span>}
@@ -426,7 +426,7 @@ export function GameOverScreen({
                         return (
                           <span key={u.iid} title={`${def.name} ★${u.star}`} className="relative w-7 h-7 rounded bg-black/40 border border-slate-700/70 flex items-center justify-center shrink-0">
                             <PokemonModelPreview dex={def.dex[u.star - 1]} alt={def.stageNames[u.star - 1]} width={24} height={24} />
-                            {u.star > 1 && <span className="absolute -top-1 -right-1 text-[7px] font-extrabold text-amber-300 bg-slate-900/90 rounded px-0.5 leading-tight">{u.star}★</span>}
+                            {u.star > 1 && <span className="absolute -top-1 -right-1 text-[7px] font-extrabold text-gold-300 bg-slate-900/90 rounded px-0.5 leading-tight">{u.star}★</span>}
                           </span>
                         );
                       })}
@@ -439,7 +439,7 @@ export function GameOverScreen({
 
       <div className="flex items-center gap-3">
         {isHost ? (
-          <button onClick={() => returnToLobby(room.code, room)} className="px-6 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold shadow-lg">{t.net_play_again}</button>
+          <button onClick={() => returnToLobby(room.code, room)} className="px-6 py-2.5 rounded-lg bg-gold-500 hover:bg-gold-400 text-black text-sm font-bold shadow-lg">{t.net_play_again}</button>
         ) : (
           <span className="px-6 py-2.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-400 text-sm font-semibold">{t.net_waiting_host}</span>
         )}

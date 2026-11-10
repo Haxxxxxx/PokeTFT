@@ -815,7 +815,7 @@ export function NetGameClient() {
   if (!room || !meta || !myUid) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 app-bg text-center px-6">
-        <div className="w-8 h-8 rounded-full border-2 border-amber-400/40 border-t-amber-400 animate-spin" />
+        <div className="w-8 h-8 rounded-full border-2 border-gold-400/40 border-t-amber-400 animate-spin" />
         <p className="text-sm text-slate-400">{t.net_reconnecting}</p>
         <button onClick={leave} className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-300">
           {t.net_back_home}
@@ -992,7 +992,7 @@ export function NetGameClient() {
       <Toasts />
       {/* Concede / forfeit confirm */}
       {confirmLeave && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setConfirmLeave(false)}>
+        <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setConfirmLeave(false)}>
           <div className="gilded gilded-strong w-full max-w-sm rounded-xl p-5 flex flex-col gap-3" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-extrabold text-rose-300">{t.net_forfeit_title}</h3>
             <p className="text-[12px] text-slate-400">{t.net_forfeit_body}</p>
@@ -1005,9 +1005,9 @@ export function NetGameClient() {
       )}
       {/* Stage-up announce overlay */}
       {stageBanner != null && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
+        <div className="fixed inset-0 z-panel flex items-center justify-center pointer-events-none">
           <div className="stage-banner text-center">
-            <div className="text-[11px] font-extrabold uppercase tracking-[0.4em] text-amber-300/80 mb-1">{t.net_stage_banner}</div>
+            <div className="text-[11px] font-extrabold uppercase tracking-[0.4em] text-gold-300/80 mb-1">{t.net_stage_banner}</div>
             <div className="text-6xl font-black gild-text drop-shadow-[0_4px_30px_rgba(212,175,55,0.4)]">{stageBanner}</div>
             <div className="text-xs text-slate-400 mt-2 tracking-wide">
               {stageBanner <= 2 ? t.net_stage_early
@@ -1048,7 +1048,7 @@ export function NetGameClient() {
                 : isPast
                   ? (result ? "bg-emerald-600/25 ring-1 ring-emerald-400/50" : "bg-rose-600/25 ring-1 ring-rose-400/50")
                   : kind === "carousel" ? "bg-fuchsia-900/25 ring-1 ring-fuchsia-500/30"
-                  : kind === "pve" ? "bg-amber-900/20 ring-1 ring-amber-600/30"
+                  : kind === "pve" ? "bg-gold-900/20 ring-1 ring-gold-600/30"
                   : "bg-slate-800/60 ring-1 ring-slate-600/40";
               return (
                 <button
@@ -1061,7 +1061,7 @@ export function NetGameClient() {
                     else { setRecapKey(key); setSpectate(recap.oppUid); }
                   }}
                   title={`${key} · ${kind}${isPast ? (result ? " · Win" : " · Loss") : ""}${clickable ? " · click for recap" : ""}`}
-                  className={`relative w-6 h-6 shrink-0 rounded flex items-center justify-center text-[12px] leading-none grayscale-[0.15] transition-all ${cls} ${open ? "ring-2 ring-amber-300" : ""} ${clickable ? "cursor-pointer hover:brightness-125" : "cursor-default"}`}
+                  className={`relative w-6 h-6 shrink-0 rounded flex items-center justify-center text-[12px] leading-none grayscale-[0.15] transition-all ${cls} ${open ? "ring-2 ring-gold-300" : ""} ${clickable ? "cursor-pointer hover:brightness-125" : "cursor-default"}`}
                 >
                   <span className={isPast && !isCurrent ? "opacity-80" : ""}>{icon}</span>
                   {isPast && !isCurrent && (
@@ -1101,7 +1101,7 @@ export function NetGameClient() {
             const tgt = spectating ? spectateP : (isSpectator ? undefined : me);
             if (!tgt) {
               return (
-                <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-400/40 text-[11px] font-bold text-amber-300">
+                <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gold-500/15 border border-gold-400/40 text-[11px] font-bold text-gold-300">
                   <Eye size={13} /> {t.net_spectate_badge}
                 </span>
               );
@@ -1111,7 +1111,7 @@ export function NetGameClient() {
             return (
               <>
                 {spectating && (
-                  <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-400/40 text-[11px] font-bold text-amber-300">
+                  <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gold-500/15 border border-gold-400/40 text-[11px] font-bold text-gold-300">
                     <Eye size={13} /> {spectateP?.name ?? t.net_rival}
                   </span>
                 )}
@@ -1156,7 +1156,7 @@ export function NetGameClient() {
             </span>
           )}
           {isHyperRoll(room.rules) && (
-            <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md border border-yellow-500/40 text-[11px] font-bold text-yellow-300 bg-yellow-500/10"
+            <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md border border-gold-500/40 text-[11px] font-bold text-gold-300 bg-gold-500/10"
               title="Hyper Roll: shop only offers cost 1–3 units; 50 starting HP">
               ⚡ Hyper Roll
             </span>
@@ -1175,12 +1175,12 @@ export function NetGameClient() {
               the whole game tree every 250ms (the old global tick caused jank). */}
           <PhaseTimer phase={phase} phaseLabel={phaseLabel} deadline={meta.deadline} totalMs={phase === "combat" ? COMBAT_MS : phase === "carousel" ? CAROUSEL_MS : PLAN_MS} resolvingLabel={t.net_resolving} />
 
-          {isHost && <span className="text-[9px] font-bold uppercase bg-amber-500 text-black rounded px-1 shrink-0">{t.net_host_badge}</span>}
+          {isHost && <span className="text-[9px] font-bold uppercase bg-gold-500 text-black rounded px-1 shrink-0">{t.net_host_badge}</span>}
           <div className="flex items-center gap-2 shrink-0">
             {/* Last-fight recap — reviewable while planning (your team + the enemy's). */}
             {phase === "planning" && !isSpectator && lastFight && (
               <button onClick={() => setShowRecap((s) => !s)} title={t.net_recap_title}
-                className={`px-2.5 py-1.5 rounded-md border text-xs font-bold inline-flex items-center gap-1.5 transition-colors ${showRecap ? "bg-amber-500/90 text-black border-amber-400" : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"}`}>
+                className={`px-2.5 py-1.5 rounded-md border text-xs font-bold inline-flex items-center gap-1.5 transition-colors ${showRecap ? "bg-gold-500/90 text-black border-gold-400" : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"}`}>
                 <BarChart3 size={13} /> {t.net_recap}
               </button>
             )}
@@ -1235,7 +1235,7 @@ export function NetGameClient() {
           {/* self-start so the trainers panel is as tall as its roster — a
               2-player lobby shouldn't draw a full-height empty box. */}
           <div className="order-last self-start gilded w-full p-2 rounded-xl min-h-0 max-h-full overflow-y-auto">
-            <h2 className="text-[10px] uppercase tracking-wider text-amber-200/55 px-1 mb-1.5">{t.net_trainers(aliveCount)}</h2>
+            <h2 className="text-[10px] uppercase tracking-wider text-gold-200/55 px-1 mb-1.5">{t.net_trainers(aliveCount)}</h2>
             <div className="flex flex-col gap-1">
               {ladder.map((p, i) => {
                 const pBoard = asBoard(p.board);
@@ -1253,7 +1253,7 @@ export function NetGameClient() {
                     key={p.uid}
                     onClick={() => setSpectate(isSpectator ? p.uid : (p.uid === myUid ? null : (spectate === p.uid ? null : p.uid)))}
                     title={p.uid === myUid && !isSpectator ? t.net_your_board : t.net_view_board(p.name)}
-                    className={`flex items-center gap-2 px-1.5 py-1 rounded-lg cursor-pointer hover:bg-slate-700/50 ${p.uid === myUid ? "bg-slate-700/70 ring-1 ring-sky-500/50" : ""} ${spectate === p.uid ? "ring-1 ring-amber-400/70 bg-amber-500/10" : ""} ${isNm && p.alive ? "ring-1 ring-rose-600/50 bg-rose-950/20" : ""} ${!p.alive ? "opacity-40" : ""}`}
+                    className={`flex items-center gap-2 px-1.5 py-1 rounded-lg cursor-pointer hover:bg-slate-700/50 ${p.uid === myUid ? "bg-slate-700/70 ring-1 ring-sky-500/50" : ""} ${spectate === p.uid ? "ring-1 ring-gold-400/70 bg-gold-500/10" : ""} ${isNm && p.alive ? "ring-1 ring-rose-600/50 bg-rose-950/20" : ""} ${!p.alive ? "opacity-40" : ""}`}
                   >
                     <span className="w-4 text-[10px] text-slate-500 font-bold text-center">{p.place ?? i + 1}</span>
                     {/* Circular portrait with a ranked ring — TFT's trainer rail.
@@ -1272,7 +1272,7 @@ export function NetGameClient() {
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className="flex items-center gap-1.5">
-                        <span className={`block text-[11px] font-semibold truncate ${isNm ? "text-rose-300" : p.uid === myUid ? "text-amber-300" : "text-slate-200"}`}>
+                        <span className={`block text-[11px] font-semibold truncate ${isNm ? "text-rose-300" : p.uid === myUid ? "text-gold-300" : "text-slate-200"}`}>
                           {p.name}{!p.connected && t.net_offline}
                         </span>
                         {/* Scouting: rivals' levels are public (TFT-style). */}
@@ -1315,16 +1315,16 @@ export function NetGameClient() {
           <div className={`order-2 relative min-w-0 min-h-0 flex items-center justify-center rounded-xl${boardFlash ? " screen-flash" : ""}`}>
             {/* Float-up text for HP damage or gold gain feedback. */}
             {floatText && (
-              <div key={floatKey} className={`float-up absolute top-4 left-1/2 -translate-x-1/2 z-30 text-sm font-extrabold drop-shadow pointer-events-none select-none ${floatText.startsWith("−") ? "text-rose-300" : "text-amber-300"}`}>
+              <div key={floatKey} className={`float-up absolute top-4 left-1/2 -translate-x-1/2 z-30 text-sm font-extrabold drop-shadow pointer-events-none select-none ${floatText.startsWith("−") ? "text-rose-300" : "text-gold-300"}`}>
                 {floatText}
               </div>
             )}
             {spectating ? (
               <div key={`spec-${spectate}`} className="board-swap absolute inset-0 flex flex-col gap-2">
-                <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 shrink-0">
-                  <span className="text-xs font-bold text-amber-300">{t.net_viewing(spectateP?.name ?? "rival")}</span>
+                <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-gold-500/10 border border-gold-500/30 shrink-0">
+                  <span className="text-xs font-bold text-gold-300">{t.net_viewing(spectateP?.name ?? "rival")}</span>
                   {isSpectator
-                    ? <span className="text-[10px] text-amber-200/60">{t.net_spectate_switch}</span>
+                    ? <span className="text-[10px] text-gold-200/60">{t.net_spectate_switch}</span>
                     : <button onClick={() => setSpectate(null)} className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-300">{t.net_back_to_mine}</button>}
                 </div>
                 <div className="relative flex-1 min-h-0 flex items-center justify-center">
@@ -1347,7 +1347,7 @@ export function NetGameClient() {
                   // Spectator with no follow target yet (about to be picked) — never
                   // show our own stale local board; just a brief loading state.
                   <div className="flex items-center gap-3 text-slate-500">
-                    <div className="w-5 h-5 rounded-full border-2 border-amber-400/40 border-t-amber-400 animate-spin" />
+                    <div className="w-5 h-5 rounded-full border-2 border-gold-400/40 border-t-amber-400 animate-spin" />
                     <span className="text-xs">{t.net_spectate_switch}</span>
                   </div>
                 ) : phase === "combat" && combatResult && me?.alive ? (
@@ -1517,7 +1517,7 @@ function FightRecap({ data, onClose }: { data: { mine: FrameUnit[]; theirs: Fram
   return (
     <div className="fixed z-40 bottom-24 right-4 w-[260px] gilded rounded-xl p-3 shadow-2xl shadow-black/50">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] uppercase tracking-wide text-amber-200/60 font-bold">{t.net_fight_last}</span>
+        <span className="text-[10px] uppercase tracking-wide text-gold-200/60 font-bold">{t.net_fight_last}</span>
         <button onClick={onClose} className="text-slate-500 hover:text-slate-200 text-xs leading-none">✕</button>
       </div>
       {/* Team toggle: yours vs the rival you fought. */}
@@ -1558,20 +1558,20 @@ function FightRecap({ data, onClose }: { data: { mine: FrameUnit[]; theirs: Fram
 function BootVeil({ label, sub, progress }: { label: string; sub?: string; progress: number }) {
   const pct = Math.round(Math.max(0, Math.min(1, progress)) * 100);
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-5 bg-[#070b16]" style={{ animation: "bootfade 0.4s ease-out 1.5s forwards" }}>
+    <div className="fixed inset-0 z-overlay flex flex-col items-center justify-center gap-5 bg-[#070b16]" style={{ animation: "bootfade 0.4s ease-out 1.5s forwards" }}>
       <div className="relative w-16 h-16 animate-spin" style={{ animationDuration: "1s" }}>
         <div className="absolute inset-0 rounded-full" style={{ background: "linear-gradient(#ef4444 0 calc(50% - 3px), #0f172a calc(50% - 3px) calc(50% + 3px), #f1f5f9 calc(50% + 3px) 100%)", boxShadow: "0 0 0 3px #0f172a, 0 0 22px 3px #ef444455" }} />
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-100 border-[4px] border-slate-900" />
       </div>
       <div className="flex flex-col items-center gap-1.5">
-        <div className="text-lg font-extrabold tracking-wide text-slate-100">Poké<span className="text-amber-400">TFT</span></div>
+        <div className="text-lg font-extrabold tracking-wide text-slate-100">Poké<span className="text-gold-400">TFT</span></div>
         <div className="text-xs text-slate-400">{label}</div>
-        {sub && <div className="text-[11px] font-semibold text-amber-300/80 tabular-nums">{sub}</div>}
+        {sub && <div className="text-[11px] font-semibold text-gold-300/80 tabular-nums">{sub}</div>}
         {/* Progress bar — fills as trainers connect, then a sweep while the board syncs. */}
         <div className="mt-1 w-52 h-1.5 rounded-full bg-slate-800/80 overflow-hidden">
           {pct >= 100
-            ? <div className="h-full w-1/3 rounded-full bg-amber-400 loading-sweep" />
-            : <div className="h-full rounded-full bg-amber-400 transition-[width] duration-500 ease-out" style={{ width: `${pct}%` }} />}
+            ? <div className="h-full w-1/3 rounded-full bg-gold-400 loading-sweep" />
+            : <div className="h-full rounded-full bg-gold-400 transition-[width] duration-500 ease-out" style={{ width: `${pct}%` }} />}
         </div>
       </div>
       <style>{`@keyframes bootfade { to { opacity: 0; visibility: hidden; } }`}</style>
@@ -1619,7 +1619,7 @@ function Toasts() {
   }, [toast, clear]);
   if (!toast) return null;
   return (
-    <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-[140] pointer-events-none">
+    <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-toast pointer-events-none">
       <div
         key={toast.seq}
         className="toast-pop px-4 py-2.5 rounded-xl border text-sm font-bold shadow-2xl flex items-center gap-2"
@@ -1706,15 +1706,15 @@ function PhaseTimer({ phase, phaseLabel, deadline, totalMs, resolvingLabel }: { 
     // viewports and only claims 220px once there is room for it.
     <div className="flex-1 min-w-0 lg:min-w-[220px] flex flex-col gap-1 px-2">
       <div className="flex justify-between items-baseline">
-        <span className={`text-xs font-bold uppercase tracking-wide ${resolving ? "text-amber-300 animate-pulse" : urgent ? "text-rose-300 timer-urgent" : phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{resolving ? resolvingLabel : phaseLabel}</span>
+        <span className={`text-xs font-bold uppercase tracking-wide ${resolving ? "text-gold-300 animate-pulse" : urgent ? "text-rose-300 timer-urgent" : phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{resolving ? resolvingLabel : phaseLabel}</span>
         <span className={`text-sm font-bold tabular-nums ${urgent ? "text-rose-300 timer-urgent" : "text-slate-200"}`}>
           {resolving
-            ? <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-amber-400/25 border-t-amber-400 animate-spin align-middle" />
+            ? <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-gold-400/25 border-t-amber-400 animate-spin align-middle" />
             : <><Countdown deadline={deadline} />s</>}
         </span>
       </div>
       {resolving
-        ? <div className="h-1.5 w-full rounded-full bg-slate-800/80 overflow-hidden"><div className="h-full w-1/3 rounded-full bg-amber-400 loading-sweep" /></div>
+        ? <div className="h-1.5 w-full rounded-full bg-slate-800/80 overflow-hidden"><div className="h-full w-1/3 rounded-full bg-gold-400 loading-sweep" /></div>
         : <SmoothBar deadline={deadline} totalMs={totalMs} combat={phase === "combat"} />}
     </div>
   );

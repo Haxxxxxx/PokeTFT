@@ -30,7 +30,7 @@ function SectionCard({ title, badge, action, children }: { title: string; badge?
         <span className="h-px flex-1 bg-gradient-to-r from-[var(--panel-edge)] to-transparent" />
         {action}
         {badge && (
-          <span className="shrink-0 text-[10px] font-semibold text-amber-200/80 px-2 py-0.5 rounded-md bg-amber-500/10 border border-[var(--panel-edge)] tabular-nums whitespace-nowrap">
+          <span className="shrink-0 text-[10px] font-semibold text-gold-200/80 px-2 py-0.5 rounded-md bg-gold-500/10 border border-[var(--panel-edge)] tabular-nums whitespace-nowrap">
             {badge}
           </span>
         )}
@@ -42,8 +42,8 @@ function SectionCard({ title, badge, action, children }: { title: string; badge?
 
 // Shared chip styling so every section reads as one cohesive gilded set.
 const chipBase = "rounded-lg border text-xs font-bold transition-all disabled:cursor-not-allowed disabled:opacity-40";
-const chipActive = "bg-amber-950/40 border-amber-500/70 text-amber-200 shadow-[0_0_16px_-6px_rgba(212,175,55,0.85)]";
-const chipIdle = "bg-slate-900/45 border-slate-700/70 text-slate-400 hover:border-amber-700/50 hover:text-slate-200";
+const chipActive = "bg-gold-950/40 border-gold-500/70 text-gold-200 shadow-[0_0_16px_-6px_rgba(212,175,55,0.85)]";
+const chipIdle = "bg-slate-900/45 border-slate-700/70 text-slate-400 hover:border-gold-700/50 hover:text-slate-200";
 
 export function GameRulesPanel({ isHost, showMode = true }: { isHost: boolean; showMode?: boolean }) {
   const t = useT();
@@ -135,10 +135,10 @@ export function GameRulesPanel({ isHost, showMode = true }: { isHost: boolean; s
                 title={regionLocked ? (lang === "fr" ? "Le mode Région fixe la région" : "Region mode fixes the region") : atCap ? `Up to ${MAX_REGIONS} regions per match` : GEN_LABELS[gen]}
                 className={`flex items-center gap-2 px-3 py-2.5 ${chipBase} ${active ? chipActive : chipIdle}`}
               >
-                <span className={`text-[9px] font-extrabold tabular-nums w-5 text-center rounded px-0.5 ${active ? "bg-amber-500/25 text-amber-100" : "bg-slate-800 text-slate-500"}`}>{roman}</span>
+                <span className={`text-[9px] font-extrabold tabular-nums w-5 text-center rounded px-0.5 ${active ? "bg-gold-500/25 text-gold-100" : "bg-slate-800 text-slate-500"}`}>{roman}</span>
                 <span className="flex-1 text-left font-bold truncate">{region}</span>
-                <span className={`text-[10px] tabular-nums ${active ? "text-amber-200/80" : "text-slate-500"}`}>{genCounts[gen]}</span>
-                {active && <Check size={13} className="text-amber-300 shrink-0" />}
+                <span className={`text-[10px] tabular-nums ${active ? "text-gold-200/80" : "text-slate-500"}`}>{genCounts[gen]}</span>
+                {active && <Check size={13} className="text-gold-300 shrink-0" />}
               </button>
             );
           })}
@@ -216,14 +216,14 @@ export function GameRulesPanel({ isHost, showMode = true }: { isHost: boolean; s
         <button onClick={() => setItemsOpen((o) => !o)} className="w-full flex items-center gap-3 p-4">
           <h3 className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-gold whitespace-nowrap">{t.r_items}</h3>
           <span className="h-px flex-1 bg-gradient-to-r from-[var(--panel-edge)] to-transparent" />
-          <span className="shrink-0 text-[10px] font-semibold text-amber-200/80 px-2 py-0.5 rounded-md bg-amber-500/10 border border-[var(--panel-edge)] tabular-nums">{activeItems}/{COMPLETED.length}</span>
+          <span className="shrink-0 text-[10px] font-semibold text-gold-200/80 px-2 py-0.5 rounded-md bg-gold-500/10 border border-[var(--panel-edge)] tabular-nums">{activeItems}/{COMPLETED.length}</span>
           <ChevronDown size={16} className={`shrink-0 text-slate-400 transition-transform ${itemsOpen ? "rotate-180" : ""}`} />
         </button>
         {itemsOpen && (
           <div className="px-4 pb-4">
             {isHost && (
               <div className="flex gap-1 mb-2">
-                <button onClick={() => setRules({ itemsEnabled: COMPLETED.map((i) => i.id) })} className="text-[10px] font-bold px-2.5 py-1 rounded-md bg-slate-800/70 border border-slate-700/70 text-slate-300 hover:text-amber-200 hover:border-amber-700/50 transition-colors">{lang === "fr" ? "Tout" : "All"}</button>
+                <button onClick={() => setRules({ itemsEnabled: COMPLETED.map((i) => i.id) })} className="text-[10px] font-bold px-2.5 py-1 rounded-md bg-slate-800/70 border border-slate-700/70 text-slate-300 hover:text-gold-200 hover:border-gold-700/50 transition-colors">{lang === "fr" ? "Tout" : "All"}</button>
                 <button onClick={() => setRules({ itemsEnabled: [] })} className="text-[10px] font-bold px-2.5 py-1 rounded-md bg-slate-800/70 border border-slate-700/70 text-slate-300 hover:text-rose-300 hover:border-rose-700/50 transition-colors">{lang === "fr" ? "Aucun" : "None"}</button>
               </div>
             )}
@@ -238,15 +238,15 @@ export function GameRulesPanel({ isHost, showMode = true }: { isHost: boolean; s
                     onClick={() => toggleItem(item.id)}
                     className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border text-left transition-all disabled:cursor-not-allowed ${
                       active
-                        ? "bg-amber-950/30 border-amber-600/50 shadow-[0_0_16px_-9px_rgba(212,175,55,0.7)]"
+                        ? "bg-gold-950/30 border-gold-600/50 shadow-[0_0_16px_-9px_rgba(212,175,55,0.7)]"
                         : "bg-slate-900/30 border-slate-800 opacity-60 hover:opacity-100 hover:border-slate-700"
                     }`}
                   >
-                    <span className={`shrink-0 ${active ? "text-amber-300" : "text-slate-400"}`}><ItemGlyph id={item.id} size={16} /></span>
-                    <span className={`flex-1 min-w-0 text-[11px] font-bold truncate ${active ? "text-amber-200" : "text-slate-400"}`}>
+                    <span className={`shrink-0 ${active ? "text-gold-300" : "text-slate-400"}`}><ItemGlyph id={item.id} size={16} /></span>
+                    <span className={`flex-1 min-w-0 text-[11px] font-bold truncate ${active ? "text-gold-200" : "text-slate-400"}`}>
                       {lang === "en" ? item.name : item.nameFr}
                     </span>
-                    {active && <Check size={13} className="text-amber-400 shrink-0" />}
+                    {active && <Check size={13} className="text-gold-400 shrink-0" />}
                   </button>
                 );
               })}

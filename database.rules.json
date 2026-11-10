@@ -17,7 +17,12 @@
     "users": {
       "$uid": {
         ".read": "auth != null && ($uid === auth.uid || root.child('users').child(auth.uid).child('friends').child($uid).val() === true)",
-        "username":        { ".read": "auth != null", ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 16 && newData.val().matches(/^[a-zA-Z0-9_]+$/)" },
+        // The charset must admit "-": the app seeds an anonymous player's profile as
+        // `Guest-<uid4>`, and because that profile is written as one multi-path update,
+        // this single .validate failing threw away the WHOLE update -- username, presence,
+        // friends and history. Every guest session was silently profile-less. A hyphen is
+        // safe in an RTDB key (unlike . # $ [ ] /), and usernameLower is used as one.
+        "username":        { ".read": "auth != null", ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 16 && newData.val().matches(/^[a-zA-Z0-9_-]+$/)" },
         "usernameLower":   { ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length <= 16" },
         "photoURL":        { ".read": "auth != null", ".write": "auth != null && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length <= 512" },
         "online":          { ".read": "auth != null", ".write": "auth != null && $uid === auth.uid" },

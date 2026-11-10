@@ -39,15 +39,15 @@ export function ProfileTile() {
   return (
     <button
       onClick={() => setProfileOpen(true)}
-      className="panel rounded-xl p-4 w-full text-left group hover:border-amber-500/25 transition-colors"
+      className="panel rounded-xl p-4 w-full text-left group hover:border-gold-500/25 transition-colors"
     >
       <div className="flex items-center gap-3">
-        <span className="w-14 h-14 rounded-xl bg-white/[0.03] border border-amber-500/25 flex items-center justify-center overflow-hidden shrink-0">
+        <span className="w-14 h-14 rounded-xl bg-white/[0.03] border border-gold-500/25 flex items-center justify-center overflow-hidden shrink-0">
           {photo ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={photo} alt="" width={56} height={56} style={{ imageRendering: "pixelated" }} />
           ) : (
-            <span className="text-xl font-bold text-amber-200/70">{name.slice(0, 1).toUpperCase()}</span>
+            <span className="text-xl font-bold text-gold-200/70">{name.slice(0, 1).toUpperCase()}</span>
           )}
         </span>
         <div className="min-w-0 flex-1">

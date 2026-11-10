@@ -51,7 +51,7 @@ function Sheet() {
   return (
     <div className="min-h-screen bg-[#070c17] text-slate-200 p-4">
       <div className="mb-3 flex items-baseline gap-3 text-xs font-bold">
-        <span className="text-amber-300">MODEL SHEET</span>
+        <span className="text-gold-300">MODEL SHEET</span>
         <span className="text-slate-400">dex {dexes[0]}–{dexes[dexes.length - 1]} · {dexes.length} models · yaw {yaw}°</span>
         {/* The harness waits on this, so it must only reach 100% once every
             model has either rendered or failed. */}
@@ -62,7 +62,7 @@ function Sheet() {
       <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(6, minmax(0, 1fr))" }}>
         {dexes.map((dex) => (
           <div key={dex} className="relative rounded-lg bg-slate-900/50 border border-white/10 overflow-hidden" style={{ height: 180 }}>
-            <span className="absolute top-1 left-1.5 z-10 text-[10px] font-extrabold text-amber-300/90">{dex}</span>
+            <span className="absolute top-1 left-1.5 z-10 text-[10px] font-extrabold text-gold-300/90">{dex}</span>
             {/* The sprite is the reference the model has to match: it shows the
                 species' canonical facing and stance. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}

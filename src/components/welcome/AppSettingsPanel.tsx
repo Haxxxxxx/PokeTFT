@@ -26,7 +26,7 @@ export function AppSettingsPanel() {
               key={opt.value}
               onClick={() => setSettings({ language: opt.value })}
               style={{ minWidth: 54 }}
-              className={`py-1.5 rounded-md text-[11px] font-bold transition-colors ${settings.language === opt.value ? "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/40" : "text-slate-500 hover:text-slate-300"}`}
+              className={`py-1.5 rounded-md text-[11px] font-bold transition-colors ${settings.language === opt.value ? "bg-gold-500/15 text-gold-300 ring-1 ring-gold-500/40" : "text-slate-500 hover:text-slate-300"}`}
             >
               {opt.label}
             </button>
@@ -54,7 +54,7 @@ export function AppSettingsPanel() {
           value={Math.round((typeof settings.volume === "number" ? settings.volume : 0.7) * 100)}
           onChange={(e) => { setSettings({ volume: Number(e.target.value) / 100 }); music.setVolume(); }}
           disabled={!settings.soundEnabled}
-          className="w-28 accent-amber-500 disabled:opacity-40"
+          className="w-28 accent-gold-500 disabled:opacity-40"
         />
       </div>
     </div>

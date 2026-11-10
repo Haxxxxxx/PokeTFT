@@ -102,7 +102,11 @@ export async function ensureProfile(uid: string, seed: { username?: string; phot
 }
 
 export function usernameValid(name: string): boolean {
-  return /^[a-zA-Z0-9_]{3,16}$/.test(name);
+  // Must stay in lockstep with the .validate on users/$uid/username in
+  // database.rules.json. "-" is admitted because the app's own generated guest
+  // names ("Guest-A2zY") use it; a client/rule disagreement here is invisible
+  // until a write is silently denied.
+  return /^[a-zA-Z0-9_-]{3,16}$/.test(name);
 }
 
 /** Claim a username (must be unique). Returns true on success. */
