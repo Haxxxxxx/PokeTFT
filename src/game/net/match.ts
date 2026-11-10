@@ -309,6 +309,8 @@ export async function beginMatch(code: string, room: Room): Promise<void> {
     "meta/deadline": serverNow() + PLAN_MS,
     "meta/hostBeat": serverNow(),
     "meta/serverDriven": true, // #110 — every game is server-driven (no host-loop mode)
+    // The next placement to hand out, counting DOWN. See takeNextPlace().
+    "meta/placeCursor": Object.values(room.players ?? {}).filter((p) => p.connected || p.isBot).length,
     combat: null,
     invited: null,
     transfers: null, // clear any stale co-op transfers from a prior game
@@ -948,6 +950,11 @@ export async function endCombat(code: string, room: Room): Promise<void> {
       u[`players/${uid}/place`] = place;
       ratingJobs.push({ uid, place });
     });
+    // Re-point the placement cursor at what is actually left. endCombat is
+    // serialised by claimTransition so it can simply assert the truth here;
+    // concede, which is NOT serialised, consumes from this same cursor instead
+    // of recomputing a place from its own snapshot.
+    u["meta/placeCursor"] = surviving.length;
 
     if (surviving.length <= 1) {
       if (surviving.length === 1) {
@@ -1081,6 +1088,54 @@ export async function clearInvitePlaceholder(code: string, uid: string): Promise
  *  leave the standings cleanly instead of vanishing. Writes only their own node. */
 export async function concede(code: string, uid: string, place: number): Promise<void> {
   await dbAdapter().update(`games/${code}/players/${uid}`, { hp: 0, alive: false, place });
+}
+
+/**
+ * Take the next placement, atomically.
+ *
+ * `fallback` is only consulted when the cursor is absent — a room that started
+ * before the cursor existed. Returns null if there is nothing left to hand out,
+ * which should not happen and is treated as "do not write a placement" rather
+ * than guessed at.
+ */
+async function takeNextPlace(code: string, fallback: number): Promise<number | null> {
+  const res = await dbAdapter().transaction<number>(`games/${code}/meta/placeCursor`, (cur) => {
+    const n = typeof cur === "number" ? cur : fallback;
+    if (n < 1) return undefined; // abort
+    return n - 1;
+  });
+  if (!res.committed) return null;
+  return ((res.value as number) ?? 0) + 1;
+}
+
+/**
+ * Eliminate a player who quit, taking their placement atomically.
+ *
+ * concede() computes `place` from a snapshot of who is alive, and nothing
+ * serialises it. Two players quitting at the same moment therefore both read
+ * the same alive count and are BOTH given that place — two 4ths and no 3rd —
+ * and the same race exists between a concede and endCombat. endCombat itself is
+ * safe: claimTransition parks the deadline so only one runs per round.
+ *
+ * Two transactions, in this order:
+ *   1. claim the elimination on the player's own `alive` flag, so a double
+ *      concede by one player cannot consume two placements;
+ *   2. take a placement from the shared cursor, so two DIFFERENT players
+ *      cannot be handed the same one.
+ *
+ * Returns the placement taken, or null if this player was already eliminated.
+ */
+export async function concedeAtomic(code: string, uid: string, aliveFallback: number): Promise<number | null> {
+  const claimed = await dbAdapter().transaction<boolean>(`games/${code}/players/${uid}/alive`, (cur) => {
+    if (cur === false) return undefined; // abort — already eliminated
+    return false;
+  });
+  if (!claimed.committed) return null;
+
+  const place = await takeNextPlace(code, aliveFallback);
+  if (place == null) return null;
+  await dbAdapter().update(`games/${code}/players/${uid}`, { hp: 0, place });
+  return place;
 }
 
 export async function returnToLobby(code: string, room: Room): Promise<void> {
