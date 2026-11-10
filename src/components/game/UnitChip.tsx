@@ -310,7 +310,7 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
         onDoubleClick={onDoubleClick}
         data-inspectable
         style={{ width: size, height: size, opacity: isDragging ? 0.4 : 1 }}
-        className={`relative select-none touch-none ${interactive ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${canEquipArmed ? "animate-pulse" : ""}`}
+        className={`relative select-none touch-none unit-hover ${interactive ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${canEquipArmed ? "animate-pulse" : ""}`}
         title={title}
       >
         {dragHitbox}
@@ -334,7 +334,7 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
         opacity: isDragging ? 0.4 : 1,
       }}
       className={`relative rounded-md border-2 bg-slate-900/80 select-none touch-none flex items-center justify-center
-        ${interactive ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
+        unit-hover ${interactive ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
         ${canEquipArmed ? "ring-2 ring-fuchsia-400 animate-pulse" : ""}`}
       title={title}
     >
