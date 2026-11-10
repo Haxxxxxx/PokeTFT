@@ -68,7 +68,7 @@ export default function DownloadPage() {
           and the type chart is a combat layer. Play in your browser, or install the app.
         </p>
         {!native && (
-          <Link href="/" className="inline-flex items-center gap-2 mt-6 px-6 py-3 rounded-xl font-bold text-[15px] bg-amber-500/95 hover:bg-amber-400 text-black transition-colors">
+          <Link href="/" className="inline-flex items-center gap-2 mt-6 px-6 py-3 rounded-xl font-bold text-[15px] bg-gold-500/95 hover:bg-gold-400 text-black transition-colors">
             ▶ Play in browser
           </Link>
         )}
@@ -82,13 +82,13 @@ export default function DownloadPage() {
             <a
               key={p.id}
               href={p.href}
-              className={`group panel rounded-2xl p-5 flex flex-col items-center text-center gap-2 transition-all hover:-translate-y-1 ${primary ? "ring-1 ring-amber-500/50 shadow-[0_20px_50px_-20px_rgba(251,191,36,0.4)]" : "hover:ring-1 hover:ring-white/10"}`}
+              className={`group panel rounded-2xl p-5 flex flex-col items-center text-center gap-2 transition-all hover:-translate-y-1 ${primary ? "ring-1 ring-gold-500/50 shadow-[0_20px_50px_-20px_rgba(251,191,36,0.4)]" : "hover:ring-1 hover:ring-white/10"}`}
             >
               <span className="text-3xl leading-none">{p.glyph || "🍎"}</span>
               <span className="text-base font-extrabold text-slate-100 mt-1">{p.name}</span>
               <span className="text-[11px] text-slate-500">{p.file}</span>
-              {primary && <span className="text-[9px] font-extrabold uppercase tracking-wider text-amber-300 mt-0.5">Your device</span>}
-              <span className={`mt-2 w-full py-2 rounded-lg text-[13px] font-bold transition-colors ${primary ? "bg-amber-500/90 group-hover:bg-amber-400 text-black" : "bg-white/[0.05] group-hover:bg-white/10 text-slate-200"}`}>
+              {primary && <span className="text-[9px] font-extrabold uppercase tracking-wider text-gold-300 mt-0.5">Your device</span>}
+              <span className={`mt-2 w-full py-2 rounded-lg text-[13px] font-bold transition-colors ${primary ? "bg-gold-500/90 group-hover:bg-gold-400 text-black" : "bg-white/[0.05] group-hover:bg-white/10 text-slate-200"}`}>
                 Download
               </span>
               <span className="text-[10px] text-slate-600 leading-snug text-left mt-1">{p.tip}</span>

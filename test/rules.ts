@@ -131,6 +131,31 @@ async function main() {
   await loadRules();
   await wipe();
 
+  console.log("\nGuest onboarding — the seeded profile must be writable:");
+  {
+    // The app seeds an anonymous user's profile with `Guest-${uid.slice(0,4)}`
+    // and writes it as ONE multi-path update. Every field in that update has to
+    // pass, so a single failing .validate silently loses the whole profile:
+    // no username, no presence, no friends, no history. Observed in a real dev
+    // session as `update at /users/<uid> failed: permission_denied`.
+    const GUEST = "guest-uid";
+    check("a guest can write the profile the app actually seeds",
+      await canPatch(`users/${GUEST}`, GUEST, {
+        username: `Guest-${GUEST.slice(0, 4)}`,
+        usernameLower: `guest-${GUEST.slice(0, 4)}`,
+        photoURL: null,
+        currentGame: null,
+      }), true);
+    // The charset is still enforced — this is not a hole, just room for the
+    // one separator the app's own generated names use.
+    check("a username with a space is still rejected",
+      await canWrite(`users/${GUEST}/username`, GUEST, "not ok"), false);
+    check("a username with a dollar sign is still rejected",
+      await canWrite(`users/${GUEST}/username`, GUEST, "ev$l"), false);
+    check("a two-character username is still rejected",
+      await canWrite(`users/${GUEST}/username`, GUEST, "ab"), false);
+  }
+
   console.log("\nLeaderboard and rating (H1) — must be server-only:");
   {
     await seed(`users/${ATTACKER}`, { username: "Attacker", rating: 1000 });

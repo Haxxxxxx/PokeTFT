@@ -185,7 +185,7 @@ export function LobbyScreen() {
     { id: "easy",     label: t.p_diff_easy,     accent: "text-emerald-300" },
     { id: "medium",   label: t.p_diff_medium,   accent: "text-sky-300" },
     { id: "hard",     label: t.p_diff_hard,     accent: "text-violet-300" },
-    { id: "expert",   label: t.p_diff_expert,   accent: "text-amber-300" },
+    { id: "expert",   label: t.p_diff_expert,   accent: "text-gold-300" },
     { id: "ultimate", label: t.p_diff_ultimate, accent: "text-rose-300" },
   ];
   const diffLabel = (d?: BotDifficulty): string =>
@@ -220,9 +220,9 @@ export function LobbyScreen() {
       {/* Top bar */}
       <header className="relative z-10 flex items-center justify-between gap-3 px-4 sm:px-6 h-14 border-b border-white/[0.06] bg-slate-950/40 backdrop-blur shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="text-amber-400 shrink-0"><PokeballIcon size={26} /></span>
+          <span className="text-gold-400 shrink-0"><PokeballIcon size={26} /></span>
           <div className="min-w-0">
-            <h1 className="font-extrabold tracking-tight text-base sm:text-lg text-slate-100 truncate">Poké<span className="text-amber-400">TFT</span><span className="text-slate-500 font-normal text-sm ml-2 hidden sm:inline">— {t.l_lobby}</span></h1>
+            <h1 className="font-extrabold tracking-tight text-base sm:text-lg text-slate-100 truncate">Poké<span className="text-gold-400">TFT</span><span className="text-slate-500 font-normal text-sm ml-2 hidden sm:inline">— {t.l_lobby}</span></h1>
             <p className="text-[11px] text-slate-500 -mt-0.5 truncate">{t.l_net_players(players.length, maxPlayers)}</p>
           </div>
         </div>
@@ -263,7 +263,7 @@ export function LobbyScreen() {
                 <Portrait name={p.name} photo={p.photoURL} ready={p.ready} isBot={p.isBot} nightmare={p.botDifficulty === "nightmare"} />
                 <span className="text-xs font-bold text-slate-200 truncate max-w-full text-center">{p.name}</span>
                 <div className="flex flex-wrap gap-0.5 justify-center">
-                  {p.isHost && <span className="text-[8px] font-bold uppercase bg-amber-500 text-black rounded px-1 leading-tight">{t.l_net_host}</span>}
+                  {p.isHost && <span className="text-[8px] font-bold uppercase bg-gold-500 text-black rounded px-1 leading-tight">{t.l_net_host}</span>}
                   {p.uid === myUid && <span className="text-[8px] font-bold uppercase bg-sky-600 text-white rounded px-1 leading-tight">{t.l_net_you}</span>}
                 </div>
                 <span className={`text-[10px] font-semibold capitalize ${p.botDifficulty === "nightmare" ? "text-rose-400 tracking-[0.15em]" : p.isBot ? "text-violet-300/80" : p.ready ? "text-emerald-400" : "text-slate-500"}`}>{p.isBot ? diffLabel(p.botDifficulty) : p.ready ? t.l_net_ready_up : t.l_net_not_ready}</span>
@@ -277,14 +277,14 @@ export function LobbyScreen() {
             );
             const PendingTile = ({ p }: { p: { uid: string; username?: string; photoURL?: string | null } }) => (
               <div className="flex flex-col items-center gap-1.5 w-20">
-                <div className="w-16 h-16 rounded-xl border border-dashed border-amber-500/40 bg-amber-500/[0.04] flex items-center justify-center overflow-hidden shrink-0 animate-pulse">
+                <div className="w-16 h-16 rounded-xl border border-dashed border-gold-500/40 bg-gold-500/[0.04] flex items-center justify-center overflow-hidden shrink-0 animate-pulse">
                   {p.photoURL
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={p.photoURL} alt="" width={44} height={44} style={{ imageRendering: "pixelated", opacity: 0.5 }} />
-                    : <span className="text-lg font-bold text-amber-300/50">{(p.username || "?").slice(0, 1).toUpperCase()}</span>}
+                    : <span className="text-lg font-bold text-gold-300/50">{(p.username || "?").slice(0, 1).toUpperCase()}</span>}
                 </div>
                 <span className="text-xs font-bold text-slate-400 truncate max-w-full text-center">{p.username}</span>
-                <span className="text-[10px] font-semibold text-amber-400/80">{lang === "fr" ? "Invité…" : "Invited…"}</span>
+                <span className="text-[10px] font-semibold text-gold-400/80">{lang === "fr" ? "Invité…" : "Invited…"}</span>
               </div>
             );
 
@@ -374,7 +374,7 @@ export function LobbyScreen() {
 
           {/* Invite friends */}
           <div className="mt-3 pt-4 border-t border-white/[0.06] flex flex-col items-center gap-2">
-            <button onClick={() => setShowInvite((s) => !s)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[11px] font-bold text-amber-300">
+            <button onClick={() => setShowInvite((s) => !s)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gold-500/10 hover:bg-gold-500/20 border border-gold-500/30 text-[11px] font-bold text-gold-300">
               <UserPlus size={13} /> {lang === "fr" ? "Inviter des amis" : "Invite friends"}
             </button>
             {showInvite && (
@@ -388,7 +388,7 @@ export function LobbyScreen() {
                     <button
                       onClick={() => { if (myUid) { sendInvite(f.uid, room.code, myProfile?.username ?? "Player", myUid); addInvitePlaceholder(room.code, f.uid, f.username, f.photoURL); setInvited((p) => ({ ...p, [f.uid]: true })); } }}
                       disabled={invited[f.uid] || !!room.invited?.[f.uid]}
-                      className="px-2.5 py-1 rounded-md bg-amber-500/90 hover:bg-amber-400 text-black text-[10px] font-bold disabled:opacity-50"
+                      className="px-2.5 py-1 rounded-md bg-gold-500/90 hover:bg-gold-400 text-black text-[10px] font-bold disabled:opacity-50"
                     >{(invited[f.uid] || room.invited?.[f.uid]) ? (lang === "fr" ? "Invité ✓" : "Invited ✓") : (lang === "fr" ? "Inviter" : "Invite")}</button>
                   </div>
                 ))}
@@ -444,7 +444,7 @@ export function LobbyScreen() {
           <aside className={`absolute inset-y-0 right-0 w-full max-w-[480px] panel border-l border-white/[0.08] shadow-2xl shadow-black/50 overflow-y-auto transition-transform duration-300 ease-out ${showRules ? "translate-x-0" : "translate-x-full"}`}>
             <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-[var(--panel-bg,rgba(10,12,20,0.92))] backdrop-blur border-b border-white/[0.06]">
               <h2 className="inline-flex items-center gap-2 text-[12px] font-extrabold uppercase tracking-[0.2em] gild-text"><Settings size={14} /> {t.l_rules}</h2>
-              <button onClick={() => setShowRules(false)} aria-label={t.a_close} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-300 hover:bg-white/[0.06] transition-colors"><X size={18} /></button>
+              <button onClick={() => setShowRules(false)} aria-label={t.a_close} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-gold-300 hover:bg-white/[0.06] transition-colors"><X size={18} /></button>
             </div>
             <div className="p-5">
               <GameRulesPanel isHost={isHost} showMode={false} />

@@ -69,11 +69,11 @@ export function ItemsPanel() {
   return (
     <div data-inspectable className="gilded rounded-xl p-3">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-[10px] uppercase tracking-wide text-amber-200/60 font-bold">{t.sh_items_title}</h2>
+        <h2 className="text-[10px] uppercase tracking-wide text-gold-200/60 font-bold">{t.sh_items_title}</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setRecipesOpen(true)}
-            className="flex items-center gap-1 text-[10px] font-bold text-amber-200/70 hover:text-amber-200"
+            className="flex items-center gap-1 text-[10px] font-bold text-gold-200/70 hover:text-gold-200"
             title={t.it_recipes_title}
           >
             <BookOpen size={12} /> {t.it_recipes}
@@ -104,7 +104,7 @@ export function ItemsPanel() {
             <div className="mt-2 flex gap-1.5">
               <button
                 onClick={() => reforgeItem(inspectedItem)}
-                className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-amber-900/50 border border-slate-700 text-[10px] font-bold text-amber-200"
+                className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-gold-900/50 border border-slate-700 text-[10px] font-bold text-gold-200"
                 title={t.it_reforge_t}
               >
                 <Hammer size={12} /> {t.it_reforge}

@@ -106,7 +106,7 @@ export function AugmentsBar({
         <>
           {/* click-away */}
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div style={{ position: "fixed", top: pos.top, right: pos.right }} className="z-50 w-72 max-w-[80vw] rounded-xl border border-violet-500/40 bg-[#0d1426] shadow-2xl p-3">
+          <div style={{ position: "fixed", top: pos.top, right: pos.right }} className="z-screen w-72 max-w-[80vw] rounded-xl border border-violet-500/40 bg-[#0d1426] shadow-2xl p-3">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-extrabold text-violet-300 uppercase tracking-wide">{fr ? "Augmentations" : "Augments"}</h3>
               <span className="text-[10px] text-slate-500">{augments.length}/3</span>

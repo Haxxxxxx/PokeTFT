@@ -91,7 +91,7 @@ export function QuickChat({ code, myUid, myName }: QuickChatProps) {
   return (
     <>
       {/* Floating toast messages */}
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none select-none">
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-screen flex flex-col items-center gap-2 pointer-events-none select-none">
         {toasts.map((toast) => {
           const isMine = toast.uid === myUid;
           return (
@@ -99,7 +99,7 @@ export function QuickChat({ code, myUid, myName }: QuickChatProps) {
               key={toast.id}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg backdrop-blur-sm border transition-all
                 ${isMine
-                  ? "bg-amber-500/25 border-amber-400/50 text-amber-200 self-end mr-4"
+                  ? "bg-gold-500/25 border-gold-400/50 text-gold-200 self-end mr-4"
                   : "bg-slate-800/80 border-slate-600/60 text-slate-200 self-start ml-4"
                 }`}
             >
@@ -113,7 +113,7 @@ export function QuickChat({ code, myUid, myName }: QuickChatProps) {
       {/* Picker popover */}
       {open && (
         <div
-          className="fixed inset-0 z-[55]"
+          className="fixed inset-0 z-panel"
           onClick={() => setOpen(false)}
         >
           <div
@@ -125,7 +125,7 @@ export function QuickChat({ code, myUid, myName }: QuickChatProps) {
                 key={msg}
                 type="button"
                 onClick={() => sendMessage(msg)}
-                className="w-full text-left px-3.5 py-2 text-xs font-semibold text-slate-200 hover:bg-amber-500/20 hover:text-amber-200 transition-colors border-b border-slate-800/60 last:border-none"
+                className="w-full text-left px-3.5 py-2 text-xs font-semibold text-slate-200 hover:bg-gold-500/20 hover:text-gold-200 transition-colors border-b border-slate-800/60 last:border-none"
               >
                 {msg}
               </button>
@@ -139,7 +139,7 @@ export function QuickChat({ code, myUid, myName }: QuickChatProps) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         title="Quick chat"
-        className="fixed bottom-4 right-4 z-50 w-10 h-10 rounded-full bg-slate-800/90 border border-slate-700/80 hover:border-amber-400/60 hover:bg-slate-700/90 text-slate-300 hover:text-amber-300 shadow-lg flex items-center justify-center text-lg leading-none transition-all"
+        className="fixed bottom-4 right-4 z-screen w-10 h-10 rounded-full bg-slate-800/90 border border-slate-700/80 hover:border-gold-400/60 hover:bg-slate-700/90 text-slate-300 hover:text-gold-300 shadow-lg flex items-center justify-center text-lg leading-none transition-all"
       >
         💬
       </button>

@@ -11,6 +11,7 @@ import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { TraitGlyph } from "@/components/game/TraitGlyph";
 import { PokemonModelPreview } from "@/components/game/PokemonModelPreview";
 import { TYPE_COLOR } from "@/game/ui";
+import { Modal } from "@/components/ui/Modal";
 import { computeAchievements, ACHIEVEMENT_TIER_COLOR } from "@/game/data/achievements";
 import { ArrowLeft, Trophy, Medal, Swords, Crown, X } from "lucide-react";
 import { useT } from "@/lib/i18n";
@@ -95,17 +96,17 @@ export function ProfileScreen() {
           >
             <ArrowLeft size={15} /> {tr("Back", "Retour")}
           </button>
-          <h1 className="text-lg font-extrabold text-amber-200">{isOther ? tr("Trainer profile", "Profil du dresseur") : tr("Profile", "Profil")}</h1>
+          <h1 className="text-lg font-extrabold text-gold-200">{isOther ? tr("Trainer profile", "Profil du dresseur") : tr("Profile", "Profil")}</h1>
         </div>
 
         {/* Identity card */}
         <div className="panel rounded-xl p-4 flex items-center gap-3.5">
-          <span className="w-16 h-16 rounded-xl bg-white/[0.03] border border-amber-500/25 flex items-center justify-center overflow-hidden shrink-0">
+          <span className="w-16 h-16 rounded-xl bg-white/[0.03] border border-gold-500/25 flex items-center justify-center overflow-hidden shrink-0">
             {photo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={photo} alt="" width={64} height={64} style={{ imageRendering: "pixelated" }} />
             ) : (
-              <span className="text-2xl font-bold text-amber-200/70">{name.slice(0, 1).toUpperCase()}</span>
+              <span className="text-2xl font-bold text-gold-200/70">{name.slice(0, 1).toUpperCase()}</span>
             )}
           </span>
           <div className="min-w-0 flex-1">
@@ -138,7 +139,7 @@ export function ProfileScreen() {
 
         {/* Achievements — earned light up, locked are dimmed. */}
         <div className="panel rounded-xl p-3">
-          <h2 className="text-[10px] uppercase tracking-wide text-amber-200/60 font-bold mb-2.5 px-1 flex items-center justify-between">
+          <h2 className="text-[10px] uppercase tracking-wide text-gold-200/60 font-bold mb-2.5 px-1 flex items-center justify-between">
             <span>{tr("Achievements", "Hauts faits")}</span>
             <span className="text-slate-500 tabular-nums">{earnedCount}/{achievements.length}</span>
           </h2>
@@ -162,7 +163,7 @@ export function ProfileScreen() {
 
         {/* History list */}
         <div className="panel rounded-xl p-3">
-          <h2 className="text-[10px] uppercase tracking-wide text-amber-200/60 font-bold mb-2 px-1">{tr("Match history", "Historique")}</h2>
+          <h2 className="text-[10px] uppercase tracking-wide text-gold-200/60 font-bold mb-2 px-1">{tr("Match history", "Historique")}</h2>
           {history === null ? (
             <p className="text-[12px] text-slate-500 py-6 text-center">{tr("Loading…", "Chargement…")}</p>
           ) : history.length === 0 ? (
@@ -173,7 +174,7 @@ export function ProfileScreen() {
                 const color = placeColor(g.place, g.players);
                 const regions = g.regions?.map((r) => (GEN_LABELS[r] ?? `Gen ${r}`).split("—")[1]?.trim() ?? `Gen ${r}`).join(", ");
                 return (
-                  <button key={g.code} onClick={() => setSelected(g)} className="w-full text-left px-2.5 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] hover:border-amber-500/30 transition-colors">
+                  <button key={g.code} onClick={() => setSelected(g)} className="w-full text-left px-2.5 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] hover:border-gold-500/30 transition-colors">
                     <div className="flex items-center gap-3">
                       <span className="w-9 h-9 rounded-lg flex items-center justify-center font-extrabold text-sm shrink-0" style={{ background: `${color}22`, color, border: `1px solid ${color}66` }}>
                         #{g.place}
@@ -248,8 +249,11 @@ function MatchDetail({ game, lang, onClose }: { game: GameResult; lang: string; 
   const team = (game.team ?? []).slice().sort((a, b) => b.s - a.s);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="panel w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-xl p-5" onClick={(e) => e.stopPropagation()}>
+    <Modal
+      onClose={onClose}
+      label={game.place === 1 ? tr("Victory", "Victoire") : tr("Match detail", "Détail du match")}
+      size="lg"
+    >
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <span className="w-11 h-11 rounded-xl flex items-center justify-center font-extrabold text-base shrink-0" style={{ background: `${color}22`, color, border: `1px solid ${color}66` }}>
@@ -264,14 +268,14 @@ function MatchDetail({ game, lang, onClose }: { game: GameResult; lang: string; 
               {regions || "—"}{typeof game.ts === "number" ? ` · ${new Date(game.ts).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}
             </div>
           </div>
-          <button onClick={onClose} aria-label={t.a_close} className="text-slate-500 hover:text-amber-300 shrink-0"><X size={18} /></button>
+          <button onClick={onClose} aria-label={t.a_close} className="text-slate-500 hover:text-gold-300 shrink-0"><X size={18} /></button>
         </div>
 
         {/* Eliminated by / Winner banner */}
         {game.place === 1 ? (
-          <div className="mb-4 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center gap-2">
-            <Trophy size={14} className="text-amber-400 shrink-0" />
-            <span className="text-[12px] font-bold text-amber-300">{tr("Winner", "Vainqueur")}</span>
+          <div className="mb-4 px-3 py-2 rounded-lg bg-gold-500/10 border border-gold-500/25 flex items-center gap-2">
+            <Trophy size={14} className="text-gold-400 shrink-0" />
+            <span className="text-[12px] font-bold text-gold-300">{tr("Winner", "Vainqueur")}</span>
           </div>
         ) : game.eliminatedBy ? (
           <div className="mb-4 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center gap-2">
@@ -284,7 +288,7 @@ function MatchDetail({ game, lang, onClose }: { game: GameResult; lang: string; 
         {/* Active traits */}
         {traits.length > 0 && (
           <div className="mb-4">
-            <h3 className="text-[10px] uppercase tracking-wide text-amber-200/60 font-bold mb-2">{tr("Synergies", "Synergies")}</h3>
+            <h3 className="text-[10px] uppercase tracking-wide text-gold-200/60 font-bold mb-2">{tr("Synergies", "Synergies")}</h3>
             <div className="flex flex-wrap gap-1.5">
               {traits.map((t) => {
                 const c = (TYPE_COLOR as Record<string, string>)[t.k] ?? "#94a3b8";
@@ -303,7 +307,7 @@ function MatchDetail({ game, lang, onClose }: { game: GameResult; lang: string; 
 
         {/* Final comp */}
         <div>
-          <h3 className="text-[10px] uppercase tracking-wide text-amber-200/60 font-bold mb-2">{tr("Final board", "Composition finale")} · {team.length}</h3>
+          <h3 className="text-[10px] uppercase tracking-wide text-gold-200/60 font-bold mb-2">{tr("Final board", "Composition finale")} · {team.length}</h3>
           {team.length === 0 ? (
             <p className="text-[12px] text-slate-600 py-4 text-center">{tr("No board recorded.", "Aucune composition enregistrée.")}</p>
           ) : (
@@ -315,7 +319,7 @@ function MatchDetail({ game, lang, onClose }: { game: GameResult; lang: string; 
                 const name = def.stageNames?.[stage] ?? def.name;
                 return (
                   <div key={i} className="flex flex-col items-center gap-1 p-2 rounded-lg bg-white/[0.02] border border-white/[0.05]">
-                    <span className="text-[9px] font-bold text-amber-300 leading-none tabular-nums">{"★".repeat(u.s)}</span>
+                    <span className="text-[9px] font-bold text-gold-300 leading-none tabular-nums">{"★".repeat(u.s)}</span>
                     <PokemonModelPreview dex={dex} alt={name} width={44} height={44} />
                     <span className="text-[10px] font-semibold text-slate-300 text-center leading-tight truncate max-w-full">{name}</span>
                   </div>
@@ -324,8 +328,7 @@ function MatchDetail({ game, lang, onClose }: { game: GameResult; lang: string; 
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

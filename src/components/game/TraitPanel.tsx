@@ -89,7 +89,7 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
     // a full-height box with a mostly-empty border around three traits. It still
     // caps at the rail height and scrolls internally once the list gets long.
     <div className="gilded w-full max-h-full min-h-0 flex flex-col p-3 rounded-xl">
-      <h2 className="text-xs uppercase tracking-wide text-amber-200/60 mb-2 shrink-0">{tr.tp_synergies}</h2>
+      <h2 className="text-xs uppercase tracking-wide text-gold-200/60 mb-2 shrink-0">{tr.tp_synergies}</h2>
       {traits.length === 0 && <p className="text-xs text-slate-500">{tr.tp_place_mons}</p>}
       {/* Scrolls when the list gets long. */}
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-1.5 pr-0.5">
@@ -112,7 +112,7 @@ export function TraitPanel({ units: override }: { units?: UnitInstance[] } = {})
               onFocus={(e) => { const r = e.currentTarget.getBoundingClientRect(); openHover(t.key, r.top, r.right + 8); }}
               onBlur={scheduleClose}
               onKeyDown={(e) => { if (e.key === "Escape" && hover?.key === t.key) { cancelClose(); setHover(null); } }}
-              className={`flex items-center gap-2 px-2 py-1 rounded-md cursor-help shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 ${active ? "bg-slate-800" : "bg-slate-900/40 opacity-60"}`}
+              className={`flex items-center gap-2 px-2 py-1 rounded-md cursor-help shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400/70 ${active ? "bg-slate-800" : "bg-slate-900/40 opacity-60"}`}
             >
               {/* Count in its own shaped badge, then the name, then the FULL
                   breakpoint chain beneath it with the reached tiers lit — TFT's
@@ -209,7 +209,7 @@ function TraitTooltip({ t, top, left, members, board, onEnter, onLeave }: { t: T
   // always know who you're looking at (the sprites alone read as tiny silhouettes).
   const [hoverMon, setHoverMon] = useState<{ name: string; cost: number } | null>(null);
   return (
-    <div id={`trait-tip-${t.key}`} role="tooltip" onMouseEnter={onEnter} onMouseLeave={onLeave} style={{ position: "fixed", top, left, borderColor: color }} className="z-[80] w-[260px] p-3 rounded-lg border bg-[#0d1426] text-slate-100 shadow-2xl">
+    <div id={`trait-tip-${t.key}`} role="tooltip" onMouseEnter={onEnter} onMouseLeave={onLeave} style={{ position: "fixed", top, left, borderColor: color }} className="z-tooltip w-[260px] p-3 rounded-lg border bg-[#0d1426] text-slate-100 shadow-2xl">
       <div className="flex items-center gap-2 mb-1.5">
         <span style={{ borderColor: color }} className="w-5 h-5 rounded border flex items-center justify-center"><TraitGlyph traitKey={t.key} size={12} /></span>
         <span className="font-bold text-sm">{t.label}</span>

@@ -37,7 +37,7 @@ export function ModeSelect({ isHost, onContinue }: { isHost: boolean; onContinue
   return (
     <div className="h-screen flex flex-col app-bg overflow-hidden">
       <header className="relative z-10 px-5 pt-5 pb-3 text-center shrink-0">
-        <p className="text-[10px] uppercase tracking-[0.28em] text-amber-400/70 font-bold">{lang === "fr" ? "Étape 1 / 2" : "Step 1 / 2"}</p>
+        <p className="text-[10px] uppercase tracking-[0.28em] text-gold-400/70 font-bold">{lang === "fr" ? "Étape 1 / 2" : "Step 1 / 2"}</p>
         <h1 className="text-xl sm:text-2xl font-extrabold gild-text mt-0.5">{lang === "fr" ? "Choisis ton mode" : "Choose your mode"}</h1>
       </header>
 

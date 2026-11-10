@@ -135,7 +135,7 @@ function ShopBarBase() {
           </div>
           <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-white">
             {t.net_buy_xp}
-            <span className="inline-flex items-center gap-0.5 text-amber-200"><CoinIcon size={11} />{ECONOMY.buyXpCost}</span>
+            <span className="inline-flex items-center gap-0.5 text-gold-200"><CoinIcon size={11} />{ECONOMY.buyXpCost}</span>
             <span className="text-sky-200">+{ECONOMY.buyXpAmount}</span>
           </div>
         </button>
@@ -149,7 +149,7 @@ function ShopBarBase() {
           <span className="inline-flex items-center gap-1 text-[11px] text-slate-300">
             <span className="inline-flex items-center gap-0.5"><CoinIcon size={11} />{ECONOMY.rerollCost}</span>
             <span className="text-slate-600">·</span>
-            <span className="inline-flex items-center gap-0.5 font-extrabold text-amber-300"><CoinIcon size={12} />{gold}</span>
+            <span className="inline-flex items-center gap-0.5 font-extrabold text-gold-300"><CoinIcon size={12} />{gold}</span>
           </span>
         </button>
         <button
@@ -167,16 +167,16 @@ function ShopBarBase() {
           interest preview rides along, since interest is a function of this
           number and players bank to the next breakpoint. */}
       <div className="gilded flex flex-col items-center justify-center gap-0.5 px-3 rounded-lg shrink-0 min-w-[76px]">
-        <span className="inline-flex items-center gap-1.5 text-2xl font-extrabold text-amber-300 tabular-nums leading-none drop-shadow">
+        <span className="inline-flex items-center gap-1.5 text-2xl font-extrabold text-gold-300 tabular-nums leading-none drop-shadow">
           <CoinIcon size={20} />
           {gold}
         </span>
-        <span className="text-[9px] font-bold uppercase tracking-wide text-amber-200/50 leading-none">
+        <span className="text-[9px] font-bold uppercase tracking-wide text-gold-200/50 leading-none">
           {t.net_gold_label}
         </span>
         <span
           title={t.net_interest_label}
-          className="mt-0.5 text-[10px] font-bold tabular-nums text-amber-200/75 leading-none"
+          className="mt-0.5 text-[10px] font-bold tabular-nums text-gold-200/75 leading-none"
         >
           +{interest(gold)}
         </span>

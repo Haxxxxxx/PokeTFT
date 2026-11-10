@@ -22,11 +22,11 @@ export function UsernamePrompt() {
           placeholder="username"
           maxLength={16}
           autoFocus
-          className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-4 py-3 text-center text-base font-bold tracking-wide text-amber-300 placeholder:text-slate-600 placeholder:font-normal placeholder:tracking-normal focus:outline-none focus:border-amber-500/50 transition-colors"
+          className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-4 py-3 text-center text-base font-bold tracking-wide text-gold-300 placeholder:text-slate-600 placeholder:font-normal placeholder:tracking-normal focus:outline-none focus:border-gold-500/50 transition-colors"
         />
         <p className="text-[11px] text-slate-500 text-center">{t.a_username_rule}</p>
         <button onClick={() => saveUsername(name)} disabled={!valid || busy}
-          className="w-full py-2.5 rounded-lg font-bold text-[13px] bg-amber-500/90 hover:bg-amber-400 text-black disabled:opacity-40 transition-colors">
+          className="w-full py-2.5 rounded-lg font-bold text-[13px] bg-gold-500/90 hover:bg-gold-400 text-black disabled:opacity-40 transition-colors">
           {busy ? "…" : t.a_continue}
         </button>
         {error && <p className="text-xs text-rose-400 text-center">{error}</p>}

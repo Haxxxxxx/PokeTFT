@@ -98,7 +98,7 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
               {lang === "fr" ? "Précédent" : "Back"}
             </button>
           )}
-          <button onClick={() => (last ? onClose() : setI(i + 1))} className="flex-1 py-2.5 rounded-xl font-extrabold text-sm bg-amber-500 hover:bg-amber-400 text-black">
+          <button onClick={() => (last ? onClose() : setI(i + 1))} className="flex-1 py-2.5 rounded-xl font-extrabold text-sm bg-gold-500 hover:bg-gold-400 text-black">
             {last ? (lang === "fr" ? "C'est parti !" : "Let's play!") : (lang === "fr" ? "Suivant" : "Next")}
           </button>
         </div>

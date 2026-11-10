@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { useState } from "react";
 import { COMPONENTS, RECIPES, combineKey, ITEM_BY_ID, RARITY_COLOR, isEmblem } from "@/game/data/itemPool";
 import { useAppStore } from "@/game/store/appStore";
 import { ItemGlyph } from "./ItemGlyph";
+import { Modal } from "@/components/ui/Modal";
 
 /** A recipe browser: pick a base component on the left and see every item it can be
  *  combined into (which partner makes what). Mirrors the TFT item cheat-sheet — and
@@ -15,13 +14,6 @@ export function RecipeBook({ onClose }: { onClose: () => void }) {
   const fr = lang === "fr";
   const [base, setBase] = useState<string>(COMPONENTS[0]?.id ?? "c-ad");
 
-  // Esc closes.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   const name = (id: string) => (fr ? ITEM_BY_ID[id]?.nameFr : ITEM_BY_ID[id]?.name) ?? id;
   const color = (id: string) => RARITY_COLOR[ITEM_BY_ID[id]?.rarity ?? "common"] ?? "#94a3b8";
 
@@ -30,29 +22,22 @@ export function RecipeBook({ onClose }: { onClose: () => void }) {
     .map((p) => ({ partner: p.id, result: RECIPES[combineKey(base, p.id)] }))
     .filter((r): r is { partner: string; result: string } => Boolean(r.result));
 
-  // Portaled to document.body: this is opened from deep inside the `tft-shell` game
-  // canvas, which is scaled via a CSS `transform` — and a `transform` on an ancestor
-  // makes it the containing block for any `position: fixed` descendant, silently
-  // trapping this "fixed inset-0" overlay inside that ancestor's local stacking
-  // context. Any sibling overlay rendered OUTSIDE the transformed canvas (end-of-round
-  // banners, the augment/carousel picker, the fight recap panel) then always painted
-  // on top of it regardless of z-index — the recipe list was unreadable underneath
-  // them. Portaling escapes the transform so this behaves like a real top-level modal.
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div
-        className="gilded rounded-xl p-4 w-full max-w-2xl max-h-[85vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs uppercase tracking-wide text-amber-200/80 font-bold">
-            {fr ? "Recettes d'objets" : "Item Recipes"}
-          </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200" title={fr ? "Fermer" : "Close"} aria-label={fr ? "Fermer" : "Close"}>
-            <X size={18} />
-          </button>
-        </div>
-
+  // <Modal> portals to document.body, which this screen specifically needs: it is
+  // opened from deep inside the `tft-shell` game canvas, which is scaled via a CSS
+  // `transform` — and a `transform` on an ancestor makes it the containing block for
+  // any `position: fixed` descendant, silently trapping a "fixed inset-0" overlay in
+  // that ancestor's local stacking context. Sibling overlays rendered OUTSIDE the
+  // transformed canvas (end-of-round banners, the augment picker, the fight recap)
+  // then painted on top of it regardless of z-index, and the recipe list was
+  // unreadable underneath them.
+  return (
+    <Modal
+      onClose={onClose}
+      label={fr ? "Recettes d'objets" : "Item Recipes"}
+      title={fr ? "Recettes d'objets" : "Item Recipes"}
+      size="lg"
+      surface="gilded"
+    >
         {/* Base components — click one to see what it builds. */}
         <div className="flex flex-wrap gap-1.5 mb-4">
           {COMPONENTS.map((c) => {
@@ -101,8 +86,6 @@ export function RecipeBook({ onClose }: { onClose: () => void }) {
             </div>
           ))}
         </div>
-      </div>
-    </div>,
-    document.body,
+    </Modal>
   );
 }

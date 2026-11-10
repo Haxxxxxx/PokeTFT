@@ -152,14 +152,14 @@ function Card() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <h2 className="text-base font-bold tracking-tight truncate">{def.stageNames[i]}</h2>
-            <span className="flex items-center gap-px text-amber-300 shrink-0">
+            <span className="flex items-center gap-px text-gold-300 shrink-0">
               {Array.from({ length: star }).map((_, k) => <StarIcon key={k} size={12} />)}
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-[11px] font-medium mt-0.5" style={{ color }}>
             {costLabel[def.cost]}
             <span className="text-slate-600">·</span>
-            <span className="inline-flex items-center gap-1 text-amber-300/90"><CoinIcon size={11} />{def.cost}</span>
+            <span className="inline-flex items-center gap-1 text-gold-300/90"><CoinIcon size={11} />{def.cost}</span>
             <span className="text-slate-600">·</span>
             <span style={{ background: arch.color }} className="text-[9px] px-1.5 py-0.5 rounded font-extrabold text-black/85 uppercase tracking-wide">
               {lang === "fr" ? arch.fr : arch.en}
@@ -183,7 +183,7 @@ function Card() {
         {heldUnit && (
           <button
             onClick={() => { sell(heldUnit.iid); clear(); }}
-            className="shrink-0 inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-bold text-amber-200 bg-amber-500/10 ring-1 ring-amber-400/40 hover:bg-amber-500/20 transition-colors"
+            className="shrink-0 inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-bold text-gold-200 bg-gold-500/10 ring-1 ring-gold-400/40 hover:bg-gold-500/20 transition-colors"
           >
             {t.ud_sell}
             <span className="inline-flex items-center gap-0.5"><CoinIcon size={10} />{sellValue(heldUnit.defId, heldUnit.star)}</span>
@@ -278,7 +278,7 @@ function Card() {
             </p>
             <div className="flex flex-wrap gap-1 mt-1.5 text-[9px] font-bold">
               <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300">+{pct(mf.hpMult)}% HP</span>
-              <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">+{pct(mf.adMult)}% ATK</span>
+              <span className="px-1.5 py-0.5 rounded bg-gold-500/15 text-gold-300">+{pct(mf.adMult)}% ATK</span>
               <span className="px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-300">+{pct(mf.apMult)}% {lang === "fr" ? "Spé" : "AP"}</span>
               <span className="px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-300">+{mf.armorBonus} {lang === "fr" ? "Déf" : "Armor"}</span>
               <span className="px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300">+{mf.mrBonus} {lang === "fr" ? "Déf.Spé" : "MR"}</span>

@@ -160,7 +160,7 @@ function Drawer({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex" onClick={onClose}>
+    <div className="fixed inset-0 z-screen flex" onClick={onClose}>
       <div className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" />
       <div
         onClick={(e) => e.stopPropagation()}

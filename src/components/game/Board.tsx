@@ -190,9 +190,9 @@ function PensionDock({ interactive }: { interactive: boolean }) {
       title={!pension ? t.net_pension_title(PENSION_COST, PENSION_ROUNDS) : undefined}
       className={`absolute right-2 top-[18%] z-30 flex w-[76px] flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-transparent p-1.5 text-center transition-all
         ${isOver ? "scale-105 border-emerald-300 bg-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.35)]" : "bg-transparent shadow-none"}
-        ${!pension && interactive ? "border-dashed text-amber-100/70" : "text-slate-100"}`}
+        ${!pension && interactive ? "border-dashed text-gold-100/70" : "text-slate-100"}`}
     >
-      <span className="text-[8px] font-extrabold uppercase tracking-wider text-amber-200/75">{t.net_pension}</span>
+      <span className="text-[8px] font-extrabold uppercase tracking-wider text-gold-200/75">{t.net_pension}</span>
       {pension && def && dex !== null ? (
         <>
           <div className="relative grid h-14 w-full place-items-center rounded-lg" style={{ background: `radial-gradient(circle, ${typeColor}55, transparent 72%)` }}>
@@ -203,7 +203,7 @@ function PensionDock({ interactive }: { interactive: boolean }) {
               height={56}
               className={ready ? "" : "opacity-85"}
             />
-            {!ready && <span className="absolute inset-0 grid place-items-center text-sm font-extrabold text-amber-100 drop-shadow-[0_1px_3px_rgba(0,0,0,1)]">{pension.roundsLeft}</span>}
+            {!ready && <span className="absolute inset-0 grid place-items-center text-sm font-extrabold text-gold-100 drop-shadow-[0_1px_3px_rgba(0,0,0,1)]">{pension.roundsLeft}</span>}
           </div>
           {ready ? (
             <button
@@ -214,12 +214,12 @@ function PensionDock({ interactive }: { interactive: boolean }) {
               {t.net_pension_collect}
             </button>
           ) : (
-            <span className="text-[8px] font-bold leading-tight text-amber-100/80">{t.net_pension_rounds(pension.roundsLeft)}</span>
+            <span className="text-[8px] font-bold leading-tight text-gold-100/80">{t.net_pension_rounds(pension.roundsLeft)}</span>
           )}
         </>
       ) : (
         <>
-          <span className={`leading-none text-amber-200/80 transition-transform ${isOver ? "scale-125" : ""}`}><PawIcon size={22} /></span>
+          <span className={`leading-none text-gold-200/80 transition-transform ${isOver ? "scale-125" : ""}`}><PawIcon size={22} /></span>
           <span className="text-[8px] leading-tight text-slate-400">{interactive ? `Drop · ${PENSION_COST} ◉` : "Empty"}</span>
         </>
       )}
@@ -475,7 +475,7 @@ function BoardBase({
                 key={d.id}
                 onClick={() => collectDrop(d.id)}
                 title={t.it_collect}
-                className="absolute z-20 flex items-center justify-center rounded-full bg-amber-400/90 hover:bg-amber-300 text-black shadow-[0_0_14px_4px_rgba(251,191,36,0.5)] animate-bounce"
+                className="absolute z-20 flex items-center justify-center rounded-full bg-gold-400/90 hover:bg-gold-300 text-black shadow-[0_0_14px_4px_rgba(251,191,36,0.5)] animate-bounce"
                 style={{
                   left: x - size / 2,
                   top: dTop - size / 2,

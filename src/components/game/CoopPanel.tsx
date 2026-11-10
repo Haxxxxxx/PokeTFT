@@ -77,7 +77,7 @@ export function CoopPanel({ code, myUid, partner, lang }: {
               <div className="flex gap-1.5">
                 {[1, 5, 10].map((n) => (
                   <button key={n} disabled={gold < n || !partner.alive} onClick={() => giveGold(n)}
-                    className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-amber-900/30 border border-amber-600/40 text-amber-200 text-[11px] font-bold disabled:opacity-30 hover:bg-amber-900/50">
+                    className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-gold-900/30 border border-gold-600/40 text-gold-200 text-[11px] font-bold disabled:opacity-30 hover:bg-gold-900/50">
                     <Coins size={11} />{n}
                   </button>
                 ))}
@@ -98,7 +98,7 @@ export function CoopPanel({ code, myUid, partner, lang }: {
                         <PokemonModelPreview dex={def.dex[u.star - 1]} alt={def.stageNames[u.star - 1]} width={26} height={26} />
                         <div className="min-w-0 flex-1">
                           <div className="text-[11px] font-bold text-slate-200 truncate">{def.stageNames[u.star - 1]}</div>
-                          <div className="text-[9px] text-amber-300/80">{"★".repeat(u.star)}{u.items?.length ? ` · ${u.items.length} ${fr ? "objet" : "item"}${u.items.length > 1 ? "s" : ""}` : ""}</div>
+                          <div className="text-[9px] text-gold-300/80">{"★".repeat(u.star)}{u.items?.length ? ` · ${u.items.length} ${fr ? "objet" : "item"}${u.items.length > 1 ? "s" : ""}` : ""}</div>
                         </div>
                         <button disabled={!partner.alive} onClick={() => giveUnit(u.iid)} title={fr ? "Envoyer" : "Send"}
                           className="shrink-0 w-7 h-7 rounded-md bg-emerald-900/40 hover:bg-emerald-700 border border-emerald-600/50 text-emerald-200 flex items-center justify-center disabled:opacity-30">

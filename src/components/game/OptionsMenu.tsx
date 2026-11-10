@@ -30,23 +30,23 @@ export function OptionsMenu() {
         title={t.o_options}
         aria-label={t.o_options}
         aria-expanded={open}
-        className={`flex items-center justify-center w-8 h-8 rounded-md border transition-colors ${open ? "bg-amber-500 text-black border-amber-400" : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"}`}
+        className={`flex items-center justify-center w-8 h-8 rounded-md border transition-colors ${open ? "bg-gold-500 text-black border-gold-400" : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"}`}
       >
         <Settings2 size={15} />
       </button>
       {open && (
-        <div className="gilded gilded-strong absolute right-0 top-full mt-2 z-[70] w-56 rounded-xl p-3 flex flex-col gap-3">
+        <div className="gilded gilded-strong absolute right-0 top-full mt-2 z-panel w-56 rounded-xl p-3 flex flex-col gap-3">
           {/* Volume */}
           <div>
             <div className="flex items-center justify-between text-[11px] font-semibold text-slate-300 mb-1.5">
-              <span className="inline-flex items-center gap-1.5 text-amber-200/80">{settings.soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />} {t.o_volume}</span>
+              <span className="inline-flex items-center gap-1.5 text-gold-200/80">{settings.soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />} {t.o_volume}</span>
               <span className="text-slate-500 tabular-nums">{settings.soundEnabled ? `${Math.round(vol * 100)}%` : t.o_muted}</span>
             </div>
             <input
               type="range" min={0} max={100} value={Math.round(vol * 100)}
               onChange={(e) => { setSettings({ volume: Number(e.target.value) / 100 }); music.setVolume(); }}
               disabled={!settings.soundEnabled}
-              className="w-full accent-amber-500 disabled:opacity-40"
+              className="w-full accent-gold-500 disabled:opacity-40"
             />
           </div>
           {/* Mute toggle */}
@@ -83,7 +83,7 @@ export function OptionsMenu() {
             <div className="flex gap-1 p-0.5 rounded-lg bg-white/[0.03] border border-white/[0.06]">
               {(["fr", "en"] as const).map((l) => (
                 <button key={l} onClick={() => setSettings({ language: l })} style={{ minWidth: 40 }}
-                  className={`py-1 rounded-md text-[11px] font-bold transition-colors ${settings.language === l ? "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/40" : "text-slate-500 hover:text-slate-300"}`}>
+                  className={`py-1 rounded-md text-[11px] font-bold transition-colors ${settings.language === l ? "bg-gold-500/15 text-gold-300 ring-1 ring-gold-500/40" : "text-slate-500 hover:text-slate-300"}`}>
                   {l.toUpperCase()}
                 </button>
               ))}
