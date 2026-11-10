@@ -1,4 +1,5 @@
 import { MON_HEIGHT_M, REFERENCE_HEIGHT_M } from "./mon-heights";
+import { MON_WEIGHT_KG, REFERENCE_MASS_CBRT } from "./mon-weights";
 
 /**
  * How much a species' real height is allowed to show in its rendered size.
@@ -32,17 +33,43 @@ const MIN_SCALE = 0.7;
 const MAX_SCALE = 1.4;
 
 /**
- * Relative render scale for a species, as a multiplier on MODEL_TARGET_HEIGHT.
+ * Relative render scale for a species, blended from its height AND its mass.
  *
- * Unknown dex falls back to 1 — the previous behaviour — so a missing height
- * degrades to "same as before" rather than to a unit that vanishes.
+ * An unknown dex falls back to 1, and a species missing one of the two measures
+ * uses whichever it has — so a gap degrades to "same as before" rather than to
+ * a unit that vanishes.
  */
 export function relativeModelScale(dex: number | string): number {
   // The lab renders a few non-species debug models ("fox", "duck"...) by name.
-  // They have no canonical height, so they keep the flat normalise.
+  // They have no canonical size, so they keep the flat normalise.
   if (typeof dex !== "number") return 1;
+
   const h = MON_HEIGHT_M[dex];
-  if (!h || !Number.isFinite(h) || h <= 0) return 1;
-  const raw = Math.pow(h / REFERENCE_HEIGHT_M, COMPRESSION);
+  const kg = MON_WEIGHT_KG[dex];
+  const usableH = h && Number.isFinite(h) && h > 0;
+  const usableW = kg && Number.isFinite(kg) && kg > 0;
+  if (!usableH && !usableW) return 1;
+
+  const fromHeight = usableH ? Math.pow(h / REFERENCE_HEIGHT_M, COMPRESSION) : null;
+  // Linear size goes as the cube root of mass.
+  const fromMass = usableW ? Math.pow(Math.cbrt(kg) / REFERENCE_MASS_CBRT, COMPRESSION) : null;
+
+  // Geometric mean, so neither signal can run away with it. Each alone is
+  // wrong in a different direction, and in opposite cases:
+  //
+  //   height alone  — PokeAPI measures a serpentine species along its LENGTH,
+  //                   so Ekans ("2.0 m") scored 1.30 and rendered larger than
+  //                   a Doduo. A coiled snake is not that big.
+  //   mass alone    — a gas or balloon species weighs almost nothing. Gastly
+  //                   (0.1 kg) would shrink to the floor despite being a
+  //                   perfectly visible 1.3 m cloud.
+  //
+  // Blended, Ekans lands at 1.02 (just under Doduo's 1.06) and Gastly at 0.72,
+  // while Snorlax — genuinely big by both measures — stays at 1.34.
+  const raw =
+    fromHeight != null && fromMass != null
+      ? Math.sqrt(fromHeight * fromMass)
+      : (fromHeight ?? fromMass ?? 1);
+
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, raw));
 }
