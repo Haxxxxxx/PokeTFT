@@ -256,10 +256,36 @@ export async function applyRatingFor(code: string, room: Room, uid: string, plac
       await dbAdapter().update(claimPath, { ratingApplied: true });
     }
 
+    // SPLIT, deliberately. These three rows used to go up as ONE root-level
+    // multi-path update, which is atomic — so if any single path was refused,
+    // all three were lost together.
+    //
+    // leaderboard/<uid> is server-only (.write: false), because it was forgeable
+    // and that was closed. But this function also runs on a CLIENT host: the
+    // browser takes over a transition ~4s after a missed server deadline, which
+    // is routine. On that path the leaderboard row is refused by design, and it
+    // was dragging the player's OWN results and history down with it — observed
+    // in production as games/<code>/ratingFailures = "permission_denied", with
+    // results null and no history row, so the end screen had nothing to show.
+    //
+    // The player's own rows go first and on their own, because the host IS
+    // allowed to write them and they are what the end screen and match history
+    // read.
     await dbAdapter().update("", {
-      [`leaderboard/${uid}`]: { username: p.name, rating, photoURL: p.photoURL ?? null },
       [`users/${uid}/history/${code}`]: buildHistoryRow(room, uid, decided.place, total, decided.delta),
       [`games/${code}/results/${uid}`]: { place: decided.place, delta: decided.delta, prevRating: rating - decided.delta, rating },
+    });
+
+    // The leaderboard row is server-only. Under the Admin SDK (Cloud Functions)
+    // this succeeds; from a client host it is refused, and that refusal is
+    // EXPECTED rather than a failure — pruneStale re-runs this with admin
+    // rights and applyRatingFor is idempotent via the `rated` claim. Swallowing
+    // it here keeps ratingFailures meaning "something is actually wrong", which
+    // is the only reason that node is worth reading.
+    await dbAdapter().update("", {
+      [`leaderboard/${uid}`]: { username: p.name, rating, photoURL: p.photoURL ?? null },
+    }).catch((e) => {
+      console.info(`[applyRatingFor] leaderboard row for ${uid} deferred to the server:`, (e as Error)?.message ?? e);
     });
   } catch (e) {
     // This is the failure this rewrite exists to fix: previously silent, unrecoverable
