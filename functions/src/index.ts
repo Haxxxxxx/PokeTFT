@@ -24,7 +24,7 @@ import { getAuth } from "firebase-admin/auth";
 import { logger } from "firebase-functions/v2";
 
 import { setDbAdapter } from "../../src/game/net/db-adapter";
-import { resolveRoundStart, endCombat, endCarousel, concede as eliminatePlayer, applyRatingFor } from "../../src/game/net/match";
+import { resolveRoundStart, endCombat, endCarousel, concedeAtomic, applyRatingFor } from "../../src/game/net/match";
 import type { Room } from "../../src/game/net/roomStore";
 import { generatePlayerLikeBoard } from "../../src/game/engine/enemy";
 import { simulate } from "../../src/game/engine/combat";
@@ -191,8 +191,13 @@ export const concede = onCall({ region: REGION }, async (req) => {
   const p = room.players?.[uid];
   if (!p || p.isBot) throw new HttpsError("permission-denied", "not a player in this game");
   if (!p.alive) return { ok: true }; // already eliminated — idempotent no-op
-  const place = Object.values(room.players ?? {}).filter((q) => q.alive).length;
-  await eliminatePlayer(code, uid, place);
+  // Atomic: the snapshot check above is a fast path, not the guard. Two players
+  // quitting at the same instant both saw the same alive count here and were
+  // both handed that placement — two 4ths and no 3rd. concedeAtomic claims the
+  // elimination and takes the placement through transactions instead.
+  const aliveFallback = Object.values(room.players ?? {}).filter((q) => q.alive).length;
+  const place = await concedeAtomic(code, uid, aliveFallback);
+  if (place == null) return { ok: true }; // someone else eliminated them first
   await applyRatingFor(code, room, uid, place).catch(() => {});
   return { ok: true };
 });
