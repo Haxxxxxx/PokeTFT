@@ -8,6 +8,7 @@ import { sendGold, sendUnit } from "@/game/net/coop";
 import { getDef } from "@/game/data/mons";
 import { Users, Coins, Send } from "lucide-react";
 import { useAnchoredPopover } from "@/lib/useAnchoredPopover";
+import { useUi } from "@/game/store/uiStore";
 import { PokemonModelPreview } from "./PokemonModelPreview";
 
 /** Double Up co-op controls: hand gold or a bench unit to your partner. The "help your
@@ -33,13 +34,40 @@ export function CoopPanel({ code, myUid, partner, lang }: {
     const g = useGame.getState();
     syncBoard(code, myUid, g.units, g.exportSave(), g.level, g.augments);
   };
+  /**
+   * Both of these take from YOU first and post the transfer second, because the
+   * mailbox write is what tells the partner it exists.
+   *
+   * That ordering only works if a failed post gives it BACK. It used to end in
+   * `.catch(() => {})`: the gold was already deducted, or the unit already off
+   * the bench, and a push that never landed simply destroyed it. The partner
+   * got nothing, and neither of you was told anything had gone wrong — the
+   * resource left the game silently.
+   *
+   * The refund paths already existed (coopReceiveGold / coopReceiveUnit); they
+   * were just never wired to the failure. The only unrecoverable case left is
+   * the client dying between the deduct and the refund, which no client-side
+   * ordering can close.
+   */
   const giveGold = (amount: number) => {
     const spent = useGame.getState().coopSpendGold(amount);
-    if (spent > 0) { sendGold(code, partner.uid, myUid, spent).catch(() => {}); syncMine(); }
+    if (spent <= 0) return;
+    syncMine();
+    sendGold(code, partner.uid, myUid, spent).catch(() => {
+      useGame.getState().coopReceiveGold(spent);
+      syncMine();
+      useUi.getState().pushToast(fr ? "Transfert échoué — or rendu" : "Transfer failed — gold returned");
+    });
   };
   const giveUnit = (iid: string) => {
     const snap = useGame.getState().coopRemoveUnit(iid);
-    if (snap) { sendUnit(code, partner.uid, myUid, snap).catch(() => {}); syncMine(); }
+    if (!snap) return;
+    syncMine();
+    sendUnit(code, partner.uid, myUid, snap).catch(() => {
+      useGame.getState().coopReceiveUnit(snap);
+      syncMine();
+      useUi.getState().pushToast(fr ? "Transfert échoué — mon rendu" : "Transfer failed — mon returned");
+    });
   };
 
   return (
