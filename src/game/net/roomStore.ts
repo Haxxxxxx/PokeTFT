@@ -548,7 +548,38 @@ export const useRoom = create<RoomState>((setState, getState) => ({
         // (otherHumans === 0 is required, so a departing host can never delete a
         //  room that other humans are still playing in.)
         if (safeToDelete) remove(roomRef(code)).catch(onWriteErr);
-        else remove(ref(db(), `games/${code}/players/${myUid}`)).catch(onWriteErr);
+        else {
+          // HAND THE HOST FLAG OVER BEFORE DROPPING MY NODE.
+          //
+          // The comment above says maybeClaimHost migrates the flag. It does —
+          // but only if some OTHER live client is still running the host loop
+          // to notice. Leaving mid-match deletes players/<me> while
+          // meta/hostUid still names me, so the room is left pointing at a
+          // player that no longer exists. If the remaining humans are
+          // eliminated or disconnected, nobody ever claims it, and every rule
+          // keyed on `meta/hostUid === auth.uid` now matches nobody: the room
+          // keeps heartbeating and never advances.
+          //
+          // Observed in production: a room stuck at stage 4 round 7 with its
+          // host's player node gone, hostUid still set to them, hostBeat and
+          // deadline ticking, and updatedAt frozen.
+          //
+          // Prefer someone who can actually drive it (connected and alive);
+          // otherwise any remaining human, so they can reclaim on reconnect. If
+          // there is genuinely nobody, the flag is left alone rather than
+          // cleared — an empty hostUid opens several room-level writes to any
+          // signed-in user, and pruneStale reaps an abandoned room anyway.
+          if (iAmHost) {
+            const successor =
+              otherHumans.find((p) => p.connected && p.alive) ??
+              otherHumans.find((p) => p.connected) ??
+              otherHumans[0];
+            if (successor) {
+              update(ref(db(), `games/${code}/meta`), { hostUid: successor.uid, updatedAt: serverTimestamp() }).catch(onWriteErr);
+            }
+          }
+          remove(ref(db(), `games/${code}/players/${myUid}`)).catch(onWriteErr);
+        }
         if (iAmHost || otherHumans.length === 0) remove(ref(db(), `lobbies/${code}`)).catch(() => {});
       }
       // Always clear my own private econ node (rules only let me write my own).

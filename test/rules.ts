@@ -131,6 +131,62 @@ async function main() {
   await loadRules();
   await wipe();
 
+  console.log("\nA CLIENT-HOSTED game must still be able to finish a round:");
+  {
+    // Most matches are driven by the host's own browser, not a Cloud Function
+    // (the client takes over ~4s past a missed server deadline). So every write
+    // the host makes on a player's behalf has to be legal for a signed-in
+    // client, not only for the Admin SDK.
+    await seed(`games/${CODE}/meta`, { hostUid: HOSTUID, phase: "combat", stage: 4, round: 7 });
+    await seed(`games/${CODE}/players/${HOSTUID}`, { uid: HOSTUID, name: "Host", alive: true });
+    await seed(`games/${CODE}/players/${VICTIM}`, { uid: VICTIM, name: "Victim", alive: true });
+    await seed(`users/${VICTIM}`, { username: "Victim", rating: 1000 });
+
+    // The shape endCombat writes at games/<code>.
+    check("the host can commit an end-of-combat round update",
+      await canPatch(`games/${CODE}`, HOSTUID, {
+        "meta/phase": "planning",
+        "meta/round": 8,
+        "meta/stage": 4,
+        "meta/updatedAt": 1,
+        "meta/deadline": 2,
+        "meta/hostBeat": 3,
+        combat: { x: 1 },
+        [`players/${VICTIM}/hp`]: 0,
+        [`players/${VICTIM}/alive`]: false,
+        [`players/${VICTIM}/place`]: 5,
+        [`players/${VICTIM}/streak`]: 0,
+        [`players/${VICTIM}/botMem`]: { seen: 1 },
+      }), true);
+
+    // The shape applyRatingFor writes, as ONE root-level multi-path update.
+    // leaderboard/<uid> is server-only (correctly — it was forgeable), and a
+    // multi-path update is atomic, so bundling it with the two paths the host
+    // IS allowed to write takes all three down together.
+    check("a host CANNOT write the leaderboard (it is server-only, by design)",
+      await canWrite(`leaderboard/${VICTIM}`, HOSTUID, { username: "Victim", rating: 1000, photoURL: null }), false);
+
+    check("...so the bundled rating persist is refused entirely",
+      await canPatch("", HOSTUID, {
+        [`leaderboard/${VICTIM}`]: { username: "Victim", rating: 1000, photoURL: null },
+        [`users/${VICTIM}/history/${CODE}`]: { place: 5, delta: -8 },
+        [`games/${CODE}/results/${VICTIM}`]: { place: 5, delta: -8 },
+      }), false);
+
+    // ...while the two paths on their own are perfectly legal for the host.
+    // That is the whole fix: split the write so a server-only row cannot take
+    // the player's own results and history down with it.
+    check("the host CAN write the eliminated player's match history",
+      await canWrite(`users/${VICTIM}/history/${CODE}`, HOSTUID, { place: 5, delta: -8 }), true);
+    check("the host CAN write the game's results row",
+      await canWrite(`games/${CODE}/results/${VICTIM}`, HOSTUID, { place: 5, delta: -8 }), true);
+    check("so history + results together survive without the leaderboard",
+      await canPatch("", HOSTUID, {
+        [`users/${VICTIM}/history/${CODE}`]: { place: 5, delta: -8 },
+        [`games/${CODE}/results/${VICTIM}`]: { place: 5, delta: -8 },
+      }), true);
+  }
+
   console.log("\nGuest onboarding — the seeded profile must be writable:");
   {
     // The app seeds an anonymous user's profile with `Guest-${uid.slice(0,4)}`
