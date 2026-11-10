@@ -16,7 +16,7 @@
     "test:doubleup": "tsx test/double-up-flow.ts && tsx test/double-up-coop.ts",
     "test:layout": "tsx test/layout.ts",
     "test:affinities": "tsx test/affinities.ts",
-    "test": "tsx test/db-adapter.ts && tsx test/combat-determinism.ts && tsx test/sim-game.ts 24 && tsx test/double-up-flow.ts && tsx test/double-up-coop.ts && tsx test/layout.ts && tsx test/affinities.ts && tsx test/ability-area.ts && tsx test/trait-gains.ts && tsx test/pension.ts",
+    "test": "tsx test/db-adapter.ts && tsx test/combat-determinism.ts && tsx test/sim-game.ts 24 && tsx test/double-up-flow.ts && tsx test/double-up-coop.ts && tsx test/layout.ts && tsx test/affinities.ts && tsx test/ability-area.ts && tsx test/trait-gains.ts && tsx test/pension.ts && tsx test/grab-zone.ts",
     "test:ability": "tsx test/ability-area.ts",
     "test:traits": "tsx test/trait-gains.ts",
     "test:rules": "firebase emulators:exec --only database --project demo-poketft \"tsx test/rules.ts\""
