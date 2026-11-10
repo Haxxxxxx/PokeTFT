@@ -169,6 +169,10 @@ export type Dict = {
   net_pension_title: (cost: number, rounds: number) => string;
   net_pension_collect: string;
   net_pension_rounds: (n: number) => string;
+  /** Shown when a matured mon could not come home because the bench was full. */
+  net_pension_blocked: string;
+  /** Rounds left before an uncollected mon is sold off to free the pension. */
+  net_pension_autosell: (n: number) => string;
   // NetGameClient — reconnect / error screen
   net_reconnecting: string;
   net_back_home: string;
@@ -396,6 +400,8 @@ export const FR: Dict = {
   net_pension_title: (cost, rounds) => `Glissez un ★ pour élever une copie (${cost} or, ${rounds} tours)`,
   net_pension_collect: "Récupérer +1",
   net_pension_rounds: (n) => `${n} tour${n > 1 ? "s" : ""}`,
+  net_pension_blocked: "Banc plein",
+  net_pension_autosell: (n) => `Vendu dans ${n} combat${n > 1 ? "s" : ""}`,
   net_reconnecting: "Reconnexion à la partie…",
   net_back_home: "Retour à l'accueil",
   net_forfeit_title: "Abandonner la partie ?",
@@ -608,6 +614,8 @@ export const EN: Dict = {
   net_pension_title: (cost, rounds) => `Drag a ★ mon to breed a copy of it (${cost} gold, ${rounds} rounds)`,
   net_pension_collect: "Collect +1",
   net_pension_rounds: (n) => `${n} round${n > 1 ? "s" : ""}`,
+  net_pension_blocked: "Bench full",
+  net_pension_autosell: (n) => `Sold in ${n} fight${n > 1 ? "s" : ""}`,
   net_reconnecting: "Reconnecting to your game…",
   net_back_home: "Back to home",
   net_forfeit_title: "Forfeit the match?",

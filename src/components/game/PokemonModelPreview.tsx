@@ -10,6 +10,20 @@ const PokemonModelPreviewCanvas = dynamic(
   { ssr: false, loading: () => null },
 );
 
+/**
+ * A Pokémon portrait. Renders the SPRITE unless a 3D model is explicitly asked
+ * for.
+ *
+ * It used to render a model whenever one existed, which meant one WebGL canvas
+ * per instance, everywhere, regardless of the models3d setting — the 8-player
+ * rail, the trait grids, match history, the drag ghost. Browsers cap live WebGL
+ * contexts (the model sheet proved eviction blanks everything past about a
+ * dozen), so a busy screen quietly lost its portraits, and the match showed 3D
+ * in some places and 2D in others at the same time.
+ *
+ * Models are not the default renderer and have not been since #119. Opting in
+ * is now explicit, so a portrait cannot silently cost a WebGL context.
+ */
 export function PokemonModelPreview({
   dex,
   alt,
@@ -19,6 +33,7 @@ export function PokemonModelPreview({
   style,
   imageClassName,
   imageStyle,
+  model = false,
 }: {
   dex: number;
   alt: string;
@@ -28,6 +43,8 @@ export function PokemonModelPreview({
   style?: CSSProperties;
   imageClassName?: string;
   imageStyle?: CSSProperties;
+  /** Opt in to the 3D model. Costs a WebGL context — use only for large art. */
+  model?: boolean;
 }) {
   const hostRef = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(false);
@@ -37,6 +54,7 @@ export function PokemonModelPreview({
   useEffect(function observeModelPreview() {
     const host = hostRef.current;
     if (!host) return;
+    if (!model) return;
     if (!("IntersectionObserver" in window)) {
       const frame = requestAnimationFrame(() => setVisible(true));
       return () => cancelAnimationFrame(frame);
@@ -51,7 +69,7 @@ export function PokemonModelPreview({
     return function stopObservingModelPreview() {
       observer.disconnect();
     };
-  }, []);
+  }, [model]);
 
   const handleLoaded = useCallback(() => setLoaded(true), []);
   const handleError = useCallback((error: Error) => {
@@ -78,7 +96,7 @@ export function PokemonModelPreview({
         style={{ imageRendering: "pixelated", opacity: loaded && !failed ? 0 : 1, ...imageStyle }}
         draggable={false}
       />
-      {visible && !failed && hasUsable3DModel(dex) && (
+      {model && visible && !failed && hasUsable3DModel(dex) && (
         <PokemonModelPreviewCanvas dex={dex} onLoaded={handleLoaded} onError={handleError} />
       )}
     </span>

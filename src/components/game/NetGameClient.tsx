@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, PointerSensor, TouchSensor, closestCenter, MeasuringStrategy, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
-import { useGame, resolveBenchSlots } from "@/game/store/gameStore";
+import { useGame, resolveBenchSlots, BENCH_SIZE } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS, CAROUSEL_MS } from "@/game/net/match";
@@ -25,6 +25,7 @@ import { db } from "@/game/net/firebase";
 import { Trash2, Eye, Maximize, Minimize, AlertTriangle, BarChart3 } from "lucide-react";
 import { AUGMENTS, augmentSlot, teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID, tailoredAugmentPicks } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
+import { Button } from "@/components/ui/Button";
 import { useUi } from "@/game/store/uiStore";
 import { makeRng, hashStr } from "@/game/engine/rng";
 import { itemsArray, normalizeUnit } from "@/game/net/rtdb-utils";
@@ -97,6 +98,70 @@ function ShopSellDrop({ children }: { children: ReactNode }) {
   return (
     <div ref={setNodeRef} className={`flex-1 rounded-xl transition-shadow ${isOver ? "ring-2 ring-rose-400/80 ring-inset" : ""}`}>
       {children}
+    </div>
+  );
+}
+
+/**
+ * Your bench, kept on screen while combat resolves.
+ *
+ * TFT lets you shop and sell during a fight, and this codebase already agreed:
+ * onDragEnd explicitly permits selling in combat ("no effect on the frozen,
+ * already-resolved fight") and Board is passed benchInteractive for combat too.
+ * None of it could fire, because the bench lives ON the planning platform and
+ * combat replaces that platform with the CombatStage — so there was nothing to
+ * drag, and a unit bought mid-fight vanished into a bench you could not see.
+ *
+ * Hex chips, matching the planning bench and the drag ghost, so a mon keeps one
+ * silhouette wherever it is.
+ */
+/** One bench slot during a fight. Shares the `bench-N` drop ids the planning
+ *  bench uses, so onDragEnd's existing reorder path works unchanged. */
+function CombatBenchSlot({
+  index, size, unit,
+}: {
+  index: number; size: number; unit: UnitInstance | undefined;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `bench-${index}` });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`relative shrink-0 flex items-end justify-center bench-slab${isOver ? " is-over" : ""}`}
+      style={{ width: size, height: size }}
+    >
+      {/* canDeploy=false: the board is locked mid-fight, so a double-click must
+          not look like it placed something. Dragging still works — between
+          slots to reorder, or onto the sell zone. */}
+      {unit && <UnitChip unit={unit} size={size} shape="hex" canDeploy={false} dragHitArea />}
+    </div>
+  );
+}
+
+/**
+ * Your bench, kept live while combat resolves.
+ *
+ * TFT lets you shop, sell AND rearrange your bench during a fight, and this
+ * codebase already half-agreed: onDragEnd explicitly permits it in combat ("no
+ * effect on the frozen, already-resolved fight") and Board is passed
+ * benchInteractive for combat too. None of it could fire, because the bench
+ * lives ON the planning platform and combat replaces that platform with the
+ * CombatStage — so there was nothing to drag, nowhere to drop, and a unit
+ * bought mid-fight vanished into a bench you could not see.
+ *
+ * Rendered as real slots rather than a loose row: the slots ARE the drop
+ * targets, and reusing the `bench-N` ids means reordering needed no new
+ * handling. Only the BOARD stays locked.
+ */
+function CombatBench() {
+  const units = useGame((s) => s.units);
+  const L = useGameLayout();
+  const slots = resolveBenchSlots(units);
+  const size = L.benchSlot - 8;
+  return (
+    <div className="shrink-0 flex items-end justify-center gap-1 px-2 pt-6 pb-1">
+      {Array.from({ length: BENCH_SIZE }, (_, i) => (
+        <CombatBenchSlot key={i} index={i} size={size} unit={slots[i] ?? undefined} />
+      ))}
     </div>
   );
 }
@@ -560,12 +625,17 @@ export function NetGameClient() {
     setAugReroll((n) => n + 1);
   };
 
-  // Planning hotkeys: R reroll · L buy XP · S sell the inspected unit. Disabled
-  // while spectating a rival — otherwise R/L/S silently mutate YOUR own economy
-  // (reroll/buy-xp/sell-last-inspected) while you're looking at someone else's board.
+  // Shop hotkeys: R reroll · L buy XP · S sell the inspected unit.
+  //
+  // Live during COMBAT as well as planning, to match the rest of the shop:
+  // buying, rerolling and selling all touch only your economy and your bench,
+  // never the frozen fight. Leaving the keys planning-only meant the mouse
+  // could do something the keyboard refused to.
+  //
+  // Disabled while spectating a rival — otherwise R/L/S silently mutate YOUR
+  // own economy while you are looking at someone else's board.
   useEffect(() => {
-    // Disabled while spectating a rival (you'd otherwise mutate your OWN econ).
-    if (phase !== "planning" || (!!spectate && spectate !== myUid)) return;
+    if ((phase !== "planning" && phase !== "combat") || (!!spectate && spectate !== myUid)) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
@@ -981,12 +1051,23 @@ export function NetGameClient() {
         dropAnimation={null}
       >
         {draggedUnit && (
-          <UnitChip
-            unit={draggedUnit}
-            size={draggedUnit.pos === null ? L.benchSlot - 8 : L.tile.w - 6}
-            interactive={false}
-            shape={draggedUnit.pos === null ? "square" : "hex"}
-          />
+          // The ghost must be the SAME thing you lifted. It used to switch to
+          // shape="square" for bench units, but the bench moved onto the
+          // platform and renders hex — and the two shapes size their art
+          // differently (hex draws the mon at ~1.85x the cell and overflows it,
+          // square draws it at size-6 and clips to the box). So grabbing a
+          // bench mon shrank it by nearly half on pickup and snapped it back on
+          // drop, which is what made the motion feel broken.
+          //
+          // Same shape, same size, same art scale: the mon now just lifts.
+          <div className="drag-ghost">
+            <UnitChip
+              unit={draggedUnit}
+              size={draggedUnit.pos === null ? L.benchSlot - 8 : L.tile.w - 6}
+              interactive={false}
+              shape="hex"
+            />
+          </div>
         )}
       </DragOverlay>
       <Toasts />
@@ -1351,6 +1432,8 @@ export function NetGameClient() {
                     <span className="text-xs">{t.net_spectate_switch}</span>
                   </div>
                 ) : phase === "combat" && combatResult && me?.alive ? (
+                  <div className="absolute inset-0 flex flex-col">
+                    <div className="relative flex-1 min-h-0 flex items-center justify-center">
                   <CombatStage
                     result={combatResult}
                     flip={!!myCombat?.flip}
@@ -1365,6 +1448,9 @@ export function NetGameClient() {
                     syncWindowMs={COMBAT_MS}
                     onResolve={() => {}}
                   />
+                    </div>
+                    <CombatBench />
+                  </div>
                 ) : board3d ? (
                   // HD-2D board (opt-in). Drag is handled natively inside the
                   // canvas and committed through the same store actions, so the
@@ -1410,23 +1496,32 @@ export function NetGameClient() {
         {/* Pinned to the height the layout engine budgeted. Left to grow with its
             content, this strip stole space the arena had already been sized
             against — which is what slid the bench slabs under the shop cards. */}
-        {!isSpectator && !spectating && <div className="shrink-0 min-h-0 flex flex-col items-center gap-1" style={{ height: L.shopH }}>
+        {!isSpectator && !spectating && <div className="relative shrink-0 min-h-0 flex flex-col items-center" style={{ height: L.shopH }}>
           {/* The bench now lives ON the platform (see Board's `withBench`), and the
               board count is ghosted across the arena floor, so only the auto-fill
-              action still needs a home down here. */}
+              action still needs a home down here.
+
+              It FLOATS above the strip rather than sitting in flow. This block is
+              pinned to the height the layout engine budgeted, so an in-flow button
+              took its space out of the shop underneath: the moment the board grew
+              a slot and you had an unplaced mon, the button appeared and the whole
+              shop dropped to make room, then jumped back when you placed one. A
+              transient hint must not resize the thing you are aiming at. */}
           {(() => {
             const boardCount = units.filter((u) => u.pos !== null).length;
             const benchCount = units.length - boardCount;
             const full = boardCount >= boardSizeForLevel(level);
             if (phase !== "planning" || benchCount === 0 || full) return null;
             return (
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={fillBoard}
                 title={t.net_board_fill_title}
-                className="self-center px-3 py-1 rounded-md bg-emerald-700/80 hover:bg-emerald-600 text-[11px] font-bold text-white leading-none"
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-panel whitespace-nowrap shadow-lg shadow-black/40"
               >
                 {t.net_board_fill}
-              </button>
+              </Button>
             );
           })()}
           <div className="flex-1 min-h-0 flex gap-3 w-full max-w-[1480px]">

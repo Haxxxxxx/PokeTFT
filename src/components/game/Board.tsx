@@ -1,17 +1,12 @@
 "use client";
 
-import { memo, useCallback, useState } from "react";
-import dynamic from "next/dynamic";
+import { memo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { FIELD, ALLY_ROW0, HEX_CLIP, hexToPixel, fieldPixelSize, rowsPixelHeight } from "@/game/engine/hex";
 import { boardSizeForLevel } from "@/game/config";
 import { getDef } from "@/game/data/mons";
 import { TYPE_COLOR } from "@/game/ui";
-import { hasUsable3DModel } from "@/game/data/model-availability";
-import { useGame, BENCH_SIZE, PENSION_COST, PENSION_ROUNDS, resolveBenchSlots } from "@/game/store/gameStore";
-import { useAppStore } from "@/game/store/appStore";
-import { HEX_W } from "@/game/ui/hex3d";
-import type { ModelId } from "@/lab/arena3d/UnitModel";
+import { useGame, BENCH_SIZE, PENSION_COST, PENSION_ROUNDS, PENSION_OVERDUE_LIMIT, resolveBenchSlots } from "@/game/store/gameStore";
 import { useGameLayout } from "./LayoutProvider";
 import { UnitChip } from "./UnitChip";
 import { ItemGlyph } from "./ItemGlyph";
@@ -20,31 +15,9 @@ import { PawIcon } from "./icons";
 import { useT } from "@/lib/i18n";
 import type { UnitInstance } from "@/game/types";
 
-const Board3DModels = dynamic(
-  () => import("./Board3DModels").then((module) => module.Board3DModels),
-  { ssr: false, loading: () => null },
-);
 
-function modelForUnit(unit: UnitInstance): number {
-  const def = getDef(unit.defId);
-  return def.dex[Math.max(0, Math.min(2, unit.star - 1))];
-}
 
-function modelKey(iid: string, model: ModelId): string {
-  return `${iid}:${model}`;
-}
 
-function projectArenaPoint(
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  tilt: number,
-  perspective: number,
-): [number, number, number] {
-  const [screenX, screenY] = projectArenaScreenPoint(x, y, width, height, tilt, perspective);
-  return [screenX - width / 2, height / 2 - screenY, 0];
-}
 
 function projectArenaScreenPoint(
   x: number,
@@ -179,7 +152,13 @@ function PensionDock({ interactive }: { interactive: boolean }) {
     disabled: !interactive || !!pension,
   });
   const t = useT();
+  // A matured mon now returns to the bench on its own (see nextRound). So the
+  // only way one is still sitting here READY is that the bench was full when it
+  // tried — which is a problem the player has to act on, not a reward waiting
+  // to be claimed. It is styled as a warning, and it says how long they have.
   const ready = !!pension && pension.roundsLeft <= 0;
+  const blocked = ready && (pension?.overdue ?? 0) > 0;
+  const fightsLeft = pension ? Math.max(0, PENSION_OVERDUE_LIMIT - (pension.overdue ?? 0) + 1) : 0;
   const def = pension ? getDef(pension.defId) : null;
   const dex = pension && def ? def.dex[Math.max(0, Math.min(2, pension.star - 1))] : null;
   const typeColor = def ? TYPE_COLOR[def.types[0]] : "#d6a64f";
@@ -189,7 +168,7 @@ function PensionDock({ interactive }: { interactive: boolean }) {
       ref={setNodeRef}
       title={!pension ? t.net_pension_title(PENSION_COST, PENSION_ROUNDS) : undefined}
       className={`absolute right-2 top-[18%] z-30 flex w-[76px] flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-transparent p-1.5 text-center transition-all
-        ${isOver ? "scale-105 border-emerald-300 bg-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.35)]" : "bg-transparent shadow-none"}
+        ${isOver ? "scale-105 border-emerald-300 bg-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.35)]" : blocked ? "border-rose-400/70 bg-rose-950/45 shadow-[0_0_18px_rgba(244,63,94,0.3)]" : "bg-transparent shadow-none"}
         ${!pension && interactive ? "border-dashed text-gold-100/70" : "text-slate-100"}`}
     >
       <span className="text-[8px] font-extrabold uppercase tracking-wider text-gold-200/75">{t.net_pension}</span>
@@ -206,13 +185,22 @@ function PensionDock({ interactive }: { interactive: boolean }) {
             {!ready && <span className="absolute inset-0 grid place-items-center text-sm font-extrabold text-gold-100 drop-shadow-[0_1px_3px_rgba(0,0,0,1)]">{pension.roundsLeft}</span>}
           </div>
           {ready ? (
-            <button
-              type="button"
-              onClick={collectPension}
-              className="w-full rounded-md bg-emerald-400 px-1 py-1 text-[9px] font-extrabold leading-none text-slate-950 hover:bg-emerald-300"
-            >
-              {t.net_pension_collect}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={collectPension}
+                className={`w-full rounded-md px-1 py-1 text-[9px] font-extrabold leading-none text-slate-950 ${
+                  blocked ? "bg-rose-400 hover:bg-rose-300" : "bg-emerald-400 hover:bg-emerald-300"
+                }`}
+              >
+                {t.net_pension_collect}
+              </button>
+              {blocked && (
+                <span className="text-[8px] font-bold leading-tight text-rose-300">
+                  {t.net_pension_blocked} · {t.net_pension_autosell(fightsLeft)}
+                </span>
+              )}
+            </>
           ) : (
             <span className="text-[8px] font-bold leading-tight text-gold-100/80">{t.net_pension_rounds(pension.roundsLeft)}</span>
           )}
@@ -246,7 +234,6 @@ function BoardBase({
 }) {
   const t = useT();
   const layout = useGameLayout();
-  const models3d = useAppStore((st) => st.settings.models3d);
   const storeUnits = useGame((s) => s.units);
   const drops = useGame((s) => s.drops);
   const collectDrop = useGame((s) => s.collectDrop);
@@ -255,17 +242,6 @@ function BoardBase({
   const tileW = layout.tile.w;
   const tileH = layout.tile.h;
   const tilt = layout.tilt;
-  const [loadedModels, setLoadedModels] = useState<Set<string>>(() => new Set());
-  const handleModelReady = useCallback((key: string) => {
-    setLoadedModels((loaded) => {
-      if (loaded.has(key)) return loaded;
-      return new Set(loaded).add(key);
-    });
-  }, []);
-  const handleModelError = useCallback((key: string, error: Error) => {
-    console.error(`3D model ${key} failed to load; keeping its 2D sprite visible.`, error);
-  }, []);
-
   const source = units ?? storeUnits;
   const board = source.filter((u) => u.pos !== null);
   const showDrops = interactive && !units;
@@ -296,49 +272,6 @@ function BoardBase({
   const benchStripH = withBench ? layout.benchH : 0;
   const frameW = innerW + pad * 2;
   const frameH = innerH + benchStripH + pad * 2;
-
-  const boardModels = board.flatMap((unit) => {
-    if (!unit.pos) return [];
-    const [c, localR] = unit.pos;
-    const { x, y } = hexToPixel({ c, r: localR + ALLY_ROW0 }, tileW, tileH);
-    const model = modelForUnit(unit);
-    return [{
-      key: modelKey(unit.iid, model),
-      model,
-      position: projectArenaPoint(
-        pad + x,
-        pad + y - yOffset,
-        frameW,
-        frameH,
-        tilt,
-        layout.perspective,
-      ),
-      scale: tileW / HEX_W,
-    }];
-  });
-  const models = [...boardModels];
-  if (withBench) {
-    const benchWidth = BENCH_SIZE * benchSize + (BENCH_SIZE - 1) * 4;
-    const benchStartX = pad + (innerW - benchWidth) / 2;
-    benchSlots.forEach((unit, index) => {
-      if (!unit) return;
-      const model = modelForUnit(unit);
-      if (!hasUsable3DModel(model)) return;
-      models.push({
-        key: modelKey(unit.iid, model),
-        model,
-        position: projectArenaPoint(
-          benchStartX + index * (benchSize + 4) + benchSize / 2,
-          pad + innerH + benchStripH,
-          frameW,
-          frameH,
-          tilt,
-          layout.perspective,
-        ),
-        scale: (benchSize - 8) / HEX_W,
-      });
-    });
-  }
 
   // Board capacity, ghosted on the floor. Only on your OWN live board — on a
   // scouted rival's board it would be their number shown over your context.
@@ -515,8 +448,6 @@ function BoardBase({
         {board.map((unit) => {
           if (!unit.pos) return null;
           const [c, localR] = unit.pos;
-          const model = modelForUnit(unit);
-          if (!hasUsable3DModel(model)) return [];
           const { x, y } = hexToPixel({ c, r: localR + ALLY_ROW0 }, tileW, tileH);
           const [screenX, screenBottom, scale] = projectArenaScreenPoint(
             pad + x,
@@ -546,8 +477,6 @@ function BoardBase({
                 size={size}
                 interactive={interactive}
                 shape="hex"
-                showModel={models3d}
-                showSprite={!loadedModels.has(modelKey(unit.iid, model)) || !hasUsable3DModel(model)}
                 dragHitArea
               />
             </div>
@@ -558,7 +487,6 @@ function BoardBase({
           const benchWidth = BENCH_SIZE * benchSize + (BENCH_SIZE - 1) * 4;
           const benchStartX = pad + (innerW - benchWidth) / 2;
           const size = benchSize - 8;
-          const model = modelForUnit(unit);
           const [screenX, screenBottom, scale] = projectArenaScreenPoint(
             benchStartX + index * (benchSize + 4) + benchSize / 2,
             pad + innerH + benchStripH,
@@ -587,34 +515,19 @@ function BoardBase({
                 interactive={benchInteractive}
                 canDeploy={benchCanDeploy}
                 shape="hex"
-                showModel={models3d}
-                showSprite={!loadedModels.has(modelKey(unit.iid, model)) || !hasUsable3DModel(model)}
                 dragHitArea
               />
             </div>
           );
         })}
       </div>
-      {/* 3D models are OFF by default (settings.models3d). Three reasons, all
-          from the model work's own notes:
-            - the baked pose map has ONE species reviewed out of 967, so most of
-              the roster would render in an unreviewed stance;
-            - every client would fetch models from a third-party GitHub repo over
-              raw.githubusercontent.com, which is not a production CDN;
-            - the model canvas sits above the unit DOM, so a tall model occludes
-              the combat HP/mana bars.
-          The pipeline is complete and ships here; flipping the default is a
-          one-line change once the poses have been reviewed. */}
-      {models3d && (
-        <Board3DModels
-          models={models}
-          height={frameH}
-          perspective={layout.perspective}
-          animationMode="board"
-          onReady={handleModelReady}
-          onError={handleModelError}
-        />
-      )}
+      {/* No 3D layer. The fighting scene cannot be done in 3D with this asset
+          set — 89% of the models ship with no animation clips at all and only 2%
+          have an attack clip (tools/model-clip-stats.mjs), so a fight rendered
+          with them is a set of frozen statues sliding around. Rather than keep a
+          toggle that made planning 3D and combat 2D, the match is uniformly 2D.
+          The pipeline itself is intact (UnitModel, /lab/model-sheet,
+          /lab/model-poses) for when the animation gap is closed. */}
       {withBench && !units && <PensionDock interactive={interactive} />}
     </div>
   );

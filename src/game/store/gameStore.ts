@@ -49,6 +49,16 @@ export function resolveBenchSlots(units: UnitInstance[]): (UnitInstance | null)[
 // Pension (Day Care): gold to deposit, planning rounds until it matures (1★→2★).
 export const PENSION_COST = 4;
 export const PENSION_ROUNDS = 3;
+/**
+ * How many further rounds a MATURED mon may sit in the pension before it is
+ * sold off automatically.
+ *
+ * A matured mon used to return only when the player clicked Collect, and if the
+ * bench was full the click just toasted "Bench full" and nothing happened. The
+ * pension then stayed occupied for the rest of the game, which quietly removed
+ * a whole mechanic from the match with no indication that anything was wrong.
+ */
+export const PENSION_OVERDUE_LIMIT = 2;
 
 /** Shared-pool copies a unit of the given star represents (★=1, ★★=3, ★★★=9). */
 const copiesForStar = (star: number) => (star === 1 ? 1 : star === 2 ? 3 : 9);
@@ -107,7 +117,16 @@ type State = {
   augments: string[];
   /** Pokémon Pension (Day Care): a single 1★ mon training to a 2★. `roundsLeft`
    *  ticks down each planning round; at 0 it's ready to collect. */
-  pension: { defId: string; star: 1 | 2 | 3; roundsLeft: number } | null;
+  pension: {
+    defId: string;
+    star: 1 | 2 | 3;
+    roundsLeft: number;
+    /**
+     * Rounds this mon has been READY but stuck, because the bench was full when
+     * it matured. Optional so saves written before auto-return still load.
+     */
+    overdue?: number;
+  } | null;
 
   // selectors
   benchUnits: () => UnitInstance[];
@@ -173,6 +192,33 @@ type State = {
 
 // Module-level RNG so the store stays serialisable; reseeded on newGame.
 let rng: Rng = makeRng(INITIAL_SEED);
+
+/**
+ * Work out the board/bench state after a pension mon comes home.
+ *
+ * Shared by the manual Collect button and the automatic return at maturity so
+ * the two cannot drift apart — they mint the same bred copy, run the same
+ * combines, and apply the same bench-capacity rule.
+ *
+ * The pool is only debited once the result is known to fit, so a refused return
+ * leaves pool scarcity untouched.
+ */
+function resolvePensionReturn(
+  p: { defId: string; star: 1 | 2 | 3 },
+  units: UnitInstance[],
+  pool: Pool,
+): { ok: true; units: UnitInstance[]; dropped: string[] } | { ok: false } {
+  const original = { ...makeInstance(p.defId), star: p.star }; // the mon you deposited
+  const copy = { ...makeInstance(p.defId), star: p.star };     // its bred copy
+  const { units: next, dropped } = applyCombines([...units, original, copy]);
+  // Checked AFTER combines: two new mons may merge into one, or into a pair you
+  // already own, so a bench that looks full can still have room.
+  if (next.filter((u) => u.pos === null).length > BENCH_SIZE) return { ok: false };
+  // Only the NEW bred copy is a fresh draw — the original's copies were debited
+  // at buy time and stayed out while it trained.
+  takeFromPool(pool, p.defId, copiesForStar(p.star));
+  return { ok: true, units: next, dropped };
+}
 
 export const useGame = create<State>((set, get) => ({
   gold: 4,
@@ -451,9 +497,39 @@ export const useGame = create<State>((set, get) => ({
     if (mode?.roundItem) items = [...items, mode.roundItem];
 
     // Pension trains one planning round closer to maturity (down to 0 = ready).
-    const pension = state.pension ? { ...state.pension, roundsLeft: Math.max(0, state.pension.roundsLeft - 1) } : null;
+    let pension = state.pension
+      ? { ...state.pension, roundsLeft: Math.max(0, state.pension.roundsLeft - 1) }
+      : null;
+    let pensionGold = 0;
+    const pool = { ...state.pool };
 
-    set({ gold: state.gold + income + bonusGold, xp: newXp, level: lvl, shop, frozen: false, items, units, drops: [], pension, pool: { ...state.pool } });
+    // A matured mon comes HOME BY ITSELF. It used to wait for a Collect click,
+    // and if the bench was full that click did nothing but toast — so a full
+    // bench at the wrong moment took the pension out of the game permanently.
+    if (pension && pension.roundsLeft === 0) {
+      const returned = resolvePensionReturn(pension, units, pool);
+      if (returned.ok) {
+        units = returned.units;
+        items = [...items, ...returned.dropped];
+        toast("Pension: your mon came home", "Pension : ton mon est rentr\u00e9");
+        pension = null;
+      } else {
+        // No room. Hold it, warn in the dock, and give the player a bounded
+        // number of rounds to make space before the slot is freed for them.
+        const overdue = (pension.overdue ?? 0) + 1;
+        if (overdue > PENSION_OVERDUE_LIMIT) {
+          pensionGold = sellValue(pension.defId, pension.star);
+          returnToPool(pool, pension.defId, copiesForStar(pension.star));
+          toast("Pension: bench stayed full — mon sold", "Pension : banc plein — mon vendu");
+          pension = null;
+        } else {
+          pension = { ...pension, overdue };
+          toast("Pension: bench full, make room!", "Pension : banc plein, fais de la place !");
+        }
+      }
+    }
+
+    set({ gold: state.gold + income + bonusGold + pensionGold, xp: newXp, level: lvl, shop, frozen: false, items, units, drops: [], pension, pool });
   },
 
   netCarouselPick: (pick) => {
@@ -697,19 +773,12 @@ export const useGame = create<State>((set, get) => ({
     const state = get();
     const p = state.pension;
     if (!p || p.roundsLeft > 0) return;
-    // Keep pool scarcity honest: the deposited mon's copies were already debited at
-    // buy time and stayed "out" while training — only the NEW bred copy is a fresh
-    // draw from the bag, so debit just that. (A deposit→collect→sell loop then nets
-    // zero on the original and −then-+ on the copy: no phantom copies minted.)
+    // Only reachable now when the automatic return at maturity was refused for a
+    // full bench — this is the player making room and pulling the mon back.
     const pool = { ...state.pool };
-    takeFromPool(pool, p.defId, copiesForStar(p.star));
-    const original = { ...makeInstance(p.defId), star: p.star }; // the mon you deposited, returned
-    const copy = { ...makeInstance(p.defId), star: p.star };      // its bred copy
-    const { units, dropped } = applyCombines([...state.units, original, copy]);
-    // Guard bench overflow AFTER combines (two new mons may merge into one, or into
-    // an existing pair) — if it still wouldn't fit, abort without mutating anything.
-    if (units.filter((u) => u.pos === null).length > BENCH_SIZE) { toast("Bench full", "Banc plein"); return; }
-    set({ units, items: [...state.items, ...dropped], pension: null, pool });
+    const returned = resolvePensionReturn(p, state.units, pool);
+    if (!returned.ok) { toast("Bench full", "Banc plein"); return; }
+    set({ units: returned.units, items: [...state.items, ...returned.dropped], pension: null, pool });
   },
 
   addRoundStats: ({ dmgDealt, dmgTaken, healed, won }) => {
