@@ -2,7 +2,8 @@
 
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { spriteUrl } from "@/game/data/mons";
-import { spriteArt } from "@/game/ui/sprite-art";
+import { spriteArt, spriteBoxFor } from "@/game/ui/sprite-art";
+import { relativeModelScale } from "@/game/data/model-scale";
 import { useT } from "@/lib/i18n";
 import { usePrefersReducedMotion } from "@/lib/useReducedMotion";
 import { sfx } from "@/lib/audio";
@@ -798,8 +799,14 @@ function CombatUnit({
    * rail spanning both of them rather than as each mon's own health.
    */
   const BAR_W = 0.66;
-  /** Same 1.85x oversize as the board, to cancel PokéAPI sprite padding. */
-  const S = Math.round(TW * 1.85);
+  /**
+   * Same rule as the board: size from the ART, not the padded frame.
+   *
+   * This was a flat `TW * 1.85` with NO species scale, while the board applied
+   * one -- so a mon changed size between planning and combat. Both now go
+   * through spriteBoxFor(), so a unit is the same size wherever it stands.
+   */
+  const S = Math.round(spriteBoxFor(unit.dex, TW, relativeModelScale(unit.dex)));
   const art = spriteArt(unit.dex, S);
   /**
    * The art's horizontal centre, in px from the cell's centre, AFTER mirroring.
@@ -981,7 +988,7 @@ function Corpse({ unit }: { unit: FrameUnit }) {
   const TILE_W = layout.tile.w;
   const TILE_H = layout.tile.h;
   const p = hexToPixel({ c: unit.c, r: unit.r }, TILE_W, TILE_H);
-  const S = Math.round(TILE_W * 1.85);
+  const S = Math.round(spriteBoxFor(unit.dex, TILE_W, relativeModelScale(unit.dex)));
   const art = spriteArt(unit.dex, S);
   const puff = Math.round(TILE_W * 0.5);
   return (
