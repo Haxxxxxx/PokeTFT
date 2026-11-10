@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, PointerSensor, TouchSensor, closestCenter, MeasuringStrategy, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
-import { useGame, resolveBenchSlots } from "@/game/store/gameStore";
+import { useGame, resolveBenchSlots, BENCH_SIZE } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
 import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS, CAROUSEL_MS } from "@/game/net/match";
@@ -98,6 +98,70 @@ function ShopSellDrop({ children }: { children: ReactNode }) {
   return (
     <div ref={setNodeRef} className={`flex-1 rounded-xl transition-shadow ${isOver ? "ring-2 ring-rose-400/80 ring-inset" : ""}`}>
       {children}
+    </div>
+  );
+}
+
+/**
+ * Your bench, kept on screen while combat resolves.
+ *
+ * TFT lets you shop and sell during a fight, and this codebase already agreed:
+ * onDragEnd explicitly permits selling in combat ("no effect on the frozen,
+ * already-resolved fight") and Board is passed benchInteractive for combat too.
+ * None of it could fire, because the bench lives ON the planning platform and
+ * combat replaces that platform with the CombatStage — so there was nothing to
+ * drag, and a unit bought mid-fight vanished into a bench you could not see.
+ *
+ * Hex chips, matching the planning bench and the drag ghost, so a mon keeps one
+ * silhouette wherever it is.
+ */
+/** One bench slot during a fight. Shares the `bench-N` drop ids the planning
+ *  bench uses, so onDragEnd's existing reorder path works unchanged. */
+function CombatBenchSlot({
+  index, size, unit,
+}: {
+  index: number; size: number; unit: UnitInstance | undefined;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `bench-${index}` });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`relative shrink-0 flex items-end justify-center bench-slab${isOver ? " is-over" : ""}`}
+      style={{ width: size, height: size }}
+    >
+      {/* canDeploy=false: the board is locked mid-fight, so a double-click must
+          not look like it placed something. Dragging still works — between
+          slots to reorder, or onto the sell zone. */}
+      {unit && <UnitChip unit={unit} size={size} shape="hex" canDeploy={false} dragHitArea />}
+    </div>
+  );
+}
+
+/**
+ * Your bench, kept live while combat resolves.
+ *
+ * TFT lets you shop, sell AND rearrange your bench during a fight, and this
+ * codebase already half-agreed: onDragEnd explicitly permits it in combat ("no
+ * effect on the frozen, already-resolved fight") and Board is passed
+ * benchInteractive for combat too. None of it could fire, because the bench
+ * lives ON the planning platform and combat replaces that platform with the
+ * CombatStage — so there was nothing to drag, nowhere to drop, and a unit
+ * bought mid-fight vanished into a bench you could not see.
+ *
+ * Rendered as real slots rather than a loose row: the slots ARE the drop
+ * targets, and reusing the `bench-N` ids means reordering needed no new
+ * handling. Only the BOARD stays locked.
+ */
+function CombatBench() {
+  const units = useGame((s) => s.units);
+  const L = useGameLayout();
+  const slots = resolveBenchSlots(units);
+  const size = L.benchSlot - 8;
+  return (
+    <div className="shrink-0 flex items-end justify-center gap-1 px-2 pt-6 pb-1">
+      {Array.from({ length: BENCH_SIZE }, (_, i) => (
+        <CombatBenchSlot key={i} index={i} size={size} unit={slots[i] ?? undefined} />
+      ))}
     </div>
   );
 }
@@ -561,12 +625,17 @@ export function NetGameClient() {
     setAugReroll((n) => n + 1);
   };
 
-  // Planning hotkeys: R reroll · L buy XP · S sell the inspected unit. Disabled
-  // while spectating a rival — otherwise R/L/S silently mutate YOUR own economy
-  // (reroll/buy-xp/sell-last-inspected) while you're looking at someone else's board.
+  // Shop hotkeys: R reroll · L buy XP · S sell the inspected unit.
+  //
+  // Live during COMBAT as well as planning, to match the rest of the shop:
+  // buying, rerolling and selling all touch only your economy and your bench,
+  // never the frozen fight. Leaving the keys planning-only meant the mouse
+  // could do something the keyboard refused to.
+  //
+  // Disabled while spectating a rival — otherwise R/L/S silently mutate YOUR
+  // own economy while you are looking at someone else's board.
   useEffect(() => {
-    // Disabled while spectating a rival (you'd otherwise mutate your OWN econ).
-    if (phase !== "planning" || (!!spectate && spectate !== myUid)) return;
+    if ((phase !== "planning" && phase !== "combat") || (!!spectate && spectate !== myUid)) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
@@ -1363,6 +1432,8 @@ export function NetGameClient() {
                     <span className="text-xs">{t.net_spectate_switch}</span>
                   </div>
                 ) : phase === "combat" && combatResult && me?.alive ? (
+                  <div className="absolute inset-0 flex flex-col">
+                    <div className="relative flex-1 min-h-0 flex items-center justify-center">
                   <CombatStage
                     result={combatResult}
                     flip={!!myCombat?.flip}
@@ -1377,6 +1448,9 @@ export function NetGameClient() {
                     syncWindowMs={COMBAT_MS}
                     onResolve={() => {}}
                   />
+                    </div>
+                    <CombatBench />
+                  </div>
                 ) : board3d ? (
                   // HD-2D board (opt-in). Drag is handled natively inside the
                   // canvas and committed through the same store actions, so the
