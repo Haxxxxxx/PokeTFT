@@ -190,7 +190,13 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
       // `img { max-width: 100% }` clamped this to the cell, so the sprite never
       // reached the size crispSize/relativeModelScale asked for, and the star
       // badge was positioned from a size that was never used.
-      style={{ imageRendering: "pixelated", maxWidth: "none" }}
+      style={{
+        imageRendering: "pixelated",
+        maxWidth: "none",
+        // Pushed down by the sprite's own bottom padding so the mon's FEET sit
+        // on the hex. See the note in CombatStage.
+        marginBottom: -spriteArt(dex, spriteSize).bottom,
+      }}
       draggable={false}
     />
   );
@@ -250,7 +256,9 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
           <div
             className="absolute flex justify-center"
             style={{
-              top: -(spriteSize - size) + spriteArt(dex, spriteSize).top - STAR_BADGE_H,
+              // + .bottom because the sprite is shifted down by exactly that much.
+              top: -(spriteSize - size) + spriteArt(dex, spriteSize).top
+                + spriteArt(dex, spriteSize).bottom - STAR_BADGE_H,
               // Centred on the ART, not the frame — sprites that sit off-centre
               // in their box would otherwise carry their stars off to one side.
               left: size / 2 + spriteArt(dex, spriteSize).centerOffsetX,
