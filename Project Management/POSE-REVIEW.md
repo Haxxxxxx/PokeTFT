@@ -89,3 +89,61 @@ Politoed, Slowking, Hitmontop, Cascoon, Dustox and more) had **no sprite at
 all** and rendered as a broken image in the shop, on the board and in combat.
 Nothing caught it because a 404 on an `<img>` is silent apart from a console
 line. Fixed, with `tools/fetch-sprites.mjs` to keep it fixed.
+
+---
+
+# The assets are not animated (measured 2026-11-10)
+
+Reported from play with models ON: *"lots of sliding"* and *"picking actions
+are fucked"* for most mons. Neither is a renderer bug.
+
+`tools/model-clip-stats.mjs` reads each model's glTF JSON chunk (a range
+request, not the whole file) and runs the SAME clip matchers `UnitModel` uses,
+so the numbers are what the game actually finds at runtime. Sampling every 16th
+National Dex entry, 62 models:
+
+| | share of models |
+|---|---|
+| **No animation clips at all** | **89%** |
+| Has a usable idle clip | 6% |
+| **Has an attack clip** | **2%** |
+| **Has walk/run (what would stop sliding)** | **2%** |
+| No skeleton at all — cannot even be posed | 34% |
+
+So: actions look broken for most mons because **98% have no attack animation**,
+and units slide because **98% have no walk clip**. Both complaints are the
+asset set, not the code.
+
+The clip matchers themselves are fine. Where clips DO exist they are found —
+Mewtwo (150) ships the full official set (71 clips: `battlewait01_loop`,
+`walk01_loop`, `attack01`, `rangeattack01`, `damage01`…) and matches cleanly.
+The set is just wildly inconsistent: a handful are fully animated, a few carry
+one odd clip (Pikachu has exactly one, `Impactrueno`; Charizard one,
+`Chariard_dizzy`), Bulbasaur uses an older naming convention
+(`001aidle`/`001fight_b`/`001walk`), and the overwhelming majority are static
+meshes.
+
+Checked for a richer source: the upstream repo has only `models/opt`, whose
+subdirectories are FORM variants (alolan, mega, galar, gmax…), not animation
+variants. There is no unoptimised animated set to switch to.
+
+## What this means for the plan above
+
+The pose worklist is still valid but smaller in scope than it looked:
+**34% of models have no skeleton**, so they can only ever be re-oriented, never
+posed bone by bone — the pose editor cannot help them.
+
+More importantly, "animated 3D units" is not reachable from this asset source.
+The realistic options are:
+
+1. **Keep sprites as the default.** They are complete for all 1,025, and a
+   sprite that lunges reads better than a static mesh that glides.
+2. **Ship models as deliberately static figures**, leaning on the existing
+   procedural motion (idle bob, attack lunge) for everything. This is the only
+   lever that reaches the 89%, since it needs no clips at all. It will never
+   look animated, but it would stop reading as broken.
+3. **Change asset source.** Nothing comparable with animations is known to be
+   freely available for this roster.
+
+This is a product decision, not an engineering one, and it is why models remain
+behind `settings.models3d`.
