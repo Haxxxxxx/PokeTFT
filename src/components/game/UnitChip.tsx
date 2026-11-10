@@ -193,9 +193,9 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
       style={{
         imageRendering: "pixelated",
         maxWidth: "none",
-        // Pushed down by the sprite's own bottom padding so the mon's FEET sit
-        // on the hex. See the note in CombatStage.
-        marginBottom: -spriteArt(dex, spriteSize).bottom,
+        // The wrapper owns the downward shift that stands the mon on the hex,
+        // so the image simply fills it. Shifting BOTH would double the offset.
+        display: "block",
       }}
       draggable={false}
     />
@@ -245,27 +245,41 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
             className="absolute inset-0 unit-base"
             style={{ clipPath: HEX_CLIP, boxShadow: `inset 0 0 0 1.5px ${ring}aa, inset 0 0 10px ${ring}22` }}
           />
+          {/* The stars live INSIDE the sprite's own box, as a sibling of the
+              image, rather than at an offset measured from the cell.
+
+              The offset version read
+                  -(spriteSize - size) + art.top + art.bottom - STAR_BADGE_H
+              which is three terms deep, and every one of them has to agree with
+              what the browser actually laid out. They did not: the rendered
+              sprite is not always `spriteSize` (crispSize snaps it, and the
+              board applies a perspective scale on top), so the stars drifted a
+              different distance above each mon — measured on a real board,
+              anywhere from 55px to 275px, which is how a 3-star badge ended up
+              floating over an empty hex two rows away.
+
+              Nesting removes the arithmetic. The box IS the sprite, so the only
+              thing the star position depends on is where the art sits inside
+              its own frame, which is exactly what spriteArt() measures. */}
           <div className="absolute inset-x-0 bottom-0 flex items-end justify-center" style={{ overflow: "visible" }}>
-            {showSprite && sprite}
-          </div>
-          {/* Pinned to the mon's HEAD, not to the top of its sprite box.
-              Sprite frames are mostly transparent padding — 20.6% above the art
-              on average, up to 50% — so "half the overhang above the cell" put
-              the stars a different, often large distance above each mon. On a
-              heavily padded sprite they detached from the unit entirely. */}
-          <div
-            className="absolute flex justify-center"
-            style={{
-              // + .bottom because the sprite is shifted down by exactly that much.
-              top: -(spriteSize - size) + spriteArt(dex, spriteSize).top
-                + spriteArt(dex, spriteSize).bottom - STAR_BADGE_H,
-              // Centred on the ART, not the frame — sprites that sit off-centre
-              // in their box would otherwise carry their stars off to one side.
-              left: size / 2 + spriteArt(dex, spriteSize).centerOffsetX,
-              transform: "translateX(-50%)",
-            }}
-          >
-            <Stars star={unit.star} />
+            <div
+              className="relative shrink-0"
+              style={{ width: spriteSize, height: spriteSize, marginBottom: -spriteArt(dex, spriteSize).bottom }}
+            >
+              {showSprite && sprite}
+              <div
+                className="absolute flex justify-center"
+                style={{
+                  top: spriteArt(dex, spriteSize).top - STAR_BADGE_H,
+                  // Centred on the ART, not the frame — sprites that sit
+                  // off-centre in their box would carry their stars off to one side.
+                  left: spriteArt(dex, spriteSize).centerX,
+                  transform: "translateX(-50%)",
+                }}
+              >
+                <Stars star={unit.star} />
+              </div>
+            </div>
           </div>
           {costBadge}
           <ItemPips items={heldItems} megaReady={megaReady} unitSize={size} />
