@@ -2,6 +2,7 @@
 
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { spriteUrl } from "@/game/data/mons";
+import { spriteArt } from "@/game/ui/sprite-art";
 import { useT } from "@/lib/i18n";
 import { usePrefersReducedMotion } from "@/lib/useReducedMotion";
 import { sfx } from "@/lib/audio";
@@ -771,6 +772,8 @@ function CombatUnit({
   const tilt = layout.tilt;
   const TW = layout.tile.w;
   const TH = layout.tile.h;
+  /** Height of the HP + mana stack, so it clears the head rather than covering it. */
+  const BAR_STACK_H = 18;
   /** Same 1.85x oversize as the board, to cancel PokéAPI sprite padding. */
   const S = Math.round(TW * 1.85);
   // Bar placement is TILE-relative, not derived from the sprite box: PokéAPI
@@ -808,7 +811,25 @@ function CombatUnit({
           fight each other: inset pins left AND right, then the width wins and
           the stack grows rightward from the left edge — which is exactly how
           the bars ended up floating off to the side of their unit. */}
-      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center" style={{ top: -Math.round(TH * 0.32) - 8 }}>
+      {/* Anchored to the mon's HEAD. The old tile-relative offset was a fixed
+          fraction of the tile, which ignored how much transparent padding the
+          sprite carries above its art — on average 20.6% of the frame, up to
+          50%. With the sprite drawn at 1.85x the tile that put the bar more
+          than half a hex above its own unit, close enough to the mon in FRONT
+          to read as that one's health. Measured per species instead. */}
+      <div
+        className="absolute flex flex-col items-center"
+        style={{
+          // The sprite box is pinned to [TH - S, TH], so the art's top edge is
+          // TH - S + art.top and the bar sits one stack-height above it.
+          top: TH - S + spriteArt(unit.dex, S).top - BAR_STACK_H,
+          // Centred on the ART, not the frame: a fair number of sprites sit
+          // off-centre in their 96x96 box, which slid the bar sideways off its
+          // own mon and toward a neighbour.
+          left: TW / 2 + spriteArt(unit.dex, S).centerOffsetX,
+          transform: "translateX(-50%)",
+        }}
+      >
       <div className={`h-[7px] rounded-[3px] bg-black/80 overflow-hidden mb-[3px] ${low ? "animate-pulse" : ""}`} style={{ outline: "1px solid rgba(0,0,0,0.55)", width: TW * 0.9 }}>
         <div className="h-full rounded-[3px] transition-[width] duration-100" style={{ width: `${hpFrac * 100}%`, background: hpBar, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 2px rgba(0,0,0,0.28)" }} />
       </div>
@@ -831,7 +852,7 @@ function CombatUnit({
       <span className="absolute left-1/2 -translate-x-1/2 rounded-[50%] pointer-events-none" style={{ bottom: -2, width: TW * 0.6, height: TW * 0.17, background: `radial-gradient(ellipse at center, ${ring}77, transparent 72%)` }} />
       {/* Box is the CELL; the sprite inside it is oversized and bottom-aligned,
           so it breaks the cell upward exactly like a board unit. */}
-      <div className="relative mx-auto flex items-end justify-center" style={{ width: TW, height: TH }}>
+      <div className="relative mx-auto" style={{ width: TW, height: TH }}>
         {/* Soft team aura behind the mon (stronger for mega) — replaces the hard ring disc. */}
         <span className="absolute inset-0 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle at 50% 60%, ${ring}${unit.mega ? "55" : "2e"}, transparent 66%)` }} />
         {/* Cast wind-up: a charging aura + an expanding ring in the move's colour, telegraphing
@@ -845,8 +866,28 @@ function CombatUnit({
             alt=""
             width={S}
             height={S}
-            className="relative drop-shadow-[0_4px_5px_rgba(0,0,0,0.6)]"
-            style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : "none", filter: cast ? `brightness(1.3) drop-shadow(0 0 11px ${cast})` : unit.disabled ? "brightness(1.25) saturate(0.4) drop-shadow(0 0 7px #7dd3fc)" : unit.burning ? "saturate(1.45) drop-shadow(0 0 7px #f97316)" : `drop-shadow(0 0 6px ${ring}88)` }}
+            // Absolute, not a flex child: as a flex item it was shrunk from S to
+            // fit a box 1.85x smaller, so its real size was whatever flexbox
+            // decided and every offset computed from S was wrong. Bottom-aligned
+            // and centred by hand, so the art box is exactly [TH - S, TH].
+            style={{
+              // max-width:none is load-bearing. Tailwind's Preflight sets
+              // `img { max-width: 100%; height: auto }`, which silently clamped
+              // this sprite to its CONTAINER — measured live, a combat sprite
+              // asking for 1.85x the tile rendered at 107x74 inside a 107x70
+              // cell. So the oversized-sprite design never actually applied,
+              // and every offset derived from that size (star badges, HP bars)
+              // was computed from a number the renderer had discarded.
+              position: "absolute", left: (TW - S) / 2, bottom: 0, width: S, height: S,
+              maxWidth: "none",
+              imageRendering: "pixelated",
+              transform: flip ? "scaleX(-1)" : "none",
+              filter: cast ? `brightness(1.3) drop-shadow(0 0 11px ${cast})`
+                : unit.disabled ? "brightness(1.25) saturate(0.4) drop-shadow(0 0 7px #7dd3fc)"
+                : unit.burning ? "saturate(1.45) drop-shadow(0 0 7px #f97316)"
+                : `drop-shadow(0 0 6px ${ring}88)`,
+            }}
+            className="drop-shadow-[0_4px_5px_rgba(0,0,0,0.6)]"
             draggable={false}
           />
         )}

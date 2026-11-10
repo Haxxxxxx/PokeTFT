@@ -3,6 +3,7 @@
 import { useDraggable } from "@dnd-kit/core";
 import { getDef, spriteUrl } from "@/game/data/mons";
 import { relativeModelScale } from "@/game/data/model-scale";
+import { spriteArt } from "@/game/ui/sprite-art";
 import { COST_COLOR } from "@/game/ui";
 import { useUi } from "@/game/store/uiStore";
 import { useGame } from "@/game/store/gameStore";
@@ -106,6 +107,9 @@ export function Stars({ star }: { star: number }) {
   );
 }
 
+/** Height of the star row, so it can be lifted clear of the mon's head. */
+const STAR_BADGE_H = 13;
+
 export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true, shape = "square", showSprite = true, showModel = false, dragHitArea = false, tilt = 0 }: { unit: UnitInstance; size?: number; interactive?: boolean; canDeploy?: boolean; shape?: "square" | "hex"; showSprite?: boolean; showModel?: boolean; dragHitArea?: boolean; tilt?: number }) {
   const t = useT();
   const def = getDef(unit.defId);
@@ -182,7 +186,11 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
       width={spriteSize}
       height={spriteSize}
       className={`image-render-pixel pointer-events-none ${shape === "hex" ? "unit-rim" : "drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"}`}
-      style={{ imageRendering: "pixelated" }}
+      // maxWidth:none — see the note in CombatStage. Preflight's
+      // `img { max-width: 100% }` clamped this to the cell, so the sprite never
+      // reached the size crispSize/relativeModelScale asked for, and the star
+      // badge was positioned from a size that was never used.
+      style={{ imageRendering: "pixelated", maxWidth: "none" }}
       draggable={false}
     />
   );
@@ -234,7 +242,21 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
           <div className="absolute inset-x-0 bottom-0 flex items-end justify-center" style={{ overflow: "visible" }}>
             {showSprite && sprite}
           </div>
-          <div className="absolute inset-x-0 flex justify-center" style={{ top: -(spriteSize - size) * 0.5 - 6 }}>
+          {/* Pinned to the mon's HEAD, not to the top of its sprite box.
+              Sprite frames are mostly transparent padding — 20.6% above the art
+              on average, up to 50% — so "half the overhang above the cell" put
+              the stars a different, often large distance above each mon. On a
+              heavily padded sprite they detached from the unit entirely. */}
+          <div
+            className="absolute flex justify-center"
+            style={{
+              top: -(spriteSize - size) + spriteArt(dex, spriteSize).top - STAR_BADGE_H,
+              // Centred on the ART, not the frame — sprites that sit off-centre
+              // in their box would otherwise carry their stars off to one side.
+              left: size / 2 + spriteArt(dex, spriteSize).centerOffsetX,
+              transform: "translateX(-50%)",
+            }}
+          >
             <Stars star={unit.star} />
           </div>
           {costBadge}
