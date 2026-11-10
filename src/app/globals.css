@@ -808,3 +808,52 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .drag-ghost { transform: none; }
 }
+
+
+/* -- Hover feedback: shop cards and units ----------------------------------
+   Deliberately uses the INDIVIDUAL `translate` / `scale` properties rather
+   than `transform`. Both of these elements already carry a transform from
+   somewhere else -- shop cards run `shop-deal-in` with `animation-fill-mode:
+   both`, which keeps its final transform applied forever, and a unit's visual
+   is counter-rotated against the board's rake. A hover rule written as
+   `transform:` would be overridden by the first and would clobber the second.
+   The individual properties compose with both.
+
+   Movement is small on purpose. These sit on a tilted 3D plane, and anything
+   larger stops reading as "this is pickable" and starts reading as the board
+   wobbling. */
+.shop-card {
+  transition: translate 140ms ease-out, filter 140ms ease-out, box-shadow 140ms ease-out;
+}
+.shop-card:hover:not(:disabled) {
+  translate: 0 -3px;
+  filter: brightness(1.14);
+  box-shadow: 0 10px 20px -10px rgba(0, 0, 0, 0.75);
+}
+.shop-card:active:not(:disabled) {
+  translate: 0 -1px;
+  transition-duration: 60ms;
+}
+
+/* A unit lifts slightly off its hex. Percentage so it scales with the tile:
+   the same pixel offset reads as a twitch on a desktop board and a jump on a
+   phone one. */
+.unit-hover {
+  transition: translate 120ms ease-out, filter 120ms ease-out;
+}
+.unit-hover:hover {
+  translate: 0 -5%;
+  filter: brightness(1.1) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5));
+}
+.unit-hover:active {
+  translate: 0 -1%;
+  transition-duration: 50ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop-card, .shop-card:hover:not(:disabled), .shop-card:active:not(:disabled),
+  .unit-hover, .unit-hover:hover, .unit-hover:active {
+    translate: none;
+    transition: none;
+  }
+}

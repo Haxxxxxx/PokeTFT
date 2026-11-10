@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type ReactNode, type Dispatch, type SetStateAction } from "react";
 import { getDef, hasDef } from "@/game/data/mons";
 import { serverNow } from "@/game/net/serverTime";
 import { markCarouselPicked, returnToLobby } from "@/game/net/match";
@@ -143,6 +143,50 @@ export function CarouselOverlay({
   // refresh can't re-show the cards and grant a SECOND free reward — local
   // pickedKey/pickLatch don't survive a remount.
   const picked = pickedKey === key || me?.carouselPicked === key;
+
+  // NOBODY LEAVES THE CAROUSEL EMPTY-HANDED.
+  //
+  // endCarousel() only advances the round and clears the menus — it has no
+  // notion of who picked. So a player who was looking at their board, tabbed
+  // away, or simply did not click in time got NOTHING, while everyone else
+  // took a free unit or item. In TFT the carousel is guaranteed; here it was
+  // silently conditional on reacting fast enough.
+  //
+  // The reward is applied client-side (netCarouselPick writes into the local
+  // game state and the save syncs from there), so the host cannot grant one
+  // retroactively — the claim has to come from this client, before the phase
+  // ends.
+  //
+  // The ITEM is the fallback, not a unit: items go to the inventory, so it is
+  // the one option that cannot fail on a full bench.
+  const autoPicked = useRef<string | null>(null);
+  useEffect(() => {
+    if (!opts || opts.length === 0 || picked) return;
+    const claim = () => {
+      // pickLatch is READ, never written: it belongs to the caller, and React
+      // 19 treats a prop ref as immutable from here. Writing pickedKey below is
+      // what actually closes the window — it hides the cards on the next render.
+      if (autoPicked.current === key || pickLatch.current === `c-${key}`) return;
+      autoPicked.current = key;
+      // Find the item rather than trusting its index. startCarousel happens to
+      // put it first today; relying on that would turn a future reorder into a
+      // silent "your free pick granted nothing on a full bench".
+      const item = opts.find((o) => o === MEGA_STONE || !!ITEM_DEF_BY_ID[o]);
+      netCarouselPick(item ?? opts[0]);
+      setPickedKey(key);
+      flushSync();
+      markCarouselPicked(room.code, myUid, key);
+    };
+    // Slightly BEFORE the deadline, so the write lands while the phase is still
+    // carousel — the host ends the round on the deadline, and a claim arriving
+    // after that is a write into a round that no longer exists.
+    const lead = 1200;
+    const ms = meta.deadline - serverNow() - lead;
+    if (ms <= 0) { claim(); return; }
+    const id = setTimeout(claim, ms);
+    return () => clearTimeout(id);
+  }, [opts, picked, key, meta.deadline, room.code, myUid, netCarouselPick, setPickedKey, flushSync, pickLatch]);
+
   if (!opts) return null;
   return (
     <div
