@@ -7,7 +7,8 @@
  * every size, tokens stay tappable, and nothing collapses or overflows.
  */
 
-import { computeGameLayout, densityFor, TILE_ASPECT } from "../src/game/ui/layout";
+import { computeGameLayout, densityFor, TILE_ASPECT, BENCH_SLOTS, BENCH_GAP } from "../src/game/ui/layout";
+import { BENCH_SIZE } from "../src/game/store/gameStore";
 import { fieldPixelSize } from "../src/game/engine/hex";
 
 let failures = 0;
@@ -173,4 +174,32 @@ if (failures) {
   console.error(`\n❌ ${failures} layout assertion(s) failed`);
   process.exit(1);
 }
+// -- The bench's slabs and the mons standing on them must share one source ---
+//
+// The layout engine sized the slabs from BENCH_GAP/BENCH_SLOTS while Board
+// hardcoded the gap (twice) and took the slot count from a different constant
+// in the game store. Nothing enforced that the two agreed; they happened to.
+// Change one and the slabs move while the units stay put -- a silent
+// misalignment nobody would think to look for.
+console.log("\nBench metrics are shared, not duplicated:");
+{
+  assert(BENCH_SIZE === BENCH_SLOTS,
+    `the store's bench size and the layout's slot count agree (${BENCH_SIZE} === ${BENCH_SLOTS})`);
+
+  for (const [w, h] of [[1280, 800], [1920, 1080], [1024, 768], [844, 390]] as const) {
+    const L = computeGameLayout(w, h);
+    assert(L.benchGap === BENCH_GAP, `${w}x${h}: the layout publishes the real gap (${L.benchGap})`);
+
+    // The strip the board draws must fit the platform it is drawn on -- this is
+    // exactly what breaks when the two sets of numbers drift apart.
+    const stripW = BENCH_SIZE * L.benchSlot + (BENCH_SIZE - 1) * L.benchGap;
+    assert(stripW <= L.field.w,
+      `${w}x${h}: ${BENCH_SIZE} slabs + gaps fit the field (${stripW} <= ${L.field.w})`);
+    // ...and are not so small that the platform is mostly empty. FLOOR on the
+    // slab size can leave at most one pixel of slack per slot.
+    assert(stripW >= L.field.w - BENCH_SIZE,
+      `${w}x${h}: and fill it to within a pixel per slot (${L.field.w - stripW}px slack)`);
+  }
+}
+
 console.log("\n✅ Responsive layout engine verified");

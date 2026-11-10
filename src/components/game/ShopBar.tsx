@@ -239,7 +239,7 @@ function ShopBarBase() {
               }}
               disabled={!affordable}
               style={{ borderColor: `${color}aa`, boxShadow: own ? `inset 0 0 0 1.5px ${color}` : undefined, animationDelay: `${i * 40}ms` }}
-              className="shop-deal-in group relative min-w-0 min-h-0 flex-1 self-stretch overflow-hidden rounded-lg border hover:brightness-125 disabled:opacity-50 transition"
+              className="shop-deal-in shop-card group relative min-w-0 min-h-0 flex-1 self-stretch overflow-hidden rounded-lg border disabled:opacity-50"
             >
               {popOverlay}
               {/* One-from-star: a separate pulsing overlay (not a class on the button

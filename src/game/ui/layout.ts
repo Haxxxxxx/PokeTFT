@@ -57,6 +57,8 @@ export type GameLayout = {
    *  zone below it — `planningBox.h` already includes it. */
   benchSlot: number;
   benchH: number;
+  /** Gap between slabs. The board positions units from this too. */
+  benchGap: number;
   /** Height of the shop strip (controls + 5 cards). */
   shopH: number;
   /** Rail widths. 0 means "not rendered inline" — see railsAsDrawers. */
@@ -178,8 +180,17 @@ const COMFORTABLE_TILE = 68;
  * tile — at a guessed 0.82 the nine slabs plus gaps came out wider than the
  * board they sit on. The strip's height is therefore part of the arena.
  */
-const BENCH_SLOTS = 9;
-const BENCH_GAP = 4;
+/**
+ * The bench's own metrics.
+ *
+ * Exported because the BOARD has to lay the slabs and the mons standing on
+ * them out from the same numbers. They used to be private here and hardcoded
+ * there — three separate copies of the gap and two separate constants for the
+ * slot count — so changing one moved the slabs while the units stayed put, or
+ * the reverse. Nothing enforced that they agreed; they happened to.
+ */
+export const BENCH_SLOTS = 9;
+export const BENCH_GAP = 4;
 const BENCH_PAD = 12;
 /** Slab edge per unit of tile: nine slabs share the field's 7.5-tile width. */
 const BENCH_TILE_RATIO = FIELD_UNITS.w / BENCH_SLOTS;
@@ -300,6 +311,7 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
     topH,
     benchSlot: benchSlabSize,
     benchH,
+    benchGap: BENCH_GAP,
     shopH,
     leftRail,
     rightRail,

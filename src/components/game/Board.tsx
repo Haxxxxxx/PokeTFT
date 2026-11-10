@@ -277,6 +277,7 @@ function BoardBase({
   // budget and overflow the arena.
   const benchSlots = withBench ? resolveBenchSlots(source) : [];
   const benchSize = layout.benchSlot;
+  const benchGap = layout.benchGap;
   const benchStripH = withBench ? layout.benchH : 0;
   const frameW = innerW + pad * 2;
   const frameH = innerH + benchStripH + pad * 2;
@@ -438,8 +439,11 @@ function BoardBase({
             drag logic keeps working. */}
         {withBench && (
           <div
-            className="absolute flex items-end justify-center gap-1.5"
-            style={{ left: pad, top: pad + innerH, width: innerW, height: benchStripH, gap: 4 }}
+            // One source for the gap: the className also carried `gap-1.5`,
+            // which the inline value silently overrode — so the stylesheet said
+            // 6px while the layout engine and the unit positions assumed 4.
+            className="absolute flex items-end justify-center"
+            style={{ left: pad, top: pad + innerH, width: innerW, height: benchStripH, gap: benchGap }}
           >
             {Array.from({ length: BENCH_SIZE }).map((_, i) => (
               <BenchSlab
@@ -492,11 +496,11 @@ function BoardBase({
         })}
         {withBench && benchSlots.map((unit, index) => {
           if (!unit) return null;
-          const benchWidth = BENCH_SIZE * benchSize + (BENCH_SIZE - 1) * 4;
+          const benchWidth = BENCH_SIZE * benchSize + (BENCH_SIZE - 1) * benchGap;
           const benchStartX = pad + (innerW - benchWidth) / 2;
           const size = benchSize - 8;
           const [screenX, screenBottom, scale] = projectArenaScreenPoint(
-            benchStartX + index * (benchSize + 4) + benchSize / 2,
+            benchStartX + index * (benchSize + benchGap) + benchSize / 2,
             pad + innerH + benchStripH,
             frameW,
             frameH,

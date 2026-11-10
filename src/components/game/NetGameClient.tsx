@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, PointerSensor, TouchSensor, closestCenter, MeasuringStrategy, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, PointerSensor, TouchSensor, closestCenter, pointerWithin, MeasuringStrategy, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
+import type { CollisionDetection } from "@dnd-kit/core";
 import { useGame, resolveBenchSlots, BENCH_SIZE } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
@@ -165,6 +166,30 @@ function CombatBench() {
     </div>
   );
 }
+
+/**
+ * Board hexes are ranked by centre distance; everything else must contain the
+ * pointer.
+ *
+ * closestCenter alone is right for the ARENA and wrong for the UI. The arena is
+ * a perspective-tilted plane, so getBoundingClientRect() returns projected
+ * boxes that overlap and mis-rank — their centres stay correctly ordered, which
+ * is why the hexes use centre distance.
+ *
+ * The bench strip, the shop and the sell zone are flat, stacked panels, and
+ * centre distance on those is actively dangerous: the sell zone sits directly
+ * below the bench, so aiming at a bench slot could put the dragged mon's centre
+ * nearer to SELL than to the slot — and selling is destructive and silent. You
+ * reach for a slot and the mon is gone.
+ *
+ * So: if the pointer is genuinely inside one or more non-hex droppables, those
+ * win. Otherwise fall back to centre distance, which keeps the board behaving
+ * exactly as before.
+ */
+const boardAwareCollision: CollisionDetection = (args) => {
+  const within = pointerWithin(args).filter((c) => !String(c.id).startsWith("cell-"));
+  return within.length ? within : closestCenter(args);
+};
 
 /** Gold cost of an augment reroll after the first (free) one per slot. */
 const AUG_REROLL_COST = 2;
@@ -1046,7 +1071,7 @@ export function NetGameClient() {
       // returns the PROJECTED axis-aligned box. Those projected boxes overlap
       // and mis-rank under perspective, but their centers stay correctly
       // ordered — so center distance is the collision test that survives tilt.
-      collisionDetection={closestCenter}
+      collisionDetection={boardAwareCollision}
       // Re-measure droppables on every drag: the board resizes with the
       // viewport now, so cached rects from a previous size would be stale.
       measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
