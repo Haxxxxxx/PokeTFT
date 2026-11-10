@@ -186,15 +186,33 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
       draggable={false}
     />
   );
+  // How far the grab zone may reach ABOVE its own cell.
+  //
+  // A hex row is tileH * ROW_STEP apart, and tileH is TILE_ASPECT * tileW, so
+  // the gap between one unit's feet and the next row's is about 0.71 * tileW —
+  // while `size` here is tileW - 6, i.e. essentially tileW.
+  //
+  // The sprite is drawn far taller than that: up to 2.1x the cell, so its
+  // overhang alone reaches ~1.6 row pitches. Matching the grab zone to the
+  // sprite (which is what this did) therefore laid every unit's hitbox clean
+  // over the unit standing BEHIND it — and Board stacks by row
+  // (`zIndex: localR + ALLY_ROW0`), so the nearer unit wins. Reaching for a
+  // back-row mon picked up the one in front of it.
+  //
+  // Half the row pitch is the most it can take without entering the next row's
+  // half of the gap. The cost is that a very tall mon is not grabbable by the
+  // head; the alternative is that its neighbour is not grabbable at all.
+  const GRAB_CEILING = size * 0.35;
   const dragHitbox = interactive && dragHitArea ? (
     <span
       className="absolute z-20"
-      // Covers exactly the overhang the sprite actually has. A fixed 0.85x was
-      // right for one sprite size and wrong for every other: now that art is
-      // scaled by species height, a flat figure left tall mons ungrabbable by
-      // the head and gave small ones a hitbox reaching into the hex above,
-      // stealing clicks meant for the unit standing there.
-      style={{ left: 0, right: 0, top: -Math.max(0, spriteSize - size), bottom: 0, pointerEvents: "auto" }}
+      style={{
+        left: 0,
+        right: 0,
+        top: -Math.min(Math.max(0, spriteSize - size), GRAB_CEILING),
+        bottom: 0,
+        pointerEvents: "auto",
+      }}
       aria-hidden
     />
   ) : null;
