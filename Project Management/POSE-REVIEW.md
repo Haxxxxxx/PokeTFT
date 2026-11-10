@@ -147,3 +147,34 @@ The realistic options are:
 
 This is a product decision, not an engineering one, and it is why models remain
 behind `settings.models3d`.
+
+---
+
+# Decision: sprites stay the default (2026-11-10)
+
+Taken after the animation measurement above. **Sprites remain the default
+renderer for all 1,025 units; 3D models stay opt-in behind
+`settings.models3d`.**
+
+Why, in one line: a sprite that lunges reads better than a static mesh that
+glides, and 89% of the models are static meshes.
+
+What this closes:
+- The pose review is **no longer on the critical path**. It only matters if
+  models are ever promoted, and the ceiling on that is now known to be low.
+  The worklist and tooling stay for whoever picks it up — including the fact
+  that 34% of models have no skeleton and can never be posed.
+- The scale anomaly (Rattata/Pikachu/Ninetales/Paras rendering oversized)
+  drops to low priority for the same reason. It is still a real bug and still
+  worth one investigation rather than six pose entries, but nothing ships on it.
+
+What this does NOT change:
+- The model pipeline stays in the tree and keeps working behind the toggle. It
+  is a complete piece of work, it cost nothing to keep, and the measurement
+  that makes it opt-in is about the ASSETS, not the code.
+- Sprites are now complete for the whole roster (the 52 missing files were
+  fixed), so the default path has no gaps.
+
+If this is ever revisited, the thing that would change the answer is a source
+of animated models for this roster. `tools/model-clip-stats.mjs` re-measures
+coverage against any source in a couple of minutes.
