@@ -982,12 +982,23 @@ export function NetGameClient() {
         dropAnimation={null}
       >
         {draggedUnit && (
-          <UnitChip
-            unit={draggedUnit}
-            size={draggedUnit.pos === null ? L.benchSlot - 8 : L.tile.w - 6}
-            interactive={false}
-            shape={draggedUnit.pos === null ? "square" : "hex"}
-          />
+          // The ghost must be the SAME thing you lifted. It used to switch to
+          // shape="square" for bench units, but the bench moved onto the
+          // platform and renders hex — and the two shapes size their art
+          // differently (hex draws the mon at ~1.85x the cell and overflows it,
+          // square draws it at size-6 and clips to the box). So grabbing a
+          // bench mon shrank it by nearly half on pickup and snapped it back on
+          // drop, which is what made the motion feel broken.
+          //
+          // Same shape, same size, same art scale: the mon now just lifts.
+          <div className="drag-ghost">
+            <UnitChip
+              unit={draggedUnit}
+              size={draggedUnit.pos === null ? L.benchSlot - 8 : L.tile.w - 6}
+              interactive={false}
+              shape="hex"
+            />
+          </div>
         )}
       </DragOverlay>
       <Toasts />

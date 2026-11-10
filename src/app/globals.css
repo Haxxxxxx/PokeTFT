@@ -788,3 +788,23 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .shop-star-up { animation: none; }
 }
+
+
+/* -- Picking a mon up -------------------------------------------------------
+   The drag ghost is the same UnitChip the board draws, so the only difference
+   between "on the board" and "in hand" should be that it reads as lifted. A
+   small scale plus a cast shadow does that; anything more and the mon stops
+   lining up with the hex it is about to land on.
+
+   No transition on the transform: the ghost follows the pointer every frame,
+   and easing a property that is already driven per-frame makes it lag behind
+   the cursor -- which reads as the unit sliding rather than being held. */
+.drag-ghost {
+  transform: scale(1.06);
+  transform-origin: bottom center;
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.55));
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .drag-ghost { transform: none; }
+}

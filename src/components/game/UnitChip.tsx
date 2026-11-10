@@ -2,6 +2,7 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { getDef, spriteUrl } from "@/game/data/mons";
+import { relativeModelScale } from "@/game/data/model-scale";
 import { COST_COLOR } from "@/game/ui";
 import { useUi } from "@/game/store/uiStore";
 import { useGame } from "@/game/store/gameStore";
@@ -105,7 +106,7 @@ export function Stars({ star }: { star: number }) {
   );
 }
 
-export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true, shape = "square", showSprite = true, showModel = true, dragHitArea = false, tilt = 0 }: { unit: UnitInstance; size?: number; interactive?: boolean; canDeploy?: boolean; shape?: "square" | "hex"; showSprite?: boolean; showModel?: boolean; dragHitArea?: boolean; tilt?: number }) {
+export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true, shape = "square", showSprite = true, showModel = false, dragHitArea = false, tilt = 0 }: { unit: UnitInstance; size?: number; interactive?: boolean; canDeploy?: boolean; shape?: "square" | "hex"; showSprite?: boolean; showModel?: boolean; dragHitArea?: boolean; tilt?: number }) {
   const t = useT();
   const def = getDef(unit.defId);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: unit.iid, disabled: !interactive });
@@ -156,9 +157,14 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
   // Capped at 2.1x the cell: snapping is unbounded on its own, and on the
   // smallest tiles the nearest whole multiple is several times the hex.
   //
-  // The same figure sizes the 3D model, so a model and a sprite occupy the
-  // identical footprint and toggling between them cannot shift the layout.
-  const spriteSize = shape === "hex" ? crispSize(size * 1.85, size * 2.1) : size - 6;
+  // Scaled by the species' real (compressed) height, the same rule the 3D
+  // models use — so a Rattata no longer occupies a Charizard's footprint. The
+  // 2.1x cap still bounds it: without one, a large mon covers its neighbours'
+  // hexes, which is what made the board look mushy.
+  const rel = relativeModelScale(dex);
+  const spriteSize = shape === "hex"
+    ? crispSize(Math.min(size * 1.85 * rel, size * 2.1), size * 2.1)
+    : Math.round((size - 6) * rel);
   const sprite = showModel ? (
     <PokemonModelPreview
       dex={dex}
@@ -183,7 +189,12 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
   const dragHitbox = interactive && dragHitArea ? (
     <span
       className="absolute z-20"
-      style={{ left: 0, right: 0, top: -size * 0.85, bottom: 0, pointerEvents: "auto" }}
+      // Covers exactly the overhang the sprite actually has. A fixed 0.85x was
+      // right for one sprite size and wrong for every other: now that art is
+      // scaled by species height, a flat figure left tall mons ungrabbable by
+      // the head and gave small ones a hitbox reaching into the hex above,
+      // stealing clicks meant for the unit standing there.
+      style={{ left: 0, right: 0, top: -Math.max(0, spriteSize - size), bottom: 0, pointerEvents: "auto" }}
       aria-hidden
     />
   ) : null;

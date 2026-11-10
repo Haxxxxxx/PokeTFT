@@ -1,10 +1,8 @@
 "use client";
 
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import dynamic from "next/dynamic";
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { spriteUrl } from "@/game/data/mons";
 import { useT } from "@/lib/i18n";
-import { hasUsable3DModel } from "@/game/data/model-availability";
 import { usePrefersReducedMotion } from "@/lib/useReducedMotion";
 import { sfx } from "@/lib/audio";
 import { hexToPixel, fieldPixelSize, hexDistance, FIELD, HEX_CLIP } from "@/game/engine/hex";
@@ -12,46 +10,18 @@ import { useGameLayout } from "./LayoutProvider";
 import { ItemPips } from "./UnitChip";
 import { CombatField3D } from "./CombatField3D";
 import { useAppStore } from "@/game/store/appStore";
-import { useModelReady, markModelReady, markModelFailed } from "@/game/data/model-ready";
 import { TYPE_COLOR } from "@/game/ui";
 import { SnowIcon, SwordIcon, ShieldIcon } from "./icons";
 import { Leaf, BarChart3 } from "lucide-react";
 import { serverNow } from "@/game/net/serverTime";
-import type { BoardModel } from "./Board3DModels";
-import type { ModelId } from "@/lab/arena3d/UnitModel";
 // geometry.ts was promoted to @/game/ui/hex3d on main (a pure rename), so the
 // model work's import of HEX_W follows it here.
-import { HEX_W } from "@/game/ui/hex3d";
 import { abilityCells, normaliseUnitItems } from "@/game/engine/combat";
 import type { CombatResult, Frame, FrameUnit, CombatEvent, CastShape } from "@/game/engine/combat";
 import type { PokeType } from "@/game/types";
 
-const Board3DModels = dynamic(
-  () => import("./Board3DModels").then((module) => module.Board3DModels),
-  { ssr: false, loading: () => null },
-);
 
-function projectArenaPoint(
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  tilt: number,
-  perspective: number,
-): [number, number, number] {
-  const dx = x - width / 2;
-  const dy = y - height / 2;
-  const angle = (tilt * Math.PI) / 180;
-  const depth = dy * Math.sin(angle);
-  const scale = perspective / (perspective - depth);
-  const screenX = width / 2 + dx * scale;
-  const screenY = height / 2 + dy * Math.cos(angle) * scale;
-  return [screenX - width / 2, height / 2 - screenY, 0];
-}
 
-function combatModelKey(unitId: string, dex: number): string {
-  return `${unitId}:${dex}`;
-}
 
 /** Mirror a replay through the field centre (180° rotation) and swap teams, so
  *  the "enemy"-side player of a shared canonical sim still sees THEIR team at the
@@ -236,7 +206,6 @@ export function CombatStage({
 
   const layout = useGameLayout();
   const board3d = useAppStore((st) => st.settings.board3d);
-  const models3d = useAppStore((st) => st.settings.models3d);
   // Older fights were persisted before unitItems existed; default it so a
   // stored replay from a previous version still renders.
   // Coerced, not just defaulted. Firebase RTDB stores arrays as index-keyed
@@ -294,61 +263,6 @@ export function CombatStage({
     return { aMap, bMap, recentFx, recentHit, facing };
   }, [fi, frames, a, b]);
 
-  // Shared with the board — see model-ready.ts. Previously this set started
-  // empty on EVERY combat mount, so the fight began in 2D sprites regardless of
-  // what the planning phase had already loaded.
-  const modelReady = useModelReady();
-  const handleModelReady = useCallback((_key: string, model: ModelId) => {
-    markModelReady(model);
-  }, []);
-  const handleModelError = useCallback((key: string, model: ModelId, error: Error) => {
-    markModelFailed(model);
-    console.error(`Combat model ${key} failed to load; keeping its sprite visible.`, error);
-  }, []);
-  const combatModels = useMemo<BoardModel[]>(() => {
-    const models: BoardModel[] = [];
-    for (const unit of a.units) {
-      const next = bMap.get(unit.id) ?? unit;
-      const model: ModelId = unit.dex;
-      const from = hexToPixel({ c: unit.c, r: unit.r }, TILE_W, TILE_H);
-      const to = hexToPixel({ c: next.c, r: next.r }, TILE_W, TILE_H);
-      let x = lerp(from.x, to.x, frac);
-      let y = lerp(from.y, to.y, frac);
-      const attack = a.events.find((event) => event.kind === "attack" && event.from === unit.id);
-      const actionKey = attack?.kind === "attack" ? `${fi}:${attack.to}` : undefined;
-      if (attack?.kind === "attack") {
-        const target = aMap.get(attack.to);
-        if (target) {
-          const point = hexToPixel({ c: target.c, r: target.r }, TILE_W, TILE_H);
-          const dx = point.x - x;
-          const dy = point.y - y;
-          const distance = Math.hypot(dx, dy) || 1;
-          x += (dx / distance) * 13;
-          y += (dy / distance) * 13;
-        }
-      }
-      const rotationY = unit.team === "enemy" ? Math.PI : 0;
-      const position = (x: number, y: number) => projectArenaPoint(
-        14 + x,
-        14 + y,
-        w + 28,
-        h + 28,
-        layout.tilt,
-        layout.perspective,
-      );
-      if ((unit.alive || next.alive) && hasUsable3DModel(model)) {
-        models.push({
-          key: combatModelKey(unit.id, model),
-          model,
-          position: position(x, y),
-          scale: TILE_W / HEX_W,
-          rotationY,
-          actionKey,
-        });
-      }
-    }
-    return models;
-  }, [a, aMap, bMap, fi, frac, h, layout.perspective, layout.tilt, TILE_H, TILE_W, w]);
 
   const aliveAlly = a.units.filter((u) => u.team === "ally" && u.alive).length;
   const aliveEnemy = a.units.filter((u) => u.team === "enemy" && u.alive).length;
@@ -506,7 +420,7 @@ export function CombatStage({
                 flash={hitThisFrame ? `${fi}-${u.id}` : null}
                 cast={castColor}
                 faceLeft={(facing.get(u.id) ?? u.c) < u.c}
-                showSprite={!models3d || !modelReady(u.dex) || !hasUsable3DModel(u.dex)}
+                showSprite
                 items={unitItems[u.id] ?? EMPTY_ITEMS}
               />
             );
@@ -557,26 +471,7 @@ export function CombatStage({
           })}
         </div>
         </div>
-      {/* 3D models are OFF by default (settings.models3d). Three reasons, all
-          from the model work's own notes:
-            - the baked pose map has ONE species reviewed out of 967, so most of
-              the roster would render in an unreviewed stance;
-            - every client would fetch models from a third-party GitHub repo over
-              raw.githubusercontent.com, which is not a production CDN;
-            - the model canvas sits above the unit DOM, so a tall model occludes
-              the combat HP/mana bars.
-          The pipeline is complete and ships here; flipping the default is a
-          one-line change once the poses have been reviewed. */}
-        {models3d && (
-          <Board3DModels
-            models={combatModels}
-            height={h + 28}
-            perspective={layout.perspective}
-            animationMode="combat"
-            onReady={handleModelReady}
-            onError={handleModelError}
-          />
-        )}
+      {/* No 3D layer — see the note in Board.tsx. */}
         </>)}
       </div>
       </div>
