@@ -6,6 +6,7 @@ import { FIELD, ALLY_ROW0, HEX_CLIP, hexToPixel, fieldPixelSize, rowsPixelHeight
 import { boardSizeForLevel } from "@/game/config";
 import { getDef } from "@/game/data/mons";
 import { TYPE_COLOR } from "@/game/ui";
+import { pensionDockMetrics } from "@/game/ui/dock-metrics";
 import { useGame, BENCH_SIZE, PENSION_COST, PENSION_ROUNDS, PENSION_OVERDUE_LIMIT, resolveBenchSlots } from "@/game/store/gameStore";
 import { useGameLayout } from "./LayoutProvider";
 import { UnitChip } from "./UnitChip";
@@ -144,7 +145,12 @@ function BenchSlab({
   );
 }
 
-function PensionDock({ interactive }: { interactive: boolean }) {
+function PensionDock({ interactive, slot, font }: { interactive: boolean; slot: number; font: number }) {
+  // Sized against the bench slot, not a fixed pixel count. See dock-metrics.ts:
+  // at a flat 76px this dock was 2.17x a bench slot on a phone and 0.81x on a
+  // desktop, so it was the one thing on the board that changed proportion as
+  // the board resized.
+  const M = pensionDockMetrics(slot, font);
   const pension = useGame((state) => state.pension);
   const collectPension = useGame((state) => state.collectPension);
   const { setNodeRef, isOver } = useDroppable({
@@ -167,48 +173,50 @@ function PensionDock({ interactive }: { interactive: boolean }) {
     <div
       ref={setNodeRef}
       title={!pension ? t.net_pension_title(PENSION_COST, PENSION_ROUNDS) : undefined}
-      className={`absolute right-2 top-[18%] z-30 flex w-[76px] flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-transparent p-1.5 text-center transition-all
+      style={{ right: M.inset, width: M.w }}
+      className={`absolute top-[18%] z-30 flex flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-transparent p-1.5 text-center transition-all
         ${isOver ? "scale-105 border-emerald-300 bg-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.35)]" : blocked ? "border-rose-400/70 bg-rose-950/45 shadow-[0_0_18px_rgba(244,63,94,0.3)]" : "bg-transparent shadow-none"}
         ${!pension && interactive ? "border-dashed text-gold-100/70" : "text-slate-100"}`}
     >
-      <span className="text-[8px] font-extrabold uppercase tracking-wider text-gold-200/75">{t.net_pension}</span>
+      <span style={{ fontSize: M.label }} className="font-extrabold uppercase tracking-wider text-gold-200/75">{t.net_pension}</span>
       {pension && def && dex !== null ? (
         <>
-          <div className="relative grid h-14 w-full place-items-center rounded-lg" style={{ background: `radial-gradient(circle, ${typeColor}55, transparent 72%)` }}>
+          <div className="relative grid w-full place-items-center rounded-lg" style={{ height: M.art, background: `radial-gradient(circle, ${typeColor}55, transparent 72%)` }}>
             <PokemonModelPreview
               dex={dex}
               alt={`${def.name} in the Pokémon Pension`}
-              width={56}
-              height={56}
+              width={M.preview}
+              height={M.preview}
               className={ready ? "" : "opacity-85"}
             />
-            {!ready && <span className="absolute inset-0 grid place-items-center text-sm font-extrabold text-gold-100 drop-shadow-[0_1px_3px_rgba(0,0,0,1)]">{pension.roundsLeft}</span>}
+            {!ready && <span style={{ fontSize: Math.round(M.art * 0.3) }} className="absolute inset-0 grid place-items-center font-extrabold text-gold-100 drop-shadow-[0_1px_3px_rgba(0,0,0,1)]">{pension.roundsLeft}</span>}
           </div>
           {ready ? (
             <>
               <button
                 type="button"
                 onClick={collectPension}
-                className={`w-full rounded-md px-1 py-1 text-[9px] font-extrabold leading-none text-slate-950 ${
+                style={{ fontSize: M.button }}
+                className={`w-full rounded-md px-1 py-1 font-extrabold leading-none text-slate-950 ${
                   blocked ? "bg-rose-400 hover:bg-rose-300" : "bg-emerald-400 hover:bg-emerald-300"
                 }`}
               >
                 {t.net_pension_collect}
               </button>
               {blocked && (
-                <span className="text-[8px] font-bold leading-tight text-rose-300">
+                <span style={{ fontSize: M.label }} className="font-bold leading-tight text-rose-300">
                   {t.net_pension_blocked} · {t.net_pension_autosell(fightsLeft)}
                 </span>
               )}
             </>
           ) : (
-            <span className="text-[8px] font-bold leading-tight text-gold-100/80">{t.net_pension_rounds(pension.roundsLeft)}</span>
+            <span style={{ fontSize: M.label }} className="font-bold leading-tight text-gold-100/80">{t.net_pension_rounds(pension.roundsLeft)}</span>
           )}
         </>
       ) : (
         <>
-          <span className={`leading-none text-gold-200/80 transition-transform ${isOver ? "scale-125" : ""}`}><PawIcon size={22} /></span>
-          <span className="text-[8px] leading-tight text-slate-400">{interactive ? `Drop · ${PENSION_COST} ◉` : "Empty"}</span>
+          <span className={`leading-none text-gold-200/80 transition-transform ${isOver ? "scale-125" : ""}`}><PawIcon size={M.icon} /></span>
+          <span style={{ fontSize: M.label }} className="leading-tight text-slate-400">{interactive ? `Drop · ${PENSION_COST} ◉` : "Empty"}</span>
         </>
       )}
     </div>
@@ -528,7 +536,7 @@ function BoardBase({
           toggle that made planning 3D and combat 2D, the match is uniformly 2D.
           The pipeline itself is intact (UnitModel, /lab/model-sheet,
           /lab/model-poses) for when the animation gap is closed. */}
-      {withBench && !units && <PensionDock interactive={interactive} />}
+      {withBench && !units && <PensionDock interactive={interactive} slot={benchSize} font={layout.font} />}
     </div>
   );
 }
