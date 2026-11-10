@@ -774,6 +774,14 @@ function CombatUnit({
   const TH = layout.tile.h;
   /** Height of the HP + mana stack, so it clears the head rather than covering it. */
   const BAR_STACK_H = 18;
+  /**
+   * Bar width, as a fraction of the tile.
+   *
+   * Was 0.9, against a column pitch of exactly one tile — so two units standing
+   * side by side had bars 0.1 of a tile apart, which read as ONE continuous
+   * rail spanning both of them rather than as each mon's own health.
+   */
+  const BAR_W = 0.66;
   /** Same 1.85x oversize as the board, to cancel PokéAPI sprite padding. */
   const S = Math.round(TW * 1.85);
   // Bar placement is TILE-relative, not derived from the sprite box: PokéAPI
@@ -822,7 +830,8 @@ function CombatUnit({
         style={{
           // The sprite box is pinned to [TH - S, TH], so the art's top edge is
           // TH - S + art.top and the bar sits one stack-height above it.
-          top: TH - S + spriteArt(unit.dex, S).top - BAR_STACK_H,
+          // + .bottom because the sprite is shifted down by exactly that much.
+          top: TH - S + spriteArt(unit.dex, S).top + spriteArt(unit.dex, S).bottom - BAR_STACK_H,
           // Centred on the ART, not the frame: a fair number of sprites sit
           // off-centre in their 96x96 box, which slid the bar sideways off its
           // own mon and toward a neighbour.
@@ -830,11 +839,11 @@ function CombatUnit({
           transform: "translateX(-50%)",
         }}
       >
-      <div className={`h-[7px] rounded-[3px] bg-black/80 overflow-hidden mb-[3px] ${low ? "animate-pulse" : ""}`} style={{ outline: "1px solid rgba(0,0,0,0.55)", width: TW * 0.9 }}>
+      <div className={`h-[7px] rounded-[3px] bg-black/80 overflow-hidden mb-[3px] ${low ? "animate-pulse" : ""}`} style={{ outline: "1px solid rgba(0,0,0,0.55)", width: TW * BAR_W }}>
         <div className="h-full rounded-[3px] transition-[width] duration-100" style={{ width: `${hpFrac * 100}%`, background: hpBar, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 2px rgba(0,0,0,0.28)" }} />
       </div>
       {/* Mana bar — glows + pulses when full (a cast is coming). */}
-      <div className={`h-[4px] rounded-full bg-black/70 overflow-hidden ${manaFull ? "animate-pulse" : ""}`} style={manaFull ? { boxShadow: "0 0 7px 1px #38bdf8dd", width: TW * 0.76 } : { width: TW * 0.76 }}>
+      <div className={`h-[4px] rounded-full bg-black/70 overflow-hidden ${manaFull ? "animate-pulse" : ""}`} style={manaFull ? { boxShadow: "0 0 7px 1px #38bdf8dd", width: TW * BAR_W * 0.82 } : { width: TW * BAR_W * 0.82 }}>
         <div className="h-full transition-[width] duration-100" style={{ width: `${manaFrac * 100}%`, background: manaFull ? "#bae6fd" : "#38bdf8" }} />
       </div>
       </div>
@@ -878,7 +887,14 @@ function CombatUnit({
               // cell. So the oversized-sprite design never actually applied,
               // and every offset derived from that size (star badges, HP bars)
               // was computed from a number the renderer had discarded.
-              position: "absolute", left: (TW - S) / 2, bottom: 0, width: S, height: S,
+              position: "absolute", left: (TW - S) / 2, width: S, height: S,
+              // Pushed DOWN by the sprite's own bottom padding so the mon's FEET
+              // land on the cell floor. Bottom-aligning the frame instead left
+              // every unit hovering above its contact shadow by however much
+              // empty space its art carries underneath — 20.7% of the frame on
+              // average, 40.6% at worst, which is 66px of nothing under a
+              // Bulbasaur at this sprite size.
+              bottom: -spriteArt(unit.dex, S).bottom,
               maxWidth: "none",
               imageRendering: "pixelated",
               transform: flip ? "scaleX(-1)" : "none",
