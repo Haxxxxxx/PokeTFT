@@ -13,6 +13,7 @@ import { RerollIcon, SnowIcon, CoinIcon, InfoIcon, StarIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
 import { useT } from "@/lib/i18n";
 import { useGameLayout } from "./LayoutProvider";
+import { shopControlMetrics } from "@/game/ui/dock-metrics";
 import { interest } from "@/game/engine/economy";
 import { sfx, playCry } from "@/lib/audio";
 
@@ -95,6 +96,7 @@ function ShopBarBase() {
   // artwork bleeding off the card rather than a pasted-on icon.
   const layout = useGameLayout();
   const artSize = Math.round(layout.shopH * 1.08);
+  const SHOP_M = shopControlMetrics(layout.font);
   // Level recap for the Buy XP control: progress toward the next level + cost.
   const atMax = level >= MAX_LEVEL;
   const xpBase = XP_TO_REACH[level];
@@ -103,7 +105,10 @@ function ShopBarBase() {
 
   return (
     <div className="flex min-w-0 items-stretch gap-2">
-      <div className="flex flex-col gap-1.5 justify-center pr-1 w-[150px] shrink-0">
+      {/* Width tracks the density tier. At a flat 150px this column took the
+          same space on a phone as on a desktop, squeezing the card strip —
+          which is the part that has to stay readable. */}
+      <div style={{ width: SHOP_M.w }} className="flex flex-col gap-1.5 justify-center pr-1 shrink-0">
         {/* Shop odds as one inline row of coloured percentages, the way TFT
             shows them. The old version was a 118px panel of five labelled bar
             rows — a lot of width for information you glance at, and every pixel
@@ -166,7 +171,7 @@ function ShopBarBase() {
           aligned with the shop row (TFT puts it in exactly this spot). The
           interest preview rides along, since interest is a function of this
           number and players bank to the next breakpoint. */}
-      <div className="gilded flex flex-col items-center justify-center gap-0.5 px-3 rounded-lg shrink-0 min-w-[76px]">
+      <div style={{ minWidth: SHOP_M.gold }} className="gilded flex flex-col items-center justify-center gap-0.5 px-3 rounded-lg shrink-0">
         <span className="inline-flex items-center gap-1.5 text-2xl font-extrabold text-gold-300 tabular-nums leading-none drop-shadow">
           <CoinIcon size={20} />
           {gold}

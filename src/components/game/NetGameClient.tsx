@@ -970,7 +970,14 @@ export function NetGameClient() {
     // Item drag → equip onto the mon at the drop target (planning only).
     const itemId = e.active.data.current?.itemId as string | undefined;
     if (itemId) {
-      if (phase !== "planning") return;
+      // During a fight, items may only go onto the BENCH. The board is frozen
+      // mid-playback, so equipping a unit that is currently fighting would
+      // change a combat whose result is already decided — the item would
+      // appear to do nothing, or worse, look like it did. A benched mon is not
+      // in the fight, so there is nothing to corrupt.
+      const benchOnly = phase === "combat";
+      if (phase !== "planning" && !benchOnly) return;
+      if (benchOnly && !target.startsWith("bench-")) return;
       const g = useGame.getState();
       let unit: UnitInstance | undefined;
       if (target.startsWith("cell-")) {
@@ -1331,7 +1338,13 @@ export function NetGameClient() {
                 while building, so they get a standing home rather than a HUD
                 chip you have to click. */}
             <div className="shrink-0 mt-auto flex flex-col gap-2">
-              {!isSpectator && phase !== "combat" && !spectating && <ItemsPanel />}
+              {/* Visible during COMBAT too. Your items are information — what
+                  you are holding and what it builds into is most of what you
+                  think about while a fight plays back, and hiding the panel
+                  meant the one moment you have to plan is the one moment you
+                  cannot see your components. Equipping is still restricted
+                  below; this is about being able to LOOK. */}
+              {!isSpectator && !spectating && <ItemsPanel />}
               {!isSpectator && <AugmentsBar augments={augments} lang={lang} variant="panel" />}
             </div>
           </div>
