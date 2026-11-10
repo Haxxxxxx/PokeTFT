@@ -383,14 +383,30 @@ export function CombatStage({
             <Corpse key={`c-${u.id}`} unit={u} />
           ))}
 
-          {/* Living units */}
-          {a.units.map((u) => {
-            const bu = bMap.get(u.id) ?? u;
-            if (!u.alive && !bu.alive) return null;
-            const pa = hexToPixel({ c: u.c, r: u.r }, TILE_W, TILE_H);
-            const pb = hexToPixel({ c: bu.c, r: bu.r }, TILE_W, TILE_H);
-            const x = lerp(pa.x, pb.x, frac);
-            const y = lerp(pa.y, pb.y, frac);
+          {/* Living units.
+              PAINTED BACK TO FRONT. Units carry no z-index, so paint order was
+              simulation order — whatever sequence the engine happened to hold
+              them in. With every sprite drawn at 1.85x its tile and overflowing
+              upward, neighbours overlap heavily, so a unit standing BEHIND
+              another was regularly drawn on top of it. The planning board has
+              always ordered by row (`zIndex: localR + ALLY_ROW0`); combat never
+              did.
+              Sorting rather than assigning z-index on purpose: these units sit
+              in the same stacking context as the ability FX and damage numbers
+              that follow them, and giving units a z-index would lift them above
+              those too. DOM order is the painter's algorithm and leaves the FX
+              layer where it belongs. Sorted on the INTERPOLATED y so the order
+              stays correct while units are moving, not just when they land. */}
+          {a.units
+            .flatMap((u) => {
+              const bu = bMap.get(u.id) ?? u;
+              if (!u.alive && !bu.alive) return [];
+              const pa = hexToPixel({ c: u.c, r: u.r }, TILE_W, TILE_H);
+              const pb = hexToPixel({ c: bu.c, r: bu.r }, TILE_W, TILE_H);
+              return [{ u, bu, x: lerp(pa.x, pb.x, frac), y: lerp(pa.y, pb.y, frac) }];
+            })
+            .sort((p, q) => p.y - q.y)
+            .map(({ u, bu, x, y }) => {
             const hpFrac = lerp(u.hpFrac, bu.hpFrac, frac);
             const manaFrac = lerp(u.manaFrac, bu.manaFrac, frac);
             const attackEv = a.events.find((e) => e.kind === "attack" && e.from === u.id);
@@ -784,6 +800,18 @@ function CombatUnit({
   const BAR_W = 0.66;
   /** Same 1.85x oversize as the board, to cancel PokéAPI sprite padding. */
   const S = Math.round(TW * 1.85);
+  const art = spriteArt(unit.dex, S);
+  /**
+   * The art's horizontal centre, in px from the cell's centre, AFTER mirroring.
+   *
+   * `flip` mirrors the sprite about its FRAME's centre (scaleX(-1)), so for a
+   * mon whose art sits off-centre in its 96x96 frame the art lands on the other
+   * side when flipped. Every unit flips to face its target, so half the board
+   * is mirrored at any moment — and anything placed at the unmirrored offset
+   * (the HP bar, the feet shadow) was then wrong by twice that offset, pushing
+   * it toward a neighbour.
+   */
+  const artCx = flip ? -art.centerOffsetX : art.centerOffsetX;
   // Bar placement is TILE-relative, not derived from the sprite box: PokéAPI
   // frames carry wildly different amounts of transparent padding, so there's no
   // consistent "crown" to measure from — anchoring to the image box left bars
@@ -831,11 +859,11 @@ function CombatUnit({
           // The sprite box is pinned to [TH - S, TH], so the art's top edge is
           // TH - S + art.top and the bar sits one stack-height above it.
           // + .bottom because the sprite is shifted down by exactly that much.
-          top: TH - S + spriteArt(unit.dex, S).top + spriteArt(unit.dex, S).bottom - BAR_STACK_H,
+          top: TH - S + art.top + art.bottom - BAR_STACK_H,
           // Centred on the ART, not the frame: a fair number of sprites sit
           // off-centre in their 96x96 box, which slid the bar sideways off its
           // own mon and toward a neighbour.
-          left: TW / 2 + spriteArt(unit.dex, S).centerOffsetX,
+          left: TW / 2 + artCx,
           transform: "translateX(-50%)",
         }}
       >
@@ -851,19 +879,34 @@ function CombatUnit({
           OUTSIDE the counter-rotated sprite stack would tilt them with the
           board; inside it they stay upright and legible at every tilt tier. */}
       {items.length > 0 && (
-        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none" style={{ bottom: -Math.round(TW * 0.18), width: TW }}>
+        <div className="absolute pointer-events-none" style={{ bottom: -Math.round(TW * 0.18), left: TW / 2 + artCx, transform: "translateX(-50%)", width: TW }}>
           <div className="relative" style={{ height: 1 }}>
             <ItemPips items={items} megaReady={unit.mega} unitSize={TW} />
           </div>
         </div>
       )}
       {/* Grounding "feet" ellipse — team-coloured, sits under the sprite. */}
-      <span className="absolute left-1/2 -translate-x-1/2 rounded-[50%] pointer-events-none" style={{ bottom: -2, width: TW * 0.6, height: TW * 0.17, background: `radial-gradient(ellipse at center, ${ring}77, transparent 72%)` }} />
+      {/* Grounding "feet" ellipse. Centred on the ART (flip included) rather
+          than on the cell: a mon standing off-centre in its frame otherwise
+          cast its shadow beside itself. */}
+      <span
+        className="absolute rounded-[50%] pointer-events-none"
+        style={{
+          bottom: -2,
+          left: TW / 2 + artCx,
+          transform: "translateX(-50%)",
+          width: TW * 0.6,
+          height: TW * 0.17,
+          background: `radial-gradient(ellipse at center, ${ring}77, transparent 72%)`,
+        }}
+      />
       {/* Box is the CELL; the sprite inside it is oversized and bottom-aligned,
           so it breaks the cell upward exactly like a board unit. */}
       <div className="relative mx-auto" style={{ width: TW, height: TH }}>
         {/* Soft team aura behind the mon (stronger for mega) — replaces the hard ring disc. */}
-        <span className="absolute inset-0 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle at 50% 60%, ${ring}${unit.mega ? "55" : "2e"}, transparent 66%)` }} />
+        {/* Centred on the art (flip included), like the shadow — a back-glow
+            offset from its own mon reads as a second, ghostly unit. */}
+        <span className="absolute inset-y-0 rounded-full pointer-events-none" style={{ left: TW / 2 + artCx, transform: "translateX(-50%)", width: TW, background: `radial-gradient(circle at 50% 60%, ${ring}${unit.mega ? "55" : "2e"}, transparent 66%)` }} />
         {/* Cast wind-up: a charging aura + an expanding ring in the move's colour, telegraphing
             the ability the instant before it fires. */}
         {cast && <span className="absolute inset-0 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle, ${cast}88, transparent 62%)` }} />}
@@ -894,7 +937,7 @@ function CombatUnit({
               // empty space its art carries underneath — 20.7% of the frame on
               // average, 40.6% at worst, which is 66px of nothing under a
               // Bulbasaur at this sprite size.
-              bottom: -spriteArt(unit.dex, S).bottom,
+              bottom: -art.bottom,
               maxWidth: "none",
               imageRendering: "pixelated",
               transform: flip ? "scaleX(-1)" : "none",
@@ -919,21 +962,59 @@ function CombatUnit({
   );
 }
 
+/**
+ * A dead unit, fading out where it fell.
+ *
+ * This used to be a separate geometry from a living unit: the sprite was drawn
+ * at 0.44 of a tile and centred on the CELL, while a living unit is drawn at
+ * 1.85 of a tile, bottom-aligned, standing on the floor. So the moment a mon
+ * died it shrank to roughly a quarter of its size and jumped upward to the
+ * middle of its hex — a hard visual cut in the one instant the player is
+ * actually looking at that unit.
+ *
+ * It now matches the living unit exactly — same scale, same feet-on-the-floor
+ * placement, same counter-rotation — and the only difference is that it is
+ * grey and fading, which is the difference that should read.
+ */
 function Corpse({ unit }: { unit: FrameUnit }) {
   const layout = useGameLayout();
   const TILE_W = layout.tile.w;
   const TILE_H = layout.tile.h;
   const p = hexToPixel({ c: unit.c, r: unit.r }, TILE_W, TILE_H);
-  // Sprite + puff scale with the tile, so a corpse doesn't dwarf a 34px hex.
-  const sprite = Math.round(TILE_W * 0.44);
+  const S = Math.round(TILE_W * 1.85);
+  const art = spriteArt(unit.dex, S);
   const puff = Math.round(TILE_W * 0.5);
   return (
     <>
       {/* One-shot dissipation puff at the moment of death (plays once on mount). */}
       <span className="absolute pointer-events-none rounded-full combat-burst" style={{ left: p.x - puff / 2, top: p.y - puff / 2, width: puff, height: puff, background: "radial-gradient(circle, rgba(226,232,240,0.55), rgba(148,163,184,0) 70%)" }} />
-      <div key={unit.id} className="absolute pointer-events-none combat-die" style={{ left: p.x - sprite / 2, top: p.y - sprite / 2 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={spriteUrl(unit.dex)} alt="" width={sprite} height={sprite} style={{ imageRendering: "pixelated", filter: "grayscale(1) brightness(0.6)" }} draggable={false} />
+      <div
+        className="absolute pointer-events-none flex items-end justify-center"
+        style={{ left: p.x - TILE_W / 2, top: p.y - TILE_H / 2, width: TILE_W, height: TILE_H }}
+      >
+        <div
+          className="relative"
+          style={{ transform: `rotateX(${-layout.tilt}deg)`, transformOrigin: "bottom center" }}
+        >
+          <div className="relative mx-auto" style={{ width: TILE_W, height: TILE_H }}>
+            <div key={unit.id} className="combat-die">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={spriteUrl(unit.dex)}
+                alt=""
+                width={S}
+                height={S}
+                style={{
+                  position: "absolute", left: (TILE_W - S) / 2, bottom: -art.bottom,
+                  width: S, height: S, maxWidth: "none",
+                  imageRendering: "pixelated",
+                  filter: "grayscale(1) brightness(0.6)",
+                }}
+                draggable={false}
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </>
   );
