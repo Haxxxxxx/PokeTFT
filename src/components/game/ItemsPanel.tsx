@@ -101,7 +101,11 @@ export function ItemsPanel() {
         <p className="text-[11px] text-slate-600 leading-relaxed">{t.it_empty}</p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-1.5">
+          {/* Bounded at source too, not just by the rail. The hint underneath
+              ("drag onto a mon to equip") is the only place the game says how
+              items are used, and an unbounded grid pushed it out of sight
+              exactly when the player had enough items to need it. */}
+          <div className="grid grid-cols-2 gap-1.5 max-h-[34vh] overflow-y-auto">
             {distinct.map((id) => (
               <ItemButton
                 key={id}

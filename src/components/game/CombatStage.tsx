@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { spriteUrl, DEF_BY_DEX, primaryTypeForDex } from "@/game/data/mons";
 import { useUi } from "@/game/store/uiStore";
 import { spriteArt, spriteBoxFor } from "@/game/ui/sprite-art";
@@ -11,6 +12,7 @@ import { usePrefersReducedMotion } from "@/lib/useReducedMotion";
 import { sfx } from "@/lib/audio";
 import { hexToPixel, fieldPixelSize, hexDistance, FIELD, HEX_CLIP } from "@/game/engine/hex";
 import { useGameLayout } from "./LayoutProvider";
+import { useDraggablePanel } from "./useDraggablePanel";
 import { ItemPips } from "./UnitChip";
 import { CombatField3D } from "./CombatField3D";
 import { useAppStore } from "@/game/store/appStore";
@@ -511,9 +513,21 @@ export function CombatStage({
           in the row. As a sibling it widened the layout and pushed itself over
           the trainers rail once the old 340px item column was removed. */}
       {suppressRecap ? null : recapOpen ? (
-        <div className="absolute left-0 top-10 z-30 max-h-[78%] flex">
-          <CombatRecapTabs units={a.units} label={t.cs_your_team} onClose={() => setRecapOpen(false)} />
-        </div>
+        <CombatRecapTabs
+          units={a.units}
+          label={t.cs_your_team}
+          onClose={() => setRecapOpen(false)}
+          // Where it has always opened: the stage's own left edge, just below
+          // the top of the fight. Expressed in viewport coordinates because
+          // the panel renders in a portal -- see the note on it. The left rail
+          // is only inline above the compact tier; below that the board starts
+          // at the padding.
+          defaultStyle={{
+            position: "fixed",
+            left: layout.pad + (layout.railsAsDrawers ? 0 : layout.leftRail + layout.gap),
+            top: layout.pad + layout.topH + layout.gap * 2 + 40,
+          }}
+        />
       ) : (
         <button
           onClick={() => setRecapOpen(true)}
@@ -596,10 +610,34 @@ const RECAP_TABS = [
   { key: "healed", label: "HEAL", color: "#34d399", bar: "bg-emerald-500", text: "text-emerald-300" },
 ] as const;
 
-/** Side recap panel for your team with DMG / TANK / HEAL tabs — pick a metric and
- *  the bars filter + re-sort to just that stat. */
-function CombatRecapTabs({ units, label, onClose }: { units: FrameUnit[]; label: string; onClose: () => void }) {
+/**
+ * Side recap panel for your team with DMG / TANK / HEAL tabs — pick a metric
+ * and the bars filter + re-sort to just that stat.
+ *
+ * Draggable, because it is pinned over the left of the battlefield and that is
+ * where your own back line fights. You could close it, which loses the numbers
+ * you opened it for, or leave it covering the fight it is describing. Now it
+ * moves, and stays where you put it.
+ *
+ * Portalled to the body for the same reason the round recap is: a z-index only
+ * ranks an element against its siblings inside the nearest stacking context,
+ * and the stage sits inside one — so no z-index here could lift a panel the
+ * player had dragged over the HUD. It also means the panel is no longer
+ * clipped by the stage's own box, which is what "anywhere" has to mean.
+ */
+function CombatRecapTabs({
+  units, label, defaultStyle, onClose,
+}: {
+  units: FrameUnit[];
+  label: string;
+  defaultStyle: CSSProperties;
+  onClose: () => void;
+}) {
   const t = useT();
+  const { nodeRef, style, onPointerDown, dragging, moved, reset } = useDraggablePanel(
+    "poketft.combatRecap",
+    defaultStyle,
+  );
   const [tab, setTab] = useState<(typeof RECAP_TABS)[number]["key"]>("dmgDealt");
   const mine = units.filter((u) => u.team === "ally" && (u.dmgDealt + u.dmgTaken + u.healed) > 0);
   const active = RECAP_TABS.find((t) => t.key === tab)!;
@@ -607,13 +645,32 @@ function CombatRecapTabs({ units, label, onClose }: { units: FrameUnit[]; label:
   const max = Math.max(1, ...mine.map(val));
   const sorted = [...mine].sort((a, b) => val(b) - val(a)).slice(0, 8);
 
-  return (
-    <div className="gilded w-[210px] shrink-0 rounded-xl p-2 self-stretch">
-      <div className="flex items-center justify-between mb-1.5 px-0.5">
-        <span className="text-[9px] uppercase tracking-wider text-gold-200/55">{label}</span>
-        <button onClick={onClose} title={t.cs_hide_recap} aria-label={t.cs_hide_recap} className="text-slate-500 hover:text-slate-200 text-xs leading-none">✕</button>
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      ref={nodeRef}
+      data-panel="combat-recap"
+      style={{ ...style, maxHeight: "72vh" }}
+      onPointerDown={onPointerDown}
+      className={`gilded z-panel w-[210px] shrink-0 rounded-xl p-2 flex flex-col select-none ${
+        dragging ? "cursor-grabbing shadow-[0_8px_30px_rgba(0,0,0,0.6)]" : "cursor-grab"
+      }`}
+    >
+      <div className="flex items-center justify-between mb-1.5 px-0.5 shrink-0">
+        {/* The grip is the affordance. Without it a draggable panel is only
+            discoverable by accident, which is the same as not being draggable. */}
+        <span className="flex items-center gap-1.5 min-w-0">
+          <span aria-hidden className="text-slate-600 leading-none tracking-[-0.15em] text-[11px]">⋮⋮</span>
+          <span className="text-[9px] uppercase tracking-wider text-gold-200/55 truncate">{label}</span>
+        </span>
+        <span className="flex items-center gap-1.5 shrink-0">
+          {moved && (
+            <button onClick={reset} title={t.net_panel_reset} aria-label={t.net_panel_reset} className="text-slate-500 hover:text-slate-200 text-xs leading-none">↺</button>
+          )}
+          <button onClick={onClose} title={t.cs_hide_recap} aria-label={t.cs_hide_recap} className="text-slate-500 hover:text-slate-200 text-xs leading-none">✕</button>
+        </span>
       </div>
-      <div className="flex gap-1 mb-2">
+      <div className="flex gap-1 mb-2 shrink-0">
         {RECAP_TABS.map((tb) => (
           <button
             key={tb.key}
@@ -625,7 +682,10 @@ function CombatRecapTabs({ units, label, onClose }: { units: FrameUnit[]; label:
           </button>
         ))}
       </div>
-      <div className="flex flex-col gap-1">
+      {/* The list scrolls rather than the panel growing: it is now positioned
+          from the viewport, so an eight-mon board must not push its own bottom
+          off screen. */}
+      <div className="flex flex-col gap-1 min-h-0 overflow-y-auto">
         {sorted.length === 0 && <div className="text-[10px] text-slate-600 text-center py-2">—</div>}
         {sorted.map((u) => (
           <div key={u.id} className={`flex items-center gap-1.5 ${u.alive ? "" : "opacity-50"}`}>
@@ -638,7 +698,8 @@ function CombatRecapTabs({ units, label, onClose }: { units: FrameUnit[]; label:
           </div>
         ))}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
