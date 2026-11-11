@@ -211,6 +211,8 @@ export type Dict = {
    *  nothing at all, which reads as the shortcut being broken. */
   net_key_sell_hint: string;
   net_key_reroll: string;
+  /** Heading above the live recipe list in an item's detail card. */
+  it_combines_with: string;
   net_key_xp: string;
   // NetGameClient — carousel overlay
   net_carousel_title: string;
@@ -436,6 +438,7 @@ export const FR: Dict = {
   net_key_sell: "Vendre",
   net_key_sell_hint: "Clique un mon d'abord pour le vendre",
   net_key_reroll: "Relancer la boutique",
+  it_combines_with: "Combine avec ton inventaire",
   net_key_xp: "Acheter de l'XP",
   net_carousel_title: "Carrousel",
   net_carousel_comeback: "Bonus de remontée",
@@ -653,6 +656,7 @@ export const EN: Dict = {
   net_key_sell: "Sell",
   net_key_sell_hint: "Click a mon first to sell it",
   net_key_reroll: "Reroll the shop",
+  it_combines_with: "Combines with your inventory",
   net_key_xp: "Buy XP",
   net_carousel_title: "Carousel",
   net_carousel_comeback: "Comeback bonus",

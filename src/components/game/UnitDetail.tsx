@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useUi } from "@/game/store/uiStore";
+import { RECIPES, combineKey, ITEM_BY_ID as RECIPE_ITEM_BY_ID } from "@/game/data/items";
 import { useGame } from "@/game/store/gameStore";
 import { sellValue } from "@/game/engine/economy";
 import { useAppStore } from "@/game/store/appStore";
@@ -53,6 +54,58 @@ export function UnitDetail() {
 }
 
 /** Detail card for an inventory item (clicked in the ItemsPanel). */
+/**
+ * What this item builds with the OTHER items you are actually holding.
+ *
+ * The recipe book already lists every combination in the game, which is a
+ * reference. This is the decision: of the components in your inventory right
+ * now, which pair with this one, and into what. Answering it previously meant
+ * opening the book, finding the row, and remembering what you owned.
+ *
+ * Only the pairs you can MAKE are shown — a list of combinations you do not
+ * have the parts for is the book again, in a smaller box.
+ */
+function Combinations({ id }: { id: string }) {
+  const t = useT();
+  const lang = useAppStore((s) => s.settings.language);
+  const items = useGame((s) => s.items);
+
+  // Count what is held, then spend one copy of `id` on itself: a lone component
+  // cannot be combined with itself, but TWO of them can, and that pair is a
+  // real recipe (Power Bracer + Power Bracer).
+  const counts = new Map<string, number>();
+  for (const it of items) counts.set(it, (counts.get(it) ?? 0) + 1);
+  counts.set(id, (counts.get(id) ?? 0) - 1);
+
+  const pairs = [...counts.entries()]
+    .filter(([, n]) => n > 0)
+    .map(([other]) => ({ other, result: RECIPES[combineKey(id, other)] }))
+    .filter((p): p is { other: string; result: string } => Boolean(p.result));
+
+  if (pairs.length === 0) return null;
+  const nameOf = (x: string) => (lang === "fr" ? RECIPE_ITEM_BY_ID[x]?.nameFr : RECIPE_ITEM_BY_ID[x]?.name) ?? x;
+
+  return (
+    <div className="px-3 pb-2">
+      <div className="text-[10px] font-bold uppercase tracking-wide text-gold-200/60 mb-1.5">
+        {t.it_combines_with}
+      </div>
+      <ul className="flex flex-col gap-1">
+        {pairs.map(({ other, result }) => (
+          <li key={other} className="flex items-center gap-1.5 rounded-lg bg-slate-800/50 border border-slate-700/50 px-2 py-1.5">
+            <ItemGlyph id={other} size={16} />
+            <span className="text-[10px] text-slate-400 shrink-0">+</span>
+            <span className="text-[10px] text-slate-300 truncate flex-1 min-w-0">{nameOf(other)}</span>
+            <span className="text-[10px] text-slate-500 shrink-0">→</span>
+            <ItemGlyph id={result} size={16} />
+            <span className="text-[10px] font-semibold text-gold-100 truncate max-w-[40%]">{nameOf(result)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function ItemCard({ id }: { id: string }) {
   const t = useT();
   const lang = useAppStore((s) => s.settings.language);
@@ -75,6 +128,7 @@ function ItemCard({ id }: { id: string }) {
         <button onClick={() => setInspectedItem(null)} aria-label={t.a_close} className="text-slate-500 hover:text-white shrink-0"><CloseIcon size={16} /></button>
       </div>
       <p className="text-[12px] text-slate-300 leading-relaxed p-3">{effect}</p>
+      <Combinations id={id} />
       <div className="px-3 pb-3">
         <p className="text-[11px] text-center text-slate-400 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/50">
           {isMega ? t.it_equip_mega : t.it_drag_equip}

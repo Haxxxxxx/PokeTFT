@@ -6,8 +6,8 @@ import { useGame } from "@/game/store/gameStore";
 import { useUi } from "@/game/store/uiStore";
 import { useAppStore } from "@/game/store/appStore";
 import { MEGA_STONE } from "@/game/data/mega";
-import { ITEM_POOL, RARITY_COLOR, isEmblem } from "@/game/data/itemPool";
-import { Hammer, Sparkles, BookOpen } from "lucide-react";
+import { ITEM_POOL, RARITY_COLOR } from "@/game/data/itemPool";
+import { BookOpen } from "lucide-react";
 import { MegaIcon } from "./icons";
 import { ItemGlyph } from "./ItemGlyph";
 import { RecipeBook } from "./RecipeBook";
@@ -32,12 +32,19 @@ function ItemButton({ id, n, selected, onClick }: { id: string; n: number; selec
       {...attributes}
       onClick={onClick}
       style={{ borderColor: selected ? "#f0abfc" : rarityColor, opacity: isDragging ? 0.4 : 1 }}
-      className={`relative flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-left transition-all min-w-0 cursor-grab active:cursor-grabbing touch-none
+      // The NAME is gone from the row. In a narrow rail every name truncated to
+      // an unreadable fragment ("Bracelet Fo…", "Cristal Ps…"), which is what
+      // "we can't read the items properly" was: the one piece of text present
+      // was the piece that did not fit. The glyph now carries the identity —
+      // it is painted in the item's two component colours — so the row shows
+      // the glyph and the count, and the full name is one click away in the
+      // detail card (and in the tooltip).
+      className={`relative flex items-center justify-center gap-1 px-1.5 py-1.5 rounded-lg border transition-all cursor-grab active:cursor-grabbing touch-none
         ${selected ? "bg-fuchsia-500/15 ring-1 ring-fuchsia-400/70" : "bg-slate-900 hover:bg-slate-800"}`}
       title={name}
+      aria-label={name}
     >
-      <span className="text-base shrink-0">{isMega ? <MegaIcon size={18} /> : <ItemGlyph id={id} size={16} />}</span>
-      <span className="text-[10px] font-semibold text-slate-200 truncate flex-1">{name}</span>
+      <span className="shrink-0">{isMega ? <MegaIcon size={22} /> : <ItemGlyph id={id} size={22} />}</span>
       {n > 1 && <span className="text-[9px] font-bold text-slate-400 shrink-0">×{n}</span>}
     </button>
   );
@@ -48,8 +55,6 @@ function ItemButton({ id, n, selected, onClick }: { id: string; n: number; selec
 export function ItemsPanel() {
   const t = useT();
   const items = useGame((s) => s.items);
-  const reforgeItem = useGame((s) => s.reforgeItem);
-  const forgeEmblem = useGame((s) => s.forgeEmblem);
   const inspectedItem = useUi((s) => s.inspectedItem);
   const setInspectedItem = useUi((s) => s.setInspectedItem);
   const [recipesOpen, setRecipesOpen] = useState(false);
@@ -108,28 +113,6 @@ export function ItemsPanel() {
             ))}
           </div>
           <p className="mt-2 text-[10px] text-slate-500 leading-snug">{t.it_drag_equip}</p>
-          {/* Anvil — reforge a selected completed item / emblem into a random other,
-              or forge a completed item into a Spatula emblem (trait grantor). */}
-          {inspectedItem && ITEM_BY_ID[inspectedItem] && ITEM_BY_ID[inspectedItem].kind !== "component" && inspectedItem !== MEGA_STONE && (
-            <div className="mt-2 flex gap-1.5">
-              <button
-                onClick={() => reforgeItem(inspectedItem)}
-                className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-gold-900/50 border border-slate-700 text-[10px] font-bold text-gold-200"
-                title={t.it_reforge_t}
-              >
-                <Hammer size={12} /> {t.it_reforge}
-              </button>
-              {!isEmblem(inspectedItem) && (
-                <button
-                  onClick={() => forgeEmblem(inspectedItem)}
-                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-fuchsia-900/50 border border-slate-700 text-[10px] font-bold text-fuchsia-200"
-                  title={t.it_forge_t}
-                >
-                  <Sparkles size={12} /> {t.it_forge_emblem}
-                </button>
-              )}
-            </div>
-          )}
         </>
       )}
     </div>
