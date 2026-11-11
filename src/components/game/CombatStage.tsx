@@ -3,6 +3,7 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { spriteUrl } from "@/game/data/mons";
 import { spriteArt, spriteBoxFor } from "@/game/ui/sprite-art";
+import { combatFxMetrics } from "@/game/ui/combat-fx";
 import { relativeModelScale } from "@/game/data/model-scale";
 import { useT } from "@/lib/i18n";
 import { usePrefersReducedMotion } from "@/lib/useReducedMotion";
@@ -1028,16 +1029,19 @@ function Corpse({ unit }: { unit: FrameUnit }) {
 }
 
 function DamageNumber({ x, y, dmg, crit, sup }: { x: number; y: number; dmg: number; crit?: boolean; sup?: boolean }) {
+  // Tile-relative: an 18px rise and a 25px crit numeral swamp a phone board and
+  // disappear on a desktop one. Floored so they stay readable either way.
+  const FX = combatFxMetrics(useGameLayout().tile.w);
   const color = crit ? "#fde047" : sup ? "#fb923c" : "#fff";
-  const size = crit ? 25 : sup ? 18 : 13;
+  const size = crit ? FX.dmgFontCrit : sup ? FX.dmgFontSup : FX.dmgFont;
   const glow = crit
     ? "0 0 9px rgba(253,224,71,0.95), 0 1px 3px #000"
     : sup ? "0 0 7px rgba(251,146,60,0.85), 0 1px 3px #000" : "0 1px 3px #000";
   // Deterministic horizontal spread so a flurry of numbers on one target fans out instead of
   // stacking into an unreadable blob.
-  const jx = ((dmg * 53) % 36) - 18;
+  const jx = (((dmg * 53) % 36) - 18) * (FX.dmgSpread / 36);
   return (
-    <div className="absolute pointer-events-none combat-float" style={{ left: x + jx, top: y - 18 }}>
+    <div className="absolute pointer-events-none combat-float" style={{ left: x + jx, top: y - FX.dmgRise }}>
       <span
         className={`block font-extrabold leading-none ${crit || sup ? "dmg-pop" : ""}`}
         style={{ color, fontSize: size, textShadow: glow, WebkitTextStroke: crit ? "0.6px rgba(0,0,0,0.45)" : undefined }}
@@ -1058,21 +1062,24 @@ function AbilityFx({ x, y, tx, ty, moveType, shape, eff }: { x: number; y: numbe
   const color = TYPE_COLOR[moveType] ?? "#a78bfa";
   const sup = eff > 1;        // super-effective → a bigger, brighter, double-ring hit
   const boost = sup ? 1.5 : 1;
+  // Sized against the tile. These were fixed pixels, so the same blast was six
+  // tiles wide on a phone and two on a desktop. See combat-fx.ts.
+  const FX = combatFxMetrics(useGameLayout().tile.w);
 
   // A blast hits every living enemy at once. It must NOT fall through to the
   // single-target burst — that drew one small pop on one unit while the whole
   // enemy side took damage. A wide shockwave from the caster is the read.
   if (shape === "blast") {
-    const s = 220 * boost;
+    const s = FX.blastRing * boost;
     return (
       <>
         <span
           className="absolute pointer-events-none rounded-full combat-cast"
-          style={{ left: x - s / 2, top: y - s / 2, width: s, height: s, border: `${sup ? 4 : 3}px solid ${color}`, boxShadow: `0 0 26px 4px ${color}aa` }}
+          style={{ left: x - s / 2, top: y - s / 2, width: s, height: s, border: `${sup ? FX.strokeSup : FX.stroke}px solid ${color}`, boxShadow: `0 0 26px 4px ${color}aa` }}
         />
         <span
           className="absolute pointer-events-none rounded-full combat-burst"
-          style={{ left: x - 60, top: y - 60, width: 120, height: 120, background: `radial-gradient(circle, ${sup ? "#fff" : color}, ${color}00 70%)` }}
+          style={{ left: x - FX.blastCore / 2, top: y - FX.blastCore / 2, width: FX.blastCore, height: FX.blastCore, background: `radial-gradient(circle, ${sup ? "#fff" : color}, ${color}00 70%)` }}
         />
       </>
     );
@@ -1080,31 +1087,31 @@ function AbilityFx({ x, y, tx, ty, moveType, shape, eff }: { x: number; y: numbe
   // Super-effective flare: a second, wider shockwave ring + a white core, so type advantage
   // reads instantly during the fight.
   const supRing = sup ? (
-    <span className="absolute pointer-events-none rounded-full combat-cast" style={{ left: tx - 52, top: ty - 52, width: 104, height: 104, border: `2px solid ${color}`, opacity: 0.7 }} />
+    <span className="absolute pointer-events-none rounded-full combat-cast" style={{ left: tx - FX.supRing / 2, top: ty - FX.supRing / 2, width: FX.supRing, height: FX.supRing, border: `${FX.strokeThin}px solid ${color}`, opacity: 0.7 }} />
   ) : null;
   if (shape === "splash") {
-    const s = 64 * boost;
+    const s = FX.splashRing * boost;
     return (
       <>
         {supRing}
-        <span className="absolute pointer-events-none rounded-full combat-cast" style={{ left: tx - s / 2, top: ty - s / 2, width: s, height: s, border: `${sup ? 4 : 3}px solid ${color}`, boxShadow: sup ? `0 0 18px 3px ${color}` : undefined }} />
-        <span className="absolute pointer-events-none rounded-full combat-burst" style={{ left: tx - 26, top: ty - 26, width: 52, height: 52, background: `radial-gradient(circle, ${sup ? "#fff" : color}, ${color}00 70%)` }} />
+        <span className="absolute pointer-events-none rounded-full combat-cast" style={{ left: tx - s / 2, top: ty - s / 2, width: s, height: s, border: `${sup ? FX.strokeSup : FX.stroke}px solid ${color}`, boxShadow: sup ? `0 0 18px 3px ${color}` : undefined }} />
+        <span className="absolute pointer-events-none rounded-full combat-burst" style={{ left: tx - FX.splashCore / 2, top: ty - FX.splashCore / 2, width: FX.splashCore, height: FX.splashCore, background: `radial-gradient(circle, ${sup ? "#fff" : color}, ${color}00 70%)` }} />
       </>
     );
   }
   if (shape === "line") {
     const dx = tx - x, dy = ty - y;
-    const len = Math.max(40, Math.hypot(dx, dy) + 30);
+    const len = Math.max(FX.beamMin, Math.hypot(dx, dy) + FX.beamOvershoot);
     const ang = (Math.atan2(dy, dx) * 180) / Math.PI;
     return (
       <span
         className="absolute pointer-events-none combat-beam"
-        style={{ left: x, top: y - 4, width: len, height: 8, transformOrigin: "0 50%", transform: `rotate(${ang}deg)`, borderRadius: 4, background: `linear-gradient(90deg, ${color}, ${color}cc 60%, ${color}00)`, boxShadow: `0 0 14px 2px ${color}aa` }}
+        style={{ left: x, top: y - FX.beamThickness / 2, width: len, height: FX.beamThickness, transformOrigin: "0 50%", transform: `rotate(${ang}deg)`, borderRadius: FX.beamThickness / 2, background: `linear-gradient(90deg, ${color}, ${color}cc 60%, ${color}00)`, boxShadow: `0 0 14px 2px ${color}aa` }}
       />
     );
   }
   // single — focused impact burst on the target
-  const s = 46 * boost;
+  const s = FX.single * boost;
   return (
     <span className="absolute pointer-events-none rounded-full combat-burst" style={{ left: tx - s / 2, top: ty - s / 2, width: s, height: s, background: `radial-gradient(circle, ${color}, ${color}00 70%)`, boxShadow: `0 0 20px 5px ${color}aa` }} />
   );
