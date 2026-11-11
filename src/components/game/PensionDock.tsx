@@ -51,6 +51,11 @@ export function PensionDock({ interactive, railW, font }: { interactive: boolean
   return (
     <div
       ref={setNodeRef}
+      // A stable hook for tools/probe-combat-recap.mjs. The dock is otherwise
+      // identified only by its own label, which is translated — so a probe
+      // guessing at it matched the page body instead and cheerfully reported
+      // the pension was 900px tall.
+      data-panel="pension"
       title={!pension ? t.net_pension_title(PENSION_COST, PENSION_ROUNDS) : undefined}
       style={{ padding: M.pad }}
       className={`gilded shrink-0 w-full flex flex-col items-center gap-1 overflow-hidden rounded-xl border transition-all

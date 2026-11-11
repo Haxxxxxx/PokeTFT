@@ -12,7 +12,7 @@ import { getDef, hasDef, archetypeOf } from "@/game/data/mons";
 import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, modeTeamBuff, modeSignatureAugment, getMode, pickMonoType, isDoubleUp, isNuzlocke, isHyperRoll, isLegendaryClash } from "@/game/data/gameModes";
 import { streakGold, roundKind, advanceRound, boardSizeForLevel, cumulativeRound } from "@/game/config";
 import { serializeBoard, saveGhost, type GhostUnit } from "@/game/net/ghost";
-import { interest } from "@/game/engine/economy";
+import { interest, sellValue } from "@/game/engine/economy";
 import { MEGA_STONE, canMega } from "@/game/data/mega";
 import { COMPONENT_IDS } from "@/game/data/itemPool";
 import { enemyToField } from "@/game/engine/hex";
@@ -81,27 +81,45 @@ function boardSig(b: unknown): string {
     .join("|");
 }
 
-function SellZone() {
+/**
+ * Dropping a mon onto the shop sells it (id "sell-shop").
+ *
+ * This replaces a dedicated 92px "drag to sell" slot that sat beside the shop
+ * for the whole match. It was a permanent reservation of the widest row on
+ * screen for a target you use a few times a round, and it took that width from
+ * the cards — the thing you actually read. TFT sells to the shop for exactly
+ * this reason, and the drop was already wired here.
+ *
+ * Losing the slot would lose the only place the game SAYS you can sell by
+ * dragging, so the shop announces it instead: while a mon is in hand the
+ * overlay appears across the cards with what the sale pays, and it turns solid
+ * when you are actually over it. Discoverable at the one moment it matters,
+ * and invisible the rest of the time.
+ */
+function ShopSellDrop({ dragValue, children }: { dragValue: number | null; children: ReactNode }) {
   const t = useT();
-  const { setNodeRef, isOver } = useDroppable({ id: "sell" });
+  const { setNodeRef, isOver } = useDroppable({ id: "sell-shop" });
+  const dragging = dragValue !== null;
   return (
     <div
       ref={setNodeRef}
-      className={`w-[92px] shrink-0 flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed transition-all
-        ${isOver ? "border-rose-400 bg-rose-500/25 text-rose-100 scale-[1.03] shadow-[0_0_22px_-6px_rgba(244,63,94,0.7)]" : "border-slate-700/70 bg-slate-900/30 text-slate-500 hover:border-rose-700/60 hover:text-rose-300/80"}`}
+      className={`relative flex-1 min-w-0 rounded-xl transition-shadow ${isOver ? "ring-2 ring-rose-400/80 ring-inset" : ""}`}
     >
-      <span className={`leading-none transition-transform ${isOver ? "scale-125" : ""}`}><Trash2 size={24} /></span>
-      <span className="text-[10px] font-extrabold uppercase tracking-wider text-center leading-tight px-2">{t.sh_drag_sell}</span>
-    </div>
-  );
-}
-
-/** Dropping a bench unit onto the shop sells it (id "sell-shop"). */
-function ShopSellDrop({ children }: { children: ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id: "sell-shop" });
-  return (
-    <div ref={setNodeRef} className={`flex-1 rounded-xl transition-shadow ${isOver ? "ring-2 ring-rose-400/80 ring-inset" : ""}`}>
       {children}
+      {dragging && (
+        <div
+          className={`absolute inset-0 z-panel pointer-events-none rounded-xl border-2 border-dashed flex items-center justify-center gap-2 transition-all
+            ${isOver
+              ? "border-rose-400 bg-rose-950/80 text-rose-100 shadow-[0_0_22px_-6px_rgba(244,63,94,0.7)]"
+              : "border-rose-700/50 bg-slate-950/55 text-rose-200/70"}`}
+        >
+          <span className={`leading-none transition-transform ${isOver ? "scale-125" : ""}`}><Trash2 size={22} /></span>
+          <span className="text-[12px] font-extrabold uppercase tracking-wider">{t.sh_drag_sell}</span>
+          <span className="inline-flex items-center gap-1 text-[13px] font-extrabold tabular-nums text-gold-300">
+            +{dragValue}<CoinIcon size={13} />
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -1037,6 +1055,11 @@ export function NetGameClient() {
     : phase === "over" ? t.net_phase_over
     : t.net_phase_planning;
 
+  // What the mon in hand would pay if dropped on the shop. null when nothing
+  // sellable is being dragged -- an ITEM drag finds no unit, so the sell
+  // overlay stays away while you are equipping.
+  const dragSellValue = draggedUnit ? sellValue(draggedUnit.defId, draggedUnit.star) : null;
+
   function onDragStart(e: DragStartEvent) {
     const iid = String(e.active.id);
     setDraggedUnit(useGame.getState().units.find((unit) => unit.iid === iid) ?? null);
@@ -1086,7 +1109,9 @@ export function NetGameClient() {
     }
 
     const iid = String(e.active.id);
-    if (target === "sell" || target === "sell-shop") sell(iid);
+    // "sell" was the dedicated slot's id; that slot is gone and the shop is
+    // the only sell target now.
+    if (target === "sell-shop") sell(iid);
     else if (target === "pension") { if (phase === "planning") depositToPension(iid); }
     else if (target.startsWith("bench-")) {
       // A specific bench slot: place the mon THERE (gaps allowed). A board unit is
@@ -1489,14 +1514,25 @@ export function NetGameClient() {
                 the item stash is pushed to the bottom (mt-auto), matching TFT's
                 component stash in the lower-left. The gap between them is empty
                 space on purpose rather than a stretched, half-empty panel. */}
-            <div className="min-h-0 flex flex-col">
+            {/* flex-1, so the synergies get what is left rather than only
+                what the stash below chose to leave them. TraitPanel is
+                max-h-full and scrolls internally, so a long synergy list is
+                reachable instead of being pushed off the rail. */}
+            <div data-panel="traits" className="flex-1 min-h-0 flex flex-col">
               <TraitPanel units={spectateUnits ?? undefined} />
             </div>
             {/* Bottom of the rail, TFT's corner: the item stash, then the
                 augment recap under it. Both are things you re-read constantly
                 while building, so they get a standing home rather than a HUD
                 chip you have to click. */}
-            <div className="shrink-0 mt-auto flex flex-col gap-2">
+            {/* Capped at 45% of the rail. The stash had no height limit at all:
+                every distinct item added a row to a 2-column grid, and the
+                block is pinned to the bottom, so a full inventory grew upwards
+                and took the synergies' space -- the panel you read constantly
+                while building was squeezed out by the one you glance at. The
+                augment recap underneath did the same. Now the stash scrolls
+                inside its own share and the synergies always keep theirs. */}
+            <div data-panel="stash" className="shrink-0 mt-auto flex flex-col gap-2 min-h-0 max-h-[45%] overflow-y-auto">
               {/* Visible during COMBAT too. Your items are information — what
                   you are holding and what it builds into is most of what you
                   think about while a fight plays back, and hiding the panel
@@ -1742,10 +1778,9 @@ export function NetGameClient() {
               </Button>
             );
           })()}
-          <div className="flex-1 min-h-0 flex gap-3 w-full max-w-[1480px]">
-            {/* Pension is docked to the board; keep selling beside the shop. */}
-            <ShopSellDrop><ShopBar /></ShopSellDrop>
-            <SellZone />
+          <div className="flex-1 min-h-0 flex w-full max-w-[1480px]">
+            {/* Full width. Selling is the shop itself now — see ShopSellDrop. */}
+            <ShopSellDrop dragValue={dragSellValue}><ShopBar /></ShopSellDrop>
           </div>
           {/* The keyboard-hint strip used to sit in flow here, on the assumption
               that the bottom block could grow to fit it. It can't any more — the

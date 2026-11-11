@@ -216,6 +216,7 @@ export type Dict = {
   /** Heading above the live recipe list in an item's detail card. */
   it_combines_with: string;
   net_round_pvp: string;
+  sh_to_level: (lvl: number) => string;
   net_panel_reset: string;
   net_round_pve: string;
   net_round_carousel: string;
@@ -449,6 +450,7 @@ export const FR: Dict = {
   net_key_reroll: "Relancer la boutique",
   it_combines_with: "Combine avec ton inventaire",
   net_round_pvp: "Duel",
+  sh_to_level: (lvl) => `Niv. ${lvl}`,
   net_panel_reset: "Remettre en place",
   net_round_pve: "Sauvages",
   net_round_carousel: "Carrousel",
@@ -674,6 +676,7 @@ export const EN: Dict = {
   net_key_reroll: "Reroll the shop",
   it_combines_with: "Combines with your inventory",
   net_round_pvp: "Duel",
+  sh_to_level: (lvl) => `To Lv ${lvl}`,
   net_panel_reset: "Snap back into place",
   net_round_pve: "Wild",
   net_round_carousel: "Carousel",

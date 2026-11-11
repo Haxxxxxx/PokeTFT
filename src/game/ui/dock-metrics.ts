@@ -25,6 +25,20 @@ const MAX_LABEL_PX = 13;
 const MAX_BODY_PX = 15;
 const MAX_BUTTON_PX = 16;
 
+/**
+ * The same ceiling, for the art.
+ *
+ * Scaled purely as a fraction of the rail, the pension's portrait reached
+ * 120px on a desktop and the panel ran to roughly 185px tall -- taller than
+ * the trainers ladder above it, for one mon that is doing nothing but waiting.
+ * A rail panel is chrome: it has to be readable at a glance, not inspectable.
+ * The mon is identified by name and star tier underneath, so the portrait only
+ * has to be big enough to recognise.
+ */
+const MAX_ART_PX = 64;
+const MAX_PREVIEW_PX = 58;
+const MAX_ICON_PX = 28;
+
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
 }
@@ -56,11 +70,11 @@ export function pensionRailMetrics(railW: number, font: number) {
     /** Content width inside that padding. */
     inner,
     /** The art well the mon sits in. */
-    art: Math.round(inner * 0.62),
+    art: clamp(Math.round(inner * 0.46), 20, MAX_ART_PX),
     /** The sprite inside that well. */
-    preview: Math.round(inner * 0.56),
+    preview: clamp(Math.round(inner * 0.42), 18, MAX_PREVIEW_PX),
     /** The paw glyph shown when the dock is empty. */
-    icon: Math.round(inner * 0.3),
+    icon: clamp(Math.round(inner * 0.22), 10, MAX_ICON_PX),
     /** Section label ("PENSION") and secondary lines. */
     label: clamp(Math.round(inner * 0.085 * font), MIN_LABEL_PX, MAX_LABEL_PX),
     /** Mon name and countdown. */

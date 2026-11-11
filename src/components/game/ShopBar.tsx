@@ -9,11 +9,12 @@ import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
 import { TraitGlyph } from "./TraitGlyph";
 import { ECONOMY, COPIES_TO_STAR, SHOP_ODDS, MAX_LEVEL, XP_TO_REACH, type Cost } from "@/game/config";
-import { RerollIcon, SnowIcon, CoinIcon, InfoIcon, StarIcon } from "./icons";
+import { RerollIcon, CoinIcon, InfoIcon, StarIcon } from "./icons";
 import type { UnitInstance, PokeType } from "@/game/types";
 import { useT } from "@/lib/i18n";
 import { useGameLayout } from "./LayoutProvider";
 import { shopControlMetrics } from "@/game/ui/dock-metrics";
+import { Lock, LockOpen } from "lucide-react";
 import { interest } from "@/game/engine/economy";
 import { sfx, playCry } from "@/lib/audio";
 
@@ -102,28 +103,21 @@ function ShopBarBase() {
   const xpBase = XP_TO_REACH[level];
   const xpNeed = atMax ? 1 : XP_TO_REACH[level + 1] - xpBase;
   const xpCur = xp - xpBase;
+  // What the level actually COSTS from here, in the currency you spend.
+  // The button already showed "12/20 XP" and "4 gold" for one purchase, which
+  // left the player doing the arithmetic that decides the whole round: is
+  // levelling now cheaper than keeping the gold for interest? Rounds up,
+  // because you cannot buy a part of a purchase.
+  const xpLeft = atMax ? 0 : Math.max(0, xpNeed - xpCur);
+  const buysLeft = Math.ceil(xpLeft / ECONOMY.buyXpAmount);
+  const goldToLevel = buysLeft * ECONOMY.buyXpCost;
 
   return (
-    <div className="flex min-w-0 items-stretch gap-2">
+    <div className="flex h-full min-h-0 min-w-0 items-stretch gap-2">
       {/* Width tracks the density tier. At a flat 150px this column took the
           same space on a phone as on a desktop, squeezing the card strip —
           which is the part that has to stay readable. */}
       <div style={{ width: SHOP_M.w }} className="flex flex-col gap-1.5 justify-center pr-1 shrink-0">
-        {/* Shop odds as one inline row of coloured percentages, the way TFT
-            shows them. The old version was a 118px panel of five labelled bar
-            rows — a lot of width for information you glance at, and every pixel
-            here is a pixel the shop cards don't get. */}
-        <div className="flex items-center justify-between gap-0.5 px-0.5" title={`${t.sh_odds} · Lv ${level}`}>
-          {odds.map((pct, idx) => {
-            const c = COST_COLOR[(idx + 1) as Cost];
-            return (
-              <span key={idx} className={`flex items-center gap-[2px] ${pct === 0 ? "opacity-30" : ""}`}>
-                <span className="w-[5px] h-[5px] rounded-full shrink-0" style={{ background: c }} />
-                <span className="text-[9px] font-bold tabular-nums" style={{ color: pct === 0 ? "#64748b" : c }}>{pct}</span>
-              </span>
-            );
-          })}
-        </div>
         {/* Buy XP — with the level recap (current level + progress to the next) and
             the cost to level past it, so all the level info lives on the button. */}
         <button
@@ -143,6 +137,14 @@ function ShopBarBase() {
             <span className="inline-flex items-center gap-0.5 text-gold-200"><CoinIcon size={11} />{ECONOMY.buyXpCost}</span>
             <span className="text-sky-200">+{ECONOMY.buyXpAmount}</span>
           </div>
+          {/* The whole level, priced. Highlighted when you can actually afford
+              it, because "can I level this round" is the question being asked. */}
+          {!atMax && (
+            <div className={`flex items-center justify-center gap-1 text-[10px] font-bold leading-none ${gold >= goldToLevel ? "text-gold-200" : "text-slate-400"}`}>
+              <span className="uppercase tracking-wide opacity-80">{t.sh_to_level(level + 1)}</span>
+              <span className="inline-flex items-center gap-0.5 tabular-nums"><CoinIcon size={10} />{goldToLevel}</span>
+            </div>
+          )}
         </button>
         {/* Reroll — bigger, with your current gold shown alongside the cost. */}
         <button
@@ -156,13 +158,6 @@ function ShopBarBase() {
             <span className="text-slate-600">·</span>
             <span className="inline-flex items-center gap-0.5 font-extrabold text-gold-300"><CoinIcon size={12} />{gold}</span>
           </span>
-        </button>
-        <button
-          onClick={() => { toggleFreeze(); if (!frozen) sfx.freeze(); }}
-          className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors
-            ${frozen ? "bg-sky-600 text-white" : "bg-slate-700/80 hover:bg-slate-600 text-slate-200"}`}
-        >
-          <SnowIcon size={13} /> {frozen ? t.sh_frozen : t.sh_freeze}
         </button>
       </div>
 
@@ -187,7 +182,40 @@ function ShopBarBase() {
         </span>
       </div>
 
-      <div className="flex min-w-0 gap-2 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1">
+        {/* The odds belong HERE, over the things they are odds ON. They used to
+            sit above the Buy XP button, which reads as a property of levelling
+            rather than of the shop -- and the one moment you check them is the
+            moment you are deciding whether to reroll these five cards.
+            The lock rides at the right of the same strip: freeze is a property
+            of the shop row, so it lives on the shop row. It was a full labelled
+            button in the control column, which gave a toggle you press once a
+            round the same weight as reroll, which you press constantly. */}
+        <div className="flex items-center gap-2 px-0.5 shrink-0">
+          <div className="flex items-center gap-2.5" title={`${t.sh_odds} · Lv ${level}`}>
+            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-none">{t.sh_odds}</span>
+            {odds.map((pct, idx) => {
+              const c = COST_COLOR[(idx + 1) as Cost];
+              return (
+                <span key={idx} className={`flex items-center gap-1 ${pct === 0 ? "opacity-30" : ""}`}>
+                  <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ background: c }} />
+                  <span className="text-[10px] font-bold tabular-nums leading-none" style={{ color: pct === 0 ? "#64748b" : c }}>{pct}%</span>
+                </span>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => { toggleFreeze(); if (!frozen) sfx.freeze(); }}
+            title={frozen ? t.sh_frozen : t.sh_freeze}
+            aria-label={frozen ? t.sh_frozen : t.sh_freeze}
+            aria-pressed={frozen}
+            className={`ml-auto inline-flex items-center justify-center rounded-md p-1.5 leading-none transition-colors
+              ${frozen ? "bg-sky-600 text-white shadow-[0_0_12px_-2px_rgba(56,189,248,0.8)]" : "bg-slate-800/70 hover:bg-slate-700 text-slate-500 hover:text-slate-200"}`}
+          >
+            {frozen ? <Lock size={13} /> : <LockOpen size={13} />}
+          </button>
+        </div>
+        <div className="flex min-w-0 gap-2 flex-1">
         {shop.map((defId, i) => {
           const key = `${i}-${rerollTick}`;
           const popOverlay = popFx?.slot === i ? (
@@ -332,6 +360,7 @@ function ShopBarBase() {
             </button>
           );
         })}
+        </div>
       </div>
     </div>
   );

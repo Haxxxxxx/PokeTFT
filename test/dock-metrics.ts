@@ -35,21 +35,24 @@ console.log("Dock + shop metrics\n");
 
 console.log("the pension dock keeps its proportion to the rail it sits in:");
 {
-  // Measured against the CONTENT width, not the rail's outer width. Padding
-  // has a 4px floor, and on the compact rail (48px) that floor binds -- it is
-  // 8% of the rail there and 5% at full width, so an outer-width ratio drifts
-  // by that difference and the assertion would be measuring the floor rather
-  // than the thing it is meant to pin down. The floor is asserted separately
-  // just below, which is the honest way to have both.
-  const ratios: number[] = [];
-  for (const [w, h] of VIEWPORTS) {
-    const L = computeGameLayout(w, h);
+  // The art is a fraction of the dock's CONTENT width until it hits its
+  // ceiling, and the ceiling is the point: scaled purely by proportion the
+  // portrait reached 120px and the panel ran ~185px tall, taller than the
+  // trainers ladder above it, for one mon that is doing nothing but waiting.
+  // So the invariant is not "always the same fraction" -- it is "a fraction
+  // while that is sensible, then capped", and both halves are asserted.
+  const below = [844, 1024].map((w) => {
+    const L = computeGameLayout(w, w === 844 ? 390 : 768);
     const M = pensionRailMetrics(L.rightRail, L.font);
-    ratios.push(M.art / M.inner);
-  }
-  const spread = Math.max(...ratios) - Math.min(...ratios);
-  assert(spread < 0.01,
-    `its art well is a constant fraction of the dock's content width at every density (${ratios.map((r) => r.toFixed(3)).join(", ")})`);
+    return M.art / M.inner;
+  });
+  assert(below.every((r) => r > 0.3 && r < 0.6),
+    `below the ceiling the art tracks the rail (${below.map((r) => r.toFixed(2)).join(", ")})`);
+
+  const small = pensionRailMetrics(computeGameLayout(844, 390).rightRail, computeGameLayout(844, 390).font);
+  const large = pensionRailMetrics(computeGameLayout(1920, 1080).rightRail, computeGameLayout(1920, 1080).font);
+  assert(small.art < large.art,
+    `and it still grows with the rail rather than being one fixed number (${small.art} < ${large.art})`);
 
   // And the padding never eats the panel: it is a floor on a narrow rail, not
   // a share of it that grows without limit.
@@ -88,6 +91,11 @@ console.log("\nand its text does not become a headline on a wide rail:");
   assert(M.label <= 13, `the section label is capped (${M.label}px)`);
   assert(M.body <= 15, `so is the mon name and countdown (${M.body}px)`);
   assert(M.button <= 16, `and the collect button (${M.button}px)`);
+  // The complaint this ceiling answers was about the panel's bulk, not its
+  // type: the portrait is what made it tall.
+  assert(M.art <= 64, `and the portrait, which is what made the panel tall (${M.art}px)`);
+  assert(M.preview <= M.art, `the sprite stays inside its own well (${M.preview} <= ${M.art})`);
+  assert(M.icon <= 28, `as is the empty-state glyph (${M.icon}px)`);
 }
 
 console.log("\nthe shop controls give space back on a small board:");
