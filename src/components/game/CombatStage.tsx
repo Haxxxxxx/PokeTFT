@@ -1,7 +1,8 @@
 "use client";
 
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
-import { spriteUrl } from "@/game/data/mons";
+import { spriteUrl, DEF_BY_DEX, primaryTypeForDex } from "@/game/data/mons";
+import { useUi } from "@/game/store/uiStore";
 import { spriteArt, spriteBoxFor } from "@/game/ui/sprite-art";
 import { combatFxMetrics, lungeCurve } from "@/game/ui/combat-fx";
 import { relativeModelScale } from "@/game/data/model-scale";
@@ -496,7 +497,8 @@ export function CombatStage({
             const t = pos.get(e.to);
             if (!t) return null;
             const p = hexToPixel({ c: t.c, r: t.r }, TILE_W, TILE_H);
-            return <DamageNumber key={`dn-${fk}`} x={p.x} y={p.y} dmg={e.dmg} crit={e.crit} sup={e.sup} />;
+            return <DamageNumber key={`dn-${fk}`} x={p.x} y={p.y} dmg={e.dmg} crit={e.crit} sup={e.sup}
+              type={TYPE_COLOR[primaryTypeForDex(t.dex) ?? "normal"] ?? null} />;
           })}
         </div>
         </div>
@@ -785,10 +787,16 @@ function CombatUnit({
   const ring = unit.mega ? "#f0abfc" : ally ? "#34d399" : "#fb7185";
   const flip = ally ? faceLeft : !faceLeft; // mons face their target
   const manaFull = manaFrac >= 0.999; // full mana → about to cast: telegraph it
-  // HP bar is TEAM-coloured (green = yours, red = enemy) so you instantly read whose mon is
-  // whose mid-fight; width still shows remaining health, and it dims/pulses when critical.
+  // HP bar carries the mon's TYPE, not its team.
+  //
+  // Team was already legible without it — the back-glow and the feet ring under
+  // every unit are team-coloured, which is what the renderer leans on. Spending
+  // the bar on the same fact twice wasted the one piece of per-unit colour on
+  // screen, while the thing you actually want mid-fight (what am I looking at,
+  // and will it resist that) had no colour at all.
   const low = hpFrac <= 0.25;
-  const hpBar = ally ? (low ? "#16a34a" : "#34d399") : (low ? "#dc2626" : "#fb7185");
+  const typeColor = TYPE_COLOR[primaryTypeForDex(unit.dex) ?? "normal"] ?? "#94a3b8";
+  const hpBar = typeColor;
   // The thrust scale follows the same curve as the step, so the unit swells
   // INTO the hit and settles out of it instead of popping to a fixed size for
   // the frame and snapping back.
@@ -841,7 +849,17 @@ function CombatUnit({
   // feet ring rather than a hard disc, so it reads as a Pokémon, not a token.
   return (
     <div
-      className="absolute flex items-end justify-center"
+      // Clickable mid-fight. A combat frame is a replay, so inspecting a unit
+      // changes nothing — and the fight is exactly when you want to know what
+      // a mon is, what it resists and what it evolves into. There was no way
+      // to ask: units were inert for the whole phase.
+      onClick={() => {
+        const hit = DEF_BY_DEX[unit.dex];
+        if (hit) useUi.getState().setInspect(hit.def.id, hit.star);
+      }}
+      role="button"
+      tabIndex={-1}
+      className="absolute flex items-end justify-center cursor-pointer"
       style={{
         left: x - TW / 2,
         top: y - TH / 2,
@@ -889,7 +907,10 @@ function CombatUnit({
           transform: "translateX(-50%)",
         }}
       >
-      <div className={`h-[7px] rounded-[3px] bg-black/80 overflow-hidden mb-[3px] ${low ? "animate-pulse" : ""}`} style={{ outline: "1px solid rgba(0,0,0,0.55)", width: TW * BAR_W }}>
+      {/* Critical HP used to be a darker shade of the team colour. With a type
+          hue that trick is gone, so it is a red outline + pulse instead —
+          louder than the old cue, and it does not fight the type for the fill. */}
+      <div className={`h-[7px] rounded-[3px] bg-black/80 overflow-hidden mb-[3px] ${low ? "animate-pulse" : ""}`} style={{ outline: low ? "1.5px solid #f87171" : "1px solid rgba(0,0,0,0.55)", width: TW * BAR_W }}>
         <div className="h-full rounded-[3px] transition-[width] duration-100" style={{ width: `${hpFrac * 100}%`, background: hpBar, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 2px rgba(0,0,0,0.28)" }} />
       </div>
       {/* Mana bar — glows + pulses when full (a cast is coming). */}
@@ -1052,11 +1073,15 @@ function Corpse({ unit }: { unit: FrameUnit }) {
   );
 }
 
-function DamageNumber({ x, y, dmg, crit, sup }: { x: number; y: number; dmg: number; crit?: boolean; sup?: boolean }) {
+function DamageNumber({ x, y, dmg, crit, sup, type }: { x: number; y: number; dmg: number; crit?: boolean; sup?: boolean; type?: string | null }) {
   // Tile-relative: an 18px rise and a 25px crit numeral swamp a phone board and
   // disappear on a desktop one. Floored so they stay readable either way.
   const FX = combatFxMetrics(useGameLayout().tile.w);
-  const color = crit ? "#fde047" : sup ? "#fb923c" : "#fff";
+  // Crit and super-effective KEEP their own hues. Those two carry game
+  // information that a type colour would overwrite — a yellow number means
+  // "that rolled a crit", not "that mon is Electric" — so only ordinary damage
+  // takes the struck mon's type, replacing a plain white that said nothing.
+  const color = crit ? "#fde047" : sup ? "#fb923c" : (type ?? "#fff");
   const size = crit ? FX.dmgFontCrit : sup ? FX.dmgFontSup : FX.dmgFont;
   const glow = crit
     ? "0 0 9px rgba(253,224,71,0.95), 0 1px 3px #000"
@@ -1097,6 +1122,15 @@ function AbilityFx({ x, y, tx, ty, moveType, shape, eff }: { x: number; y: numbe
     const s = FX.blastRing * boost;
     return (
       <>
+        {/* The scorch OUTLASTS the ring. A blast hits the whole enemy side and
+            was over in 0.5s, which left no trace that something board-wide had
+            just happened — by the time you looked, the only evidence was the
+            health bars. This lingers for ~1.6s, under the units, so a big
+            ability reads as having happened TO the board. */}
+        <span
+          className="absolute pointer-events-none rounded-full combat-scorch"
+          style={{ left: x - s / 2, top: y - s / 2, width: s, height: s, background: `radial-gradient(circle, ${color}3a, ${color}00 68%)` }}
+        />
         <span
           className="absolute pointer-events-none rounded-full combat-cast"
           style={{ left: x - s / 2, top: y - s / 2, width: s, height: s, border: `${sup ? FX.strokeSup : FX.stroke}px solid ${color}`, boxShadow: `0 0 26px 4px ${color}aa` }}
@@ -1117,6 +1151,11 @@ function AbilityFx({ x, y, tx, ty, moveType, shape, eff }: { x: number; y: numbe
     const s = FX.splashRing * boost;
     return (
       <>
+        {/* Same idea at target scale — see the blast note. */}
+        <span
+          className="absolute pointer-events-none rounded-full combat-scorch"
+          style={{ left: tx - s / 2, top: ty - s / 2, width: s, height: s, background: `radial-gradient(circle, ${color}32, ${color}00 70%)` }}
+        />
         {supRing}
         <span className="absolute pointer-events-none rounded-full combat-cast" style={{ left: tx - s / 2, top: ty - s / 2, width: s, height: s, border: `${sup ? FX.strokeSup : FX.stroke}px solid ${color}`, boxShadow: sup ? `0 0 18px 3px ${color}` : undefined }} />
         <span className="absolute pointer-events-none rounded-full combat-burst" style={{ left: tx - FX.splashCore / 2, top: ty - FX.splashCore / 2, width: FX.splashCore, height: FX.splashCore, background: `radial-gradient(circle, ${sup ? "#fff" : color}, ${color}00 70%)` }} />

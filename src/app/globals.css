@@ -870,3 +870,25 @@ body {
     transition: none;
   }
 }
+
+
+/* -- Lingering ground mark from a wide ability -----------------------------
+   A blast resolves against the whole enemy side in half a second. With the
+   ring and the core both gone almost immediately, nothing on the board said
+   that something big had just landed; you noticed it in the health bars
+   afterwards, which is reading the result rather than seeing the event.
+
+   This sits UNDER the units (the FX layer paints before them) and fades over
+   ~1.6s, so the board itself carries the aftermath for a beat. Deliberately
+   dim: it is evidence, not a second explosion. */
+@keyframes combat-scorch {
+  0%   { opacity: 0; transform: scale(0.72); }
+  14%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.1); }
+}
+.combat-scorch {
+  animation: combat-scorch 1.6s ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .combat-scorch { animation: none; opacity: 0; }
+}

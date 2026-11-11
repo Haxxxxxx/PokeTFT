@@ -1034,6 +1034,35 @@ export function getDef(id: string): UnitDef {
 /** The mon's typing at a given star (1..3). Falls back to base `types` for any star a
  *  line doesn't override. Used by combat, synergies and the detail panel so a mon that
  *  changes type as it evolves is reflected everywhere. */
+/**
+ * Every dex number a roster entry can appear as, mapped back to its definition
+ * and the star tier it represents.
+ *
+ * Combat frames carry a `dex`, not a defId — they are a replay of what was on
+ * the board, not a reference to the roster — so anything that wants to know
+ * what a fighting unit IS (its types, its name, its card) had no way to ask.
+ * Built once from UNITS rather than searched per lookup, since combat asks for
+ * this on every frame for every unit.
+ */
+export const DEF_BY_DEX: Record<number, { def: UnitDef; star: 1 | 2 | 3 }> = (() => {
+  const out: Record<number, { def: UnitDef; star: 1 | 2 | 3 }> = {};
+  for (const def of UNITS) {
+    def.dex.forEach((d, i) => {
+      // First writer wins: a shared dex between entries keeps the earlier one
+      // rather than flapping between them frame to frame.
+      if (out[d] === undefined) out[d] = { def, star: (i + 1) as 1 | 2 | 3 };
+    });
+  }
+  return out;
+})();
+
+/** The primary type of whatever is standing on a hex, by dex. */
+export function primaryTypeForDex(dex: number): PokeType | null {
+  const hit = DEF_BY_DEX[dex];
+  if (!hit) return null;
+  return typesForStar(hit.def, hit.star)[0] ?? null;
+}
+
 export function typesForStar(def: UnitDef, star: number): PokeType[] {
   return def.typesByStar?.[star - 1] ?? def.types;
 }
