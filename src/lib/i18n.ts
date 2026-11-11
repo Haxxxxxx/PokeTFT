@@ -168,6 +168,8 @@ export type Dict = {
   net_pension: string;
   net_pension_title: (cost: number, rounds: number) => string;
   net_pension_collect: string;
+  net_pension_drop: string;
+  net_pension_empty: string;
   net_pension_rounds: (n: number) => string;
   /** Shown when a matured mon could not come home because the bench was full. */
   net_pension_blocked: string;
@@ -213,6 +215,11 @@ export type Dict = {
   net_key_reroll: string;
   /** Heading above the live recipe list in an item's detail card. */
   it_combines_with: string;
+  net_round_pvp: string;
+  net_panel_reset: string;
+  net_round_pve: string;
+  net_round_carousel: string;
+  net_round_click_recap: string;
   net_key_xp: string;
   // NetGameClient — carousel overlay
   net_carousel_title: string;
@@ -406,6 +413,8 @@ export const FR: Dict = {
   net_pension: "Pension",
   net_pension_title: (cost, rounds) => `Glissez un ★ pour élever une copie (${cost} or, ${rounds} tours)`,
   net_pension_collect: "Récupérer +1",
+  net_pension_drop: "Déposer",
+  net_pension_empty: "Vide",
   net_pension_rounds: (n) => `${n} tour${n > 1 ? "s" : ""}`,
   net_pension_blocked: "Banc plein",
   net_pension_autosell: (n) => `Vendu dans ${n} combat${n > 1 ? "s" : ""}`,
@@ -439,6 +448,11 @@ export const FR: Dict = {
   net_key_sell_hint: "Clique un mon d'abord pour le vendre",
   net_key_reroll: "Relancer la boutique",
   it_combines_with: "Combine avec ton inventaire",
+  net_round_pvp: "Duel",
+  net_panel_reset: "Remettre en place",
+  net_round_pve: "Sauvages",
+  net_round_carousel: "Carrousel",
+  net_round_click_recap: "Clique pour le résumé",
   net_key_xp: "Acheter de l'XP",
   net_carousel_title: "Carrousel",
   net_carousel_comeback: "Bonus de remontée",
@@ -624,6 +638,8 @@ export const EN: Dict = {
   net_pension: "Day Care",
   net_pension_title: (cost, rounds) => `Drag a ★ mon to breed a copy of it (${cost} gold, ${rounds} rounds)`,
   net_pension_collect: "Collect +1",
+  net_pension_drop: "Drop",
+  net_pension_empty: "Empty",
   net_pension_rounds: (n) => `${n} round${n > 1 ? "s" : ""}`,
   net_pension_blocked: "Bench full",
   net_pension_autosell: (n) => `Sold in ${n} fight${n > 1 ? "s" : ""}`,
@@ -657,6 +673,11 @@ export const EN: Dict = {
   net_key_sell_hint: "Click a mon first to sell it",
   net_key_reroll: "Reroll the shop",
   it_combines_with: "Combines with your inventory",
+  net_round_pvp: "Duel",
+  net_panel_reset: "Snap back into place",
+  net_round_pve: "Wild",
+  net_round_carousel: "Carousel",
+  net_round_click_recap: "Click for the recap",
   net_key_xp: "Buy XP",
   net_carousel_title: "Carousel",
   net_carousel_comeback: "Comeback bonus",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, PointerSensor, TouchSensor, closestCenter, pointerWithin, MeasuringStrategy, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
 import type { CollisionDetection } from "@dnd-kit/core";
 import { useGame, resolveBenchSlots, BENCH_SIZE } from "@/game/store/gameStore";
@@ -43,6 +43,9 @@ function asUnits(u: unknown): UnitInstance[] {
   return (Array.isArray(u) ? u : Object.values(u as Record<string, UnitInstance>)).map(normalizeUnit);
 }
 import { Board } from "./Board";
+import { createPortal } from "react-dom";
+import { PensionDock } from "./PensionDock";
+import { useDraggablePanel } from "./useDraggablePanel";
 import { computeTraits } from "@/game/engine/synergies";
 import { TYPE_COLOR } from "@/game/ui";
 import { TraitGlyph } from "./TraitGlyph";
@@ -191,6 +194,75 @@ const boardAwareCollision: CollisionDetection = (args) => {
   return within.length ? within : closestCenter(args);
 };
 
+/**
+ * The recap for one past round: who you fought, whether you won, what it cost.
+ *
+ * A component rather than an inline branch because it owns drag state, and a
+ * hook cannot live inside a conditional render. Its position is remembered
+ * between openings — you open a recap to compare it against something, and
+ * having to re-park it every round is the reason you stop opening it.
+ */
+function RoundRecapPanel({
+  roundKey, won, oppName, oppPhoto, dmg, defaultStyle, onClose,
+}: {
+  roundKey: string;
+  won: boolean;
+  oppName: string;
+  oppPhoto?: string | null;
+  dmg: number;
+  /** Where it opens before the player moves it. Fixed coordinates, because it
+   *  renders in a portal — see below. */
+  defaultStyle: CSSProperties;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const { nodeRef, style, onPointerDown, dragging, moved, reset } = useDraggablePanel(
+    "poketft.recapPanel",
+    defaultStyle,
+  );
+  // Portalled to the body. It used to render inside the round tracker, which
+  // carries z-20 -- and a z-index only ranks an element against its siblings
+  // INSIDE the nearest stacking context. So a panel the player had dragged
+  // over the HUD bar (z-30) disappeared under it no matter what z-index it
+  // asked for. "Anywhere" has to mean anywhere.
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      ref={nodeRef}
+      style={style}
+      onPointerDown={onPointerDown}
+      className={`gilded gilded-strong z-panel flex items-center gap-3 px-3 py-1 rounded-lg shrink-0 select-none ${
+        dragging ? "cursor-grabbing shadow-[0_8px_30px_rgba(0,0,0,0.6)]" : "cursor-grab"
+      }`}
+    >
+      {/* The grip is the affordance. Without it a draggable panel is only
+          discoverable by accident, which is the same as not being draggable. */}
+      <span aria-hidden className="text-slate-600 leading-none tracking-[-0.15em] text-[11px]">⋮⋮</span>
+      <span className="text-[10px] font-bold text-slate-400">{roundKey}</span>
+      <span className="flex items-center gap-1.5">
+        {oppPhoto
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={oppPhoto} alt="" width={18} height={18} className="rounded" style={{ imageRendering: "pixelated" }} draggable={false} />
+          : null}
+        <span className="text-[11px] font-bold text-slate-200">{oppName}</span>
+      </span>
+      <span className={`text-[11px] font-extrabold ${won ? "text-emerald-300" : "text-rose-300"}`}>{won ? t.net_round_win : t.net_round_loss}</span>
+      {!won && dmg > 0 && <span className="text-[10px] text-rose-300/80">−{dmg} PV</span>}
+      {moved && (
+        <button
+          onClick={reset}
+          title={t.net_panel_reset}
+          className="text-slate-500 hover:text-slate-200 text-xs leading-none"
+        >
+          ↺
+        </button>
+      )}
+      <button onClick={onClose} className="text-slate-500 hover:text-slate-200 text-xs leading-none">✕</button>
+    </div>,
+    document.body,
+  );
+}
+
 /** Gold cost of an augment reroll after the first (free) one per slot. */
 const AUG_REROLL_COST = 2;
 
@@ -264,6 +336,12 @@ export function NetGameClient() {
   const [roundLog, setRoundLog] = useState<{ stage: number; round: number; won: boolean; pve: boolean; oppUid: string; oppName: string; dmg: number; survivors: number }[]>([]);
   // Past timeline chip the player tapped to see a fight recap (null = closed).
   const [recapKey, setRecapKey] = useState<string | null>(null);
+  // The hovered round cube, with the screen rect it occupies. The rect is kept
+  // here rather than rendering the card inside the cube because the strip is a
+  // scroller, and a scroller clips (see the note on it below): a card parented
+  // to a cube would be cut off at the strip's edge. Holding the position lets
+  // the card render fixed, outside everything that clips.
+  const [hoverRound, setHoverRound] = useState<{ key: string; x: number; y: number } | null>(null);
   const [pickedKey, setPickedKey] = useState<string | null>(null);
   // The augment slot index we just picked — hides the augment panel immediately on
   // pick (the `<=` count gate alone can leave it open when you're behind a slot).
@@ -1157,7 +1235,18 @@ export function NetGameClient() {
             <span className="text-[8px] uppercase tracking-[0.15em] text-slate-400/70 leading-none">{t.net_stage}</span>
             <span className="text-base font-bold tabular-nums gild-text leading-none">{meta.stage}-{meta.round}</span>
           </div>
-          <div className="flex-1 flex items-center justify-center gap-1 overflow-x-auto">
+          {/* py-2 is load-bearing. This scrolls horizontally, and CSS gives you
+              no way to scroll one axis while leaving the other visible: the
+              moment overflow-x is `auto`, overflow-y computes to `auto` too and
+              the box clips vertically. The current round is scaled to 1.18 and
+              every played round carries a result dot hung at -top-0.5, so both
+              were sliced off by a scroll container nobody thought was clipping.
+              The padding gives them room inside it; overflow-y-hidden just says
+              out loud that the vertical axis was never meant to scroll. */}
+          <div
+            className="flex-1 flex items-center justify-center gap-1 overflow-x-auto overflow-y-hidden py-2"
+            onScroll={() => setHoverRound(null)}
+          >
             {schedule.map(({ stage, round, kind }) => {
               const key = `${stage}-${round}`;
               const result = resultByKey.get(key);
@@ -1179,13 +1268,36 @@ export function NetGameClient() {
                 <button
                   key={key}
                   type="button"
-                  disabled={!clickable}
+                  // aria-disabled, NOT disabled. A browser does not dispatch
+                  // mouse events to a disabled form control, and most rounds
+                  // are unclickable (every PvE round, every future round) --
+                  // so `disabled` meant the hover card worked on precisely the
+                  // rounds that least needed explaining and on nothing else.
+                  // The click is guarded below instead. tabIndex keeps the
+                  // unclickable ones out of the tab order, which is what
+                  // `disabled` was buying us.
+                  aria-disabled={!clickable}
+                  tabIndex={clickable ? 0 : -1}
                   onClick={() => {
                     if (!clickable || !recap) return;
                     if (open) setRecapKey(null);
                     else { setRecapKey(key); setSpectate(recap.oppUid); }
                   }}
-                  title={`${key} · ${kind}${isPast ? (result ? " · Win" : " · Loss") : ""}${clickable ? " · click for recap" : ""}`}
+                  onMouseEnter={(e) => {
+                    const r = e.currentTarget.getBoundingClientRect();
+                    // The card is centred on the cube, so a cube near either
+                    // edge would push half of it off screen — and the rounds
+                    // at the ends of the strip are exactly the ones you scroll
+                    // to. Clamped to half the card's own widest sensible size.
+                    const half = 130;
+                    const centre = r.left + r.width / 2;
+                    setHoverRound({
+                      key,
+                      x: Math.min(Math.max(centre, half), window.innerWidth - half),
+                      y: r.bottom,
+                    });
+                  }}
+                  onMouseLeave={() => setHoverRound((h) => (h?.key === key ? null : h))}
                   className={`relative w-6 h-6 shrink-0 rounded flex items-center justify-center text-[12px] leading-none grayscale-[0.15] transition-all ${cls} ${open ? "ring-2 ring-gold-300" : ""} ${clickable ? "cursor-pointer hover:brightness-125" : "cursor-default"}`}
                 >
                   <span className={isPast && !isCurrent ? "opacity-80" : ""}>{icon}</span>
@@ -1196,23 +1308,58 @@ export function NetGameClient() {
               );
             })}
           </div>
+          {/* Replaces a `title` attribute, which waited a second, rendered in
+              the OS style, and could not say who you fought or what it cost --
+              so the round strip read as a row of unlabelled icons you had to
+              already understand. Fixed to the hovered cube's own rect, so the
+              scroller above cannot clip it. */}
+          {hoverRound && (() => {
+            const item = schedule.find((sc) => `${sc.stage}-${sc.round}` === hoverRound.key);
+            if (!item) return null;
+            const r = recapByKey.get(hoverRound.key);
+            const res = resultByKey.get(hoverRound.key);
+            const canOpen = !!r && !r.pve && r.oppUid !== myUid && !!players[r.oppUid];
+            if (typeof document === "undefined") return null;
+            // Portalled for the same reason as the recap panel: the strip sits
+            // in a z-20 context, so a card asking for z-tooltip still painted
+            // under the HUD bar immediately below it -- which is exactly where
+            // a card hanging off the round strip lands.
+            return createPortal(
+              <div
+                role="tooltip"
+                style={{ left: hoverRound.x, top: hoverRound.y + 6 }}
+                className="fixed z-tooltip -translate-x-1/2 pointer-events-none whitespace-nowrap rounded-md border border-white/10 bg-[#0a0e1a]/95 px-2.5 py-1.5 shadow-lg"
+              >
+                <div className="text-[11px] font-bold text-slate-100">
+                  {t.net_stage} {hoverRound.key} · {item.kind === "carousel" ? t.net_round_carousel : item.kind === "pve" ? t.net_round_pve : t.net_round_pvp}
+                </div>
+                {res !== undefined && (
+                  <div className={`text-[11px] font-semibold ${res ? "text-emerald-300" : "text-rose-300"}`}>
+                    {res ? t.net_round_win : t.net_round_loss}
+                    {r && !r.pve && r.oppName ? ` · ${r.oppName}` : ""}
+                    {r && !r.won && r.dmg > 0 ? ` · −${r.dmg} PV` : ""}
+                  </div>
+                )}
+                {canOpen && <div className="text-[9px] text-slate-400">{t.net_round_click_recap}</div>}
+              </div>,
+              document.body,
+            );
+          })()}
           {recapKey && recapByKey.get(recapKey) && (() => {
             const r = recapByKey.get(recapKey)!;
             const opp = players[r.oppUid];
             return (
-              <div className="gilded gilded-strong absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-3 px-3 py-1 rounded-lg shrink-0">
-                <span className="text-[10px] font-bold text-slate-400">{recapKey}</span>
-                <span className="flex items-center gap-1.5">
-                  {opp?.photoURL
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={opp.photoURL} alt="" width={18} height={18} className="rounded" style={{ imageRendering: "pixelated" }} />
-                    : null}
-                  <span className="text-[11px] font-bold text-slate-200">{r.oppName}</span>
-                </span>
-                <span className={`text-[11px] font-extrabold ${r.won ? "text-emerald-300" : "text-rose-300"}`}>{r.won ? t.net_round_win : t.net_round_loss}</span>
-                {!r.won && r.dmg > 0 && <span className="text-[10px] text-rose-300/80">−{r.dmg} PV</span>}
-                <button onClick={() => { setRecapKey(null); setSpectate(null); }} className="text-slate-500 hover:text-slate-200 text-xs leading-none">✕</button>
-              </div>
+              <RoundRecapPanel
+                roundKey={recapKey}
+                won={r.won}
+                oppName={r.oppName}
+                oppPhoto={opp?.photoURL}
+                dmg={r.dmg}
+                // Where it used to sit: the right end of the round tracker.
+                // Expressed in fixed coordinates now that it is portalled.
+                defaultStyle={{ position: "fixed", top: L.pad + 6, right: L.pad + 10 }}
+                onClose={() => { setRecapKey(null); setSpectate(null); }}
+              />
             );
           })()}
         </div>
@@ -1362,10 +1509,19 @@ export function NetGameClient() {
           </div>
           )}
 
-          {/* Players rail (RIGHT): every trainer as their profile picture with HP. */}
-          {/* self-start so the trainers panel is as tall as its roster — a
-              2-player lobby shouldn't draw a full-height empty box. */}
-          <div className="order-last self-start gilded w-full p-2 rounded-xl min-h-0 max-h-full overflow-y-auto">
+          {/* Right rail: the trainers ladder, with the pension docked beneath it.
+              Both answer the same question — what is coming for me in a few
+              rounds — which is why they belong in one column. The pension used
+              to float over the arena at top-[18%], competing with the hexes for
+              space and kept near-transparent so it would not cover the fight;
+              the panel that is a timer was the one you could not read. */}
+          {/* self-start on the COLUMN, not on the panel: it means "as tall as
+              its contents" here, so a 2-player lobby doesn't draw a full-height
+              empty box. On the panel itself it would now mean as WIDE as its
+              contents -- self-start aligns on the cross axis, and this column's
+              cross axis is horizontal where the grid track's was vertical. */}
+          <div className="order-last self-start flex flex-col min-h-0 max-h-full" style={{ gap: L.gap }}>
+          <div className="gilded w-full p-2 rounded-xl min-h-0 overflow-y-auto">
             <h2 className="text-[10px] uppercase tracking-wider text-gold-200/55 px-1 mb-1.5">{t.net_trainers(aliveCount)}</h2>
             <div className="flex flex-col gap-1">
               {ladder.map((p, i) => {
@@ -1436,6 +1592,18 @@ export function NetGameClient() {
                 );
               })}
             </div>
+          </div>
+          {/* Your own pension, in every phase. It is never a spectator's — the
+              store holds OUR pension, and a spectator has no board of their own
+              to have put a mon in one. Dropping is planning-only, on our own
+              board, which is the same gate the bench uses. */}
+          {!isSpectator && (
+            <PensionDock
+              interactive={phase === "planning" && (!spectate || spectate === myUid)}
+              railW={L.rightRail}
+              font={L.font}
+            />
+          )}
           </div>
 
           {/* Center: the shared field. Fills the track the rails leave behind, so
