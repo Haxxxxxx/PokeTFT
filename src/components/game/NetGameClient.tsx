@@ -6,7 +6,7 @@ import type { CollisionDetection } from "@dnd-kit/core";
 import { useGame, resolveBenchSlots, BENCH_SIZE } from "@/game/store/gameStore";
 import { useRoom } from "@/game/net/roomStore";
 import { startServerTime, serverNow } from "@/game/net/serverTime";
-import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, finishCarouselEarlyIfReady, predictOpponent, PLAN_MS, COMBAT_MS, CAROUSEL_MS } from "@/game/net/match";
+import { resolveRoundStart, endCombat, endCarousel, heartbeat, maybeClaimHost, syncBoard, finishCarouselEarlyIfReady, markCarouselPicked, predictOpponent, PLAN_MS, COMBAT_MS, CAROUSEL_MS } from "@/game/net/match";
 import { simulate, type FrameUnit } from "@/game/engine/combat";
 import { getDef, hasDef, archetypeOf } from "@/game/data/mons";
 import { rosterForRoom, modeStartItems, modeRoundItem, modeLootScale, modeTeamBuff, modeSignatureAugment, getMode, pickMonoType, isDoubleUp, isNuzlocke, isHyperRoll, isLegendaryClash } from "@/game/data/gameModes";
@@ -58,6 +58,7 @@ import { TraitPanel } from "./TraitPanel";
 import { UnitDetail } from "./UnitDetail";
 import { OptionsMenu } from "./OptionsMenu";
 import { MatchChat } from "./MatchChat";
+import { subscribeCarouselGrants } from "@/game/net/carousel-grants";
 import { ItemsPanel } from "./ItemsPanel";
 import { CombatStage } from "./CombatStage";
 import { CoinIcon, PawIcon, SwordIcon, GiftIcon } from "./icons";
@@ -568,6 +569,40 @@ export function NetGameClient() {
     // partner mailbox on every room write. Only the mode can change what this does.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room?.code, myUid, isSpectator, room?.rules?.mode, coopReceiveGold, coopReceiveUnit]);
+
+  // Drain carousel rewards the host left for me.
+  //
+  // A carousel pick is applied in the PICKER's own client, so being
+  // disconnected when the timer expires means applying nothing — and the node
+  // is wiped on the way to planning. The host now parks the reward; this takes
+  // it. See carousel-grants.ts.
+  useEffect(() => {
+    if (!room?.code || !myUid || isSpectator) return;
+    const code = room.code;
+    const stop = subscribeCarouselGrants(code, myUid, (g) => {
+      // Not until our own save is loaded: applying an item on top of default
+      // state would be overwritten by the hydrate that follows, which is the
+      // same silent loss this fix exists to close. Returning false leaves the
+      // grant in the box for the next subscribe.
+      if (hydrated.current === "none") return false;
+      const live = useRoom.getState().liveRoom;
+      const mine = live?.players?.[myUid];
+      // Idempotence against a redelivery: the authoritative flag says whether
+      // this round's reward has already been taken. If it has, the grant is
+      // stale — clear it without granting a second copy.
+      if (mine?.carouselPicked === g.key) return true;
+      useGame.getState().netCarouselPick(g.pick);
+      // Claim the round, so a repeat delivery (or a second tab) cannot take it
+      // again, and push the save immediately rather than waiting for the
+      // debounced sync — `items` is not in that effect's dependency list.
+      markCarouselPicked(code, myUid, g.key).catch(() => {});
+      const gs = useGame.getState();
+      syncBoard(code, myUid, gs.units, gs.exportSave(), gs.level, gs.augments, gs.gold);
+      useUi.getState().pushToast(t.net_carousel_granted);
+      return true;
+    });
+    return stop;
+  }, [room?.code, myUid, isSpectator, t]);
 
   // Push my board + economy snapshot to the room (debounced) — board for combat,
   // save for reconnect.

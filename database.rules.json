@@ -151,6 +151,26 @@
           ".write": "auth != null && root.child('games').child($code).child('meta/hostUid').val() === auth.uid"
         },
 
+        // Carousel rewards left for a player who was disconnected when the
+        // timer ran out. The host writes them; the recipient applies the reward
+        // in their own client and clears the row. Written per ROUND key rather
+        // than a push id so a host retry overwrites instead of granting twice.
+        //
+        // The recipient's grant is deletion-only: if they could write it they
+        // could hand themselves any item in the game.
+        "grants": {
+          "$uid": {
+            "$gid": {
+              ".write": "auth != null && (root.child('games').child($code).child('meta/hostUid').val() === auth.uid || ($uid === auth.uid && !newData.exists()))",
+              ".validate": "newData.hasChildren(['pick','key'])",
+              "pick": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64" },
+              "key":  { ".validate": "newData.isString() && newData.val().length <= 12" },
+              "ts":   { ".validate": "newData.isNumber()" },
+              "$other": { ".validate": false }
+            }
+          }
+        },
+
         // Match chat. There was no rule here at all, which does NOT mean "open":
         // writes fell through to games/$code/.write, which only permits CREATING
         // a game or the host DELETING one -- so every message was refused, and

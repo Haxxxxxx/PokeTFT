@@ -866,11 +866,31 @@ export async function endCarousel(code: string, room: Room): Promise<void> {
   return withClaimGuard(code, async () => {
     room = (await freshRoom(code)) ?? room; // authoritative state (migration-safe)
     const next = advanceRound(room.meta.stage, room.meta.round);
-    await dbAdapter().update(gamePath(code), {
+
+    // Leave the reward for anyone who never picked. The pick is applied in the
+    // PICKER's own client, so a player who is disconnected when the timer runs
+    // out applies nothing and the node is about to be wiped -- closing the tab
+    // during a carousel used to cost you the round's item outright.
+    //
+    // Keyed by the round, not a push id: endCarousel can be retried, and a
+    // push id would hand out the same carousel twice.
+    const key = `${room.meta.stage}-${room.meta.round}`;
+    const u: Updates = {
       "meta/phase": "planning", "meta/stage": next.stage, "meta/round": next.round,
       "meta/deadline": serverNow() + PLAN_MS, "meta/hostBeat": serverNow(), "meta/updatedAt": serverNow(),
       carousel: null,
-    });
+    };
+    for (const p of alivePlayers(room)) {
+      if (p.isBot || p.carouselPicked === key) continue;
+      // Index 0 is the item slot startCarousel built; 1..4 are units. Granting
+      // the item is not an arbitrary default -- netCarouselPick silently drops
+      // a unit when the bench is full, so a unit grant can evaporate on
+      // arrival while an item always lands.
+      const pick = room.carousel?.[p.uid]?.[0];
+      if (typeof pick !== "string" || !pick) continue;
+      u[`grants/${p.uid}/${key}`] = { pick, key, ts: serverNow() };
+    }
+    await dbAdapter().update(gamePath(code), u);
   });
 }
 

@@ -226,6 +226,7 @@ export type Dict = {
   net_round_pvp: string;
   sh_to_level: (lvl: number) => string;
   chat_title: string;
+  net_carousel_granted: string;
   chat_close: string;
   chat_send: string;
   chat_empty: string;
@@ -474,6 +475,7 @@ export const FR: Dict = {
   net_round_pvp: "Duel",
   sh_to_level: (lvl) => `Niv. ${lvl}`,
   chat_title: "Tchat",
+  net_carousel_granted: "Récompense de carrousel récupérée",
   chat_close: "Fermer le tchat",
   chat_send: "Envoyer",
   chat_empty: "Personne n’a encore parlé.",
@@ -714,6 +716,7 @@ export const EN: Dict = {
   net_round_pvp: "Duel",
   sh_to_level: (lvl) => `To Lv ${lvl}`,
   chat_title: "Chat",
+  net_carousel_granted: "Carousel reward collected",
   chat_close: "Close chat",
   chat_send: "Send",
   chat_empty: "Nobody has said anything yet.",
