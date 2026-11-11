@@ -120,6 +120,14 @@ export type Dict = {
   ud_stat_health: string;
   ud_stat_attack: string;
   ud_stat_dps: string;
+  ud_stat_def: string;
+  ud_recommended: string;
+  ud_recommended_hint: string;
+  ud_axis_offense: string;
+  ud_axis_ability: string;
+  ud_axis_survive: string;
+  ud_axis_sustain: string;
+  ud_axis_tempo: string;
   ud_stat_aspd: string;
   ud_stat_armor: string;
   ud_stat_mr: string;
@@ -379,6 +387,14 @@ export const FR: Dict = {
   ud_stat_health: "PV",
   ud_stat_attack: "Attaque",
   ud_stat_dps: "DPS",
+  ud_stat_def: "Déf / Spé",
+  ud_recommended: "Objets conseillés",
+  ud_recommended_hint: "pour ce mon",
+  ud_axis_offense: "Attaque",
+  ud_axis_ability: "Capacité",
+  ud_axis_survive: "Survie",
+  ud_axis_sustain: "Soin",
+  ud_axis_tempo: "Tempo",
   ud_stat_aspd: "Vit. Att.",
   ud_stat_armor: "Armure",
   ud_stat_mr: "Rés. Mag.",
@@ -611,6 +627,14 @@ export const EN: Dict = {
   ud_stat_health: "Health",
   ud_stat_attack: "Attack",
   ud_stat_dps: "DPS",
+  ud_stat_def: "Armor / MR",
+  ud_recommended: "Recommended items",
+  ud_recommended_hint: "for this mon",
+  ud_axis_offense: "Attack",
+  ud_axis_ability: "Ability",
+  ud_axis_survive: "Survive",
+  ud_axis_sustain: "Sustain",
+  ud_axis_tempo: "Tempo",
   ud_stat_aspd: "Atk Spd",
   ud_stat_armor: "Armor",
   ud_stat_mr: "Mag Res",
