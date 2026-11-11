@@ -51,5 +51,30 @@ export function combatFxMetrics(tileW: number) {
     dmgFontSup: Math.max(10, 18 * u),
     dmgFontCrit: Math.max(12, 25 * u),
     dmgSpread: 36 * u,
+    /**
+     * How far a unit steps into the thing it is hitting.
+     *
+     * Was a flat 13px, which is 28% of a tile on a phone and 11% on a desktop
+     * — a lurch on one board and almost invisible on the other.
+     */
+    lunge: 13 * u,
   };
+}
+
+/**
+ * The shape of a strike over its frame.
+ *
+ * The lunge used to be binary: full reach for the whole attack frame, then
+ * back to zero. With a CSS transition smoothing the edges that reads as a
+ * jump-and-return, not a hit — there is no moment of impact in it, because the
+ * unit spends the entire frame already extended.
+ *
+ * sin(pi * t) gives 0 at the start, peak at the middle and 0 again at the end,
+ * so the unit drives in and recovers within the frame and the peak lands where
+ * the damage number and the hit flash already fire. Cheap, and it is the whole
+ * difference between "moved" and "struck".
+ */
+export function lungeCurve(frac: number): number {
+  const t = Math.min(1, Math.max(0, frac));
+  return Math.sin(Math.PI * t);
 }

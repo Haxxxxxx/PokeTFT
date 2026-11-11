@@ -3,7 +3,7 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { spriteUrl } from "@/game/data/mons";
 import { spriteArt, spriteBoxFor } from "@/game/ui/sprite-art";
-import { combatFxMetrics } from "@/game/ui/combat-fx";
+import { combatFxMetrics, lungeCurve } from "@/game/ui/combat-fx";
 import { relativeModelScale } from "@/game/data/model-scale";
 import { useT } from "@/lib/i18n";
 import { usePrefersReducedMotion } from "@/lib/useReducedMotion";
@@ -222,6 +222,7 @@ export function CombatStage({
     [result],
   );
   const TILE_W = layout.tile.w;
+  const FX = combatFxMetrics(TILE_W);
   const TILE_H = layout.tile.h;
 
   const { w, h } = fieldPixelSize(TILE_W, TILE_H);
@@ -415,16 +416,24 @@ export function CombatStage({
             const castEv = a.events.find((e) => e.kind === "cast" && e.from === u.id);
             const castColor = castEv && castEv.kind === "cast" ? (TYPE_COLOR[castEv.moveType] ?? "#a78bfa") : null;
             const hitThisFrame = recentHit.has(u.id);
-            // Lunge toward the thing we're hitting.
+            // Step into the thing we're hitting.
+            //
+            // Reach scales with the tile (it was a flat 13px, so the same step
+            // was 28% of a tile on a phone and 11% on a desktop), and it is
+            // shaped across the frame by lungeCurve rather than held at full
+            // extension for the whole of it — a unit that is already extended
+            // when the frame opens has no moment of impact.
             let lunge = { dx: 0, dy: 0 };
+            let strike = 0;
             if (attackEv && attackEv.kind === "attack") {
               const tgt = aMap.get(attackEv.to);
               if (tgt) {
                 const tp = hexToPixel({ c: tgt.c, r: tgt.r }, TILE_W, TILE_H);
                 const dx = tp.x - x, dy = tp.y - y;
                 const m = Math.hypot(dx, dy) || 1;
-                lunge = { dx: (dx / m) * 13, dy: (dy / m) * 13 }; // a punchier step into the target
-
+                strike = lungeCurve(frac);
+                const reach = FX.lunge * strike;
+                lunge = { dx: (dx / m) * reach, dy: (dy / m) * reach };
               }
             }
             return (
@@ -436,6 +445,7 @@ export function CombatStage({
                 hpFrac={hpFrac}
                 manaFrac={manaFrac}
                 lunge={lunge}
+                strike={strike}
                 flash={hitThisFrame ? `${fi}-${u.id}` : null}
                 cast={castColor}
                 faceLeft={(facing.get(u.id) ?? u.c) < u.c}
@@ -762,10 +772,10 @@ const HexGrid = memo(function HexGrid() {
 });
 
 function CombatUnit({
-  unit, x, y, hpFrac, manaFrac, lunge, flash, cast, faceLeft, showSprite, items,
+  unit, x, y, hpFrac, manaFrac, lunge, strike, flash, cast, faceLeft, showSprite, items,
 }: {
   unit: FrameUnit; x: number; y: number; hpFrac: number; manaFrac: number;
-  lunge: { dx: number; dy: number }; flash: string | null; cast: string | null; faceLeft: boolean;
+  lunge: { dx: number; dy: number }; strike: number; flash: string | null; cast: string | null; faceLeft: boolean;
   /** False once this unit's 3D model has loaded — the sprite is the fallback. */
   showSprite: boolean;
   /** Held item ids, constant for the fight (CombatResult.unitItems). */
@@ -779,8 +789,10 @@ function CombatUnit({
   // whose mid-fight; width still shows remaining health, and it dims/pulses when critical.
   const low = hpFrac <= 0.25;
   const hpBar = ally ? (low ? "#16a34a" : "#34d399") : (low ? "#dc2626" : "#fb7185");
-  const lunging = lunge.dx !== 0 || lunge.dy !== 0; // mid-attack → thrust scale for impact
-  const castScale = cast ? 1.16 : lunging ? 1.08 : 1; // cast wind-up pops bigger than an attack
+  // The thrust scale follows the same curve as the step, so the unit swells
+  // INTO the hit and settles out of it instead of popping to a fixed size for
+  // the frame and snapping back.
+  const castScale = cast ? 1.16 : 1 + 0.08 * strike;
   // Mirrors the planning board exactly: a cell-sized, bottom-aligned box with an
   // oversized sprite standing in it. The previous version counter-rotated the
   // WHOLE bar+sprite stack about its bottom edge while the sprite image was far
@@ -836,7 +848,9 @@ function CombatUnit({
         width: TW,
         height: TH,
         transform: `translate(${lunge.dx}px, ${lunge.dy}px)`,
-        transition: "transform 80ms ease-out",
+        // No transition: the lunge is recomputed every animation frame now, and
+        // easing a value that is already being driven per-frame only makes it
+        // lag the thing it is supposed to be hitting.
       }}
     >
       {/* Counter-rotated so the unit stands upright on the raked ground, anchored
