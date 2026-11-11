@@ -4,15 +4,10 @@ import { memo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { FIELD, ALLY_ROW0, HEX_CLIP, hexToPixel, fieldPixelSize, rowsPixelHeight } from "@/game/engine/hex";
 import { boardSizeForLevel } from "@/game/config";
-import { getDef } from "@/game/data/mons";
-import { TYPE_COLOR } from "@/game/ui";
-import { pensionDockMetrics } from "@/game/ui/dock-metrics";
-import { useGame, BENCH_SIZE, PENSION_COST, PENSION_ROUNDS, PENSION_OVERDUE_LIMIT, resolveBenchSlots } from "@/game/store/gameStore";
+import { useGame, BENCH_SIZE, resolveBenchSlots } from "@/game/store/gameStore";
 import { useGameLayout } from "./LayoutProvider";
 import { UnitChip } from "./UnitChip";
 import { ItemGlyph } from "./ItemGlyph";
-import { PokemonModelPreview } from "./PokemonModelPreview";
-import { PawIcon } from "./icons";
 import { useT } from "@/lib/i18n";
 import type { UnitInstance } from "@/game/types";
 
@@ -140,84 +135,6 @@ function BenchSlab({
           className="absolute pointer-events-none unit-contact"
           style={{ width: size * 0.56, height: size * 0.18, bottom: size * 0.1 }}
         />
-      )}
-    </div>
-  );
-}
-
-function PensionDock({ interactive, slot, font }: { interactive: boolean; slot: number; font: number }) {
-  // Sized against the bench slot, not a fixed pixel count. See dock-metrics.ts:
-  // at a flat 76px this dock was 2.17x a bench slot on a phone and 0.81x on a
-  // desktop, so it was the one thing on the board that changed proportion as
-  // the board resized.
-  const M = pensionDockMetrics(slot, font);
-  const pension = useGame((state) => state.pension);
-  const collectPension = useGame((state) => state.collectPension);
-  const { setNodeRef, isOver } = useDroppable({
-    id: "pension",
-    disabled: !interactive || !!pension,
-  });
-  const t = useT();
-  // A matured mon now returns to the bench on its own (see nextRound). So the
-  // only way one is still sitting here READY is that the bench was full when it
-  // tried — which is a problem the player has to act on, not a reward waiting
-  // to be claimed. It is styled as a warning, and it says how long they have.
-  const ready = !!pension && pension.roundsLeft <= 0;
-  const blocked = ready && (pension?.overdue ?? 0) > 0;
-  const fightsLeft = pension ? Math.max(0, PENSION_OVERDUE_LIMIT - (pension.overdue ?? 0) + 1) : 0;
-  const def = pension ? getDef(pension.defId) : null;
-  const dex = pension && def ? def.dex[Math.max(0, Math.min(2, pension.star - 1))] : null;
-  const typeColor = def ? TYPE_COLOR[def.types[0]] : "#d6a64f";
-
-  return (
-    <div
-      ref={setNodeRef}
-      title={!pension ? t.net_pension_title(PENSION_COST, PENSION_ROUNDS) : undefined}
-      style={{ right: M.inset, width: M.w }}
-      className={`absolute top-[18%] z-30 flex flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-transparent p-1.5 text-center transition-all
-        ${isOver ? "scale-105 border-emerald-300 bg-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.35)]" : blocked ? "border-rose-400/70 bg-rose-950/45 shadow-[0_0_18px_rgba(244,63,94,0.3)]" : "bg-transparent shadow-none"}
-        ${!pension && interactive ? "border-dashed text-gold-100/70" : "text-slate-100"}`}
-    >
-      <span style={{ fontSize: M.label }} className="font-extrabold uppercase tracking-wider text-gold-200/75">{t.net_pension}</span>
-      {pension && def && dex !== null ? (
-        <>
-          <div className="relative grid w-full place-items-center rounded-lg" style={{ height: M.art, background: `radial-gradient(circle, ${typeColor}55, transparent 72%)` }}>
-            <PokemonModelPreview
-              dex={dex}
-              alt={`${def.name} in the Pokémon Pension`}
-              width={M.preview}
-              height={M.preview}
-              className={ready ? "" : "opacity-85"}
-            />
-            {!ready && <span style={{ fontSize: Math.round(M.art * 0.3) }} className="absolute inset-0 grid place-items-center font-extrabold text-gold-100 drop-shadow-[0_1px_3px_rgba(0,0,0,1)]">{pension.roundsLeft}</span>}
-          </div>
-          {ready ? (
-            <>
-              <button
-                type="button"
-                onClick={collectPension}
-                style={{ fontSize: M.button }}
-                className={`w-full rounded-md px-1 py-1 font-extrabold leading-none text-slate-950 ${
-                  blocked ? "bg-rose-400 hover:bg-rose-300" : "bg-emerald-400 hover:bg-emerald-300"
-                }`}
-              >
-                {t.net_pension_collect}
-              </button>
-              {blocked && (
-                <span style={{ fontSize: M.label }} className="font-bold leading-tight text-rose-300">
-                  {t.net_pension_blocked} · {t.net_pension_autosell(fightsLeft)}
-                </span>
-              )}
-            </>
-          ) : (
-            <span style={{ fontSize: M.label }} className="font-bold leading-tight text-gold-100/80">{t.net_pension_rounds(pension.roundsLeft)}</span>
-          )}
-        </>
-      ) : (
-        <>
-          <span className={`leading-none text-gold-200/80 transition-transform ${isOver ? "scale-125" : ""}`}><PawIcon size={M.icon} /></span>
-          <span style={{ fontSize: M.label }} className="leading-tight text-slate-400">{interactive ? `Drop · ${PENSION_COST} ◉` : "Empty"}</span>
-        </>
       )}
     </div>
   );
@@ -540,7 +457,6 @@ function BoardBase({
           toggle that made planning 3D and combat 2D, the match is uniformly 2D.
           The pipeline itself is intact (UnitModel, /lab/model-sheet,
           /lab/model-poses) for when the animation gap is closed. */}
-      {withBench && !units && <PensionDock interactive={interactive} slot={benchSize} font={layout.font} />}
     </div>
   );
 }

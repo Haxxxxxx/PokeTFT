@@ -19,27 +19,54 @@
 const MIN_LABEL_PX = 7;
 const MIN_BUTTON_PX = 8;
 
+/** Legibility ceiling. Above this, a rail panel's text stops looking like
+ *  chrome and starts competing with the board for attention. */
+const MAX_LABEL_PX = 13;
+const MAX_BODY_PX = 15;
+const MAX_BUTTON_PX = 16;
+
+function clamp(n: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, n));
+}
+
 /**
- * The pension dock holds exactly one mon, so it is sized against the bench
- * slot — the other thing on the board that holds exactly one mon.
+ * The pension dock, which now lives in the right rail beneath the trainers
+ * ladder rather than floating over the arena.
+ *
+ * It used to be sized against the bench slot, because both hold exactly one
+ * mon. On the rail that neighbour is gone: what it must sit beside now is the
+ * trainers list, so it is sized against the rail's own width — which the
+ * layout engine already solves against the viewport, exactly as the bench slot
+ * was. The discipline is unchanged and it is the whole point of this file: a
+ * proportion of something the engine computes, never a pixel count.
+ *
+ * Text is the exception, and deliberately so. It is clamped at BOTH ends: a
+ * floor because below it nothing is readable, and a ceiling because the rail
+ * grows to 214px on a desktop and type scaled linearly to that width reads as
+ * a headline inside what is meant to be chrome.
  */
-export function pensionDockMetrics(benchSlot: number, font: number) {
-  const w = Math.round(benchSlot * 1.06);
+export function pensionRailMetrics(railW: number, font: number) {
+  const pad = Math.max(4, Math.round(railW * 0.045));
+  const inner = Math.max(1, railW - pad * 2);
   return {
-    /** Overall width of the dock. */
-    w,
+    /** Outer width — the rail's, since the dock is a full-width rail panel. */
+    w: railW,
+    /** Inner padding of the panel. */
+    pad,
+    /** Content width inside that padding. */
+    inner,
     /** The art well the mon sits in. */
-    art: Math.round(w * 0.74),
+    art: Math.round(inner * 0.62),
     /** The sprite inside that well. */
-    preview: Math.round(w * 0.64),
+    preview: Math.round(inner * 0.56),
     /** The paw glyph shown when the dock is empty. */
-    icon: Math.round(w * 0.3),
-    /** Section label ("PENSION"). */
-    label: Math.max(MIN_LABEL_PX, Math.round(w * 0.11 * font)),
-    /** Collect button / countdown text. */
-    button: Math.max(MIN_BUTTON_PX, Math.round(w * 0.13 * font)),
-    /** Inset from the board edge, so it does not crowd the hexes on a phone. */
-    inset: Math.max(4, Math.round(benchSlot * 0.1)),
+    icon: Math.round(inner * 0.3),
+    /** Section label ("PENSION") and secondary lines. */
+    label: clamp(Math.round(inner * 0.085 * font), MIN_LABEL_PX, MAX_LABEL_PX),
+    /** Mon name and countdown. */
+    body: clamp(Math.round(inner * 0.095 * font), MIN_LABEL_PX, MAX_BODY_PX),
+    /** Collect button. */
+    button: clamp(Math.round(inner * 0.105 * font), MIN_BUTTON_PX, MAX_BUTTON_PX),
   };
 }
 
