@@ -82,6 +82,31 @@ export function OptionsMenu() {
               ))}
             </div>
           </div>
+        {/* Shortcuts live HERE because they stopped living anywhere.
+            The in-game hint strip was removed (it overflowed the shop), which
+            left them documented only in the first-run tour — a slide most
+            people skip once and never see again. An undiscoverable shortcut is
+            the same as a missing one: this was reported as "the keyboard
+            shortcuts aren't working" when every one of them did. */}
+        <div className="border-t border-white/[0.07] pt-2.5">
+          <div className="text-[10px] font-bold uppercase tracking-wide text-gold-200/60 mb-1.5">{t.net_keys_label}</div>
+          <ul className="flex flex-col gap-1">
+            {[
+              { keys: ["R", "D"], label: t.net_key_reroll },
+              { keys: ["L", "F"], label: t.net_key_xp },
+              { keys: ["S"], label: t.net_key_sell },
+            ].map((row) => (
+              <li key={row.label} className="flex items-center justify-between gap-2 text-[11px] text-slate-300">
+                <span className="truncate">{row.label}</span>
+                <span className="flex gap-1 shrink-0">
+                  {row.keys.map((k) => (
+                    <kbd key={k} className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-600 text-[10px] font-bold text-slate-200 leading-none">{k}</kbd>
+                  ))}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
         </div>
       )}
     </div>

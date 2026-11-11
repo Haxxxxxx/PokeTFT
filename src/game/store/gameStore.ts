@@ -6,7 +6,7 @@ import { makeRng, randInt, type Rng } from "../engine/rng";
 import { makePool, makeUnitsByCost, rollShop, takeFromPool, returnToPool, type Pool, type UnitsByCost } from "../engine/shop";
 import { sellValue, interest } from "../engine/economy";
 import { applyCombines, makeInstance } from "../engine/combine";
-import { MEGA_STONE, canMega } from "../data/mega";
+import { MEGA_STONE, canMega, canHoldMegaStone } from "../data/mega";
 import { ITEM_POOL, ITEM_BY_ID, COMPONENT_IDS, COMPLETED_IDS, EMBLEM_IDS, EMBLEM_TRAIT, RECIPES, combineKey, isComponent, isEmblem } from "../data/itemPool";
 import { AUGMENT_BY_ID } from "../data/augments";
 import { isHyperRoll, isLegendaryClash } from "../data/gameModes";
@@ -658,9 +658,11 @@ export const useGame = create<State>((set, get) => ({
     if (!unit) return;
 
     // Mega Stone only attaches to a Mega-capable mon AT ITS FINAL FORM (★★★).
-    if (itemId === MEGA_STONE) {
-      if (!canMega(unit.defId)) { toast("This mon can't Mega Evolve", "Ce Pokémon ne peut pas Méga-évoluer"); return; }
-      if (unit.star < 3) { toast("Mega Stone needs the final form (★★★)", "La Méga-Gemme nécessite la forme finale (★★★)"); return; }
+    if (itemId === MEGA_STONE && !canHoldMegaStone(unit.defId, unit.star)) {
+      // Split only to say WHICH half failed; the rule itself is canHoldMegaStone.
+      if (!canMega(unit.defId)) toast("This mon can't Mega Evolve", "Ce Pokémon ne peut pas Méga-évoluer");
+      else toast("Mega Stone needs the final form (★★★)", "La Méga-Gemme nécessite la forme finale (★★★)");
+      return;
     }
 
     // An emblem on a mon that already has that trait is wasted — block it.

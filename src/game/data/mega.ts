@@ -134,6 +134,20 @@ export function canMega(defId: string): boolean {
   return defId in MEGA_FORMS;
 }
 
+/**
+ * May this mon hold a Mega Stone?
+ *
+ * THE RULE LIVES HERE because it was previously written out at three call
+ * sites and one of them disagreed. The player's UI and the equip action both
+ * required a mega-capable mon at its FINAL form (3 stars); the bot drafter
+ * checked only canMega() and happily stoned 1- and 2-star mons. So the AI was
+ * playing by a rule the player could not use, which is the worst kind of
+ * imbalance — invisible, and it looks like the game cheating.
+ */
+export function canHoldMegaStone(defId: string, star: number): boolean {
+  return canMega(defId) && star >= 3;
+}
+
 export function hasMegaStone(items: string[] | undefined): boolean {
   return !!items && items.includes(MEGA_STONE);
 }

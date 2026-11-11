@@ -664,16 +664,25 @@ export function NetGameClient() {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
-      if (k === "r") { e.preventDefault(); reroll(); }
-      else if (k === "l") { e.preventDefault(); buyXp(); }
+      // D and F are aliases for R and L. Every autobattler player arrives with
+      // D-to-reroll and F-for-XP already in their hands, and the first thing a
+      // shortcut that does nothing teaches you is that shortcuts do not work
+      // here. Both sets are live; neither is "the" binding.
+      if (k === "r" || k === "d") { e.preventDefault(); reroll(); }
+      else if (k === "l" || k === "f") { e.preventDefault(); buyXp(); }
       else if (k === "s") {
+        e.preventDefault();
         const iid = useUi.getState().inspect?.iid;
-        if (iid) { e.preventDefault(); sell(iid); useUi.getState().clearInspect(); }
+        if (iid) { sell(iid); useUi.getState().clearInspect(); }
+        // Previously a silent no-op. Sell needs a selected mon, and pressing a
+        // key that does nothing and says nothing is indistinguishable from a
+        // broken shortcut -- which is exactly how it was reported.
+        else useUi.getState().pushToast(t.net_key_sell_hint);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [phase, spectate, myUid, reroll, buyXp, sell]);
+  }, [phase, spectate, myUid, reroll, buyXp, sell, t]);
 
   // When you're eliminated, default to watching the current leader.
   const prevAliveRef = useRef<boolean | undefined>(undefined);
@@ -975,6 +984,9 @@ export function NetGameClient() {
       // change a combat whose result is already decided — the item would
       // appear to do nothing, or worse, look like it did. A benched mon is not
       // in the fight, so there is nothing to corrupt.
+      // Back into the inventory = cancel. Explicit, so it can never fall
+      // through to "equip the nearest mon".
+      if (target === "items") return;
       const benchOnly = phase === "combat";
       if (phase !== "planning" && !benchOnly) return;
       if (benchOnly && !target.startsWith("bench-")) return;

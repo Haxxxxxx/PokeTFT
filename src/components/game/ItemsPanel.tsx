@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useDraggable } from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { useGame } from "@/game/store/gameStore";
 import { useUi } from "@/game/store/uiStore";
 import { useAppStore } from "@/game/store/appStore";
@@ -61,13 +61,23 @@ export function ItemsPanel() {
     return () => window.removeEventListener("keydown", onKey);
   }, [setInspectedItem]);
 
+  // Catches an item dragged back out of play. See the note on the root below.
+  const { setNodeRef: setPanelRef, isOver: panelOver } = useDroppable({ id: "items" });
+
   // Count each distinct item; one row per kind.
   const counts = new Map<string, number>();
   for (const it of items) counts.set(it, (counts.get(it) ?? 0) + 1);
   const distinct = [...counts.keys()];
 
   return (
-    <div data-inspectable className="gilded rounded-xl p-3">
+    // The panel is itself a DROP TARGET, which it was not: it had a draggable
+    // per item and nothing to catch one coming back. Releasing an item over
+    // the panel therefore matched no droppable under the pointer, fell through
+    // to nearest-centre, and equipped whichever mon happened to be closest —
+    // so putting an item back silently handed it to a neighbour.
+    //
+    // Catching it here makes "drop it where you got it" mean cancel.
+    <div ref={setPanelRef} data-inspectable className={`gilded rounded-xl p-3 transition-shadow ${panelOver ? "ring-2 ring-gold-300/70 ring-inset" : ""}`}>
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-[10px] uppercase tracking-wide text-gold-200/60 font-bold">{t.sh_items_title}</h2>
         <div className="flex items-center gap-2">
