@@ -217,6 +217,12 @@ export type Dict = {
   it_combines_with: string;
   net_round_pvp: string;
   sh_to_level: (lvl: number) => string;
+  chat_title: string;
+  chat_close: string;
+  chat_send: string;
+  chat_empty: string;
+  chat_placeholder: string;
+  chat_spectator: string;
   net_panel_reset: string;
   net_round_pve: string;
   net_round_carousel: string;
@@ -451,6 +457,12 @@ export const FR: Dict = {
   it_combines_with: "Combine avec ton inventaire",
   net_round_pvp: "Duel",
   sh_to_level: (lvl) => `Niv. ${lvl}`,
+  chat_title: "Tchat",
+  chat_close: "Fermer le tchat",
+  chat_send: "Envoyer",
+  chat_empty: "Personne n’a encore parlé.",
+  chat_placeholder: "Écris un message…",
+  chat_spectator: "Tu observes — lecture seule.",
   net_panel_reset: "Remettre en place",
   net_round_pve: "Sauvages",
   net_round_carousel: "Carrousel",
@@ -677,6 +689,12 @@ export const EN: Dict = {
   it_combines_with: "Combines with your inventory",
   net_round_pvp: "Duel",
   sh_to_level: (lvl) => `To Lv ${lvl}`,
+  chat_title: "Chat",
+  chat_close: "Close chat",
+  chat_send: "Send",
+  chat_empty: "Nobody has said anything yet.",
+  chat_placeholder: "Write a message…",
+  chat_spectator: "You’re spectating — read only.",
   net_panel_reset: "Snap back into place",
   net_round_pve: "Wild",
   net_round_carousel: "Carousel",

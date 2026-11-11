@@ -57,7 +57,7 @@ import { ShopBar } from "./ShopBar";
 import { TraitPanel } from "./TraitPanel";
 import { UnitDetail } from "./UnitDetail";
 import { OptionsMenu } from "./OptionsMenu";
-import { QuickChat } from "./QuickChat";
+import { MatchChat } from "./MatchChat";
 import { ItemsPanel } from "./ItemsPanel";
 import { CombatStage } from "./CombatStage";
 import { CoinIcon, PawIcon, SwordIcon, GiftIcon } from "./icons";
@@ -1837,8 +1837,18 @@ export function NetGameClient() {
         sub={t.net_boot_trainers(connectedHumans, humanPlayers.length)}
         progress={humanPlayers.length ? connectedHumans / humanPlayers.length : 1}
       />}
-      {inMatch && !isSpectator && me?.alive && (
-        <QuickChat code={room.code} myUid={myUid} myName={me.name} />
+      {/* No longer gated on me.alive. Being knocked out does not end your
+          interest in the lobby -- you watch the rest of it play out, and the
+          old gate cut you out of the conversation at exactly the moment you
+          had nothing to do but talk. Spectators get the panel read-only; the
+          rules have no player node to authorise their writes. */}
+      {inMatch && (
+        <MatchChat
+          code={room.code}
+          myUid={myUid}
+          myName={me?.name ?? ""}
+          canSend={!isSpectator && !!me}
+        />
       )}
     </DndContext>
   );
