@@ -999,6 +999,15 @@ function CombatUnit({
  * grey and fading, which is the difference that should read.
  */
 function Corpse({ unit }: { unit: FrameUnit }) {
+  // Unmounted once the fade has played. The animation alone is not enough: a
+  // unit stays dead for the rest of the combat, so this component keeps being
+  // rendered, and anything it leaves on screen stays there. Removing the node
+  // is what actually guarantees no residue.
+  const [faded, setFaded] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setFaded(true), 450); // just past the 0.4s fade
+    return () => clearTimeout(id);
+  }, []);
   const layout = useGameLayout();
   const TILE_W = layout.tile.w;
   const TILE_H = layout.tile.h;
@@ -1006,6 +1015,7 @@ function Corpse({ unit }: { unit: FrameUnit }) {
   const S = Math.round(spriteBoxFor(unit.dex, TILE_W, relativeModelScale(unit.dex)));
   const art = spriteArt(unit.dex, S);
   const puff = Math.round(TILE_W * 0.5);
+  if (faded) return null;
   return (
     <>
       {/* One-shot dissipation puff at the moment of death (plays once on mount). */}

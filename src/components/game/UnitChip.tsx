@@ -8,7 +8,7 @@ import { COST_COLOR } from "@/game/ui";
 import { useUi } from "@/game/store/uiStore";
 import { useGame } from "@/game/store/gameStore";
 import { useT } from "@/lib/i18n";
-import { MEGA_STONE, canMega, isMegaActive } from "@/game/data/mega";
+import { MEGA_STONE, canHoldMegaStone, isMegaActive } from "@/game/data/mega";
 import { HEX_CLIP } from "@/game/engine/hex";
 import { crispSize } from "@/game/ui/pixel";
 import { StarIcon, MegaIcon } from "./icons";
@@ -126,7 +126,7 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
   const heldItems = unit.items ?? [];
   const megaReady = isMegaActive(unit.defId, heldItems);
   // Any held item can be equipped (max 3); the Mega Stone also needs a Mega-capable mon.
-  const canEquipArmed = interactive && !!armedItem && heldItems.length < 3 && (armedItem === MEGA_STONE ? (canMega(unit.defId) && unit.star >= 3) : true);
+  const canEquipArmed = interactive && !!armedItem && heldItems.length < 3 && (armedItem === MEGA_STONE ? canHoldMegaStone(unit.defId, unit.star) : true);
 
   function onClick() {
     if (interactive && armedItem) {

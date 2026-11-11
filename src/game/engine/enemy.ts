@@ -6,7 +6,7 @@ import { UNITS, getDef, typesForStar, archetypeOf } from "../data/mons";
 import { TRAITS_BY_KEY } from "../data/traits";
 import { effectiveness } from "../data/typeChart";
 import { EMBLEM_TRAIT } from "../data/items";
-import { canMega, MEGA_STONE } from "../data/mega";
+import { canMega, canHoldMegaStone, MEGA_STONE } from "../data/mega";
 import { makeRng, weightedPick, randInt, type Rng } from "./rng";
 
 export type BotLevel = "easy" | "medium" | "hard" | "expert" | "ultimate" | "clone" | "nightmare";
@@ -531,9 +531,9 @@ function buildBotBoard(stage: number, round: number, tier: TierName, seed: numbe
     // In Mega Madness the stones are handed out every round, so stone EVERY capable mon.
     if (stage >= cfg.megaStage) {
       if (brain?.preferMega) {
-        for (const u of board) if (canMega(u.defId) && u.items.length < 3 && !u.items.includes(MEGA_STONE)) u.items = [...u.items, MEGA_STONE];
+        for (const u of board) if (canHoldMegaStone(u.defId, u.star) && u.items.length < 3 && !u.items.includes(MEGA_STONE)) u.items = [...u.items, MEGA_STONE];
       } else {
-        const megaTarget = canMega(carry.defId) ? carry : board.find((u) => canMega(u.defId));
+        const megaTarget = canHoldMegaStone(carry.defId, carry.star) ? carry : board.find((u) => canHoldMegaStone(u.defId, u.star));
         if (megaTarget && megaTarget.items.length < 3) megaTarget.items = [...megaTarget.items, MEGA_STONE];
       }
     }

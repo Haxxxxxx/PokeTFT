@@ -207,6 +207,11 @@ export type Dict = {
   net_board_fill: string;
   net_keys_label: string;
   net_key_sell: string;
+  /** Shown when SELL is pressed with no mon selected — the key used to do
+   *  nothing at all, which reads as the shortcut being broken. */
+  net_key_sell_hint: string;
+  net_key_reroll: string;
+  net_key_xp: string;
   // NetGameClient — carousel overlay
   net_carousel_title: string;
   net_carousel_comeback: string;
@@ -429,6 +434,9 @@ export const FR: Dict = {
   net_board_fill: "Remplir",
   net_keys_label: "Raccourcis",
   net_key_sell: "Vendre",
+  net_key_sell_hint: "Clique un mon d'abord pour le vendre",
+  net_key_reroll: "Relancer la boutique",
+  net_key_xp: "Acheter de l'XP",
   net_carousel_title: "Carrousel",
   net_carousel_comeback: "Bonus de remontée",
   net_carousel_picked_waiting: (n) => `Choisi — en attente de ${n} dresseur${n > 1 ? "s" : ""}…`,
@@ -643,6 +651,9 @@ export const EN: Dict = {
   net_board_fill: "Fill",
   net_keys_label: "Keys",
   net_key_sell: "Sell",
+  net_key_sell_hint: "Click a mon first to sell it",
+  net_key_reroll: "Reroll the shop",
+  net_key_xp: "Buy XP",
   net_carousel_title: "Carousel",
   net_carousel_comeback: "Comeback bonus",
   net_carousel_picked_waiting: (n) => `Picked — waiting for ${n} trainer${n > 1 ? "s" : ""}…`,
