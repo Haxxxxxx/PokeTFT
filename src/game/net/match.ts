@@ -288,12 +288,29 @@ export async function applyRatingFor(code: string, room: Room, uid: string, plac
       console.info(`[applyRatingFor] leaderboard row for ${uid} deferred to the server:`, (e as Error)?.message ?? e);
     });
   } catch (e) {
-    // This is the failure this rewrite exists to fix: previously silent, unrecoverable
-    // data loss. Now: loud (so it's actually debuggable) and durable (so the exact data
-    // needed to safely repair it — the already-decided place/delta — isn't lost either).
+    const msg = (e as Error)?.message ?? String(e);
+    // users/<uid>/rating is server-only (.write: false), so this function
+    // refusing on a CLIENT host is the designed path, not an incident: the
+    // claim at games/<code>/rated/<uid> keeps the decided place+delta, and
+    // pruneStale re-runs this with admin rights and finishes it. It is
+    // reported at info, and NOT written to ratingFailures, for the same reason
+    // the leaderboard row above is not — that node is only worth reading if it
+    // means something is actually wrong.
+    //
+    // The throw stays. Nothing below this point may run: writing the history
+    // row here would make the server's repair short-circuit on "already done"
+    // and the authoritative rating would never be applied at all.
+    if (/permission_denied/i.test(msg)) {
+      console.info(`[applyRatingFor] rating for ${uid} in game ${code} deferred to the server (client host cannot write it).`);
+      throw e;
+    }
+    // Anything else is the failure this rewrite exists to fix: previously silent,
+    // unrecoverable data loss. Now: loud (so it's actually debuggable) and durable
+    // (so the exact data needed to safely repair it — the already-decided
+    // place/delta — isn't lost either).
     console.error(`[applyRatingFor] persist failed for ${uid} in game ${code}:`, e);
     await dbAdapter().update(`games/${code}/ratingFailures`, {
-      [uid]: { place: decided.place, delta: decided.delta, error: (e as Error)?.message ?? String(e), ts: serverNow() },
+      [uid]: { place: decided.place, delta: decided.delta, error: msg, ts: serverNow() },
     }).catch(() => {});
     throw e;
   }

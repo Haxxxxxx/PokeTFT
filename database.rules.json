@@ -151,6 +151,40 @@
           ".write": "auth != null && root.child('games').child($code).child('meta/hostUid').val() === auth.uid"
         },
 
+        // Match chat. There was no rule here at all, which does NOT mean "open":
+        // writes fell through to games/$code/.write, which only permits CREATING
+        // a game or the host DELETING one -- so every message was refused, and
+        // the client swallowed the error, so the feature looked present and had
+        // never once delivered a message.
+        //
+        // What these rules do enforce:
+        //   - only a player in THIS game may post (spectators read, cannot write)
+        //   - uid is auth.uid, and name must equal the name on their own player
+        //     node, so nobody can post under another trainer's banner
+        //   - messages are write-once: no edits, no deleting what someone said.
+        //     The whole games/$code node is removed by pruneStale, which is what
+        //     bounds growth over time
+        //   - 1..240 chars, and a timestamp within a few seconds of server time,
+        //     so a message cannot be backdated to the top of the log
+        //
+        // What they do NOT enforce, deliberately stated: a per-second RATE limit.
+        // Rules cannot count prior writes, and any scheme keyed on a companion
+        // "last sent" node is bypassed by simply not writing that node. The
+        // throttle is client-side. If chat flooding ever becomes a real problem
+        // the fix is a Cloud Function relay, not a rule that reads like it is
+        // protecting something and is not.
+        "chat": {
+          "$mid": {
+            ".write": "auth != null && !data.exists() && root.child('games').child($code).child('players').child(auth.uid).exists()",
+            ".validate": "newData.hasChildren(['uid','name','msg','t'])",
+            "uid":  { ".validate": "newData.val() === auth.uid" },
+            "name": { ".validate": "newData.isString() && newData.val() === root.child('games').child($code).child('players').child(auth.uid).child('name').val()" },
+            "msg":  { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 240" },
+            "t":    { ".validate": "newData.isNumber() && newData.val() >= now - 15000 && newData.val() <= now + 5000" },
+            "$other": { ".validate": false }
+          }
+        },
+
         "players": {
           "$uid": {
             // A parent .write CASCADES to the whole subtree and a child rule cannot revoke it — so while this
