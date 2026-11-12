@@ -6,6 +6,9 @@ import { FIELD, ALLY_ROW0, HEX_CLIP, hexToPixel, fieldPixelSize, rowsPixelHeight
 import { boardSizeForLevel } from "@/game/config";
 import { useGame, BENCH_SIZE, resolveBenchSlots } from "@/game/store/gameStore";
 import { useGameLayout } from "./LayoutProvider";
+import { ArenaEffects } from "./ArenaEffects";
+import { resolveArena } from "@/game/ui/arena-variants";
+import { useAppStore } from "@/game/store/appStore";
 import { UnitChip } from "./UnitChip";
 import { ItemGlyph } from "./ItemGlyph";
 import { useT } from "@/lib/i18n";
@@ -201,14 +204,23 @@ function BoardBase({
 
   // Board capacity, ghosted on the floor. Only on your OWN live board — on a
   // scouted rival's board it would be their number shown over your context.
+  // The arena dresses itself from whatever board is standing on it — ours, or
+  // a rival's while scouting, since that board is what is on screen.
+  const arenaUnits = units ?? storeUnits;
+  const arenaPin = useAppStore((st) => st.settings.arenaPin);
+  const arenaEffects = useAppStore((st) => st.settings.arenaEffects);
+  const arena = resolveArena(arenaUnits, arenaPin);
+
   const capacity = boardSizeForLevel(level);
   const boardCount = board.length;
   const showCapacity = interactive && !units;
 
   return (
     <div
-      className="relative arena-frame"
+      className="relative arena-frame arena-themed"
+      data-arena={arena.key}
       style={{
+        ["--arena-accent" as string]: arena.accent,
         width: innerW + pad * 2,
         height: frameH,
         padding: pad,
@@ -250,6 +262,7 @@ function BoardBase({
           {/* Carved lip between the arena floor and its border. */}
           <span className="arena-rail" aria-hidden />
           <span className="arena-dust" aria-hidden />
+          {arenaEffects && <ArenaEffects effect={arena.effect} accent={arena.accent} />}
         </div>
 
         {/* Board capacity, ghosted large across the floor — TFT's "6/6". Lies on
