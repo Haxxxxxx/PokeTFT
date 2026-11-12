@@ -9,6 +9,9 @@
           "poketft-arena"
         ],
         "game": [
+          "poke-tft"
+        ],
+        "legacy": [
           "game-poketft-arena"
         ]
       }
