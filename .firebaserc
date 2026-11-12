@@ -5,14 +5,14 @@
   "targets": {
     "poketft-arena": {
       "hosting": {
-        "landing": [
-          "poketft-arena"
-        ],
-        "game": [
+        "prod": [
           "poke-tft"
         ],
-        "legacy": [
+        "dev": [
           "game-poketft-arena"
+        ],
+        "redirect": [
+          "poketft-arena"
         ]
       }
     }

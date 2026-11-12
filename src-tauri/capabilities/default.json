@@ -11,6 +11,7 @@
   ],
   "remote": {
     "urls": [
+      "https://poke-tft.web.app/*",
       "https://game-poketft-arena.web.app/*"
     ]
   }

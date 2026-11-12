@@ -17,120 +17,7 @@
   },
   "hosting": [
     {
-      "target": "landing",
-      "public": "out-landing",
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**"
-      ],
-      "headers": [
-        {
-          "comment": "Default: never cache \u2014 stale index.html could point at old copy/links.",
-          "source": "**",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "no-cache, no-store, must-revalidate"
-            }
-          ]
-        },
-        {
-          "comment": "Screenshots are static assets, safe to cache long \u2014 re-uploading a changed file gets a new deploy anyway.",
-          "source": "/screenshots/**",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "public, max-age=31536000, immutable"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "target": "game",
-      "public": "out",
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**"
-      ],
-      "rewrites": [
-        {
-          "comment": "Serve the static native-auth bridge page.",
-          "source": "/native-auth",
-          "destination": "/native-auth.html"
-        },
-        {
-          "comment": "Serve the static download page.",
-          "source": "/download",
-          "destination": "/download.html"
-        },
-        {
-          "comment": "Landing page, served from the same site as the game so one domain covers everything.",
-          "source": "/home",
-          "destination": "/home.html"
-        },
-        {
-          "source": "**",
-          "destination": "/index.html"
-        }
-      ],
-      "headers": [
-        {
-          "comment": "Default: never cache \u2014 stale index.html points at old JS chunks.",
-          "source": "**",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "no-cache, no-store, must-revalidate"
-            }
-          ]
-        },
-        {
-          "comment": "Hashed build assets are immutable.",
-          "source": "/_next/static/**",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "public, max-age=31536000, immutable"
-            }
-          ]
-        },
-        {
-          "comment": "Mirrored Pok\u00e9mon sprites.",
-          "source": "/sprites/**",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "public, max-age=31536000, immutable"
-            }
-          ]
-        },
-        {
-          "comment": "Mirrored Pok\u00e9mon cries (audio).",
-          "source": "/cries/**",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "public, max-age=31536000, immutable"
-            }
-          ]
-        },
-        {
-          "comment": "Landing screenshots are static assets, safe to cache long.",
-          "source": "/screenshots/**",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "public, max-age=31536000, immutable"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "target": "legacy",
+      "target": "prod",
       "public": "out",
       "ignore": [
         "firebase.json",
@@ -210,7 +97,112 @@
           ]
         }
       ],
-      "comment": "The previous game URL, game-poketft-arena.web.app. Serves the SAME build from the same out/ directory so every link already shared keeps working. Keep this block in step with the game block above; Firebase has no way to point one target at two sites, which is why it is duplicated rather than aliased."
+      "comment": "PRODUCTION \u2014 poke-tft.web.app. Serves the game at /, the landing at /home. This is the origin the desktop/mobile shell loads (see src-tauri/src/lib.rs)."
+    },
+    {
+      "target": "dev",
+      "public": "out",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "comment": "Serve the static native-auth bridge page.",
+          "source": "/native-auth",
+          "destination": "/native-auth.html"
+        },
+        {
+          "comment": "Serve the static download page.",
+          "source": "/download",
+          "destination": "/download.html"
+        },
+        {
+          "comment": "Landing page, served from the same site as the game so one domain covers everything.",
+          "source": "/home",
+          "destination": "/home.html"
+        },
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ],
+      "headers": [
+        {
+          "comment": "Default: never cache \u2014 stale index.html points at old JS chunks.",
+          "source": "**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, must-revalidate"
+            }
+          ]
+        },
+        {
+          "comment": "Hashed build assets are immutable.",
+          "source": "/_next/static/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        },
+        {
+          "comment": "Mirrored Pok\u00e9mon sprites.",
+          "source": "/sprites/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        },
+        {
+          "comment": "Mirrored Pok\u00e9mon cries (audio).",
+          "source": "/cries/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        },
+        {
+          "comment": "Landing screenshots are static assets, safe to cache long.",
+          "source": "/screenshots/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        }
+      ],
+      "comment": "DEV \u2014 game-poketft-arena.web.app. Same build, deployed first to check a release before prod. Keep this block in step with prod; Firebase permits one site per target, which is why it is duplicated rather than aliased."
+    },
+    {
+      "target": "redirect",
+      "comment": "poketft-arena.web.app, the original landing URL. It is the project's DEFAULT site, which Firebase refuses to delete, so it 301s to prod instead \u2014 which is better than deleting it anyway: every link already shared keeps working rather than dying.",
+      "public": "hosting-redirect",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "redirects": [
+        {
+          "source": "/",
+          "destination": "https://poke-tft.web.app/",
+          "type": 301
+        },
+        {
+          "source": "/:rest*",
+          "destination": "https://poke-tft.web.app/:rest*",
+          "type": 301
+        }
+      ]
     }
   ]
 }

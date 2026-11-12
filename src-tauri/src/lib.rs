@@ -2,7 +2,7 @@ use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_opener::OpenerExt;
 
-const HOSTED: &str = "https://game-poketft-arena.web.app";
+const HOSTED: &str = "https://poke-tft.web.app";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
