@@ -14,6 +14,10 @@ export type AppSettings = {
    *  and lit in a 3D arena) instead of the CSS board. Opt-in while it beds in —
    *  the CSS board stays the default and the fallback. */
   board3d: boolean;
+  /** Ambient arena weather. Off = the themed slab without particles. */
+  arenaEffects: boolean;
+  /** 'auto' follows the board's strongest synergy; a type key pins it. */
+  arenaPin: string;
 };
 
 export type AppStore = {
@@ -39,6 +43,8 @@ export const useAppStore = create<AppStore>()(
         soundEnabled: true,
         volume: 0.7,
         board3d: false,
+        arenaEffects: true,
+        arenaPin: "auto",
       },
       setSettings: (update) => set((s) => ({ settings: { ...s.settings, ...update } })),
       profileOpen: false,
