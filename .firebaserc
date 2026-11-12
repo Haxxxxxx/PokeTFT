@@ -8,11 +8,14 @@
         "prod": [
           "poke-tft"
         ],
-        "dev": [
-          "game-poketft-arena"
-        ],
         "redirect": [
           "poketft-arena"
+        ],
+        "dev": [
+          "poketft-dev"
+        ],
+        "app": [
+          "game-poketft-arena"
         ]
       }
     }
