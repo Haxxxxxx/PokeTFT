@@ -226,6 +226,8 @@ export type Dict = {
   net_round_pvp: string;
   sh_to_level: (lvl: number) => string;
   chat_title: string;
+  draft_title: string;
+  draft_sub: string;
   net_carousel_granted: string;
   chat_close: string;
   chat_send: string;
@@ -475,6 +477,8 @@ export const FR: Dict = {
   net_round_pvp: "Duel",
   sh_to_level: (lvl) => `Niv. ${lvl}`,
   chat_title: "Tchat",
+  draft_title: "Choisis ton starter",
+  draft_sub: "Un Pokémon offert pour ouvrir la partie — tiré du roster de ce salon.",
   net_carousel_granted: "Récompense de carrousel récupérée",
   chat_close: "Fermer le tchat",
   chat_send: "Envoyer",
@@ -716,6 +720,8 @@ export const EN: Dict = {
   net_round_pvp: "Duel",
   sh_to_level: (lvl) => `To Lv ${lvl}`,
   chat_title: "Chat",
+  draft_title: "Draft your starter",
+  draft_sub: "One free Pokémon to open the game — drawn from this lobby’s roster.",
   net_carousel_granted: "Carousel reward collected",
   chat_close: "Close chat",
   chat_send: "Send",

@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/Button";
 import { useUi } from "@/game/store/uiStore";
 import { makeRng, hashStr } from "@/game/engine/rng";
 import { itemsArray, normalizeUnit } from "@/game/net/rtdb-utils";
-import { CarouselOverlay, AugmentOverlay, GameOverScreen } from "./GameOverlays";
+import { CarouselOverlay, AugmentOverlay, DraftOverlay, GameOverScreen } from "./GameOverlays";
 import type { UnitInstance } from "@/game/types";
 
 
@@ -284,6 +284,10 @@ function RoundRecapPanel({
 
 /** Gold cost of an augment reroll after the first (free) one per slot. */
 const AUG_REROLL_COST = 2;
+
+/** How many starters the opening draft offers. Six fills one row at every
+ *  density without the grid wrapping into a second. */
+const DRAFT_PICKS = 6;
 
 export function NetGameClient() {
   // Declared first: effects far above the old declaration site read `t` (e.g. the
@@ -736,6 +740,35 @@ export function NetGameClient() {
     setAugRerollSlot(augSlotNow);
     setAugReroll(0);
   }
+  // Opening draft: one free starter, offered once at 1-1 before the first shop.
+  // Derived exactly like the augment offer — a deterministic draw seeded by the
+  // player's uid and the room code — so it survives a re-render and a reconnect
+  // without ever being re-rolled, and two players in the same room get
+  // different offers.
+  const drafted = useGame((st) => st.drafted);
+  const draftPick = useGame((st) => st.draftPick);
+  const draftOptions = useMemo(() => {
+    if (!room?.code || !myUid) return [];
+    const roster = rosterForRoom(room.rules, hashStr(room.code));
+    // Cheap mons only. The draft is a head start, not a jackpot: offering a
+    // 5-cost here would decide the game before the first shop.
+    const cheap = roster.filter((id) => (getDef(id)?.cost ?? 9) <= 2);
+    const pool = cheap.length >= DRAFT_PICKS ? cheap : roster;
+    let seed = hashStr(room.code) ^ 0x9e3779b9;
+    for (let i = 0; i < myUid.length; i++) seed = (Math.imul(seed, 31) + myUid.charCodeAt(i)) >>> 0;
+    const rng = makeRng(seed >>> 0);
+    const bag = [...pool];
+    const out: string[] = [];
+    while (out.length < Math.min(DRAFT_PICKS, bag.length)) {
+      out.push(...bag.splice(Math.floor(rng() * bag.length), 1));
+    }
+    return out;
+    // Keyed on the room CODE and mode only, for the same reason the augment
+    // offer is: depending on the whole rules object would redraw the offer
+    // mid-pick whenever any unrelated room field was written.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.code, myUid, room?.rules?.mode, room?.rules?.draftPoolSize]);
+
   const augOptions = useMemo(() => {
     if (augSlotNow == null) return [];
     const owned = new Set(useGame.getState().augments);
@@ -1182,6 +1215,12 @@ export function NetGameClient() {
   // Spectating a rival from the scoreboard → watch their board, bench and fights
   // (read-only). Works while alive (scouting) and after death (keep watching).
   const spectating = !!spectate && spectate !== myUid && !!players[spectate];
+  // Only on the opening round, only for a live player on their own board, and
+  // only when the augment overlay is not up — two full-screen pickers at once
+  // would stack and the player would answer whichever mounted on top.
+  const showDraft = !showAugment && !drafted && phase === "planning"
+    && meta?.stage === 1 && meta?.round === 1
+    && !isSpectator && !spectating && !!me?.alive && draftOptions.length > 0;
   const spectateP = spectating ? players[spectate!] : undefined;
   const spectateUnits = spectating ? asBoard(spectateP?.board) : null;
   // Bench is now PUBLIC (lobby chose full transparency), so spectating shows the rival's bench.
@@ -1834,6 +1873,18 @@ export function NetGameClient() {
           revealBoard={revealBoard} setRevealBoard={setRevealBoard}
           units={units} pickLatch={pickLatch}
           netCarouselPick={netCarouselPick} flushSync={flushSync}
+        />
+      )}
+
+      {showDraft && (
+        <DraftOverlay
+          options={draftOptions}
+          revealBoard={revealBoard}
+          setRevealBoard={setRevealBoard}
+          pickLatch={pickLatch}
+          draftPick={draftPick}
+          flushSync={flushSync}
+          onPicked={() => { if (room) { const g = useGame.getState(); syncBoard(room.code, myUid, g.units, g.exportSave(), g.level, g.augments, g.gold); } }}
         />
       )}
 
