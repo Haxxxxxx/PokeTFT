@@ -7,6 +7,7 @@ import { boardSizeForLevel } from "@/game/config";
 import { useGame, BENCH_SIZE, resolveBenchSlots } from "@/game/store/gameStore";
 import { useGameLayout } from "./LayoutProvider";
 import { ArenaEffects } from "./ArenaEffects";
+import { IncomeBalls } from "./IncomeBalls";
 import { resolveArena } from "@/game/ui/arena-variants";
 import { useAppStore } from "@/game/store/appStore";
 import { UnitChip } from "./UnitChip";
@@ -470,6 +471,11 @@ function BoardBase({
           toggle that made planning 3D and combat 2D, the match is uniformly 2D.
           The pipeline itself is intact (UnitModel, /lab/model-sheet,
           /lab/model-poses) for when the animation gap is closed. */}
+
+      {/* Interest, stacked down the left edge. Only on your OWN live board:
+          on a scouted rival's board it would be their economy shown over your
+          context, which is the same mistake the capacity counter avoids. */}
+      {withBench && !units && <IncomeBalls size={benchSize} inset={Math.max(4, Math.round(benchSize * 0.1))} />}
     </div>
   );
 }
