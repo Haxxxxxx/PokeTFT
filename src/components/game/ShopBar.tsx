@@ -15,7 +15,6 @@ import { useT } from "@/lib/i18n";
 import { useGameLayout } from "./LayoutProvider";
 import { shopControlMetrics } from "@/game/ui/dock-metrics";
 import { Lock, LockOpen } from "lucide-react";
-import { interest } from "@/game/engine/economy";
 import { sfx, playCry } from "@/lib/audio";
 
 /** Copies a unit instance is worth toward star-ups (1 / 3 / 9). */
@@ -173,12 +172,6 @@ function ShopBarBase() {
         </span>
         <span className="text-[9px] font-bold uppercase tracking-wide text-gold-200/50 leading-none">
           {t.net_gold_label}
-        </span>
-        <span
-          title={t.net_interest_label}
-          className="mt-0.5 text-[10px] font-bold tabular-nums text-gold-200/75 leading-none"
-        >
-          +{interest(gold)}
         </span>
       </div>
 
