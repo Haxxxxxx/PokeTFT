@@ -11,6 +11,11 @@ type UiState = {
   /** An inventory item being inspected in the detail panel (mutually exclusive
    *  with a mon inspect). */
   inspectedItem: string | null;
+  /** A full-screen picker (draft / augment / carousel) owns the screen. Chrome
+   *  anchored to the board hides while it is up — advice about a board you
+   *  cannot see is just something in the way. */
+  pickerOpen: boolean;
+  setPickerOpen: (v: boolean) => void;
   setInspectedItem: (id: string | null) => void;
 
   /** Which player's board we're viewing. null = your own (interactive). */
@@ -38,6 +43,8 @@ export const useUi = create<UiState>((set) => ({
   clearInspect: () => set({ inspect: null, inspectedItem: null }),
 
   inspectedItem: null,
+  pickerOpen: false,
+  setPickerOpen: (v) => set({ pickerOpen: v }),
   setInspectedItem: (id) => set({ inspectedItem: id, inspect: null }),
 
   viewPlayerId: null,

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRoom } from "@/game/net/roomStore";
 import { useGame } from "@/game/store/gameStore";
 import { useAppStore } from "@/game/store/appStore";
+import { useUi } from "@/game/store/uiStore";
 import { GraduationCap, Check, X } from "lucide-react";
 
 const DONE_KEY = "poketft_tutorial_done";
@@ -23,6 +24,10 @@ const STEPS: Step[] = [
  * text stays full-size and legible (incl. landscape phones).
  */
 export function FirstMatchCoach() {
+  // Hidden while a full-screen pick owns the screen: the coach is a popover
+  // ABOUT the board (z-panel sits above z-screen by the stacking ladder), so
+  // without this it floats over the draft cards.
+  const pickerOpen = useUi((s) => s.pickerOpen);
   const lang = useAppStore((s) => s.settings.language);
   const phase = useRoom((s) => s.room?.meta?.phase);
   // Subscribe to the RAW units array (not the derived selectors, which are stable
@@ -62,6 +67,7 @@ export function FirstMatchCoach() {
     });
   }, [units, level]);
 
+  if (pickerOpen) return null;
   if (dismissed !== false) return null;
   // Only surface during planning — combat/carousel have their own focus.
   if (phase && phase !== "planning") return null;

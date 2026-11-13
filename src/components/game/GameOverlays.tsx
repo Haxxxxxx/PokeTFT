@@ -14,8 +14,10 @@ import { MegaIcon, CoinIcon, TrophyIcon } from "./icons";
 import { Eye, Sparkles, RefreshCw, Swords } from "lucide-react";
 import { normalizeUnit } from "@/game/net/rtdb-utils";
 import { COST_COLOR, TYPE_COLOR } from "@/game/ui";
+import { TRAITS_BY_KEY } from "@/game/data/traits";
 import { useT } from "@/lib/i18n";
 import { useAppStore } from "@/game/store/appStore";
+import { useUi } from "@/game/store/uiStore";
 import { sfx } from "@/lib/audio";
 import type { FrameUnit } from "@/game/engine/combat";
 import type { Room, RoomPlayer, RoomMeta } from "@/game/net/roomStore";
@@ -258,6 +260,122 @@ export function CarouselOverlay({
       })()}
       </div>
       </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The opening draft — one free starter, taken before the first shop.
+ *
+ * The lobby has always had a `draftPoolSize` (60/90/120) which genuinely does
+ * something: it caps the roster a match draws from. What it never had was a
+ * moment where the player sees that roster and makes a choice about it. The
+ * game opened by handing everyone the same random shop, so the first decision
+ * of a match was "buy whichever of these five is least bad".
+ *
+ * Built on the augment overlay's rails rather than as a new server phase.
+ * Augments already prove the pattern works: options derived deterministically
+ * from a seed, the pick applied to local state, the result carried by the
+ * ordinary save sync. A new phase would mean touching the host state machine,
+ * the RTDB phase validator and every reconnect path, to buy nothing the player
+ * can see.
+ */
+export function DraftOverlay({
+  options, revealBoard, setRevealBoard, pickLatch, draftPick, flushSync, onPicked,
+}: {
+  options: string[];
+  revealBoard: boolean;
+  setRevealBoard: Dispatch<SetStateAction<boolean>>;
+  pickLatch: LatchRef;
+  draftPick: (defId: string) => void;
+  flushSync: () => void;
+  onPicked: () => void;
+}) {
+  const t = useT();
+  const lang = useAppStore((s) => s.settings.language);
+  const setPickerOpen = useUi((st) => st.setPickerOpen);
+  // Owned by the overlay rather than by the caller: it is true exactly while
+  // this is mounted, which is the definition, and it sidesteps the hook-order
+  // trap of deriving it next to state that is declared after an early return.
+  // The first-match coach sits at z-panel and this at z-screen, so by the
+  // stacking ladder the coach is correctly ABOVE it — it has to opt out.
+  useEffect(() => {
+    setPickerOpen(true);
+    return () => setPickerOpen(false);
+  }, [setPickerOpen]);
+  if (options.length === 0) return null;
+  return (
+    <div
+      className="fixed inset-0 z-screen overflow-y-auto"
+      style={revealBoard
+        ? { background: "transparent" }
+        : { background: "radial-gradient(58% 58% at 50% 38%, rgba(13,80,120,0.42), rgba(2,6,23,0.93))", backdropFilter: "blur(7px)" }}
+    >
+      <button
+        onClick={() => setRevealBoard((v) => !v)}
+        style={{ pointerEvents: "auto" }}
+        className="absolute top-4 right-4 z-10 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-slate-200 shadow-lg"
+      >
+        <Eye size={13} className="inline align-text-bottom mr-1" />{revealBoard ? t.net_show_choices : t.net_hide_view_board}
+      </button>
+      {!revealBoard && (
+        <div className="min-h-full flex flex-col items-center justify-center p-4">
+          <div className="celebrate-pop flex flex-col items-center w-full">
+            <h2 className="text-2xl font-black gild-text mb-1">{t.draft_title}</h2>
+            <p className="text-[12px] text-slate-400 mb-5">{t.draft_sub}</p>
+            <div className="flex flex-wrap items-stretch justify-center gap-3 max-w-[980px]">
+              {options.map((defId) => {
+                const def = getDef(defId);
+                if (!def) return null;
+                const color = COST_COLOR[def.cost] ?? "#94a3b8";
+                const take = () => {
+                  // Same latch the carousel and augments use: a double click, or
+                  // a re-render landing between the click and the state write,
+                  // must not spend the one pick twice.
+                  if (pickLatch.current === "draft") return;
+                  pickLatch.current = "draft";
+                  sfx.carouselPick();
+                  draftPick(defId);
+                  onPicked();
+                  flushSync();
+                };
+                return (
+                  <button
+                    key={defId}
+                    onClick={take}
+                    style={{ borderColor: `${color}aa` }}
+                    className="group relative w-[150px] rounded-xl border-2 bg-[#0d1426] p-3 flex flex-col items-center gap-1.5 transition-transform hover:scale-[1.04] hover:brightness-110"
+                  >
+                    <span
+                      className="absolute inset-0 rounded-[10px] pointer-events-none"
+                      style={{ background: `linear-gradient(180deg, transparent 40%, ${color}26 100%)` }}
+                    />
+                    <PokemonModelPreview dex={def.dex[0]} alt={def.name} width={76} height={76} />
+                    <span className="text-[13px] font-extrabold text-slate-100">{def.name}</span>
+                    <span className="flex flex-wrap justify-center gap-1">
+                      {def.types.map((tp) => (
+                        <span
+                          key={tp}
+                          className="rounded px-1.5 py-[1px] text-[9px] font-bold text-black"
+                          style={{ background: TYPE_COLOR[tp as PokeType] }}
+                        >
+                          {TRAITS_BY_KEY[tp]?.label ?? tp}
+                        </span>
+                      ))}
+                    </span>
+                    <span style={{ color }} className="inline-flex items-center gap-0.5 text-[11px] font-extrabold">
+                      <CoinIcon size={11} />{def.cost}
+                    </span>
+                    <span className="text-[10px] text-slate-500 line-clamp-2">
+                      {lang === "fr" ? def.move.name : def.move.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

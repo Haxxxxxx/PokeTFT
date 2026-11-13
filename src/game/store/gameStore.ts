@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { ECONOMY, XP_TO_REACH, MAX_LEVEL, BOARD, boardSizeForLevel, roundKind, roundsInStage, streakGold, type Cost } from "../config";
 import type { UnitInstance } from "../types";
-import { getDef, typesForStar } from "../data/mons";
+import { getDef, hasDef, typesForStar } from "../data/mons";
 import { makeRng, randInt, type Rng } from "../engine/rng";
 import { makePool, makeUnitsByCost, rollShop, takeFromPool, returnToPool, type Pool, type UnitsByCost } from "../engine/shop";
 import { sellValue, interest } from "../engine/economy";
@@ -115,6 +115,12 @@ type State = {
   drops: ItemDrop[];
   /** Chosen augment ids (TFT-style persistent boosts). */
   augments: string[];
+  /** The opening draft has been taken this game. Latches once. */
+  drafted: boolean;
+  /** iid of the free starter newGame auto-placed. The draft REPLACES this one
+   *  rather than adding to it, so drafting is a choice about the opening mon
+   *  and not an extra mon. Null once replaced (or if none was seeded). */
+  autoStarterIid: string | null;
   /** Pokémon Pension (Day Care): a single 1★ mon training to a 2★. `roundsLeft`
    *  ticks down each planning round; at 0 it's ready to collect. */
   pension: {
@@ -162,8 +168,8 @@ type State = {
   /** Pick an augment — applies its effect and persists it. */
   pickAugment: (id: string) => void;
   /** Multiplayer: snapshot / restore the local economy for reconnect. */
-  exportSave: () => { gold: number; xp: number; level: number; units: UnitInstance[]; shop: (string | null)[]; items: string[]; augments: string[]; pension: State["pension"] };
-  importSave: (save: { gold: number; xp: number; level: number; units?: UnitInstance[]; shop?: (string | null)[]; items?: string[]; augments?: string[]; pension?: State["pension"] }, allowedIds?: string[], enabledItems?: string[]) => void;
+  exportSave: () => { gold: number; xp: number; level: number; units: UnitInstance[]; shop: (string | null)[]; items: string[]; augments: string[]; pension: State["pension"]; drafted: boolean };
+  importSave: (save: { gold: number; xp: number; level: number; units?: UnitInstance[]; shop?: (string | null)[]; items?: string[]; augments?: string[]; pension?: State["pension"]; drafted?: boolean }, allowedIds?: string[], enabledItems?: string[]) => void;
   /** Spawn loot drops at slain-creep positions (called at PvE combat-end). Idempotent
    *  per id so a re-render / reconnect can't double-drop. */
   spawnDrops: (drops: ItemDrop[]) => void;
@@ -176,6 +182,9 @@ type State = {
   reforgeItem: (itemId: string) => void;
   /** Anvil: forge a completed item into a random Spatula emblem (trait grantor). */
   forgeEmblem: (itemId: string) => void;
+  /** Opening draft: take one free starter from the offered picks. Once only —
+   *  `drafted` latches so a reconnect cannot claim a second. */
+  draftPick: (defId: string) => void;
   /** Pension: drop a 1★ mon into the Day Care to train it into a 2★. */
   depositToPension: (iid: string) => void;
   /** Pension: retrieve a matured mon (back to the bench, one star higher). */
@@ -235,6 +244,8 @@ export const useGame = create<State>((set, get) => ({
   items: [],
   drops: [],
   augments: [],
+  drafted: false,
+  autoStarterIid: null,
   gameTotals: { dmgDealt: 0, dmgTaken: 0, healed: 0, roundsWon: 0, roundsPlayed: 0 },
 
   benchUnits: () => get().units.filter((u) => u.pos === null),
@@ -254,17 +265,20 @@ export const useGame = create<State>((set, get) => ({
     // generateCreepBoard) so this single mon can win them.
     const starters = unitsByCost[1] ?? [];
     const units: UnitInstance[] = [];
+    let autoStarterIid: string | null = null;
     if (starters.length) {
       const id = starters[randInt(rng, starters.length)];
       takeFromPool(pool, id);
-      units.push({ ...makeInstance(id), pos: [3, BOARD.rows - 1] });
+      const inst = { ...makeInstance(id), pos: [3, BOARD.rows - 1] } as UnitInstance;
+      units.push(inst);
+      autoStarterIid = inst.iid;
     }
     set({
       pool, unitsByCost, enabledItems: enabledItems && enabledItems.length ? enabledItems : null,
       pension: null,
       gold: 4, xp: 0, level: 1,
       // Game-mode starting items (region signature Emblem + item, Mega Madness stone).
-      streak: 0, units, frozen: false, items: startItems ? [...startItems] : [], drops: [], augments: [],
+      streak: 0, units, frozen: false, items: startItems ? [...startItems] : [], drops: [], augments: [], drafted: false, autoStarterIid,
       shop: rollShop(1, pool, rng, unitsByCost),
       gameTotals: { dmgDealt: 0, dmgTaken: 0, healed: 0, roundsWon: 0, roundsPlayed: 0 },
     });
@@ -597,7 +611,7 @@ export const useGame = create<State>((set, get) => ({
     const s = get();
     // Fold any uncollected board drops into the synced items so a reconnect banks
     // them (the board-drop layer is purely a local visual; the item is never lost).
-    return { gold: s.gold, xp: s.xp, level: s.level, units: s.units, shop: s.shop, items: [...s.items, ...s.drops.map((d) => d.itemId)], augments: s.augments, pension: s.pension };
+    return { gold: s.gold, xp: s.xp, level: s.level, units: s.units, shop: s.shop, items: [...s.items, ...s.drops.map((d) => d.itemId)], augments: s.augments, pension: s.pension, drafted: s.drafted };
   },
 
   importSave: (save, allowedIds, enabledItems) => {
@@ -631,6 +645,45 @@ export const useGame = create<State>((set, get) => ({
       drops: [], // synced saves bank drops as items (see exportSave)
       augments: toArray<string>(save.augments).filter(Boolean) as string[],
       pension: restoredPension,
+      // Latched through the save, the same way augments are: without it a
+      // reconnect during round 1-1 reopens the draft and hands out a second
+      // free mon. RTDB drops `false`, so a missing field means "not yet".
+      drafted: save.drafted === true,
+    });
+  },
+
+  draftPick: (defId) => {
+    const state = get();
+    // Once only. The overlay gates on this too, but the store is where it has
+    // to be enforced: two rapid clicks, or a re-render mid-pick, both reach
+    // here before any gate upstream has re-evaluated.
+    if (state.drafted) return;
+    // hasDef, NOT getDef: getDef never returns undefined — it hands back a
+    // placeholderDef for an unknown id — so a truthiness check on it is dead
+    // code and a bad id would have produced a phantom unit.
+    if (!hasDef(defId)) return;
+
+    // REPLACE the free starter newGame auto-placed, rather than adding to it.
+    // The game already gives one free mon; drafting is meant to make that mon
+    // a choice, not to hand out a second one and inflate everyone's opening.
+    let units = state.units;
+    let pos: UnitInstance["pos"] = null;
+    const auto = state.autoStarterIid ? units.find((u) => u.iid === state.autoStarterIid) : undefined;
+    if (auto) {
+      // Give its copy back before taking the chosen one, or the pool slowly
+      // leaks a copy of a mon nobody ever owned.
+      returnToPool(state.pool, auto.defId, copiesForStar(auto.star));
+      pos = auto.pos;
+      units = units.filter((u) => u.iid !== auto.iid);
+    }
+
+    // Free to the PLAYER, not free of the shared pool — it is a real copy, and
+    // skipping the debit would quietly inflate everyone's three-star odds.
+    takeFromPool(state.pool, defId);
+    const r = applyCombines([...units, { ...makeInstance(defId), pos }]);
+    set({
+      drafted: true, autoStarterIid: null,
+      units: r.units, items: [...state.items, ...r.dropped], pool: { ...state.pool },
     });
   },
 

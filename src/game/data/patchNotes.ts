@@ -12,6 +12,41 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    // One entry for the whole batch, on the PATCH digit. A version per feature
+    // burns through numbers that then mean nothing -- v0.5 to v0.9 shipped in
+    // under three hours once. There is plenty of room below the minor.
+    id: "2026-11-12",
+    version: "v0.9.1",
+    title: {
+      en: "Live chat, draft your starter, and an arena that reads your board",
+      fr: "Tchat en direct, draft de ton starter, et une ar\u00e8ne qui lit ton plateau",
+    },
+    changes: [
+      { en: "Live chat in every match \u2014 free text and quick presets, with scrollback you can actually read. The old quick-chat had never delivered a single message: the database refused every write and the error was swallowed.",
+        fr: "Tchat en direct dans chaque partie \u2014 texte libre et messages rapides, avec un historique lisible. L'ancien tchat n'avait jamais d\u00e9livr\u00e9 un seul message : la base refusait chaque \u00e9criture et l'erreur \u00e9tait aval\u00e9e." },
+      { en: "Draft your starter: the free opening mon is now a choice between six, drawn from the lobby's roster, instead of a random handout.",
+        fr: "Draft de ton starter : le Pok\u00e9mon offert en ouverture est d\u00e9sormais un choix parmi six, tir\u00e9s du roster du salon, au lieu d'un tirage al\u00e9atoire." },
+      { en: "The arena takes its character from your board \u2014 a Fire team fights on warm basalt under drifting embers, a Water team on a cold shelf in the rain. Eighteen types, each with its own weather.",
+        fr: "L'ar\u00e8ne prend le caract\u00e8re de ton plateau \u2014 une \u00e9quipe Feu combat sur du basalte chaud sous des braises, une \u00e9quipe Eau sur une dalle froide sous la pluie. Dix-huit types, chacun sa m\u00e9t\u00e9o." },
+      { en: "Unit details now recommend the items worth building on that mon, ranked from its own statline, instead of reprinting the type chart.",
+        fr: "La fiche d'une unit\u00e9 recommande d\u00e9sormais les objets qui lui conviennent, class\u00e9s d'apr\u00e8s ses propres stats, au lieu de r\u00e9afficher le tableau des types." },
+      { en: "Shop: the drop odds moved above the cards they are odds on, freeze became a lock at the top right, the level now shows what it costs in gold, and the sell slot is gone \u2014 drag onto the shop to sell, so the cards get the full width.",
+        fr: "Boutique : les chances sont pass\u00e9es au-dessus des cartes concern\u00e9es, le gel est devenu un cadenas en haut \u00e0 droite, le niveau affiche son co\u00fbt en or, et la case de vente a disparu \u2014 glisse sur la boutique pour vendre, les cartes prennent toute la largeur." },
+      { en: "The Day Care moved off the board into the right rail under the trainers list, and is no longer taller than it needs to be.",
+        fr: "La Pension a quitt\u00e9 le plateau pour la colonne de droite sous la liste des dresseurs, et n'est plus plus grande que n\u00e9cessaire." },
+      { en: "Both recap panels can be dragged anywhere and stay where you put them \u2014 the round recap and the combat DMG/TANK/HEAL panel, which used to cover the fight it was describing.",
+        fr: "Les deux r\u00e9capitulatifs se d\u00e9placent o\u00f9 tu veux et y restent \u2014 celui du round et celui du combat (DMG/TANK/HEAL), qui masquait le combat qu'il d\u00e9crivait." },
+      { en: "Round tracker: the icons were being cut in half by a scrolling strip, and every round now explains itself on hover \u2014 stage, type, who you fought and what it cost.",
+        fr: "Suivi des rounds : les ic\u00f4nes \u00e9taient coup\u00e9es en deux par la barre d\u00e9filante, et chaque round s'explique au survol \u2014 \u00e9tage, type, adversaire et PV perdus." },
+      { en: "Your item stash can no longer squeeze the synergy list off the rail when your inventory fills up.",
+        fr: "Ton stock d'objets ne peut plus chasser la liste des synergies de la colonne quand l'inventaire se remplit." },
+      { en: "A carousel reward is no longer lost if you are disconnected when the timer runs out \u2014 it waits for you and is applied when you come back.",
+        fr: "Une r\u00e9compense de carrousel n'est plus perdue si tu es d\u00e9connect\u00e9 \u00e0 la fin du chrono \u2014 elle t'attend et s'applique \u00e0 ton retour." },
+      { en: "The game has one address now: poke-tft.web.app. Old links still work.",
+        fr: "Le jeu a une seule adresse d\u00e9sormais : poke-tft.web.app. Les anciens liens fonctionnent toujours." },
+    ],
+  },
+  {
     id: "2026-08-25",
     version: "v0.8",
     title: { en: "Desktop app sign-in actually fixed, plus UI & history fixes", fr: "Connexion de l'appli desktop enfin corrigée, plus correctifs d'affichage & d'historique" },
