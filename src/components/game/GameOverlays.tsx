@@ -438,7 +438,11 @@ export function AugmentOverlay({
         <button
           onClick={rerollAugments}
           disabled={augRerollCost > 0 && gold < augRerollCost}
-          className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-900/50 hover:bg-violet-700 border border-violet-500/50 text-violet-100 text-[12px] font-bold disabled:opacity-35 disabled:cursor-not-allowed transition-colors"
+          // mt-5 plus three full-height augment cards overran a phone in
+          // landscape, so the reroll fell below the fold of the scroll
+          // container and read as "not rendering". Tighter margin, and the
+          // button is kept in flow with a floor on the gap.
+          className="mt-3 sm:mt-5 shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-900/50 hover:bg-violet-700 border border-violet-500/50 text-violet-100 text-[12px] font-bold disabled:opacity-35 disabled:cursor-not-allowed transition-colors"
         >
           <RefreshCw size={14} />
           {t.net_augment_reroll}
