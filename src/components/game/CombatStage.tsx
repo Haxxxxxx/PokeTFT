@@ -294,12 +294,19 @@ export function CombatStage({
 
   return (
     <div className={inline
-      ? "absolute inset-0 flex items-center justify-center"
-      : "fixed inset-0 z-screen flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"}>
-      {/* Combat chrome (scoreboard + timer) FLOATS at the top so the battlefield
-          stays vertically centered in the exact same box as the planning board —
-          the layout never shifts between phases. */}
-      <div className="absolute top-0 inset-x-0 flex flex-col items-center">
+      ? "absolute inset-0 flex flex-col items-center justify-center"
+      : "fixed inset-0 z-screen flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4"}>
+      {/* Combat chrome (scoreboard + timer). IN FLOW, with a reserved height.
+          It used to float `absolute top-0` so the battlefield could stay
+          centred in the same box as the planning board — but the board no
+          longer matches planning's size anyway (combat solves its own tile),
+          and the floating version was simply drawn ON the board: 24px onto it
+          at 1920x1080, 52px at 852x393. The height is fixed rather than
+          natural so the board does not jump when the pre-fight bar leaves. */}
+      <div
+        className="shrink-0 w-full flex flex-col items-center justify-start overflow-hidden"
+        style={{ height: layout.combat.chromeH }}
+      >
       {/* Subtle one-line matchup (was a big scoreboard bar) — survivor counts +
           opponent, kept minimal so it doesn't dominate the fight view. */}
       <div className="flex items-center justify-center gap-2 mb-1 text-[11px] font-bold max-w-[460px]">

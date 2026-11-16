@@ -53,12 +53,15 @@ for (const vp of VIEWPORTS) {
   assert(usedH <= vp.h, `${vp.name} (${vp.w}x${vp.h}) — planning fits (${usedH} <= ${vp.h})`);
 }
 
-console.log("\nCOMBAT phase fits every viewport (full 8-row field, no bench):");
+console.log("\nCOMBAT phase fits every viewport (full 8-row field, bench AND shop):");
 for (const vp of VIEWPORTS) {
   const L = computeGameLayout(vp.w, vp.h);
-  const usedH = L.hideBottomInCombat
-    ? L.topH + L.boardBox.h + L.gap + L.pad * 2
-    : L.topH + L.boardBox.h + L.shopH + L.gap * 2 + L.pad * 2;
+  // Nothing yields during the fight any more: the shop stays (you can buy
+  // mid-combat) and so does the bench (or the mon you just bought vanishes
+  // into a row you cannot see). Combat pays for both out of its own tile.
+  const usedH = L.combat.hidesBottom
+    ? L.topH + L.combat.chromeH + L.combat.boardBox.h + L.gap + L.pad * 2
+    : L.topH + L.combat.chromeH + L.combat.boardBox.h + L.combat.benchH + L.shopH + L.gap * 2 + L.pad * 2;
   assert(usedH <= vp.h, `${vp.name} — combat fits (${usedH} <= ${vp.h})`);
 }
 
@@ -71,12 +74,22 @@ for (const vp of VIEWPORTS) {
   assert(usedW <= vp.w, `${vp.name} — horizontal fits (${usedW} <= ${vp.w})`);
 }
 
-console.log("\nThe board never changes scale between phases:");
+// The board USED to be one size in both phases. It cannot be any more: combat
+// draws eight rows where planning draws four, into the same column, with the
+// shop and bench still up. Holding both to one tile meant the fight's
+// constraint set the size of the whole game — a 38% smaller board at every
+// moment, to spare a few seconds of resize. What still has to hold is that
+// combat never GROWS into the fight, and never collapses to nothing.
+console.log("\nCombat's board is its own size, and never larger than planning's:");
 for (const vp of VIEWPORTS) {
   const L = computeGameLayout(vp.w, vp.h);
   assert(
-    L.planningBox.w === L.boardBox.w,
-    `${vp.name} — same tile in planning and combat (board ${L.boardBox.w}px wide)`,
+    L.combat.tile.w <= L.tile.w,
+    `${vp.name} — combat tile ${L.combat.tile.w}px <= planning ${L.tile.w}px`,
+  );
+  assert(
+    L.combat.tile.w >= 16,
+    `${vp.name} — combat tile ${L.combat.tile.w}px stays legible`,
   );
 }
 

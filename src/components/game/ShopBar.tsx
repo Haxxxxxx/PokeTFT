@@ -103,7 +103,14 @@ function ShopBarBase() {
   // below the fold, where the document does not scroll. The least useful line
   // goes first: the cost to level is an optimisation, the level and the button
   // are the controls.
-  const tightShop = layout.railsAsDrawers;
+  // Keyed on DENSITY, not on whether the rails are drawers. Those used to be
+  // the same thing, so `railsAsDrawers` was standing in for "short screen" —
+  // and then the rails learned to go inline on a short-but-wide window, which
+  // silently handed this row its roomy variant while `shopH` was still the
+  // compact tier's 86px. The extra lines overran it exactly as described
+  // above. What makes the shop tight is the height it was given, not what the
+  // rails are doing.
+  const tightShop = layout.density === "compact";
   // Level recap for the Buy XP control: progress toward the next level + cost.
   const atMax = level >= MAX_LEVEL;
   const xpBase = XP_TO_REACH[level];
