@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>iOS capability check</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      margin: 0; padding: 16px;
+      background: #0a0e1a; color: #e2e8f0;
+      font: 15px/1.5 -apple-system, system-ui, sans-serif;
+    }
+    h1 { font-size: 17px; margin: 0 0 12px; color: #fbbf24; }
+    table { width: 100%; border-collapse: collapse; }
+    td { padding: 7px 4px; border-bottom: 1px solid #1e293b; vertical-align: top; }
+    td:first-child { color: #94a3b8; width: 52%; }
+    .y { color: #34d399; font-weight: 700; }
+    .n { color: #f87171; font-weight: 700; }
+    .v { color: #f8fafc; font-weight: 700; }
+    p { color: #64748b; font-size: 12px; margin: 14px 0 0; }
+  </style>
+</head>
+<body>
+  <!-- Reads, from REAL Safari, the three facts the mobile fixes rest on.
+       Chromium cannot answer any of them: it implements the Fullscreen API,
+       and it keeps innerHeight and visualViewport.height identical. -->
+  <h1>PokéTFT · iOS capability check</h1>
+  <table id="t"></table>
+  <p id="verdict"></p>
+
+  <script>
+    function row(label, value, kind) {
+      const tr = document.createElement("tr");
+      const a = document.createElement("td");
+      const b = document.createElement("td");
+      a.textContent = label;
+      b.textContent = value;
+      b.className = kind || "v";
+      tr.append(a, b);
+      document.getElementById("t").append(tr);
+    }
+
+    var de = document.documentElement;
+    var vv = window.visualViewport;
+
+    var fsEl = typeof de.requestFullscreen === "function";
+    var fsWk = typeof de.webkitRequestFullscreen === "function";
+    row("requestFullscreen on <html>", fsEl ? "present" : "ABSENT", fsEl ? "y" : "n");
+    row("webkitRequestFullscreen on <html>", fsWk ? "present" : "ABSENT", fsWk ? "y" : "n");
+
+    row("window.innerHeight", String(window.innerHeight));
+    row("visualViewport.height", vv ? String(Math.round(vv.height)) : "no visualViewport");
+    var diff = vv ? window.innerHeight - Math.round(vv.height) : 0;
+    row("difference (URL bar etc.)", String(diff) + "px", diff !== 0 ? "n" : "y");
+
+    row("window.innerWidth", String(window.innerWidth));
+    row("devicePixelRatio", String(window.devicePixelRatio));
+    row("orientation", window.innerWidth > window.innerHeight ? "landscape" : "portrait");
+
+    var standalone = navigator.standalone === true
+      || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+    row("running standalone (home screen)", standalone ? "YES" : "no — Safari tab", standalone ? "y" : "n");
+
+    row("safe-area-inset-top", getComputedStyle(de).getPropertyValue("--sat") || "n/a");
+    row("UA", navigator.userAgent.slice(0, 64));
+
+    var msgs = [];
+    if (!fsEl && !fsWk) msgs.push("No Fullscreen API — the in-game button correctly hides here.");
+    if (diff !== 0) msgs.push("innerHeight overstates the visible area by " + diff + "px — this is why the board now reads visualViewport.");
+    if (standalone) msgs.push("Launched from the Home Screen: this is the fullscreen path.");
+    document.getElementById("verdict").textContent = msgs.join(" ");
+  </script>
+</body>
+</html>

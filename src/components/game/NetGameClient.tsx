@@ -1215,6 +1215,11 @@ export function NetGameClient() {
   // Spectating a rival from the scoreboard → watch their board, bench and fights
   // (read-only). Works while alive (scouting) and after death (keep watching).
   const spectating = !!spectate && spectate !== myUid && !!players[spectate];
+  // The rail is 48px on a phone in landscape. Below roughly a portrait plus
+  // padding there is no room for a name, a level chip or synergy hexes, and
+  // rendering them anyway pushed them past the right edge of the screen — into
+  // a document that does not scroll, so they were clipped rather than reachable.
+  const slimRail = L.rightRail < 120;
   // Only on the opening round, only for a live player on their own board, and
   // only when the augment overlay is not up — two full-screen pickers at once
   // would stack and the player would answer whichever mounted on top.
@@ -1632,7 +1637,14 @@ export function NetGameClient() {
               cross axis is horizontal where the grid track's was vertical. */}
           <div className="order-last self-start flex flex-col min-h-0 max-h-full" style={{ gap: L.gap }}>
           <div className="gilded w-full p-2 rounded-xl min-h-0 overflow-y-auto">
-            <h2 className="text-[10px] uppercase tracking-wider text-gold-200/55 px-1 mb-1.5">{t.net_trainers(aliveCount)}</h2>
+            {/* On a phone the rail is 48px wide (TIERS.compact.rightRail) and
+                "Dresseurs · 2 restants" cannot fit in it — it wrapped and then
+                spilled past the right edge of the screen, where the document
+                does not scroll, so it was simply cut off. The slim rail shows
+                the count alone; the names live one tap away on each portrait. */}
+            <h2 className="text-[10px] uppercase tracking-wider text-gold-200/55 px-1 mb-1.5 text-center">
+              {slimRail ? aliveCount : t.net_trainers(aliveCount)}
+            </h2>
             <div className="flex flex-col gap-1">
               {ladder.map((p, i) => {
                 const pBoard = asBoard(p.board);
@@ -1650,9 +1662,9 @@ export function NetGameClient() {
                     key={p.uid}
                     onClick={() => setSpectate(isSpectator ? p.uid : (p.uid === myUid ? null : (spectate === p.uid ? null : p.uid)))}
                     title={p.uid === myUid && !isSpectator ? t.net_your_board : t.net_view_board(p.name)}
-                    className={`flex items-center gap-2 px-1.5 py-1 rounded-lg cursor-pointer hover:bg-slate-700/50 ${p.uid === myUid ? "bg-slate-700/70 ring-1 ring-sky-500/50" : ""} ${spectate === p.uid ? "ring-1 ring-gold-400/70 bg-gold-500/10" : ""} ${isNm && p.alive ? "ring-1 ring-rose-600/50 bg-rose-950/20" : ""} ${!p.alive ? "opacity-40" : ""}`}
+                    className={`flex items-center rounded-lg cursor-pointer hover:bg-slate-700/50 ${slimRail ? "justify-center p-0.5" : "gap-2 px-1.5 py-1"} ${p.uid === myUid ? "bg-slate-700/70 ring-1 ring-sky-500/50" : ""} ${spectate === p.uid ? "ring-1 ring-gold-400/70 bg-gold-500/10" : ""} ${isNm && p.alive ? "ring-1 ring-rose-600/50 bg-rose-950/20" : ""} ${!p.alive ? "opacity-40" : ""}`}
                   >
-                    <span className="w-4 text-[10px] text-slate-500 font-bold text-center">{p.place ?? i + 1}</span>
+                    {!slimRail && <span className="w-4 text-[10px] text-slate-500 font-bold text-center">{p.place ?? i + 1}</span>}
                     {/* Circular portrait with a ranked ring — TFT's trainer rail.
                         The ring colour carries standing (gold at the top, rose
                         for a nightmare bot) so the rail is scannable without
@@ -1666,7 +1678,20 @@ export function NetGameClient() {
                       ) : dex ? (
                         <PokemonModelPreview dex={dex} alt={p.name} width={26} height={26} />
                       ) : <span className="text-[10px] font-bold text-slate-500">{p.name.slice(0, 1).toUpperCase()}</span>}
+                      {/* HP as a ring segment under the portrait, since the bar
+                          and its number are gone at this width. */}
+                      {slimRail && (
+                        <span className="absolute inset-x-0 bottom-0 h-[3px] bg-slate-900/80">
+                          <span className="block h-full" style={{ width: `${Math.max(0, p.hp)}%`, background: p.hp > 50 ? "#34d399" : p.hp > 25 ? "#fbbf24" : "#f87171" }} />
+                        </span>
+                      )}
                     </span>
+                    {slimRail ? (
+                      // A phone keeps the portrait and a thread of HP under it.
+                      // Everything else — name, level, synergies, the number —
+                      // is what made the row 150px wide in a 48px column.
+                      <span className="sr-only">{p.name}</span>
+                    ) : (
                     <span className="flex-1 min-w-0">
                       <span className="flex items-center gap-1.5">
                         <span className={`block text-[11px] font-semibold truncate ${isNm ? "text-rose-300" : p.uid === myUid ? "text-gold-300" : "text-slate-200"}`}>
@@ -1698,6 +1723,7 @@ export function NetGameClient() {
                         <span className="text-[10px] tabular-nums text-slate-400 w-6 text-right">{Math.max(0, p.hp)}</span>
                       </span>
                     </span>
+                    )}
                   </div>
                 );
               })}
