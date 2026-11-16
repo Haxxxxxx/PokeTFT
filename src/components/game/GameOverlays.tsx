@@ -481,7 +481,17 @@ export function GameOverScreen({
     ? <TrophyIcon size={18} style={{ color: place === 1 ? "#fbbf24" : place === 2 ? "#cbd5e1" : "#d97706" }} />
     : `#${place}`);
   return (
-    <div className="fixed inset-0 z-screen flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm gap-5 p-4">
+    // overflow-y-auto, and the centring moved to an inner wrapper.
+    //
+    // This was the one full-screen overlay without it: the draft and augment
+    // screens both scroll, this one did not. With justify-center on the fixed
+    // box, a tall standings list (eight players, their boards, the totals)
+    // centres its own overflow — so the buttons underneath go off the bottom
+    // of the screen with no way to reach them. Reported as not being able to
+    // quit once the game is over, and it bites hardest on a phone, where
+    // there is least height to spare.
+    <div className="fixed inset-0 z-screen overflow-y-auto bg-black/85 backdrop-blur-sm">
+    <div className="min-h-full flex flex-col items-center justify-center gap-5 p-4">
       <div className={`celebrate-pop flex flex-col items-center gap-2 ${iWon ? "text-gold-300" : "text-slate-200"}`}>
         {iWon && <TrophyIcon size={52} />}
         <div className="text-4xl font-extrabold">{iWon ? t.net_victory : t.net_gameover}</div>
@@ -611,6 +621,7 @@ export function GameOverScreen({
         )}
         <button onClick={leave} className="px-6 py-2.5 rounded-lg bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-slate-200 text-sm font-bold">{t.net_quit}</button>
       </div>
+    </div>
     </div>
   );
 }

@@ -5,7 +5,6 @@ import { ref, push, onChildAdded, query, limitToLast, onValue } from "firebase/d
 import { db } from "@/game/net/firebase";
 import { useT } from "@/lib/i18n";
 import { useDraggablePanel } from "./useDraggablePanel";
-import { useGameLayout } from "./LayoutProvider";
 import { MessageSquare, Send, X } from "lucide-react";
 
 /**
@@ -61,12 +60,6 @@ export function MatchChat({
   canSend: boolean;
 }) {
   const t = useT();
-  // The toggle used to sit at bottom-4, which put it squarely on the last shop
-  // card's cost badge — measured as a real overlap at 1440x900, and worse on a
-  // phone where the cards are narrower. It now clears the shop row, whose
-  // height the layout engine already publishes.
-  const layout = useGameLayout();
-  const liftAboveShop = layout.shopH + layout.pad + 10;
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
@@ -162,7 +155,7 @@ export function MatchChat({
     <>
       {/* Unread, floated over the board while the panel is shut. */}
       {!open && toasts.length > 0 && (
-        <div style={{ bottom: liftAboveShop + 48 }} className="fixed right-4 z-screen flex flex-col items-end gap-1.5 pointer-events-none select-none">
+        <div className="fixed right-4 top-24 z-screen flex flex-col items-end gap-1.5 pointer-events-none select-none">
           {toasts.map((m) => (
             <div key={m.id} className="flex items-baseline gap-2 rounded-full border border-slate-600/60 bg-slate-900/90 px-3 py-1.5 text-xs shadow-lg backdrop-blur-sm">
               <span className="font-bold text-gold-200/80">{m.name}</span>
@@ -260,12 +253,11 @@ export function MatchChat({
         onClick={toggle}
         aria-label={t.chat_title}
         title={t.chat_title}
-        style={{ bottom: liftAboveShop }}
-        className="fixed right-4 z-screen flex h-10 w-10 items-center justify-center rounded-full border border-slate-700/80 bg-slate-800/90 text-slate-300 shadow-lg transition-all hover:border-gold-400/60 hover:bg-slate-700/90 hover:text-gold-300"
+        className={`relative px-2.5 py-1.5 rounded-md border text-xs font-bold leading-none ${open ? "bg-gold-500/90 text-black border-gold-400" : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"}`}
       >
-        <MessageSquare size={17} />
+        <MessageSquare size={14} />
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-extrabold text-white">
+          <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-extrabold text-white">
             {unread > 9 ? "9+" : unread}
           </span>
         )}

@@ -24,7 +24,7 @@ import { useT } from "@/lib/i18n";
  * The next ball also carries a fill ring showing progress toward it, so the
  * gold between breakpoints is not dead space.
  */
-export function IncomeBalls({ size, inset }: { size: number; inset: number }) {
+export function IncomeBalls({ size, inset, relative }: { size: number; inset: number; relative?: boolean }) {
   const gold = useGame((s) => s.gold);
   const t = useT();
 
@@ -48,8 +48,10 @@ export function IncomeBalls({ size, inset }: { size: number; inset: number }) {
       data-income={earned}
       data-income-cap={cap}
       title={`${t.net_interest_label} +${earned}`}
-      className="pointer-events-none absolute z-20 select-none"
-      style={{ left: inset, top: "50%", transform: "translateY(-50%)", width: size, height }}
+      className={`pointer-events-none select-none ${relative ? "relative" : "absolute z-20"}`}
+      style={relative
+        ? { width: size, height }
+        : { left: inset, top: "50%", transform: "translateY(-50%)", width: size, height }}
     >
       {Array.from({ length: cap }, (_, i) => {
         const filled = i < earned;

@@ -7,6 +7,7 @@ import { boardSizeForLevel } from "@/game/config";
 import { useGame, BENCH_SIZE, resolveBenchSlots } from "@/game/store/gameStore";
 import { useGameLayout } from "./LayoutProvider";
 import { ArenaEffects } from "./ArenaEffects";
+import { IncomeBalls } from "./IncomeBalls";
 import { resolveArena } from "@/game/ui/arena-variants";
 import { useAppStore } from "@/game/store/appStore";
 import { UnitChip } from "./UnitChip";
@@ -463,6 +464,17 @@ function BoardBase({
           );
         })}
       </div>
+      {/* Interest, flush against the board's left edge and OUTSIDE it.
+          right:100% on a child of the (relative) arena frame puts it just
+          past that edge — anchored to the board column instead it floated in
+          the middle of the empty track, and anchored inside the frame it sat
+          on the hexes. Only on your own live board. */}
+      {withBench && !units && (
+        <div className="absolute top-1/2 -translate-y-1/2 pointer-events-none" style={{ right: "100%", marginRight: 10 }}>
+          <IncomeBalls size={Math.round(benchSize * 0.62)} inset={0} relative />
+        </div>
+      )}
+
       {/* No 3D layer. The fighting scene cannot be done in 3D with this asset
           set — 89% of the models ship with no animation clips at all and only 2%
           have an attack clip (tools/model-clip-stats.mjs), so a fight rendered
