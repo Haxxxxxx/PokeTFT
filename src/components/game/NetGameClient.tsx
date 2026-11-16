@@ -45,7 +45,6 @@ function asUnits(u: unknown): UnitInstance[] {
 import { Board } from "./Board";
 import { createPortal } from "react-dom";
 import { PensionDock } from "./PensionDock";
-import { IncomeBalls } from "./IncomeBalls";
 import { useDraggablePanel } from "./useDraggablePanel";
 import { computeTraits } from "@/game/engine/synergies";
 import { TYPE_COLOR } from "@/game/ui";
@@ -1234,11 +1233,6 @@ export function NetGameClient() {
   // is chrome; on a 393px-tall screen it was spending a tenth of the height on
   // a row of icons you glance at between rounds.
   const tightTop = L.railsAsDrawers;
-  // The stack lives in the board column's left slack. That slack is generous on
-  // a desktop and thin on a phone, so the ball is sized against the bench slot
-  // and then capped — an un-capped mon-sized ball is wider than the gap it has
-  // to sit in at the compact tier.
-  const incomeBallSize = Math.min(L.benchSlot, Math.max(18, Math.round(L.viewport.w * 0.045)));
   // Only on the opening round, only for a live player on their own board, and
   // only when the augment overlay is not up — two full-screen pickers at once
   // would stack and the player would answer whichever mounted on top.
@@ -1581,6 +1575,14 @@ export function NetGameClient() {
               </button>
             )}
             {/* Only where the rail is not on screen. */}
+            {inMatch && (
+              <MatchChat
+                code={room.code}
+                myUid={myUid}
+                myName={me?.name ?? ""}
+                canSend={!isSpectator && !!me}
+              />
+            )}
             {L.railsAsDrawers && (
               <button
                 onClick={() => setRailDrawer((v) => !v)}
@@ -1627,7 +1629,9 @@ export function NetGameClient() {
                 onClick={() => setRailDrawer(false)}
                 className="fixed inset-0 z-panel bg-black/60 backdrop-blur-sm"
               />
-              <div className="fixed left-0 top-0 bottom-0 z-panel w-[min(76vw,300px)] flex flex-col gap-2 overflow-y-auto bg-[#0a0e1a]/95 border-r border-white/10 p-2.5 shadow-2xl">
+              {/* Opens from the RIGHT: that is the side the request named, and
+                  it is also the side the button that opens it lives on. */}
+              <div className="fixed right-0 top-0 bottom-0 z-panel w-[min(76vw,300px)] flex flex-col gap-2 overflow-y-auto bg-[#0a0e1a]/95 border-l border-white/10 p-2.5 shadow-2xl">
                 <div className="flex items-center justify-between shrink-0">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-gold-200/60">{t.sh_items_title}</span>
                   <button onClick={() => setRailDrawer(false)} aria-label={t.chat_close} className="text-slate-400 hover:text-slate-100">
@@ -1804,16 +1808,6 @@ export function NetGameClient() {
               and combat together), so the arena never jumps when the phase flips.
               A `board-swap` fade plays when the view changes. */}
           <div className={`order-2 relative min-w-0 min-h-0 flex items-center justify-center rounded-xl${boardFlash ? " screen-flash" : ""}`}>
-            {/* Interest, BESIDE the board. It used to be drawn inside the arena
-                frame, which put it over the left-hand hexes — on a phone that
-                is squarely on top of the playable area. The board column
-                centres the arena, so anchoring here uses the slack the column
-                already has instead of borrowing from the board.
-                Only on your OWN live board: on a scouted rival's it would be
-                their economy shown over your context. */}
-            {!isSpectator && !spectating && phase !== "combat" && (
-              <IncomeBalls size={incomeBallSize} inset={0} />
-            )}
             {/* Float-up text for HP damage or gold gain feedback. */}
             {floatText && (
               <div key={floatKey} className={`float-up absolute top-4 left-1/2 -translate-x-1/2 z-30 text-sm font-extrabold drop-shadow pointer-events-none select-none ${floatText.startsWith("−") ? "text-rose-300" : "text-gold-300"}`}>
@@ -2020,14 +2014,7 @@ export function NetGameClient() {
           old gate cut you out of the conversation at exactly the moment you
           had nothing to do but talk. Spectators get the panel read-only; the
           rules have no player node to authorise their writes. */}
-      {inMatch && (
-        <MatchChat
-          code={room.code}
-          myUid={myUid}
-          myName={me?.name ?? ""}
-          canSend={!isSpectator && !!me}
-        />
-      )}
+
     </DndContext>
   );
 }
@@ -2260,8 +2247,11 @@ function PhaseTimer({ phase, phaseLabel, deadline, totalMs, resolvingLabel }: { 
     // but UNREACHABLE — you could not scroll to it. It now compresses on small
     // viewports and only claims 220px once there is room for it.
     <div className="flex-1 min-w-0 lg:min-w-[220px] flex flex-col gap-1 px-2">
-      <div className="flex justify-between items-baseline">
-        <span className={`text-xs font-bold uppercase tracking-wide ${resolving ? "text-gold-300 animate-pulse" : urgent ? "text-rose-300 timer-urgent" : phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{resolving ? resolvingLabel : phaseLabel}</span>
+      {/* gap-2 and a truncating label: justify-between alone leaves no space
+          once the label fills the row, and on the tightened HUD the phase name
+          ran straight into the countdown — "PLANIFICATION18s". */}
+      <div className="flex justify-between items-baseline gap-2">
+        <span className={`truncate text-xs font-bold uppercase tracking-wide ${resolving ? "text-gold-300 animate-pulse" : urgent ? "text-rose-300 timer-urgent" : phase === "combat" ? "text-rose-300" : "text-sky-300"}`}>{resolving ? resolvingLabel : phaseLabel}</span>
         <span className={`text-sm font-bold tabular-nums ${urgent ? "text-rose-300 timer-urgent" : "text-slate-200"}`}>
           {resolving
             ? <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-gold-400/25 border-t-amber-400 animate-spin align-middle" />
