@@ -21,7 +21,23 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
 
   useEffect(() => {
-    const read = () => setSize({ w: window.innerWidth, h: window.innerHeight });
+    const read = () => {
+      // visualViewport, NOT window.innerHeight.
+      //
+      // On iOS Safari window.innerHeight is the LAYOUT viewport: it stays at
+      // the full height while the URL bar is on screen, so the board was being
+      // solved for more height than the player can actually see and the bottom
+      // of it sat under the browser chrome. visualViewport is the part that is
+      // really visible, and it is what changes as the bar collapses.
+      //
+      // Chromium keeps the two in step, which is why no amount of emulation
+      // surfaces this — it only shows up on the device.
+      const vv = window.visualViewport;
+      setSize({
+        w: Math.round(vv?.width ?? window.innerWidth),
+        h: Math.round(vv?.height ?? window.innerHeight),
+      });
+    };
     read();
 
     // visualViewport tracks the browser chrome collapsing on mobile (URL bar
