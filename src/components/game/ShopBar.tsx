@@ -97,6 +97,13 @@ function ShopBarBase() {
   const layout = useGameLayout();
   const artSize = Math.round(layout.shopH * 1.08);
   const SHOP_M = shopControlMetrics(layout.font);
+  // A phone in landscape budgets 86px for the whole shop row (TIERS.compact
+  // .shopH). The control column stacks level + XP bar + buy line + the
+  // cost-to-level line, which together overran that and pushed the button 24px
+  // below the fold, where the document does not scroll. The least useful line
+  // goes first: the cost to level is an optimisation, the level and the button
+  // are the controls.
+  const tightShop = layout.railsAsDrawers;
   // Level recap for the Buy XP control: progress toward the next level + cost.
   const atMax = level >= MAX_LEVEL;
   const xpBase = XP_TO_REACH[level];
@@ -116,29 +123,37 @@ function ShopBarBase() {
       {/* Width tracks the density tier. At a flat 150px this column took the
           same space on a phone as on a desktop, squeezing the card strip —
           which is the part that has to stay readable. */}
-      <div style={{ width: SHOP_M.w }} className="flex flex-col gap-1.5 justify-center pr-1 shrink-0">
+      <div style={{ width: SHOP_M.w }} className={`flex flex-col justify-center pr-1 shrink-0 ${tightShop ? "gap-0.5" : "gap-1.5"}`}>
         {/* Buy XP — with the level recap (current level + progress to the next) and
             the cost to level past it, so all the level info lives on the button. */}
         <button
           onClick={buyXp}
           disabled={gold < ECONOMY.buyXpCost || atMax}
-          className={`flex flex-col gap-1 px-2.5 py-1.5 rounded-lg bg-sky-800/80 hover:bg-sky-700 disabled:opacity-40 border border-sky-600/40 transition-colors ${levelUpFx ? "celebrate-pop" : ""}`}
+          className={`flex flex-col rounded-lg bg-sky-800/80 hover:bg-sky-700 disabled:opacity-40 border border-sky-600/40 transition-colors ${tightShop ? "gap-0 px-2 py-1" : "gap-1 px-2.5 py-1.5"} ${levelUpFx ? "celebrate-pop" : ""}`}
         >
-          <div className="flex items-center justify-between w-full text-[10px] leading-none">
-            <span className="font-extrabold text-slate-100">{t.net_level} {level}</span>
-            <span className="text-sky-200 tabular-nums">{atMax ? "MAX" : `${xpCur}/${xpNeed} XP`}</span>
-          </div>
-          <div className="h-1.5 w-full rounded-full bg-sky-950/70 overflow-hidden">
-            <div className="h-full bg-sky-300 transition-all" style={{ width: atMax ? "100%" : `${(xpCur / xpNeed) * 100}%` }} />
-          </div>
+          {!tightShop && (
+            <>
+              <div className="flex items-center justify-between w-full text-[10px] leading-none">
+                <span className="font-extrabold text-slate-100">{t.net_level} {level}</span>
+                <span className="text-sky-200 tabular-nums">{atMax ? "MAX" : `${xpCur}/${xpNeed} XP`}</span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-sky-950/70 overflow-hidden">
+                <div className="h-full bg-sky-300 transition-all" style={{ width: atMax ? "100%" : `${(xpCur / xpNeed) * 100}%` }} />
+              </div>
+            </>
+          )}
           <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-white">
-            {t.net_buy_xp}
+            {tightShop && <span className="text-sky-200 tabular-nums">{t.net_lv}{level}</span>}
+            {/* "Acheter XP" wraps to two lines in a 120px column and pushed the
+                button past its row. The icon-cost pair beside it already says
+                what the control does. */}
+            {tightShop ? "XP" : t.net_buy_xp}
             <span className="inline-flex items-center gap-0.5 text-gold-200"><CoinIcon size={11} />{ECONOMY.buyXpCost}</span>
             <span className="text-sky-200">+{ECONOMY.buyXpAmount}</span>
           </div>
           {/* The whole level, priced. Highlighted when you can actually afford
               it, because "can I level this round" is the question being asked. */}
-          {!atMax && (
+          {!atMax && !tightShop && (
             <div className={`flex items-center justify-center gap-1 text-[10px] font-bold leading-none ${gold >= goldToLevel ? "text-gold-200" : "text-slate-400"}`}>
               <span className="uppercase tracking-wide opacity-80">{t.sh_to_level(level + 1)}</span>
               <span className="inline-flex items-center gap-0.5 tabular-nums"><CoinIcon size={10} />{goldToLevel}</span>
@@ -149,13 +164,17 @@ function ShopBarBase() {
         <button
           onClick={() => { reroll(); sfx.reroll(); setRerollTick((n) => n + 1); }}
           disabled={gold < ECONOMY.rerollCost}
-          className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg bg-slate-700/80 hover:bg-slate-600 disabled:opacity-40 transition-colors"
+          className={`flex items-center justify-center rounded-lg bg-slate-700/80 hover:bg-slate-600 disabled:opacity-40 transition-colors ${tightShop ? "gap-1.5 px-2 py-1" : "flex-col gap-0.5 px-3 py-1.5"}`}
         >
-          <span className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-100"><RerollIcon size={16} /> {t.sh_reroll}</span>
-          <span className="inline-flex items-center gap-1 text-[11px] text-slate-300">
+          <span className={`inline-flex items-center gap-1.5 font-bold text-slate-100 ${tightShop ? "text-[12px]" : "text-sm"}`}>
+            <RerollIcon size={tightShop ? 13 : 16} /> {t.sh_reroll}
+          </span>
+          <span className={`inline-flex items-center gap-1 text-slate-300 ${tightShop ? "text-[10px]" : "text-[11px]"}`}>
             <span className="inline-flex items-center gap-0.5"><CoinIcon size={11} />{ECONOMY.rerollCost}</span>
-            <span className="text-slate-600">·</span>
-            <span className="inline-flex items-center gap-0.5 font-extrabold text-gold-300"><CoinIcon size={12} />{gold}</span>
+            {/* The gold-in-hand reading is the first thing to go when the row
+                has to fit a phone: it is already in the HUD above. */}
+            {!tightShop && <><span className="text-slate-600">·</span>
+            <span className="inline-flex items-center gap-0.5 font-extrabold text-gold-300"><CoinIcon size={12} />{gold}</span></>}
           </span>
         </button>
       </div>
@@ -306,7 +325,14 @@ function ShopBarBase() {
               </span>
 
               {/* Traits with icons, stacked top-left. */}
-              <div className="absolute top-2.5 left-2 z-10 flex flex-col items-start gap-1">
+              {/* The star/copies chip and the trait chips stack downward from
+                  the top of the card. On a phone the card is 57px tall and this
+                  stack measured 76px, so it ran out of the bottom and collided
+                  with the name — which is the overlapping text in the iPhone
+                  report. The chips are scouting detail; the name, cost and art
+                  are what you buy from. Hidden rather than shrunk, because at
+                  8px they were already at the floor. */}
+              <div className={`absolute top-2.5 left-2 z-10 flex flex-col items-start gap-1 ${tightShop ? "hidden" : ""}`}>
                 {own && (
                   /* One copy from a star-up is the single most consequential
                      thing a shop card can tell you, and it was whispering it in
