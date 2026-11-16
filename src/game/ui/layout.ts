@@ -45,16 +45,25 @@ export type GameLayout = {
   /** Board box while planning, using `planningRows`. */
   planningBox: { w: number; h: number };
   /**
-   * True when the bench and shop must yield the screen during combat. Only
-   * compact needs this, and it is what lets the full 8-row field fit there at
-   * the same tile size — so the board still never changes scale between phases.
+   * Combat's own geometry.
    *
-   * Read by NetGameClient, which is the shell. It was read by MatchShell for a
-   * while, and MatchShell was never mounted — so this described an intention
-   * nothing carried out, and `fightAvail` below budgeted the shop's height to a
-   * board that still had the shop under it.
+   * The fight draws all 8 rows into the same column planning uses for 4, with
+   * the shop and bench still on screen, so it gets a smaller tile of its own.
+   * Published rather than derived at the call site so the fit is solved once,
+   * here, against the height the fight actually receives.
    */
-  hideBottomInCombat: boolean;
+  combat: {
+    tile: { w: number; h: number };
+    field: { w: number; h: number };
+    boardBox: { w: number; h: number };
+    benchSlot: number;
+    benchH: number;
+    perspective: number;
+    /** True when the shop and bench must yield for the fight to stay readable. */
+    hidesBottom: boolean;
+    /** Height reserved above the battlefield for the fight's scoreboard. */
+    chromeH: number;
+  };
   /** Height of the top strip (round tracker + stage/round + timer). */
   topH: number;
   /** Edge length of one bench slot, and the bench strip's total height. The
@@ -114,6 +123,42 @@ const PERSPECTIVE_RATIO = 3.6;
 
 /** Below this the hex tokens stop being reliably tappable with a thumb. */
 const MIN_TILE_W = 34;
+/**
+ * The combat field's floor. Far below MIN_TILE_W on purpose: that one is a
+ * DRAGGABILITY floor, and the fight's board is locked — there is nothing on it
+ * to pick up. All it has to do is stay legible while it fits.
+ */
+const MIN_COMBAT_TILE = 16;
+/**
+ * Width below which the rails stay drawers however much spare width there is.
+ * A phone in landscape can technically afford 288px of rail without costing
+ * the board a pixel, but a third of a phone's width is not a readable panel.
+ */
+const RAILS_INLINE_MIN_W = 1000;
+/**
+ * Height reserved for the fight's own scoreboard — the survivor line and the
+ * army-strength bars that sit above the battlefield.
+ *
+ * It used to float `absolute top-0` over the board on the theory that the
+ * battlefield stayed centred in the same box as the planning board, so the
+ * layout never shifted between phases. It was drawing ON the board the whole
+ * time: measured 24px onto it at 1920x1080 and 52px at 852x393. Nobody filed
+ * it because the rows it covers are empty ground on a big screen. Reserved
+ * rather than measured at runtime so the board does not jump when the
+ * pre-fight bar comes and goes.
+ */
+const COMBAT_CHROME_H = 60;
+/**
+ * Combat tile below which the fight stops being readable, and the shop and
+ * bench yield the screen for the few seconds it resolves.
+ *
+ * Keeping them up is worth real estate — you can buy and rearrange mid-fight —
+ * but not at any price: on a 393px-tall phone, paying for the shop, the bench
+ * AND the scoreboard out of the fight's own tile leaves ~17px hexes, which is
+ * not a battle you can follow. So the shop stays wherever it can, and steps
+ * aside only where the alternative is a fight you cannot see.
+ */
+const LEGIBLE_COMBAT_TILE = 24;
 /** Above this the board stops reading as a board on huge monitors. */
 const MAX_TILE_W = 118;
 
@@ -247,19 +292,13 @@ function benchHeightFor(slot: number, pad: number): number {
 export function computeGameLayout(vw: number, vh: number): GameLayout {
   const density = densityFor(vh);
   const tier = TIERS[density];
-  const { topH, benchSlot, shopH, leftRail, rightRail, gap, pad, font, railsAsDrawers, tilt, perspective } = tier;
+  // leftRail/rightRail/railsAsDrawers are decided below, from width as well as
+  // density — see "Do the rails have to hide?".
+  const { topH, benchSlot, shopH, gap, pad, font, tilt, perspective } = tier;
 
   // Placeholder; recomputed from the solved tile below, since the slabs are
   // sized from it (they live on the platform).
   let benchH = benchHeightFor(benchSlot, pad);
-
-  // Horizontal: in drawer mode the traits rail costs nothing (it overlays), but
-  // the slim player-avatar strip stays in flow on the right.
-  const hChrome = railsAsDrawers
-    ? rightRail + gap + pad * 2
-    : leftRail + rightRail + gap * 2 + pad * 2;
-  const availW = Math.max(120, vw - hChrome);
-  const fromW = (availW - BOARD_CHROME) / FIELD_UNITS.w;
 
   const fullUnitsH = rowsPixelHeight(FIELD.rows, 1);
   const contextUnitsH = rowsPixelHeight(PLANNING_CONTEXT_ROWS, 1);
@@ -282,6 +321,41 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
     const perTile = unitsH * TILE_ASPECT + (withBench ? BENCH_TILE_RATIO : 0);
     return (avail - fixed) / perTile;
   };
+
+  // ── Do the rails have to hide? ──────────────────────────────────────────
+  //
+  // Density keys on HEIGHT alone, which is right for how much VERTICAL chrome
+  // a screen can afford but says nothing about width. A short, wide window —
+  // a half-screen laptop at 1043x469 — was being handed the phone treatment
+  // and hiding its synergies and items behind a button while 580px of screen
+  // sat empty on either side of the board.
+  //
+  // The board is a fixed-aspect object pinned by HEIGHT here, so width past
+  // what the tile needs can never become a bigger board. If the rails fit in
+  // width the board was never going to use, they cost it nothing and belong
+  // on screen. Below RAILS_INLINE_MIN_W they stay drawers: 288px of rail on a
+  // phone is a third of the screen, and the panels would be too cramped to
+  // read even though the board would survive it.
+  const heightCeil = Math.min(
+    COMFORTABLE_TILE,
+    Math.max(tileFor(rowsPixelHeight(WINDOWED_ROWS, 1), availH, true), tileFor(contextUnitsH, availH, true)),
+  );
+  const railWidth = TIERS.medium.leftRail + TIERS.medium.rightRail + gap * 2 + pad * 2;
+  const tileIfRailsInline = (Math.max(120, vw - railWidth) - BOARD_CHROME) / FIELD_UNITS.w;
+  const promoteRails =
+    tier.railsAsDrawers && vw >= RAILS_INLINE_MIN_W && tileIfRailsInline >= heightCeil;
+
+  const railsAsDrawers = tier.railsAsDrawers && !promoteRails;
+  const leftRail = promoteRails ? TIERS.medium.leftRail : tier.leftRail;
+  const rightRail = promoteRails ? TIERS.medium.rightRail : tier.rightRail;
+
+  // Horizontal: in drawer mode the traits rail costs nothing (it overlays), but
+  // the slim player-avatar strip stays in flow on the right.
+  const hChrome = railsAsDrawers
+    ? rightRail + gap + pad * 2
+    : leftRail + rightRail + gap * 2 + pad * 2;
+  const availW = Math.max(120, vw - hChrome);
+  const fromW = (availW - BOARD_CHROME) / FIELD_UNITS.w;
 
   // Preferred arrangement, solved for both phases at once so the tile is the
   // same in each and the arena never changes scale mid-match:
@@ -314,23 +388,14 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
   ) < COMFORTABLE_TILE;
 
   const planningRows = windowed ? WINDOWED_ROWS : PLANNING_CONTEXT_ROWS;
-  const hideBottomInCombat = windowed;
-
-  const fightAvail = hideBottomInCombat
-    ? Math.max(80, vh - (topH + gap + pad * 2))
-    : availH;
 
   const planTile = tileFor(rowsPixelHeight(planningRows, 1), availH, true);
-  // When the bottom yields, combat drops the bench with the shop and the field
-  // owns the column outright; when it stays, the bench is still under the
-  // field and has to be paid for.
-  const fightTile = tileFor(fullUnitsH, fightAvail, !hideBottomInCombat);
 
   // Windowing is a RECOVERY, not a size bonus: it buys back a comfortable tile
   // and stops there. Without this cap a cramped viewport could hand out a larger
   // board than a roomier one — so growing the window would shrink the board.
   const rawTile = windowed
-    ? Math.min(fromW, planTile, fightTile, COMFORTABLE_TILE)
+    ? Math.min(fromW, planTile, COMFORTABLE_TILE)
     : Math.min(fromW, idealTile);
 
   const tileW = clamp(Math.floor(rawTile), MIN_TILE_W, MAX_TILE_W);
@@ -348,6 +413,35 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
   const benchStripH = benchSlabSize + BENCH_PAD;
   benchH = benchStripH;
 
+  // ── Combat solves its OWN tile ──────────────────────────────────────────
+  //
+  // The board used to be one size for both phases, which reads better but is
+  // only affordable when something gives during the fight. Nothing does now:
+  // the shop and the bench both stay up while combat resolves (you can buy and
+  // rearrange mid-fight, and a mon bought into a bench you cannot see is just
+  // lost). So combat is bidding for the same column as planning while drawing
+  // EIGHT rows against planning's four — it cannot have the same tile and fit.
+  //
+  // Tying planning to combat's constraint made the whole game's board small;
+  // the fight shrinking for the few seconds it is on screen costs much less.
+  // Capped at the planning tile so the board never GROWS into a fight.
+  // Try it with the shop and bench up, paying for the scoreboard too.
+  const withBottom = availH - COMBAT_CHROME_H;
+  const tileWithBottom = Math.min(fromW, tileFor(fullUnitsH, withBottom, true));
+  // Only if that leaves a fight you cannot read does the bottom step aside.
+  const combatHidesBottom = tileWithBottom < LEGIBLE_COMBAT_TILE;
+  const combatAvail = combatHidesBottom
+    ? Math.max(80, vh - (topH + gap + pad * 2)) - COMBAT_CHROME_H
+    : withBottom;
+
+  const rawCombatTile = Math.min(fromW, tileFor(fullUnitsH, combatAvail, !combatHidesBottom));
+  // MIN_TILE_W is a draggability floor and the combat field is locked — there
+  // is nothing to drag on it — so it does not apply. Fitting does.
+  const combatTileW = clamp(Math.floor(rawCombatTile), MIN_COMBAT_TILE, tileW);
+  const combatTileH = Math.round(combatTileW * TILE_ASPECT);
+  const combatField = fieldPixelSize(combatTileW, combatTileH);
+  const combatSlab = Math.floor((combatField.w - (BENCH_SLOTS - 1) * BENCH_GAP) / BENCH_SLOTS);
+
   return {
     density,
     railsAsDrawers,
@@ -358,7 +452,16 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
     planningRows,
     // Includes the bench strip: during planning the arena IS field + slabs.
     planningBox: { w: field.w + BOARD_CHROME, h: planningH + BOARD_CHROME + benchStripH },
-    hideBottomInCombat,
+    combat: {
+      tile: { w: combatTileW, h: combatTileH },
+      field: combatField,
+      boardBox: { w: combatField.w + BOARD_CHROME, h: combatField.h + BOARD_CHROME },
+      benchSlot: combatSlab,
+      benchH: combatSlab + BENCH_PAD,
+      hidesBottom: combatHidesBottom,
+      chromeH: COMBAT_CHROME_H,
+      perspective: Math.round(Math.max(perspective, combatField.w * PERSPECTIVE_RATIO)),
+    },
     topH,
     benchSlot: benchSlabSize,
     benchH,

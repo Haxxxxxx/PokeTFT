@@ -50,7 +50,7 @@ import { computeTraits } from "@/game/engine/synergies";
 import { TYPE_COLOR } from "@/game/ui";
 import { TraitGlyph } from "./TraitGlyph";
 import { Board3D } from "./Board3D";
-import { useGameLayout } from "./LayoutProvider";
+import { useGameLayout, CombatLayoutScope } from "./LayoutProvider";
 import { UnitChip } from "./UnitChip";
 import { PokemonModelPreview } from "./PokemonModelPreview";
 import { ShopBar } from "./ShopBar";
@@ -1238,17 +1238,17 @@ export function NetGameClient() {
   // Same threshold densityFor() uses for "a phone in landscape". The top strip
   // is chrome; on a 393px-tall screen it was spending a tenth of the height on
   // a row of icons you glance at between rounds.
-  const tightTop = L.railsAsDrawers;
-  // On a phone there is not enough height for two HUD bars, an 8-row
-  // battlefield, the bench AND the shop at a tile you can see. The layout
-  // engine already decided what gives — `hideBottomInCombat`: the bottom
-  // yields while the fight resolves, which is what lets the full field fit at
-  // the same tile size as planning. That flag had no effect, because its only
-  // reader was MatchShell, a shell this screen stopped using (and which is now
-  // deleted). So the shop stayed, the board was solved against height it never
-  // got, and the arena overflowed its column upward and drew THROUGH the HUD —
-  // 62px of board over the gold/HP row, measured at 852x393.
-  const bottomYields = phase === "combat" && L.hideBottomInCombat;
+  // Density, not the rails — same conflation as the shop row. `topH` is a
+  // per-density budget, so if these bars relax while density is still compact
+  // they overrun it, and the board gets solved against height the HUD is
+  // standing on. That is the bug this screen was just fixed for.
+  const tightTop = L.density === "compact";
+  // The shop and bench stay up during combat wherever they can — you can buy
+  // and rearrange mid-fight, and a mon bought into a bench you cannot see is
+  // just lost. The fight pays for them out of its own tile. Only where that
+  // price leaves hexes too small to follow does the bottom step aside; the
+  // engine makes that call, since it is the one that knows the tile.
+  const bottomYields = phase === "combat" && L.combat.hidesBottom;
   // Only on the opening round, only for a live player on their own board, and
   // only when the augment overlay is not up — two full-screen pickers at once
   // would stack and the player would answer whichever mounted on top.
@@ -1862,6 +1862,7 @@ export function NetGameClient() {
                     <span className="text-xs">{t.net_spectate_switch}</span>
                   </div>
                 ) : phase === "combat" && combatResult && me?.alive ? (
+                  <CombatLayoutScope>
                   <div className="absolute inset-0 flex flex-col">
                     <div className="relative flex-1 min-h-0 flex items-center justify-center">
                   <CombatStage
@@ -1879,11 +1880,10 @@ export function NetGameClient() {
                     onResolve={() => {}}
                   />
                     </div>
-                    {/* Yields with the shop on a phone: without the shop there
-                        is nothing to buy INTO the bench, and the 8-row field
-                        needs the height more than a row you cannot fill. */}
+                    {/* Goes with the shop: there is nothing to buy into it. */}
                     {!bottomYields && <CombatBench />}
                   </div>
+                  </CombatLayoutScope>
                 ) : board3d ? (
                   // HD-2D board (opt-in). Drag is handled natively inside the
                   // canvas and committed through the same store actions, so the

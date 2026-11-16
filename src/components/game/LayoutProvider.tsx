@@ -67,3 +67,30 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
 export function useGameLayout(): GameLayout {
   return useContext(LayoutCtx) ?? SSR_LAYOUT;
 }
+
+/**
+ * Re-publishes the layout with COMBAT's geometry in place of planning's.
+ *
+ * The fight draws eight rows where planning draws four, into the same column
+ * and with the shop and bench still on screen, so it gets a smaller tile of
+ * its own. Everything under the battlefield reads the tile from context —
+ * the field, the unit chips, the ability overlays, the hex maths — so swapping
+ * it here is what makes all of them agree, rather than threading a second tile
+ * through twenty call sites and having one of them keep the old one.
+ */
+export function CombatLayoutScope({ children }: { children: ReactNode }) {
+  const L = useGameLayout();
+  const scoped = useMemo<GameLayout>(
+    () => ({
+      ...L,
+      tile: L.combat.tile,
+      field: L.combat.field,
+      boardBox: L.combat.boardBox,
+      benchSlot: L.combat.benchSlot,
+      benchH: L.combat.benchH,
+      perspective: L.combat.perspective,
+    }),
+    [L],
+  );
+  return <LayoutCtx.Provider value={scoped}>{children}</LayoutCtx.Provider>;
+}
