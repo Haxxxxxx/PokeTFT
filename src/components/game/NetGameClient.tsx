@@ -181,7 +181,13 @@ function CombatBench() {
   const slots = resolveBenchSlots(units);
   const size = L.benchSlot - 8;
   return (
-    <div className="shrink-0 flex items-end justify-center gap-1 px-2 pt-6 pb-1">
+    // Pinned to the strip height the layout engine budgets for a bench, so the
+    // fight is solved against the height this actually costs. `pt-6` made it
+    // ~8px taller than any bench the engine knows about, which is small until
+    // you notice the arena is centred in what is left and spills the
+    // difference over the HUD. items-end keeps the headroom above the slabs
+    // that the padding was there for — tall chips still overhang upward.
+    <div className="shrink-0 flex items-end justify-center gap-1 px-2 pb-1" style={{ height: L.benchH }}>
       {Array.from({ length: BENCH_SIZE }, (_, i) => (
         <CombatBenchSlot key={i} index={i} size={size} unit={slots[i] ?? undefined} />
       ))}
@@ -1233,6 +1239,16 @@ export function NetGameClient() {
   // is chrome; on a 393px-tall screen it was spending a tenth of the height on
   // a row of icons you glance at between rounds.
   const tightTop = L.railsAsDrawers;
+  // On a phone there is not enough height for two HUD bars, an 8-row
+  // battlefield, the bench AND the shop at a tile you can see. The layout
+  // engine already decided what gives — `hideBottomInCombat`: the bottom
+  // yields while the fight resolves, which is what lets the full field fit at
+  // the same tile size as planning. That flag had no effect, because its only
+  // reader was MatchShell, a shell this screen stopped using (and which is now
+  // deleted). So the shop stayed, the board was solved against height it never
+  // got, and the arena overflowed its column upward and drew THROUGH the HUD —
+  // 62px of board over the gold/HP row, measured at 852x393.
+  const bottomYields = phase === "combat" && L.hideBottomInCombat;
   // Only on the opening round, only for a live player on their own board, and
   // only when the augment overlay is not up — two full-screen pickers at once
   // would stack and the player would answer whichever mounted on top.
@@ -1863,7 +1879,10 @@ export function NetGameClient() {
                     onResolve={() => {}}
                   />
                     </div>
-                    <CombatBench />
+                    {/* Yields with the shop on a phone: without the shop there
+                        is nothing to buy INTO the bench, and the 8-row field
+                        needs the height more than a row you cannot fill. */}
+                    {!bottomYields && <CombatBench />}
                   </div>
                 ) : board3d ? (
                   // HD-2D board (opt-in). Drag is handled natively inside the
@@ -1910,7 +1929,7 @@ export function NetGameClient() {
         {/* Pinned to the height the layout engine budgeted. Left to grow with its
             content, this strip stole space the arena had already been sized
             against — which is what slid the bench slabs under the shop cards. */}
-        {!isSpectator && !spectating && <div className="relative shrink-0 min-h-0 flex flex-col items-center" style={{ height: L.shopH }}>
+        {!isSpectator && !spectating && !bottomYields && <div className="relative shrink-0 min-h-0 flex flex-col items-center" style={{ height: L.shopH }}>
           {/* The bench now lives ON the platform (see Board's `withBench`), and the
               board count is ghosted across the arena floor, so only the auto-fill
               action still needs a home down here.

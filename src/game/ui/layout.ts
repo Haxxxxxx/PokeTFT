@@ -48,6 +48,11 @@ export type GameLayout = {
    * True when the bench and shop must yield the screen during combat. Only
    * compact needs this, and it is what lets the full 8-row field fit there at
    * the same tile size — so the board still never changes scale between phases.
+   *
+   * Read by NetGameClient, which is the shell. It was read by MatchShell for a
+   * while, and MatchShell was never mounted — so this described an intention
+   * nothing carried out, and `fightAvail` below budgeted the shop's height to a
+   * board that still had the shop under it.
    */
   hideBottomInCombat: boolean;
   /** Height of the top strip (round tracker + stage/round + timer). */
@@ -148,9 +153,16 @@ const TIERS: Record<Density, Tier> = {
   // fish-eyed. Now that the distance scales with the field (PERSPECTIVE_RATIO),
   // a deeper rake reads as depth rather than distortion — and the reference
   // board is raked considerably harder than a timid 24°.
-  compact: { topH: 56, benchSlot: 44, shopH: 86, leftRail: 0, rightRail: 48, gap: 4, pad: 4, font: 0.8, railsAsDrawers: true, tilt: 24, perspective: 1500 },
-  medium: { topH: 78, benchSlot: 66, shopH: 128, leftRail: 138, rightRail: 150, gap: 8, pad: 8, font: 0.9, railsAsDrawers: false, tilt: 29, perspective: 1800 },
-  full: { topH: 86, benchSlot: 92, shopH: 158, leftRail: 196, rightRail: 214, gap: 12, pad: 10, font: 1, railsAsDrawers: false, tilt: 33, perspective: 2100 },
+  // `topH` is the budget for EVERYTHING above the board: the round tracker AND
+  // the HUD bar under it, plus the gap between them. There are two bars, not
+  // one. Budgeting for a single bar is what let the board be solved against
+  // ~20px it never had — measured: 79px of bars against a 56px budget on a
+  // phone, 97 against 78, 101 against 86. The board then overflowed its column
+  // UPWARD and drew straight through the HUD (worst in combat, where the field
+  // is 8 rows instead of 5). These are the measured heights plus a pixel.
+  compact: { topH: 80, benchSlot: 44, shopH: 86, leftRail: 0, rightRail: 48, gap: 4, pad: 4, font: 0.8, railsAsDrawers: true, tilt: 24, perspective: 1500 },
+  medium: { topH: 98, benchSlot: 66, shopH: 128, leftRail: 138, rightRail: 150, gap: 8, pad: 8, font: 0.9, railsAsDrawers: false, tilt: 29, perspective: 1800 },
+  full: { topH: 102, benchSlot: 92, shopH: 158, leftRail: 196, rightRail: 214, gap: 12, pad: 10, font: 1, railsAsDrawers: false, tilt: 33, perspective: 2100 },
 };
 
 /**
@@ -162,10 +174,25 @@ const TIERS: Record<Density, Tier> = {
  * third of the board on nothing and shrinks the hexes you actually work in.
  *
  * So planning shows the ally half plus two rows of context by default, and
- * drops to one when the viewport is tight. Combat still draws the full field.
+ * drops the context entirely when the viewport is tight. Combat still draws
+ * the full field.
  */
 const PLANNING_CONTEXT_ROWS = 6;
-const WINDOWED_ROWS = 5;
+/**
+ * Your half and nothing else, once the field is windowed.
+ *
+ * Four, not five. The context rows are EMPTY during planning — the enemy half
+ * is bare ground until combat — so a fifth row shows the player nothing while
+ * costing real tile size. At 375px tall that row is the difference between a
+ * 33px tile with 24px bench slabs and a 39px tile with 29px slabs, and the
+ * slabs are what you have to drop a mon onto with a thumb.
+ *
+ * It is also the only count that keeps the tile monotonic in the viewport.
+ * Switching between five and four rows on a threshold meant a slightly SMALLER
+ * phone could be handed a bigger board than a slightly larger one, which is
+ * the same trap the COMFORTABLE_TILE cap below exists to avoid.
+ */
+const WINDOWED_ROWS = 4;
 
 /**
  * Tile size below which showing all 8 rows during planning stops being worth it
@@ -192,6 +219,8 @@ const COMFORTABLE_TILE = 68;
 export const BENCH_SLOTS = 9;
 export const BENCH_GAP = 4;
 const BENCH_PAD = 12;
+/** Pixels held back from every tile solve, to absorb integer rounding. */
+const FIT_SLACK = 4;
 /** Slab edge per unit of tile: nine slabs share the field's 7.5-tile width. */
 const BENCH_TILE_RATIO = FIELD_UNITS.w / BENCH_SLOTS;
 /** Constant the gaps subtract from that span, folded into the tile solve. */
@@ -234,7 +263,6 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
 
   const fullUnitsH = rowsPixelHeight(FIELD.rows, 1);
   const contextUnitsH = rowsPixelHeight(PLANNING_CONTEXT_ROWS, 1);
-  const windowUnitsH = rowsPixelHeight(WINDOWED_ROWS, 1);
 
   // Vertical chrome that is ALWAYS present: the top strip and the shop, with a
   // gap on either side of the arena. The bench is deliberately NOT here — it
@@ -244,8 +272,13 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
   const availH = Math.max(80, vh - chromeBase);
 
   /** Largest tile fitting `rows` of field, plus the bench strip when shown. */
-  const tileFor = (unitsH: number, avail: number, withBench: boolean) => {
-    const fixed = BOARD_CHROME + (withBench ? BENCH_PAD - BENCH_GAP_OFFSET : 0);
+  const tileFor = (unitsH: number, avail: number, withBench: boolean, slack: number = FIT_SLACK) => {
+    // FIT_SLACK absorbs rounding. The tile is solved as a real number, but the
+    // board is laid out from `tileH = round(tileW * TILE_ASPECT)`, which can
+    // round UP — and that half-pixel is multiplied by 6.25 rows of field, so a
+    // solve that fits exactly can still render ~3px too tall. Cheaper to give
+    // the fit a few pixels than to discover it one viewport at a time.
+    const fixed = BOARD_CHROME + slack + (withBench ? BENCH_PAD - BENCH_GAP_OFFSET : 0);
     const perTile = unitsH * TILE_ASPECT + (withBench ? BENCH_TILE_RATIO : 0);
     return (avail - fixed) / perTile;
   };
@@ -254,16 +287,31 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
   // same in each and the arena never changes scale mid-match:
   //   planning — ally half + 2 context rows, plus bench slabs on the platform
   //   combat   — the full 8-row field, no bench (the fight view draws none)
+  // `withBench` is true for the combat term too. Combat keeps a bench — it is
+  // a different component (CombatBench), but it sits in the same column under
+  // the field and costs the same height, so solving the fight as if the field
+  // had the column to itself overstated the height by a whole bench strip. The
+  // arena was then centred in a box one bench shorter than it was sized for,
+  // which pushed ~40px of it up over the HUD at every desktop size.
   const idealTile = Math.min(
     fromW,
     tileFor(contextUnitsH, availH, true),
-    tileFor(fullUnitsH, availH, false),
+    tileFor(fullUnitsH, availH, true),
   );
 
   // If that leaves the tokens too small to drag comfortably, reorganize instead
   // of shrinking: window the field while planning. Adaptive rather than keyed
   // to a density tier, so there's no cliff where the board suddenly halves.
-  const windowed = idealTile < COMFORTABLE_TILE;
+  //
+  // Decided WITHOUT the fit slack. Those few pixels are a rounding margin, not
+  // a reason to rearrange the screen — counting them here pushed a 1280x800
+  // laptop from 68.3 to 67.7 against a threshold of 68, which windowed its
+  // planning board and took the shop away mid-fight over a third of a pixel.
+  const windowed = Math.min(
+    fromW,
+    tileFor(contextUnitsH, availH, true, 0),
+    tileFor(fullUnitsH, availH, true, 0),
+  ) < COMFORTABLE_TILE;
 
   const planningRows = windowed ? WINDOWED_ROWS : PLANNING_CONTEXT_ROWS;
   const hideBottomInCombat = windowed;
@@ -272,8 +320,11 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
     ? Math.max(80, vh - (topH + gap + pad * 2))
     : availH;
 
-  const planTile = tileFor(windowed ? windowUnitsH : contextUnitsH, availH, true);
-  const fightTile = tileFor(fullUnitsH, fightAvail, false);
+  const planTile = tileFor(rowsPixelHeight(planningRows, 1), availH, true);
+  // When the bottom yields, combat drops the bench with the shop and the field
+  // owns the column outright; when it stays, the bench is still under the
+  // field and has to be paid for.
+  const fightTile = tileFor(fullUnitsH, fightAvail, !hideBottomInCombat);
 
   // Windowing is a RECOVERY, not a size bonus: it buys back a comfortable tile
   // and stops there. Without this cap a cramped viewport could hand out a larger
