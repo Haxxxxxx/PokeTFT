@@ -14,6 +14,7 @@ import { ProfileEditor } from "@/components/social/ProfileEditor";
 import { HowToPlay } from "@/components/HowToPlay";
 import { NewsModal, hasUnseenNews, markNewsSeen } from "@/components/NewsModal";
 import { PokeballIcon } from "@/components/game/icons";
+import { IosInstallHint } from "./IosInstallHint";
 import { isNativeShell } from "@/game/net/nativeShell";
 import { Swords, Trophy, Megaphone, AlertTriangle, Download, Users, Zap, Star, Shield } from "lucide-react";
 import { PokemonModelPreview } from "@/components/game/PokemonModelPreview";
@@ -143,6 +144,10 @@ export function WelcomeScreen() {
           </div>
         </div>
       </header>
+
+      {/* iOS: the only route to a fullscreen game on that platform, and nothing
+          in iOS advertises it. See IosInstallHint. */}
+      <IosInstallHint />
 
       {/* Friend invites */}
       {invites.length > 0 && (
