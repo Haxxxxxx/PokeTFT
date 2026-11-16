@@ -10,6 +10,7 @@ import { ITEM_POOL, RARITY_COLOR } from "@/game/data/itemPool";
 import { AUGMENT_TIER_COLOR, type Augment } from "@/game/data/augments";
 import { BENCH_SIZE } from "@/game/store/gameStore";
 import { ItemGlyph, AugmentGlyph } from "./ItemGlyph";
+import { useGameLayout } from "./LayoutProvider";
 import { MegaIcon, CoinIcon, TrophyIcon } from "./icons";
 import { Eye, Sparkles, RefreshCw, Swords } from "lucide-react";
 import { normalizeUnit } from "@/game/net/rtdb-utils";
@@ -94,19 +95,32 @@ function CarouselCard({ onClick, color, name, sub, cost, types, art, disabled, n
 
 /** Augment choice in the ornate frame: icon in a gilded tile, name, then the
  *  effect on the dark panel — matching the TFT "Select an Augment" look. */
-function OrnateAugmentCard({ onClick, icon, name, desc, tier, frame, combat }: { onClick: () => void; icon: ReactNode; name: string; desc: string; tier: string; frame: string; combat?: boolean }) {
+/**
+ * `tight` is the phone-in-landscape variant.
+ *
+ * At 272px a card plus the header and the reroll under it came to 432px of
+ * content in a 393px viewport (375px on an iPhone SE) — so the reroll button
+ * sat 23px BELOW the fold. The overlay scrolls, so it was reachable, but a
+ * button you have to go looking for is the one that gets reported as "not
+ * rendering". Shrinking the card is what buys it back: it is the only part of
+ * this overlay big enough to pay for itself.
+ */
+function OrnateAugmentCard({ onClick, icon, name, desc, tier, frame, combat, tight }: { onClick: () => void; icon: ReactNode; name: string; desc: string; tier: string; frame: string; combat?: boolean; tight?: boolean }) {
   return (
-    <OrnateFrame onClick={onClick} frame={frame} height={272}>
-      <div className="flex flex-col items-center pt-5 px-3">
-        <div className="w-16 h-16 rounded-lg flex items-center justify-center" style={{ background: `${frame}1a`, border: `1px solid ${frame}55`, color: frame }}>{icon}</div>
-        <div className="mt-1.5 flex items-center gap-1.5">
+    <OrnateFrame onClick={onClick} frame={frame} height={tight ? 200 : 272}>
+      <div className={`flex flex-col items-center px-3 ${tight ? "pt-2.5" : "pt-5"}`}>
+        <div
+          className={`rounded-lg flex items-center justify-center ${tight ? "w-11 h-11" : "w-16 h-16"}`}
+          style={{ background: `${frame}1a`, border: `1px solid ${frame}55`, color: frame }}
+        >{icon}</div>
+        <div className={`flex items-center gap-1.5 ${tight ? "mt-1" : "mt-1.5"}`}>
           <span className="text-[9px] font-bold uppercase tracking-[0.18em]" style={{ color: frame }}>{tier}</span>
           {combat && <span className="inline-flex items-center gap-0.5 text-[8px] font-bold uppercase tracking-wide px-1 rounded bg-rose-500/20 text-rose-300 border border-rose-400/40"><Swords size={8} /> Combat</span>}
         </div>
-        <span className="mt-1 text-[15px] font-bold text-slate-100 text-center leading-tight drop-shadow">{name}</span>
+        <span className={`mt-1 font-bold text-slate-100 text-center leading-tight drop-shadow ${tight ? "text-[13px]" : "text-[15px]"}`}>{name}</span>
       </div>
-      <div className="mt-auto bg-black/40 border-t border-white/10 px-3 py-3 text-center">
-        <span className="text-[11px] text-slate-300 leading-snug">{desc}</span>
+      <div className={`mt-auto bg-black/40 border-t border-white/10 px-3 text-center ${tight ? "py-1.5" : "py-3"}`}>
+        <span className={`text-slate-300 leading-snug ${tight ? "text-[10px]" : "text-[11px]"}`}>{desc}</span>
       </div>
     </OrnateFrame>
   );
@@ -399,6 +413,9 @@ export function AugmentOverlay({
 }) {
   const t = useT();
   const lang = useAppStore((s) => s.settings.language);
+  // Phone in landscape: the whole picker has to clear ~375px of height, and
+  // the reroll button is the thing that falls off the bottom when it does not.
+  const tight = useGameLayout().density === "compact";
   return (
     <div
       className="fixed inset-0 z-screen overflow-y-auto"
@@ -414,24 +431,25 @@ export function AugmentOverlay({
         <Eye size={13} className="inline align-text-bottom mr-1" />{revealBoard ? t.net_show_choices : t.net_hide_view_board}
       </button>
       {!revealBoard && (
-      <div className="min-h-full flex flex-col items-center justify-center p-4">
+      <div className={`min-h-full flex flex-col items-center justify-center ${tight ? "p-2" : "p-4"}`}>
       <div className="celebrate-pop flex flex-col items-center">
-        <div className="flex items-center gap-2.5 mb-1">
-          <span><Sparkles size={24} /></span>
-          <h2 className="text-2xl font-extrabold text-violet-300 tracking-tight">{t.net_augment_slot(augSlotNow + 1)}</h2>
+        <div className={`flex items-center gap-2.5 ${tight ? "mb-0.5" : "mb-1"}`}>
+          <span><Sparkles size={tight ? 18 : 24} /></span>
+          <h2 className={`font-extrabold text-violet-300 tracking-tight ${tight ? "text-lg" : "text-2xl"}`}>{t.net_augment_slot(augSlotNow + 1)}</h2>
         </div>
-        <p className="text-xs text-slate-300/80 mb-5">{t.net_augment_pick_one}</p>
-        <div className="flex gap-3 flex-wrap justify-center max-w-[640px]">
+        <p className={`text-xs text-slate-300/80 ${tight ? "mb-2" : "mb-5"}`}>{t.net_augment_pick_one}</p>
+        <div className={`flex flex-wrap justify-center max-w-[640px] ${tight ? "gap-2" : "gap-3"}`}>
         {augOptions.map((a) => (
           <OrnateAugmentCard
             key={a.id}
             onClick={() => { const lk = `a-${augSlotNow}`; if (pickLatch.current === lk) return; pickLatch.current = lk; sfx.augmentPick(); pickAugment(a.id); setPickedSlot(augSlotNow); flushSync(); }}
-            icon={<AugmentGlyph id={a.id} size={34} />}
+            icon={<AugmentGlyph id={a.id} size={tight ? 24 : 34} />}
             name={lang === "fr" ? a.nameFr : a.name}
             desc={lang === "fr" ? a.descFr : a.desc}
             tier={a.tier}
             frame={AUGMENT_TIER_COLOR[a.tier]}
             combat={!!a.combat}
+            tight={tight}
           />
         ))}
         </div>
