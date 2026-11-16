@@ -15,12 +15,15 @@ const DL = {
   android: `${RELEASE}/download/PokeTFT.apk`,
 };
 
-type OS = "windows" | "macos" | "android" | "other";
+type OS = "windows" | "macos" | "android" | "ios" | "other";
 function detectOS(): OS {
   if (typeof navigator === "undefined") return "other";
   const ua = navigator.userAgent.toLowerCase();
   if (/android/.test(ua)) return "android";
-  if (/iphone|ipad|ipod/.test(ua)) return "other";
+  if (/iphone|ipod/.test(ua)) return "ios";
+  // iPadOS 13+ reports itself as a Mac. The touch-point count is what still
+  // separates them, and getting this wrong sends an iPad user to a .dmg.
+  if (/ipad/.test(ua) || (/mac/.test(ua) && navigator.maxTouchPoints > 1)) return "ios";
   if (/win/.test(ua)) return "windows";
   if (/mac/.test(ua)) return "macos";
   return "other";
@@ -73,6 +76,35 @@ export default function DownloadPage() {
           </Link>
         )}
       </div>
+
+      {/* iOS has no download, and saying so plainly is the point.
+          Apple permits installation only through the App Store, TestFlight
+          (builds expire after 90 days; external testing needs review) or
+          ad-hoc (every device UDID registered by hand, 100 a year). None of
+          those is something a visitor can act on from a link, so there is no
+          .ipa to offer and pretending otherwise would just waste their time.
+          Add to Home Screen gives them the fullscreen game in two taps, which
+          is the thing they actually came for. */}
+      {os === "ios" && (
+        <div className="w-full max-w-3xl mb-4 panel rounded-2xl p-5 ring-1 ring-gold-500/50 shadow-[0_20px_50px_-20px_rgba(251,191,36,0.4)]">
+          <div className="flex items-center gap-2.5 mb-1">
+            <span className="text-2xl leading-none">🍎</span>
+            <span className="text-base font-extrabold text-slate-100">iPhone &amp; iPad</span>
+            <span className="text-[9px] font-extrabold uppercase tracking-wider text-gold-300">Your device</span>
+          </div>
+          <p className="text-[12px] text-slate-400 leading-relaxed">
+            There is no iOS app to download — Apple only allows installs through the App Store,
+            and PokéTFT is not on it. Instead, add it to your Home Screen: it launches
+            fullscreen, with no address bar and no Safari toolbar.
+          </p>
+          <ol className="mt-3 flex flex-col gap-1.5 text-[12px] text-slate-300">
+            <li><span className="font-bold text-gold-300">1.</span> Open <span className="font-semibold">poke-tft.web.app</span> in <span className="font-semibold">Safari</span> (it has to be Safari — Chrome on iOS cannot install it).</li>
+            <li><span className="font-bold text-gold-300">2.</span> Tap the <span className="font-semibold">Share</span> button (the square with an arrow).</li>
+            <li><span className="font-bold text-gold-300">3.</span> Choose <span className="font-semibold">Add to Home Screen</span>, then <span className="font-semibold">Add</span>.</li>
+            <li><span className="font-bold text-gold-300">4.</span> Launch it from the Home Screen icon — rotate to landscape and play.</li>
+          </ol>
+        </div>
+      )}
 
       {/* Download cards */}
       <div className="w-full max-w-3xl grid grid-cols-1 sm:grid-cols-3 gap-4">

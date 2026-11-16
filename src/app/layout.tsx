@@ -15,6 +15,34 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "PokéTFT",
   description: "Auto-battler Pokémon style TFT",
+  // Add to Home Screen is the ONLY route to a fullscreen game on iOS: Safari
+  // on iPhone does not implement the Fullscreen API at all, and Apple does not
+  // permit installing an app from a website. These tags are what make the
+  // home-screen launch open without a URL bar or a browser toolbar, instead of
+  // opening a plain Safari tab with a nicer icon.
+  applicationName: "PokéTFT",
+  appleWebApp: {
+    capable: true,
+    title: "PokéTFT",
+    // "black", not "black-translucent". Translucent puts the clock and the
+    // battery ON TOP of the page, which on this layout lands them over the
+    // top HUD strip. Opaque costs a thin bar and keeps the HUD readable.
+    statusBarStyle: "black",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/manifest.webmanifest",
+  other: {
+    // Next emits only the modern `mobile-web-app-capable`. iOS 15.4+ reads
+    // `display: standalone` straight off the manifest, so that is enough on a
+    // current iPhone — but older iOS keys on this legacy name and nothing
+    // else, and it is the single tag that decides whether the home-screen
+    // launch opens fullscreen or as a Safari tab with a nicer icon. One line
+    // to cover the versions Next no longer emits for.
+    "apple-mobile-web-app-capable": "yes",
+  },
 };
 
 // Mobile hardening: lock zoom (the game is a fixed canvas that scales itself, so
