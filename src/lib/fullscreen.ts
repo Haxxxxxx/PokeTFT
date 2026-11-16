@@ -8,6 +8,38 @@ type FsDoc = Document & {
 };
 type FsEl = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
 
+/**
+ * Can this browser put the page itself into fullscreen?
+ *
+ * iPhone Safari CANNOT, and never could: Element.requestFullscreen is not
+ * implemented, and webkitRequestFullscreen exists only on <video>. Every call
+ * below therefore resolved to `undefined` and did nothing at all — so the
+ * button sat in the HUD doing nothing, on the one platform where the screen is
+ * small enough for it to matter. Reported from a real iPhone as "the
+ * fullscreen version doesn't work".
+ *
+ * There is no workaround in the page: the way to get a fullscreen game on iOS
+ * is Add to Home Screen, which runs it as a standalone app with no browser
+ * chrome at all. So the honest thing is to detect the gap and say so, rather
+ * than keep offering a control that cannot work.
+ */
+export function fullscreenSupported(): boolean {
+  if (typeof document === "undefined") return false;
+  const el = document.documentElement as FsEl;
+  return typeof el.requestFullscreen === "function"
+    || typeof el.webkitRequestFullscreen === "function";
+}
+
+/** Already running as an installed/standalone app — iOS home-screen or any
+ *  browser's installed PWA. There is nothing to toggle in that case: there is
+ *  no browser chrome left to hide. */
+export function isStandalone(): boolean {
+  if (typeof window === "undefined") return false;
+  const nav = window.navigator as Navigator & { standalone?: boolean };
+  return nav.standalone === true
+    || window.matchMedia?.("(display-mode: standalone)")?.matches === true;
+}
+
 export function isFullscreen(): boolean {
   if (typeof document === "undefined") return false;
   const d = document as FsDoc;

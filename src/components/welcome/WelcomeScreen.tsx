@@ -102,29 +102,39 @@ export function WelcomeScreen() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col app-bg">
+    <div className="min-h-dvh flex flex-col app-bg">
       {/* Top nav bar */}
-      <header className="flex items-center justify-between gap-3 px-4 sm:px-6 h-14 border-b border-white/[0.06] bg-slate-950/40 backdrop-blur shrink-0">
+      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 sm:px-6 min-h-14 py-2 border-b border-white/[0.06] bg-slate-950/40 backdrop-blur shrink-0">
         <div className="flex items-center gap-2.5">
           <span className="text-gold drop-shadow-[0_0_8px_rgba(212,175,55,0.5)]"><PokeballIcon size={26} /></span>
           <span className="font-extrabold tracking-tight text-xl drop-shadow-[0_0_12px_rgba(212,175,55,0.3)]">Poké<span className="gild-text">TFT</span></span>
         </div>
-        <div className="flex items-center gap-4">
-          <button onClick={() => setLeaderboardOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-gold-300 uppercase tracking-wide"><Trophy size={13} /> {lang === "fr" ? "Classement" : "Ranks"}</button>
-          <button onClick={openNews} aria-label={lang === "fr" ? "Nouveautés" : "What's new"} className="relative inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-emerald-300 uppercase tracking-wide"><Megaphone size={13} /> {lang === "fr" ? "Actus" : "News"}{unseenNews && <span className="absolute -top-1 -right-2 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}</button>
-          <button onClick={() => setHowTo(true)} className="text-xs font-bold text-slate-400 hover:text-sky-300 uppercase tracking-wide">{t.w_how_to_play}</button>
-          {showGetApp && <a href="/download" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gold-500/40 bg-gold-500/8 text-xs font-bold text-gold-400 hover:text-gold-300 hover:border-gold-400/60 hover:bg-gold-500/12 uppercase tracking-wide transition-colors"><Download size={13} /> {lang === "fr" ? "Télécharger" : "Get app"}</a>}
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1.5 sm:gap-4">
+          <button onClick={() => setLeaderboardOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-gold-300 uppercase tracking-wide"><Trophy size={13} /> <span className="hidden sm:inline">{lang === "fr" ? "Classement" : "Ranks"}</span></button>
+          <button onClick={openNews} aria-label={lang === "fr" ? "Nouveautés" : "What's new"} className="relative inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-emerald-300 uppercase tracking-wide"><Megaphone size={13} /> <span className="hidden sm:inline">{lang === "fr" ? "Actus" : "News"}</span>{unseenNews && <span className="absolute -top-1 -right-2 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}</button>
+          <button onClick={() => setHowTo(true)} className="text-xs font-bold text-slate-400 hover:text-sky-300 uppercase tracking-wide whitespace-nowrap">
+            <span className="hidden sm:inline">{t.w_how_to_play}</span>
+            {/* No icon on this one, so the label cannot simply hide or the
+                control would vanish. A short form keeps it reachable. */}
+            <span className="sm:hidden">?</span>
+          </button>
+          {showGetApp && <a href="/download" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gold-500/40 bg-gold-500/8 text-xs font-bold text-gold-400 hover:text-gold-300 hover:border-gold-400/60 hover:bg-gold-500/12 uppercase tracking-wide transition-colors"><Download size={13} /> <span className="hidden sm:inline">{lang === "fr" ? "Télécharger" : "Get app"}</span></a>}
           {/* Profile chip */}
           <div className="flex items-center gap-2.5 pl-3 border-l border-slate-800">
-            <span className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0">
+            <button
+              type="button"
+              onClick={() => setProfileOpen(true)}
+              aria-label={t.w_profile}
+              className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0"
+            >
               {profile?.photoURL
                 // eslint-disable-next-line @next/next/no-img-element
                 ? <img src={profile.photoURL} alt="" width={30} height={30} style={{ imageRendering: "pixelated" }} />
                 : <span className="text-sm font-extrabold text-slate-500">{(name || "?").slice(0, 1).toUpperCase()}</span>}
-            </span>
+            </button>
             <div className="flex flex-col leading-tight">
               <span className="text-sm font-bold text-gold-300">{profile?.username}</span>
-              <span className="flex gap-2 text-[10px]">
+              <span className="hidden sm:flex gap-2 text-[10px]">
                 <button onClick={() => setProfileOpen(true)} className="text-gold-400 hover:text-gold-300 font-semibold">{t.w_profile}</button>
                 <button onClick={() => setEditProfile(true)} className="text-sky-400 hover:text-sky-300">Edit</button>
                 <button onClick={signOut} className="text-slate-500 hover:text-rose-400">Sign out</button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, PointerSensor, TouchSensor, closestCenter, pointerWithin, MeasuringStrategy, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
 import type { CollisionDetection } from "@dnd-kit/core";
 import { useGame, resolveBenchSlots, BENCH_SIZE } from "@/game/store/gameStore";
@@ -64,7 +64,7 @@ import { CombatStage } from "./CombatStage";
 import { CoinIcon, PawIcon, SwordIcon, GiftIcon } from "./icons";
 import { useT } from "@/lib/i18n";
 import { sfx } from "@/lib/audio";
-import { toggleFullscreen, isFullscreen } from "@/lib/fullscreen";
+import { toggleFullscreen, isFullscreen, fullscreenSupported, isStandalone } from "@/lib/fullscreen";
 
 function asBoard(b: unknown): UnitInstance[] {
   if (!b) return [];
@@ -2028,6 +2028,24 @@ function BootVeil({ label, sub, progress }: { label: string; sub?: string; progr
 function FullscreenButton() {
   const t = useT();
   const [fs, setFs] = useState(false);
+  // Resolved on the client only: both of these touch document/navigator, and
+  // the server render must not disagree with the first client paint.
+  //
+  // Hidden where the page cannot go fullscreen at all (iPhone Safari) or where
+  // it already is (installed to the home screen). A control that cannot do
+  // anything is worse than no control: it reads as a bug in the game rather
+  // than a gap in the platform.
+  //
+  // useSyncExternalStore, not an effect: this is a read of something OUTSIDE
+  // React that never changes after load, and setting state in an effect to
+  // mirror it is both a lint error and an extra render. The server snapshot
+  // says "supported" so the markup matches the first client paint, then the
+  // client snapshot corrects it.
+  const usable = useSyncExternalStore(
+    () => () => {},
+    () => fullscreenSupported() && !isStandalone(),
+    () => true,
+  );
   useEffect(() => {
     const on = () => setFs(isFullscreen());
     on();
@@ -2038,6 +2056,7 @@ function FullscreenButton() {
       document.removeEventListener("webkitfullscreenchange", on);
     };
   }, []);
+  if (!usable) return null;
   return (
     <button
       onClick={() => toggleFullscreen()}
