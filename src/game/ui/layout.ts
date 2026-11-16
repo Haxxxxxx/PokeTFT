@@ -148,9 +148,9 @@ const TIERS: Record<Density, Tier> = {
   // fish-eyed. Now that the distance scales with the field (PERSPECTIVE_RATIO),
   // a deeper rake reads as depth rather than distortion — and the reference
   // board is raked considerably harder than a timid 24°.
-  compact: { topH: 32, benchSlot: 44, shopH: 86, leftRail: 0, rightRail: 48, gap: 4, pad: 4, font: 0.8, railsAsDrawers: true, tilt: 24, perspective: 1500 },
-  medium: { topH: 48, benchSlot: 66, shopH: 128, leftRail: 138, rightRail: 150, gap: 8, pad: 8, font: 0.9, railsAsDrawers: false, tilt: 29, perspective: 1800 },
-  full: { topH: 56, benchSlot: 92, shopH: 158, leftRail: 196, rightRail: 214, gap: 12, pad: 10, font: 1, railsAsDrawers: false, tilt: 33, perspective: 2100 },
+  compact: { topH: 56, benchSlot: 44, shopH: 86, leftRail: 0, rightRail: 48, gap: 4, pad: 4, font: 0.8, railsAsDrawers: true, tilt: 24, perspective: 1500 },
+  medium: { topH: 78, benchSlot: 66, shopH: 128, leftRail: 138, rightRail: 150, gap: 8, pad: 8, font: 0.9, railsAsDrawers: false, tilt: 29, perspective: 1800 },
+  full: { topH: 86, benchSlot: 92, shopH: 158, leftRail: 196, rightRail: 214, gap: 12, pad: 10, font: 1, railsAsDrawers: false, tilt: 33, perspective: 2100 },
 };
 
 /**

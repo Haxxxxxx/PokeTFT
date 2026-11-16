@@ -143,7 +143,15 @@ function ShopBarBase() {
             </>
           )}
           <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-white">
-            {tightShop && <span className="text-sky-200 tabular-nums">{t.net_lv}{level}</span>}
+            {tightShop && (
+              // The level AND the XP still owed. Collapsing this line to just
+              // the level removed the only place the XP to the next level was
+              // shown on a phone — "can't see the actual amount of XP needed
+              // to level up". It costs a few characters to say both.
+              <span className="text-sky-200 tabular-nums">
+                {t.net_lv}{level}{!atMax && <span className="text-sky-300/80"> {xpCur}/{xpNeed}</span>}
+              </span>
+            )}
             {/* "Acheter XP" wraps to two lines in a 120px column and pushed the
                 button past its row. The icon-cost pair beside it already says
                 what the control does. */}

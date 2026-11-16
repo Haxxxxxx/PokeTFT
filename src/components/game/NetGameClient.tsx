@@ -23,7 +23,7 @@ import { subscribeTransfers } from "@/game/net/coop";
 import { recordUltimateBotWin, type RankedResult } from "@/game/net/users";
 import { ref as dbRef, onValue } from "firebase/database";
 import { db } from "@/game/net/firebase";
-import { Trash2, Eye, Maximize, Minimize, AlertTriangle, BarChart3 } from "lucide-react";
+import { Trash2, Eye, Maximize, Minimize, AlertTriangle, BarChart3, Backpack } from "lucide-react";
 import { AUGMENTS, augmentSlot, teamBuffForAugments, combineTeamBuffs, AUGMENT_BY_ID, tailoredAugmentPicks } from "@/game/data/augments";
 import { useAppStore } from "@/game/store/appStore";
 import { Button } from "@/components/ui/Button";
@@ -45,6 +45,7 @@ function asUnits(u: unknown): UnitInstance[] {
 import { Board } from "./Board";
 import { createPortal } from "react-dom";
 import { PensionDock } from "./PensionDock";
+import { IncomeBalls } from "./IncomeBalls";
 import { useDraggablePanel } from "./useDraggablePanel";
 import { computeTraits } from "@/game/engine/synergies";
 import { TYPE_COLOR } from "@/game/ui";
@@ -61,7 +62,7 @@ import { MatchChat } from "./MatchChat";
 import { subscribeCarouselGrants } from "@/game/net/carousel-grants";
 import { ItemsPanel } from "./ItemsPanel";
 import { CombatStage } from "./CombatStage";
-import { CoinIcon, PawIcon, SwordIcon, GiftIcon } from "./icons";
+import { CoinIcon, PawIcon, SwordIcon, GiftIcon, CloseIcon } from "./icons";
 import { useT } from "@/lib/i18n";
 import { sfx } from "@/lib/audio";
 import { toggleFullscreen, isFullscreen, fullscreenSupported, isStandalone } from "@/lib/fullscreen";
@@ -313,6 +314,9 @@ export function NetGameClient() {
   const netCarouselPick = useGame((s) => s.netCarouselPick);
   const pickAugment = useGame((s) => s.pickAugment);
   const augments = useGame((s) => s.augments);
+  // Drives the badge on the drawer button, so the count is visible without
+  // opening it — the stash is otherwise invisible on a phone.
+  const items = useGame((s) => s.items);
   const lang = useAppStore((s) => s.settings.language);
   const board3d = useAppStore((s) => s.settings.board3d);
   const buyXp = useGame((s) => s.buyXp);
@@ -339,6 +343,12 @@ export function NetGameClient() {
     useSensor(TouchSensor, { activationConstraint: { delay: 140, tolerance: 8 } }),
   );
   const [draggedUnit, setDraggedUnit] = useState<UnitInstance | null>(null);
+  // The left rail (synergies, item stash, augments) is not rendered at the
+  // compact tier. The code said it was "reachable from the drawer button in
+  // the top strip" -- there was no such button anywhere, so on a phone the
+  // items were simply gone, and with them the drop target used to take an item
+  // back off a mon. This is that drawer.
+  const [railDrawer, setRailDrawer] = useState(false);
   const lastRoundKey = useRef<string | null>(null);
   // "none" until local econ is first hydrated; "fresh" = we fell back to a new game
   // (priv save hadn't arrived yet), "save" = restored from the synced save. Lets a
@@ -1220,6 +1230,15 @@ export function NetGameClient() {
   // rendering them anyway pushed them past the right edge of the screen — into
   // a document that does not scroll, so they were clipped rather than reachable.
   const slimRail = L.rightRail < 120;
+  // Same threshold densityFor() uses for "a phone in landscape". The top strip
+  // is chrome; on a 393px-tall screen it was spending a tenth of the height on
+  // a row of icons you glance at between rounds.
+  const tightTop = L.railsAsDrawers;
+  // The stack lives in the board column's left slack. That slack is generous on
+  // a desktop and thin on a phone, so the ball is sized against the bench slot
+  // and then capped — an un-capped mon-sized ball is wider than the gap it has
+  // to sit in at the compact tier.
+  const incomeBallSize = Math.min(L.benchSlot, Math.max(18, Math.round(L.viewport.w * 0.045)));
   // Only on the opening round, only for a live player on their own board, and
   // only when the augment overlay is not up — two full-screen pickers at once
   // would stack and the player would answer whichever mounted on top.
@@ -1333,11 +1352,11 @@ export function NetGameClient() {
         {/* Round tracker (TFT-style): an icon per round — Sword=PvP, Leaf=PvE, Gift=
             carousel — grouped by stage. The current round glows; past PvP rounds
             colour win/loss and stay clickable for a recap. */}
-        <div className="gilded relative z-20 flex items-center gap-3 px-3 py-1.5 rounded-lg">
+        <div className={`gilded relative z-20 flex items-center rounded-lg ${tightTop ? "gap-1.5 px-2 py-0.5" : "gap-2.5 px-2.5 py-1"}`}>
           {/* Current stage/round recap, pinned beside the round tracker. */}
           <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/[0.06]">
-            <span className="text-[8px] uppercase tracking-[0.15em] text-slate-400/70 leading-none">{t.net_stage}</span>
-            <span className="text-base font-bold tabular-nums gild-text leading-none">{meta.stage}-{meta.round}</span>
+            {!tightTop && <span className="text-[8px] uppercase tracking-[0.15em] text-slate-400/70 leading-none">{t.net_stage}</span>}
+            <span className={`font-bold tabular-nums gild-text leading-none ${tightTop ? "text-[11px]" : "text-sm"}`}>{meta.stage}-{meta.round}</span>
           </div>
           {/* py-2 is load-bearing. This scrolls horizontally, and CSS gives you
               no way to scroll one axis while leaving the other visible: the
@@ -1348,7 +1367,7 @@ export function NetGameClient() {
               The padding gives them room inside it; overflow-y-hidden just says
               out loud that the vertical axis was never meant to scroll. */}
           <div
-            className="flex-1 flex items-center justify-center gap-1 overflow-x-auto overflow-y-hidden py-2"
+            className={`flex-1 flex items-center justify-center overflow-x-auto overflow-y-hidden ${tightTop ? "gap-0.5 py-1" : "gap-1 py-1.5"}`}
             onScroll={() => setHoverRound(null)}
           >
             {schedule.map(({ stage, round, kind }) => {
@@ -1356,7 +1375,8 @@ export function NetGameClient() {
               const result = resultByKey.get(key);
               const isCurrent = stage === meta.stage && round === meta.round;
               const isPast = result !== undefined;
-              const icon = kind === "carousel" ? <GiftIcon size={14} /> : kind === "pve" ? <PawIcon size={14} /> : <SwordIcon size={14} />;
+              const ic = tightTop ? 10 : 12;
+              const icon = kind === "carousel" ? <GiftIcon size={ic} /> : kind === "pve" ? <PawIcon size={ic} /> : <SwordIcon size={ic} />;
               const recap = recapByKey.get(key);
               const clickable = isPast && !!recap && !recap.pve && recap.oppUid !== myUid && !!players[recap.oppUid];
               const open = recapKey === key;
@@ -1402,7 +1422,7 @@ export function NetGameClient() {
                     });
                   }}
                   onMouseLeave={() => setHoverRound((h) => (h?.key === key ? null : h))}
-                  className={`relative w-6 h-6 shrink-0 rounded flex items-center justify-center text-[12px] leading-none grayscale-[0.15] transition-all ${cls} ${open ? "ring-2 ring-gold-300" : ""} ${clickable ? "cursor-pointer hover:brightness-125" : "cursor-default"}`}
+                  className={`relative shrink-0 rounded flex items-center justify-center leading-none grayscale-[0.15] transition-all ${tightTop ? "w-[18px] h-[18px] text-[9px]" : "w-5 h-5 text-[10px]"} ${cls} ${open ? "ring-2 ring-gold-300" : ""} ${clickable ? "cursor-pointer hover:brightness-125" : "cursor-default"}`}
                 >
                   <span className={isPast && !isCurrent ? "opacity-80" : ""}>{icon}</span>
                   {isPast && !isCurrent && (
@@ -1470,7 +1490,7 @@ export function NetGameClient() {
 
         {/* Top HUD bar: stat chips, then the phase/timer segment + controls.
             (The stage badge lives next to the timeline above.) */}
-        <div className="relative z-30 gilded flex items-center gap-2.5 px-3.5 py-2 rounded-xl min-w-0 max-w-full">
+        <div className={`relative z-30 gilded flex items-center rounded-xl min-w-0 max-w-full ${tightTop ? "gap-1.5 px-2 py-0.5" : "gap-2.5 px-3 py-1"}`}>
           {(() => {
             // The HUD economy reflects whoever's board you're looking at: a scouted rival → their
             // now-public econ (lobby chose full transparency); else your own live numbers.
@@ -1560,6 +1580,22 @@ export function NetGameClient() {
                 <BarChart3 size={13} /> {t.net_recap}
               </button>
             )}
+            {/* Only where the rail is not on screen. */}
+            {L.railsAsDrawers && (
+              <button
+                onClick={() => setRailDrawer((v) => !v)}
+                aria-label={t.sh_items_title}
+                title={t.sh_items_title}
+                className={`relative px-2.5 py-1.5 rounded-md border text-xs font-bold leading-none ${railDrawer ? "bg-gold-500/90 text-black border-gold-400" : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"}`}
+              >
+                <Backpack size={14} />
+                {items.length > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-gold-400 px-1 text-[9px] font-extrabold text-black">
+                    {items.length}
+                  </span>
+                )}
+              </button>
+            )}
             <OptionsMenu />
             <FullscreenButton />
             <button onClick={onLeaveClick} className="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-xs font-bold text-slate-300">{t.net_leave}</button>
@@ -1585,8 +1621,28 @@ export function NetGameClient() {
             gap: L.gap,
           }}
         >
-          {/* Left rail: synergies + item stash (hidden on compact — reachable from
-              the drawer button in the top strip). */}
+          {L.railsAsDrawers && railDrawer && (
+            <>
+              <div
+                onClick={() => setRailDrawer(false)}
+                className="fixed inset-0 z-panel bg-black/60 backdrop-blur-sm"
+              />
+              <div className="fixed left-0 top-0 bottom-0 z-panel w-[min(76vw,300px)] flex flex-col gap-2 overflow-y-auto bg-[#0a0e1a]/95 border-r border-white/10 p-2.5 shadow-2xl">
+                <div className="flex items-center justify-between shrink-0">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gold-200/60">{t.sh_items_title}</span>
+                  <button onClick={() => setRailDrawer(false)} aria-label={t.chat_close} className="text-slate-400 hover:text-slate-100">
+                    <CloseIcon size={14} />
+                  </button>
+                </div>
+                <div className="min-h-0 shrink-0"><TraitPanel units={spectateUnits ?? undefined} /></div>
+                {!isSpectator && !spectating && <ItemsPanel />}
+                {!isSpectator && <AugmentsBar augments={augments} lang={lang} variant="panel" />}
+              </div>
+            </>
+          )}
+
+          {/* Left rail: synergies + item stash. On a phone it is not in flow —
+              it opens as the drawer above, from the backpack button in the HUD. */}
           {!L.railsAsDrawers && (
           <div className="flex flex-col gap-3 min-h-0">
             {/* Synergies sit at the TOP of the rail at their natural height;
@@ -1748,6 +1804,16 @@ export function NetGameClient() {
               and combat together), so the arena never jumps when the phase flips.
               A `board-swap` fade plays when the view changes. */}
           <div className={`order-2 relative min-w-0 min-h-0 flex items-center justify-center rounded-xl${boardFlash ? " screen-flash" : ""}`}>
+            {/* Interest, BESIDE the board. It used to be drawn inside the arena
+                frame, which put it over the left-hand hexes — on a phone that
+                is squarely on top of the playable area. The board column
+                centres the arena, so anchoring here uses the slack the column
+                already has instead of borrowing from the board.
+                Only on your OWN live board: on a scouted rival's it would be
+                their economy shown over your context. */}
+            {!isSpectator && !spectating && phase !== "combat" && (
+              <IncomeBalls size={incomeBallSize} inset={0} />
+            )}
             {/* Float-up text for HP damage or gold gain feedback. */}
             {floatText && (
               <div key={floatKey} className={`float-up absolute top-4 left-1/2 -translate-x-1/2 z-30 text-sm font-extrabold drop-shadow pointer-events-none select-none ${floatText.startsWith("−") ? "text-rose-300" : "text-gold-300"}`}>
