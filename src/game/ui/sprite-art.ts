@@ -56,7 +56,15 @@ export const TARGET_ART_HEIGHT = 0.8;
  * height, which is the padding error creeping back in through the ceiling. At
  * 3.2 every species reaches its intended size.
  */
+// 3.2, and it has to be. A sprite whose art fills a small part of its 96px
+// frame needs a big box to bring that art up to TARGET_ART_HEIGHT, and this
+// is the ceiling on that, not a target. Lowering it to the 2.1 that UnitChip's
+// comment claims breaks the rule the tests enforce — that two species with the
+// same scale render at the same art height — because the padded ones stop
+// reaching it (measured: dex 628 at 88.5px against dex 963 at 78.8px).
 const MAX_BOX = 3.2;
+/** Same ceiling, for the snap step that is applied after this one. */
+export const MAX_SPRITE_BOX = MAX_BOX;
 
 /**
  * The sprite box to render, chosen so the ART inside it lands at

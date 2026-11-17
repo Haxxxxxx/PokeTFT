@@ -666,9 +666,15 @@ body {
    cheapest stand-in for the lit edge a 3D model would get from the scene. The
    last, softer shadow is the ambient occlusion back toward the ground. */
 .unit-rim {
+  /* TWO passes, not three. Every drop-shadow in a filter chain is its own
+     blur of the whole layer, and this runs on every mon on the board — up to
+     ten of yours plus the enemy's during a fight, each one also being
+     animated. The middle pass was a decorative blue bloom sitting underneath
+     a white rim that already separates the sprite from the floor; dropping it
+     removes a third of the per-sprite filter cost and is close to invisible.
+     Reported as the game stuttering on lower-powered machines. */
   filter:
     drop-shadow(0 0 1px rgba(226, 240, 255, 0.85))
-    drop-shadow(0 0 2px rgba(150, 200, 255, 0.4))
     drop-shadow(0 3px 4px rgba(0, 0, 0, 0.7));
 }
 
