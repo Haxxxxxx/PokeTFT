@@ -39,7 +39,14 @@ const measure = async (label) => {
     const rc = chrome ? chrome.getBoundingClientRect() : null;
     const rf = fr ? fr.getBoundingClientRect() : null;
     const chromeOnBoard = rc && rf ? Math.round(Math.min(rc.bottom, rf.bottom) - Math.max(rc.top, rf.top)) : null;
-    return { chrome: R(chrome), chromeOnBoard,
+    // The fight's side recap is a fixed 210px panel. On a narrow screen the
+    // board centres further left, so check it is not sitting on the hexes.
+    const recap = document.querySelector('[data-panel="combat-recap"]');
+    const rr = recap ? recap.getBoundingClientRect() : null;
+    const recapOnBoard = rr && rf
+      ? Math.round(Math.min(rr.right, rf.right) - Math.max(rr.left, rf.left))
+      : null;
+    return { recap: R(recap), recapOnBoard, chrome: R(chrome), chromeOnBoard,
       col: R(col), frame: R(fr), grid: R(grid), barBottom: Math.round(barBottom), vh: window.innerHeight,
       combat: /COMBAT/i.test(document.body.innerText) };
   });
@@ -49,7 +56,8 @@ const measure = async (label) => {
   const overHud = m.barBottom - m.frame.t;
   const ok = aboveCol <= 0 && belowCol <= 0 && overHud <= 0;
   console.log(`${ok ? "OK  " : "FAIL"} ${label} combat=${m.combat} col h=${m.col.h} arena h=${m.frame.h} | above=${aboveCol} below=${belowCol} overHUD=${overHud}`);
-  console.log(`       chrome h=${m.chrome?.h} overlapsBoard=${m.chromeOnBoard}`);
+  console.log(`       chrome h=${m.chrome?.h} overlapsBoard=${m.chromeOnBoard}  recap=${JSON.stringify(m.recap)} overlapsBoard=${m.recapOnBoard}`);
+  if (m.recapOnBoard !== null && m.recapOnBoard > 0) { console.log(`       ✗ the side recap sits ON the board by ${m.recapOnBoard}px`); bad++; }
   if (process.env.SHOT_DIR) await p.screenshot({ path: `${process.env.SHOT_DIR}/fight-${label}.png` });
   return ok;
 };

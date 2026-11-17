@@ -231,6 +231,16 @@ export function CombatStage({
   const { w, h } = fieldPixelSize(TILE_W, TILE_H);
   // Platform thickness, matching the planning board's.
   const wallT = Math.max(10, Math.round(TILE_W * 0.26));
+
+  // How much room is there beside the board for the side recap? The board is
+  // centred in its column, so the gutter is half of whatever the column has
+  // left over. `layout` here is combat-scoped, so boardBox is the fight's.
+  const recapColW = layout.viewport.w - (layout.railsAsDrawers
+    ? layout.rightRail + layout.gap + layout.pad * 2
+    : layout.leftRail + layout.rightRail + layout.gap * 2 + layout.pad * 2);
+  const recapGutter = Math.floor((recapColW - layout.boardBox.w) / 2) - layout.gap;
+  const recapW = Math.min(210, recapGutter);
+  const recapFits = recapW >= 150;
   const fi = Math.min(Math.floor(idx), last);
   const frac = idx - fi;
   const a = frames[fi];
@@ -518,11 +528,19 @@ export function CombatStage({
 
       {/* Recap as an OVERLAY pinned to the stage's own left edge, not a sibling
           in the row. As a sibling it widened the layout and pushed itself over
-          the trainers rail once the old 340px item column was removed. */}
-      {suppressRecap ? null : recapOpen ? (
+          the trainers rail once the old 340px item column was removed.
+
+          Pinned to that edge at a FIXED 210px, it was sitting on the hexes as
+          soon as the board grew toward it: measured 41px onto the board at
+          667x375. The board is centred in its column, so the gutter beside it
+          is whatever the column has spare — and that is what this panel gets.
+          Below a readable floor it does not open at all, because half a panel
+          over the battlefield is worse than no panel. */}
+      {suppressRecap || !recapFits ? null : recapOpen ? (
         <CombatRecapTabs
           units={a.units}
           label={t.cs_your_team}
+          width={recapW}
           onClose={() => setRecapOpen(false)}
           // Where it has always opened: the stage's own left edge, just below
           // the top of the fight. Expressed in viewport coordinates because
@@ -633,12 +651,14 @@ const RECAP_TABS = [
  * clipped by the stage's own box, which is what "anywhere" has to mean.
  */
 function CombatRecapTabs({
-  units, label, defaultStyle, onClose,
+  units, label, defaultStyle, onClose, width,
 }: {
   units: FrameUnit[];
   label: string;
   defaultStyle: CSSProperties;
   onClose: () => void;
+  /** Sized to the gutter beside the board — see the caller. */
+  width: number;
 }) {
   const t = useT();
   const { nodeRef, style, onPointerDown, dragging, moved, reset } = useDraggablePanel(
@@ -657,9 +677,9 @@ function CombatRecapTabs({
     <div
       ref={nodeRef}
       data-panel="combat-recap"
-      style={{ ...style, maxHeight: "72vh" }}
+      style={{ ...style, maxHeight: "72vh", width }}
       onPointerDown={onPointerDown}
-      className={`gilded z-panel w-[210px] shrink-0 rounded-xl p-2 flex flex-col select-none ${
+      className={`gilded z-panel shrink-0 rounded-xl p-2 flex flex-col select-none ${
         dragging ? "cursor-grabbing shadow-[0_8px_30px_rgba(0,0,0,0.6)]" : "cursor-grab"
       }`}
     >

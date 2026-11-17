@@ -55,8 +55,14 @@ const DIFF = WHAT === "over" ? /^\s*(difficile|hard)\s*$/i : /^\s*(facile|moyen|
 if (!(await btn(DIFF, 2500))) await btn(/^\s*(facile|moyen|easy|medium)\s*$/i, 2000);
 await page.waitForTimeout(700);
 await btn(/lancer la partie|lancer|start/i, 8000); await page.waitForTimeout(7000);
-const draft = page.locator('[class*="w-\\[150px\\]"]').first();
-if (await draft.isVisible().catch(() => false)) { await draft.click().catch(() => {}); await page.waitForTimeout(1600); }
+// Reaching the final standings needs the field down to one survivor, and a
+// drafted mon wins enough PvE rounds to keep the player alive indefinitely —
+// a 25-minute run bled 7hp. An empty board loses every round at full damage,
+// which is the only way a harness gets to see this screen in finite time.
+if (WHAT !== "over") {
+  const draft = page.locator('[class*="w-\\[150px\\]"]').first();
+  if (await draft.isVisible().catch(() => false)) { await draft.click().catch(() => {}); await page.waitForTimeout(1600); }
+}
 await esc();
 
 // Idle until the overlay we want is on screen. Never picks anything: both of
