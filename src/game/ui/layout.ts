@@ -159,8 +159,15 @@ const COMBAT_CHROME_H = 60;
  * aside only where the alternative is a fight you cannot see.
  */
 const LEGIBLE_COMBAT_TILE = 24;
-/** Above this the board stops reading as a board on huge monitors. */
-const MAX_TILE_W = 118;
+/**
+ * Above this the board stops reading as a board on huge monitors.
+ *
+ * 118 was leaving a 1920x1080 desktop with the board on 44% of the screen and
+ * ~520px of nothing down either side — height alone affords a 138px tile
+ * there, so the ceiling, not the viewport, was what made it small. 140 puts
+ * the board at roughly the width TFT itself gives one on the same monitor.
+ */
+const MAX_TILE_W = 140;
 
 type Tier = {
   topH: number;
@@ -367,10 +374,14 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
   // had the column to itself overstated the height by a whole bench strip. The
   // arena was then centred in a box one bench shorter than it was sized for,
   // which pushed ~40px of it up over the HUD at every desktop size.
+  // PLANNING's own best tile. The eight-row term that used to be in here left
+  // when combat got a tile of its own — leaving it meant the fight's needs
+  // still set the size of a board the fight does not use, which is the exact
+  // thing that was supposed to stop. On a 1920x1080 desktop it was holding the
+  // tile at 109px when planning alone affords the 118px ceiling.
   const idealTile = Math.min(
     fromW,
     tileFor(contextUnitsH, availH, true),
-    tileFor(fullUnitsH, availH, true),
   );
 
   // If that leaves the tokens too small to drag comfortably, reorganize instead
@@ -381,10 +392,11 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
   // a reason to rearrange the screen — counting them here pushed a 1280x800
   // laptop from 68.3 to 67.7 against a threshold of 68, which windowed its
   // planning board and took the shop away mid-fight over a third of a pixel.
+  // Decided on planning alone, for the same reason: windowing exists to keep
+  // the tile you DRAG on comfortable, and combat is solved separately.
   const windowed = Math.min(
     fromW,
     tileFor(contextUnitsH, availH, true, 0),
-    tileFor(fullUnitsH, availH, true, 0),
   ) < COMFORTABLE_TILE;
 
   const planningRows = windowed ? WINDOWED_ROWS : PLANNING_CONTEXT_ROWS;

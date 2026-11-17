@@ -97,7 +97,7 @@ console.log("\nTokens stay tappable and sane:");
 for (const vp of VIEWPORTS) {
   const L = computeGameLayout(vp.w, vp.h);
   assert(L.tile.w >= 34, `${vp.name} — tile ${L.tile.w}px >= 34px minimum`);
-  assert(L.tile.w <= 118, `${vp.name} — tile ${L.tile.w}px <= 118px maximum`);
+  assert(L.tile.w <= 140, `${vp.name} — tile ${L.tile.w}px <= 140px maximum`);
   // Bench slabs scale with the tile. They're DROP targets resolved by
   // closest-center rather than precision tap targets, and the unit sprite
   // drawn in one overflows it, so the usable area is larger than the socket.
