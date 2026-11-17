@@ -427,6 +427,7 @@ function BoardBase({
                 interactive={interactive}
                 shape="hex"
                 dragHitArea
+                renderScale={scale}
               />
             </div>
           );
@@ -465,6 +466,7 @@ function BoardBase({
                 canDeploy={benchCanDeploy}
                 shape="hex"
                 dragHitArea
+                renderScale={scale}
               />
             </div>
           );

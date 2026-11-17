@@ -63,6 +63,33 @@ export const SPRITE_SOURCE = 96;
  */
 const SNAP_TOLERANCE = 0.1;
 
+/**
+ * `crispSize`, for art that something else is going to SCALE afterwards.
+ *
+ * The board foreshortens each row with a CSS `transform: scale()` on the unit,
+ * so the size crispSize hands back is not the size the player sees. A sprite
+ * snapped to a clean 192 (2x of 96) and then scaled by 1.037 lands on screen
+ * at 199 — a 2.074x sample of a 96px source, which is exactly the ragged
+ * upscale the snapping exists to prevent. Measured on a live board: 2.074x,
+ * 1.781x, 1.344x, 1.057x. Not one integral, so the snapping was achieving
+ * nothing for any mon actually standing on the field.
+ *
+ * So snap the size the player SEES, then divide the row's scale back out to
+ * get the size to lay out at. The on-screen result is a whole multiple of the
+ * source again, and one source pixel covers exactly N screen pixels.
+ */
+export function crispSizeScaled(
+  desired: number,
+  maxSize: number,
+  scale: number,
+  source: number = SPRITE_SOURCE,
+): number {
+  if (!(scale > 0) || !Number.isFinite(scale) || Math.abs(scale - 1) < 1e-6) {
+    return crispSize(desired, maxSize, source);
+  }
+  return crispSize(desired * scale, maxSize * scale, source) / scale;
+}
+
 export function crispSize(desired: number, maxSize: number, source: number = SPRITE_SOURCE): number {
   const cap = Math.max(1, maxSize);
   const target = Math.min(desired, cap);

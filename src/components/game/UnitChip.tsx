@@ -10,7 +10,7 @@ import { useGame } from "@/game/store/gameStore";
 import { useT } from "@/lib/i18n";
 import { MEGA_STONE, canHoldMegaStone, isMegaActive } from "@/game/data/mega";
 import { HEX_CLIP } from "@/game/engine/hex";
-import { crispSize } from "@/game/ui/pixel";
+import { crispSizeScaled } from "@/game/ui/pixel";
 import { MAX_SPRITE_BOX } from "@/game/ui/sprite-art";
 import { StarIcon, MegaIcon } from "./icons";
 import { ItemGlyph } from "./ItemGlyph";
@@ -111,7 +111,7 @@ export function Stars({ star }: { star: number }) {
 /** Height of the star row, so it can be lifted clear of the mon's head. */
 const STAR_BADGE_H = 13;
 
-export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true, shape = "square", showSprite = true, showModel = false, dragHitArea = false, tilt = 0 }: { unit: UnitInstance; size?: number; interactive?: boolean; canDeploy?: boolean; shape?: "square" | "hex"; showSprite?: boolean; showModel?: boolean; dragHitArea?: boolean; tilt?: number }) {
+export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true, shape = "square", showSprite = true, showModel = false, dragHitArea = false, tilt = 0, renderScale = 1 }: { unit: UnitInstance; size?: number; interactive?: boolean; canDeploy?: boolean; shape?: "square" | "hex"; showSprite?: boolean; showModel?: boolean; dragHitArea?: boolean; tilt?: number; /** CSS scale the BOARD applies to this chip for row perspective. Folded into the sprite snap so the on-screen size stays a whole multiple of the source. */ renderScale?: number }) {
   const t = useT();
   const def = getDef(unit.defId);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: unit.iid, disabled: !interactive });
@@ -174,7 +174,7 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
   // so the padded frame does. See spriteBoxFor().
   const rel = relativeModelScale(dex);
   const spriteSize = shape === "hex"
-    ? crispSize(spriteBoxFor(dex, size, rel), size * MAX_SPRITE_BOX)
+    ? crispSizeScaled(spriteBoxFor(dex, size, rel), size * MAX_SPRITE_BOX, renderScale)
     : Math.round(spriteBoxFor(dex, size - 6, rel));
   const sprite = showModel ? (
     <PokemonModelPreview
