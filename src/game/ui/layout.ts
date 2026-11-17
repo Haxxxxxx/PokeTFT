@@ -149,17 +149,6 @@ const RAILS_INLINE_MIN_W = 1000;
  */
 const COMBAT_CHROME_H = 60;
 /**
- * Combat tile below which the fight stops being readable, and the shop and
- * bench yield the screen for the few seconds it resolves.
- *
- * Keeping them up is worth real estate — you can buy and rearrange mid-fight —
- * but not at any price: on a 393px-tall phone, paying for the shop, the bench
- * AND the scoreboard out of the fight's own tile leaves ~17px hexes, which is
- * not a battle you can follow. So the shop stays wherever it can, and steps
- * aside only where the alternative is a fight you cannot see.
- */
-const LEGIBLE_COMBAT_TILE = 24;
-/**
  * Above this the board stops reading as a board on huge monitors.
  *
  * 118 was leaving a 1920x1080 desktop with the board on 44% of the screen and
@@ -379,9 +368,15 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
   // still set the size of a board the fight does not use, which is the exact
   // thing that was supposed to stop. On a 1920x1080 desktop it was holding the
   // tile at 109px when planning alone affords the 118px ceiling.
+  // Planning AND combat, solved together, because they share one tile wherever
+  // nothing yields for the fight. Dropping the eight-row term here is what let
+  // the board shrink 20% at every phase flip on a desktop — the exact thing
+  // this layout was built to avoid. Rows still differ between the phases; the
+  // SCALE does not.
   const idealTile = Math.min(
     fromW,
     tileFor(contextUnitsH, availH, true),
+    tileFor(fullUnitsH, availH - COMBAT_CHROME_H, true),
   );
 
   // If that leaves the tokens too small to drag comfortably, reorganize instead
@@ -394,11 +389,25 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
   // planning board and took the shop away mid-fight over a third of a pixel.
   // Decided on planning alone, for the same reason: windowing exists to keep
   // the tile you DRAG on comfortable, and combat is solved separately.
+  // Decided on the SAME expression the tile comes from, or the two disagree at
+  // the boundary and a slightly larger viewport is handed a smaller board
+  // (measured: 68 → 53 across the threshold).
   const windowed = Math.min(
     fromW,
     tileFor(contextUnitsH, availH, true, 0),
+    tileFor(fullUnitsH, availH - COMBAT_CHROME_H, true, 0),
   ) < COMFORTABLE_TILE;
 
+  // Where nothing yields during the fight — every desktop — planning draws the
+  // FULL field, not six rows of it. Not for the two rows of context: so that
+  // planning and combat are showing the same number of rows and can therefore
+  // share one tile. The board changing size at the phase flip is the thing
+  // this layout went out of its way to avoid, and a 20% jump every round on a
+  // 1920px screen is worse than the hexes being a little smaller.
+  //
+  // A windowed viewport keeps four rows and its own combat tile: there the
+  // bottom yields for the fight, so the two phases are not competing for the
+  // same height and a shared tile would only shrink the board you drag on.
   const planningRows = windowed ? WINDOWED_ROWS : PLANNING_CONTEXT_ROWS;
 
   const planTile = tileFor(rowsPixelHeight(planningRows, 1), availH, true);
@@ -406,9 +415,34 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
   // Windowing is a RECOVERY, not a size bonus: it buys back a comfortable tile
   // and stops there. Without this cap a cramped viewport could hand out a larger
   // board than a roomier one — so growing the window would shrink the board.
+  // The bottom yields for the fight exactly where the field is windowed. A
+  // structural rule, not one keyed on the resulting tile: deciding it from the
+  // tile put a cliff at the threshold, where a slightly BIGGER screen kept its
+  // shop, paid for it out of the shared tile and ended up with a smaller board
+  // than the screen below it (measured 53 → 34).
+  const fightAvail = (windowed
+    ? Math.max(80, vh - (topH + gap + pad * 2))
+    : availH) - COMBAT_CHROME_H;
+  // No bench in the fight where the bottom has gone with it.
+  const fightTile = tileFor(fullUnitsH, fightAvail, !windowed);
+
+  // ONE tile, both phases, every size — the invariant this layout was built
+  // around and which a separate combat tile quietly broke: a 20% shrink at
+  // every phase flip on a 1920px desktop.
+  // Unwindowed, the two phases share one tile outright: same column, same
+  // chrome, so planning respects the fight's fit and the board never changes
+  // size at the flip.
+  //
+  // Windowed, it cannot. The fight there wants a tile below MIN_TILE_W — the
+  // floor that keeps a token draggable — so binding planning to it would hand
+  // a phone 24px bench slabs and a board that still does not fit (measured at
+  // 667x375: combat 380px into 375). The bottom yields instead, which buys the
+  // fight most of the gap back, and whatever is left over the fight pays out
+  // of its own tile rather than charging it to the board you play on.
   const rawTile = windowed
     ? Math.min(fromW, planTile, COMFORTABLE_TILE)
-    : Math.min(fromW, idealTile);
+    : Math.min(fromW, idealTile, planTile, fightTile);
+
 
   const tileW = clamp(Math.floor(rawTile), MIN_TILE_W, MAX_TILE_W);
   const tileH = Math.round(tileW * TILE_ASPECT);
@@ -437,18 +471,19 @@ export function computeGameLayout(vw: number, vh: number): GameLayout {
   // Tying planning to combat's constraint made the whole game's board small;
   // the fight shrinking for the few seconds it is on screen costs much less.
   // Capped at the planning tile so the board never GROWS into a fight.
-  // Try it with the shop and bench up, paying for the scoreboard too.
-  const withBottom = availH - COMBAT_CHROME_H;
-  const tileWithBottom = Math.min(fromW, tileFor(fullUnitsH, withBottom, true));
   // Only if that leaves a fight you cannot read does the bottom step aside.
-  const combatHidesBottom = tileWithBottom < LEGIBLE_COMBAT_TILE;
-  const combatAvail = combatHidesBottom
-    ? Math.max(80, vh - (topH + gap + pad * 2)) - COMBAT_CHROME_H
-    : withBottom;
+  const combatHidesBottom = windowed;
 
-  const rawCombatTile = Math.min(fromW, tileFor(fullUnitsH, combatAvail, !combatHidesBottom));
+  const rawCombatTile = Math.min(fromW, fightTile);
   // MIN_TILE_W is a draggability floor and the combat field is locked — there
   // is nothing to drag on it — so it does not apply. Fitting does.
+  //
+  // Unwindowed, the fight simply TAKES the planning tile: both phases draw the
+  // same eight rows into the same column, the shared solve above already
+  // cleared the fight's own fit, and anything else would be a scale change
+  // nobody asked for.
+  // Capped at the planning tile, so the fight never GROWS into the board and,
+  // wherever the yield gives it room to spare, simply matches it.
   const combatTileW = clamp(Math.floor(rawCombatTile), MIN_COMBAT_TILE, tileW);
   const combatTileH = Math.round(combatTileW * TILE_ASPECT);
   const combatField = fieldPixelSize(combatTileW, combatTileH);

@@ -522,6 +522,9 @@ export function GameOverScreen({
   gameTotals: { dmgDealt: number; dmgTaken: number; healed: number; roundsWon: number; roundsPlayed: number };
 }) {
   const t = useT();
+  // Phone in landscape. Everything here is readable at a glance except the two
+  // buttons at the bottom, which is the only part you actually need.
+  const tight = useGameLayout().density === "compact";
   // Final standings: every player ranked by placement (winner = #1), with their
   // final team. Double Up: keep teammates adjacent by tie-breaking on team.
   const standings = Object.values(players).sort((a, b) => (a.place ?? 99) - (b.place ?? 99) || (a.teamId ?? 0) - (b.teamId ?? 0) || (a.uid < b.uid ? -1 : 1));
@@ -538,11 +541,11 @@ export function GameOverScreen({
     // of the screen with no way to reach them. Reported as not being able to
     // quit once the game is over, and it bites hardest on a phone, where
     // there is least height to spare.
-    <div className="fixed inset-0 z-screen overflow-y-auto bg-black/85 backdrop-blur-sm">
-    <div className="min-h-full flex flex-col items-center justify-center gap-5 p-4">
-      <div className={`celebrate-pop flex flex-col items-center gap-2 ${iWon ? "text-gold-300" : "text-slate-200"}`}>
-        {iWon && <TrophyIcon size={52} />}
-        <div className="text-4xl font-extrabold">{iWon ? t.net_victory : t.net_gameover}</div>
+    <div className="fixed inset-0 z-screen overflow-y-auto bg-black/95 backdrop-blur-sm">
+    <div className={`min-h-full flex flex-col items-center justify-center ${tight ? "gap-2 p-2" : "gap-5 p-4"}`}>
+      <div className={`celebrate-pop flex flex-col items-center ${tight ? "gap-0.5" : "gap-2"} ${iWon ? "text-gold-300" : "text-slate-200"}`}>
+        {iWon && <TrophyIcon size={tight ? 30 : 52} />}
+        <div className={`font-extrabold ${tight ? "text-2xl" : "text-4xl"}`}>{iWon ? t.net_victory : t.net_gameover}</div>
         {meta?.endedByHost
           ? <div className="text-sm font-semibold text-rose-300">{t.net_host_left}</div>
           : <div className="text-sm text-slate-400">{t.net_placed(me?.place ?? 1)}</div>}
@@ -558,7 +561,7 @@ export function GameOverScreen({
         const topHeal = [...mine].sort((a, b) => b.healed - a.healed)[0];
         const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${Math.round(n)}`);
         return (
-          <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-gold-500/40 bg-gold-500/10">
+          <div className={`flex items-center gap-3 px-4 rounded-xl border border-gold-500/40 bg-gold-500/10 ${tight ? "py-1" : "py-2.5"}`}>
             <div className="rounded-lg bg-black/30 border border-gold-500/40 p-1 shrink-0 relative">
               <PokemonModelPreview dex={mvp.dex} alt={mvp.name} width={44} height={44} />
               <span className="absolute -top-1.5 -left-1.5 text-sm">⭐</span>
@@ -580,7 +583,7 @@ export function GameOverScreen({
       {gameTotals.roundsPlayed > 0 && (() => {
         const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${Math.round(n)}`);
         return (
-          <div className="flex flex-col gap-1.5 px-4 py-2.5 rounded-xl border border-sky-500/30 bg-sky-500/[0.07]">
+          <div className={`flex flex-col gap-1.5 px-4 rounded-xl border border-sky-500/30 bg-sky-500/[0.07] ${tight ? "py-1" : "py-2.5"}`}>
             <div className="text-[9px] uppercase tracking-wide text-sky-200/60 font-bold">{t.net_summary_label}</div>
             <div className="flex items-center gap-3 text-[10px] font-bold flex-wrap">
               <span className="text-rose-300" title={t.net_summary_dealt}>⚔ {fmt(gameTotals.dmgDealt)}</span>
@@ -599,7 +602,7 @@ export function GameOverScreen({
         const moved = before.label !== after.label;
         const up = rankResult.rating > rankResult.prevRating;
         return (
-          <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08]">
+          <div className={`flex items-center gap-3 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] ${tight ? "py-1" : "py-2"}`}>
             <span className={`text-lg font-extrabold tabular-nums ${rankResult.delta >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
               {rankResult.delta >= 0 ? "+" : ""}{rankResult.delta} LP
             </span>
@@ -626,7 +629,7 @@ export function GameOverScreen({
             return (
               <div
                 key={p.uid}
-                className={`flex items-center gap-3 px-3 py-2 rounded-xl border ${first ? "bg-gold-500/10 border-gold-500/50" : "bg-slate-900/70 border-slate-700/50"} ${isMe ? "ring-1 ring-sky-500/60" : ""}`}
+                className={`flex items-center gap-3 px-3 rounded-xl border ${tight ? "py-0.5" : "py-2"} ${first ? "bg-gold-500/10 border-gold-500/50" : "bg-slate-900/70 border-slate-700/50"} ${isMe ? "ring-1 ring-sky-500/60" : ""}`}
               >
                 <span className="w-8 text-center text-lg font-extrabold tabular-nums shrink-0">{medal(p.place ?? 99)}</span>
                 <span className="w-9 h-9 rounded-md bg-black/40 border border-slate-700 flex items-center justify-center shrink-0 overflow-hidden">
