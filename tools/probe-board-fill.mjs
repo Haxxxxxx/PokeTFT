@@ -1,6 +1,7 @@
 import { webkit } from "playwright";
 const URL = process.argv[2];
 const SIZES = (process.argv[3] ?? "1920x1080").split(",").map((s) => s.split("x").map(Number));
+// No SHOT_DIR, no screenshots — writing to "undefined/" litters the repo.
 const OUT = process.env.SHOT_DIR;
 const b = await webkit.launch();
 const ctx = await b.newContext({ viewport: { width: SIZES[0][0], height: SIZES[0][1] }, deviceScaleFactor: 1 });
@@ -15,7 +16,7 @@ await click(/jouer en invit|play as guest|invit/i, 6000); await p.waitForTimeout
 await btn(/^\s*(cr[ée]er|create)\b/i, 8000);
 for (let i = 0; i < 3; i++) { await p.waitForTimeout(1200); if (!(await btn(/^\s*(continuer|continue|suivant)\b/i, 2500))) break; }
 await p.waitForTimeout(2000);
-await p.screenshot({ path: `${OUT}/web-prelobby-${SIZES[0][0]}x${SIZES[0][1]}.png` });
+if (OUT) await p.screenshot({ path: `${OUT}/web-prelobby-${SIZES[0][0]}x${SIZES[0][1]}.png` });
 await esc();
 await btn(/^\s*(facile|moyen|easy|medium)\s*$/i, 2500); await p.waitForTimeout(700);
 await btn(/lancer la partie|lancer|start/i, 8000); await p.waitForTimeout(7000);
@@ -34,6 +35,6 @@ for (const [W, H] of SIZES) {
   });
   console.log(`${W}x${H} planning  arena=${JSON.stringify(m.arena)}  cols=${m.cols}`);
   if (m.arena) console.log(`   arena uses ${Math.round(100 * m.arena.w / m.vw)}% of width; dead left ${m.arena.l}, right ${m.vw - m.arena.r}`);
-  await p.screenshot({ path: `${OUT}/web-game-${W}x${H}.png` });
+  if (OUT) await p.screenshot({ path: `${OUT}/web-game-${W}x${H}.png` });
 }
 await b.close();
