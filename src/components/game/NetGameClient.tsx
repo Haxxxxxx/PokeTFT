@@ -1243,6 +1243,18 @@ export function NetGameClient() {
   // they overrun it, and the board gets solved against height the HUD is
   // standing on. That is the bug this screen was just fixed for.
   const tightTop = L.density === "compact";
+  // Narrower still than "compact". At 667x375 — an iPhone SE in landscape —
+  // the economy cluster, the next-opponent chip and the controls came to 58px
+  // more than the row, and since nothing to the left of the controls can
+  // shrink (the phase timer already gives up everything it has), the overflow
+  // lands on the RIGHT: the Quit button sat 58px past the edge of the screen,
+  // inside an ancestor that clips. Not merely ugly — there was no way to
+  // leave the game.
+  //
+  // The two cells that go are the derived ones. Interest is already drawn as
+  // the Poké Ball stack beside the board, and the streak's gold is a rounding
+  // detail next to being unable to quit.
+  const ultraTight = L.viewport.w < 760;
   // The shop and bench stay up during combat wherever they can — you can buy
   // and rearrange mid-fight, and a mon bought into a bench you cannot see is
   // just lost. The fight pays for them out of its own tile. Only where that
@@ -1525,9 +1537,9 @@ export function NetGameClient() {
                 <div className="flex items-stretch rounded-lg bg-black/30 border border-white/[0.07] overflow-hidden divide-x divide-white/[0.06] shrink-0">
                   <StatCell label={t.net_hp} accent="#ff6b6b" value={Math.max(0, tgt.hp ?? 0)} />
                   <StatCell label={t.net_gold} accent="#fbbf24" icon={<CoinIcon size={12} />} value={g} />
-                  <StatCell label={t.net_interest} accent="#fcd34d" value={`+${interest(g)}`} />
-                  <StatCell label={t.net_streak} accent={stk >= 0 ? "#34d399" : "#f87171"} value={`${stk >= 0 ? "W" : "L"}${Math.abs(stk)}`} sub={`+${streakGold(stk)}`}
-                    title={t.net_streak_title} />
+                  {!ultraTight && <StatCell label={t.net_interest} accent="#fcd34d" value={`+${interest(g)}`} />}
+                  {!ultraTight && <StatCell label={t.net_streak} accent={stk >= 0 ? "#34d399" : "#f87171"} value={`${stk >= 0 ? "W" : "L"}${Math.abs(stk)}`} sub={`+${streakGold(stk)}`}
+                    title={t.net_streak_title} />}
                   <StatCell label={t.net_alive(aliveCount).replace(/[0-9]+\s*/, "")} accent="#cbd5e1" value={aliveCount} />
                 </div>
               </>
