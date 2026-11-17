@@ -55,7 +55,7 @@ const measure = async (label) => {
   const belowCol = m.frame.b - m.col.b;
   const overHud = m.barBottom - m.frame.t;
   const ok = aboveCol <= 0 && belowCol <= 0 && overHud <= 0;
-  console.log(`${ok ? "OK  " : "FAIL"} ${label} combat=${m.combat} col h=${m.col.h} arena h=${m.frame.h} | above=${aboveCol} below=${belowCol} overHUD=${overHud}`);
+  console.log(`${ok ? "OK  " : "FAIL"} ${label} combat=${m.combat} col h=${m.col.h} arena ${m.frame.w}x${m.frame.h} | above=${aboveCol} below=${belowCol} overHUD=${overHud}`);
   console.log(`       chrome h=${m.chrome?.h} overlapsBoard=${m.chromeOnBoard}  recap=${JSON.stringify(m.recap)} overlapsBoard=${m.recapOnBoard}`);
   if (m.recapOnBoard !== null && m.recapOnBoard > 0) { console.log(`       ✗ the side recap sits ON the board by ${m.recapOnBoard}px`); bad++; }
   if (process.env.SHOT_DIR) await p.screenshot({ path: `${process.env.SHOT_DIR}/fight-${label}.png` });
