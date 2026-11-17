@@ -11,6 +11,7 @@ import { useT } from "@/lib/i18n";
 import { MEGA_STONE, canHoldMegaStone, isMegaActive } from "@/game/data/mega";
 import { HEX_CLIP } from "@/game/engine/hex";
 import { crispSize } from "@/game/ui/pixel";
+import { MAX_SPRITE_BOX } from "@/game/ui/sprite-art";
 import { StarIcon, MegaIcon } from "./icons";
 import { ItemGlyph } from "./ItemGlyph";
 import { PokemonModelPreview } from "./PokemonModelPreview";
@@ -158,18 +159,22 @@ export function UnitChip({ unit, size = 56, interactive = true, canDeploy = true
   // multiple of that 96px source. Nearest-neighbour upscaling is only clean at
   // integer multiples — at 1.72x some source pixels cover two screen pixels and
   // their neighbours cover one, which is what made the board look mushy.
-  // Capped at 2.1x the cell: snapping is unbounded on its own, and on the
-  // smallest tiles the nearest whole multiple is several times the hex.
+  // Capped at MAX_SPRITE_BOX (3.2x the cell): snapping is unbounded on its
+  // own, and on the smallest tiles the nearest whole multiple is several times
+  // the hex. The cap is a CEILING on the padded frame, not on the visible mon
+  // — a sprite whose art fills little of its 96px frame needs a big box to
+  // bring that art up to a consistent height. This comment used to say 2.1,
+  // which is not what the constant has ever been.
   //
   // Scaled by the species' real (compressed) height, the same rule the 3D
   // models use — so a Rattata no longer occupies a Charizard's footprint. The
-  // 2.1x cap still bounds it: without one, a large mon covers its neighbours'
+  // The cap still bounds it: without one, a large mon covers its neighbours'
   // hexes, which is what made the board look mushy.
   // Sized so the VISIBLE ART lands at a consistent fraction of the cell, not
   // so the padded frame does. See spriteBoxFor().
   const rel = relativeModelScale(dex);
   const spriteSize = shape === "hex"
-    ? crispSize(spriteBoxFor(dex, size, rel), size * 3.2)
+    ? crispSize(spriteBoxFor(dex, size, rel), size * MAX_SPRITE_BOX)
     : Math.round(spriteBoxFor(dex, size - 6, rel));
   const sprite = showModel ? (
     <PokemonModelPreview

@@ -34,9 +34,14 @@ export function IncomeBalls({ size, inset, relative }: { size: number; inset: nu
   // showing a half-filled ring that can never complete would be a lie.
   const toNext = earned >= cap ? 0 : (gold % ECONOMY.interestPer) / ECONOMY.interestPer;
 
-  // Overlap, so it reads as a stack rather than a column of separate balls.
+  // Overlap, so it reads as a stack rather than a column of separate balls —
+  // but BARELY. At 0.58 the balls covered 42% of each other, and because an
+  // unearned ball is drawn at 0.34 opacity there is nothing to occlude with:
+  // every ball's outline and equator line showed straight through the one in
+  // front, so five of them read as a tangle of rings rather than a pile.
+  // Translucent things cannot overlap much and stay legible.
   // Bottom ball is the first earned, so the pile grows upward as you bank.
-  const step = size * 0.58;
+  const step = size * 0.88;
   const height = size + step * (cap - 1);
 
   return (

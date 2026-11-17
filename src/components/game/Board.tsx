@@ -109,10 +109,16 @@ function HexCell({
           height: tileH - 3,
           clipPath: HEX_CLIP,
           pointerEvents: "none",
-          background: ally ? tint.bg : "rgba(148,163,184,0.05)",
+          // The enemy half was a 5% fill with a 20% hairline, which on this
+          // board is very nearly nothing: the grid you are meant to be reading
+          // positions against vanished under the mons, and the field looked
+          // like a flat slab with pokémon floating on it. The combat view
+          // draws the same hexes legibly, which is why the fight reads better
+          // than planning does.
+          background: ally ? tint.bg : "rgba(148,163,184,0.12)",
           boxShadow: ally
             ? `inset 0 0 0 1.5px ${tint.ring}, ${tint.glow}`
-            : "inset 0 0 0 1px rgba(170,196,236,0.2), inset 0 0 14px rgba(120,150,200,0.07)",
+            : "inset 0 0 0 1.5px rgba(170,196,236,0.42), inset 0 0 14px rgba(120,150,200,0.14)",
         }}
       />
     </>
