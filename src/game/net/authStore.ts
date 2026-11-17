@@ -3,12 +3,13 @@
 import { create } from "zustand";
 import {
   onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
-  signInWithCredential, linkWithPopup, linkWithCredential, EmailAuthProvider,
+  signInWithCredential, linkWithPopup, linkWithRedirect, linkWithCredential, EmailAuthProvider,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously,
   sendPasswordResetEmail, deleteUser,
   signOut as fbSignOut, type User, type AuthError,
 } from "firebase/auth";
 import { ref, remove } from "firebase/database";
+import { isStandalone } from "@/lib/fullscreen";
 import { onOpenUrl, getCurrent as getCurrentDeepLinkUrls } from "@tauri-apps/plugin-deep-link";
 import { auth, db } from "./firebase";
 import { isNativeShell, openNativeGoogleSignIn } from "./nativeShell";
@@ -94,7 +95,24 @@ export const useAuth = create<AuthState>((set, get) => ({
     // If we returned from a redirect sign-in, success flows through onAuthStateChanged;
     // surface only the failure case (e.g. Google rejects an embedded-webview UA) so the
     // user sees why instead of a silent no-op.
-    getRedirectResult(auth()).catch((e) => set({ error: authErr(e) }));
+    //
+    // `credential-already-in-use` has to be handled HERE as well as on the
+    // popup path. An installed app now signs in by redirect, so a player whose
+    // Google identity already has an account comes back through this call
+    // rather than through the popup's catch — and without this they would land
+    // on a raw Firebase error with no way forward, on the one platform where
+    // redirect is the only flow available.
+    getRedirectResult(auth()).catch((e) => {
+      const code = (e as { code?: string })?.code ?? "";
+      if (code.includes("credential-already-in-use")) {
+        const cred = GoogleAuthProvider.credentialFromError(e as AuthError);
+        if (cred) {
+          signInWithCredential(auth(), cred).catch((e2) => set({ error: authErr(e2) }));
+          return;
+        }
+      }
+      set({ error: authErr(e) });
+    });
     // Native shell bridge: after the system-browser Google sign-in, the bridge page
     // (native-auth/page.tsx) redirects to a REAL poketft://auth-callback?id_token=...
     // deep link — registered with the OS via tauri-plugin-deep-link (src-tauri/tauri.conf.json
@@ -176,13 +194,28 @@ export const useAuth = create<AuthState>((set, get) => ({
     }
     const provider = new GoogleAuthProvider();
     const currentUser = auth().currentUser;
+    // An installed app — iOS Add to Home Screen, or any browser's PWA — has no
+    // popup to open. `window.open` there either hands the whole flow to Safari,
+    // where the session then lands in the BROWSER rather than in the app the
+    // player is looking at, or is blocked outright. Either way they come back
+    // to a home-screen app that is still signed out, which is what was
+    // reported.
+    //
+    // Redirect navigates the app's own webview and `getRedirectResult` (wired
+    // up at init) picks the result up on return. Worth being plain about the
+    // limit: iOS gives a standalone app its own storage container, so a session
+    // established in Safari is NEVER visible to the installed app. Signing in
+    // inside the app is not a convenience here, it is the only route.
+    const installed = isStandalone();
     try {
       // Link to the existing anonymous account so the guest's stats carry over.
       // Falls back to a plain sign-in if this Google identity already has its own
       // Firebase account (credential-already-in-use).
       if (currentUser?.isAnonymous) {
+        if (installed) { await linkWithRedirect(currentUser, provider); return; }
         await linkWithPopup(currentUser, provider);
       } else {
+        if (installed) { await signInWithRedirect(auth(), provider); return; }
         await signInWithPopup(auth(), provider);
       }
     } catch (e) {
