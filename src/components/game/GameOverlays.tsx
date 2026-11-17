@@ -50,13 +50,13 @@ function Countdown({ deadline }: { deadline: number }) {
 
 /** Ornate gold-framed TFT card (used for carousel rewards + augments): a gilded
  *  border with corner brackets, a blue gilded body, and a dark info panel. */
-function OrnateFrame({ onClick, frame = "#d4af37", height, children }: { onClick: () => void; frame?: string; height: number; children: ReactNode }) {
+function OrnateFrame({ onClick, frame = "#d4af37", height, width = 160, children }: { onClick: () => void; frame?: string; height: number; width?: number; children: ReactNode }) {
   const cornerCls = "absolute w-2.5 h-2.5 pointer-events-none";
   return (
     <button
       onClick={onClick}
-      style={{ height, borderColor: `${frame}99`, boxShadow: "0 10px 28px -18px rgba(0,0,0,0.85)" }}
-      className="group relative w-[160px] shrink-0 rounded-lg border overflow-hidden hover:-translate-y-1 hover:brightness-110 transition-all"
+      style={{ height, width, borderColor: `${frame}99`, boxShadow: "0 10px 28px -18px rgba(0,0,0,0.85)" }}
+      className="group relative shrink-0 rounded-lg border overflow-hidden hover:-translate-y-1 hover:brightness-110 transition-all"
     >
       <span className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(180deg, #0b1020 0%, ${frame}14 68%, ${frame}30 100%)` }} />
       <div className="relative z-10 w-full h-full flex flex-col">{children}</div>
@@ -68,10 +68,10 @@ function OrnateFrame({ onClick, frame = "#d4af37", height, children }: { onClick
   );
 }
 
-function CarouselCard({ onClick, color, name, sub, cost, types, art, disabled, note }: { onClick: () => void; color: string; name: string; sub?: string; cost?: number; types?: PokeType[]; art: ReactNode; disabled?: boolean; note?: string }) {
+function CarouselCard({ onClick, color, name, sub, cost, types, art, disabled, note, width }: { onClick: () => void; color: string; name: string; sub?: string; cost?: number; types?: PokeType[]; art: ReactNode; disabled?: boolean; note?: string; width?: number }) {
   return (
     <div className={disabled ? "opacity-45 grayscale pointer-events-none relative" : "relative"}>
-      <OrnateFrame onClick={disabled ? () => {} : onClick} frame={color} height={200}>
+      <OrnateFrame onClick={disabled ? () => {} : onClick} frame={color} height={200} width={width}>
         <div className="flex-1 flex items-center justify-center pt-3 pb-1">{art}</div>
         <div className="px-2 py-2 bg-black/40 border-t border-white/10 flex flex-col items-center gap-1">
           <span className="text-sm font-bold text-slate-100 text-center leading-tight drop-shadow">{name}</span>
@@ -133,6 +133,27 @@ function OrnateAugmentCard({ onClick, icon, name, desc, tier, frame, combat, tig
 // ─────────────────────────────────────────────────────────────────────────────
 
 type LatchRef = { current: string | null };
+
+/**
+ * Backdrop for a modal phase overlay.
+ *
+ * The gradient's centre is only ~0.3 opaque and, on a phone, the HUD strip
+ * sits right in that focus — so the bar behind printed straight through the
+ * overlay's own heading. Measured at 852x393: "Carrousel" over a top bar by
+ * 107x32px, two copies of the same word in the same pixels. Taller viewports
+ * centre their content clear of the bar and never showed it.
+ *
+ * Opaque on compact rather than moving the content, because the content has
+ * nowhere to go: the augment picker already fills a 393px screen exactly.
+ * Nothing is lost by hiding the HUD here — these overlays are modal, a reroll
+ * cost is printed on its own button, and seeing the board is a button.
+ */
+function overlayBackdrop(tint: string, tight: boolean, revealBoard: boolean) {
+  if (revealBoard) return { background: "transparent" };
+  return tight
+    ? { background: "rgba(2,6,23,0.97)", backdropFilter: "blur(7px)" }
+    : { background: `radial-gradient(58% 58% at 50% 38%, ${tint}, rgba(2,6,23,0.93))`, backdropFilter: "blur(7px)" };
+}
 
 export function CarouselOverlay({
   room, me, myUid, meta, pickedKey, revealBoard, setRevealBoard, units, pickLatch,
@@ -203,13 +224,16 @@ export function CarouselOverlay({
     return () => clearTimeout(id);
   }, [opts, picked, key, meta.deadline, room.code, myUid, netCarouselPick, setPickedKey, flushSync, pickLatch]);
 
+  // Phone in landscape: the HUD behind must not print through this overlay,
+  // and the row of rewards has to fit the screen it is offered on.
+  const L = useGameLayout();
+  const tight = L.density === "compact";
+
   if (!opts) return null;
   return (
     <div
       className="fixed inset-0 z-screen overflow-y-auto"
-      style={revealBoard
-        ? { background: "transparent" }
-        : { background: "radial-gradient(58% 58% at 50% 38%, rgba(146,64,14,0.32), rgba(2,6,23,0.93))", backdropFilter: "blur(7px)" }}
+      style={overlayBackdrop("rgba(146,64,14,0.32)", tight, revealBoard)}
     >
       <button
         onClick={() => setRevealBoard((v) => !v)}
@@ -247,17 +271,25 @@ export function CarouselOverlay({
         // A unit pick needs a free bench slot; items/Mega go to the inventory.
         const benchFull = units.filter((u) => u.pos === null).length >= BENCH_SIZE;
         const fullNote = t.net_bench_full;
+        // Five fixed 160px cards came to 848px of row. That fits an 852px
+        // phone by four pixels and overruns a 667px one by 181 — two of the
+        // five rewards simply off the side of the screen, where the only way
+        // to reach them was to notice the row scrolls sideways. The row is
+        // sized to the viewport instead, so every option is always on it.
+        const gapPx = tight ? 8 : 12;
+        const cardW = Math.min(160, Math.floor((L.viewport.w - 24 - gapPx * (opts.length - 1)) / opts.length));
         return (
-        <div className="flex gap-3 justify-center items-start">
+        <div className={`flex justify-center items-start ${tight ? "gap-2" : "gap-3"}`}>
           {opts.map((pick, i) => {
             const onPick = () => { if (pickLatch.current === `c-${key}`) return; pickLatch.current = `c-${key}`; sfx.carouselPick(); netCarouselPick(pick); setPickedKey(key); flushSync(); markCarouselPicked(room.code, myUid, key); };
-            if (pick === MEGA_STONE) return <CarouselCard key={i} onClick={onPick} color="#f0abfc" name={t.it_mega_stone} sub={t.net_carousel_mega_sub} art={<span className="text-fuchsia-300"><MegaIcon size={56} /></span>} />;
+            if (pick === MEGA_STONE) return <CarouselCard key={i} width={cardW} onClick={onPick} color="#f0abfc" name={t.it_mega_stone} sub={t.net_carousel_mega_sub} art={<span className="text-fuchsia-300"><MegaIcon size={56} /></span>} />;
             const item = ITEM_DEF_BY_ID[pick];
-            if (item) return <CarouselCard key={i} onClick={onPick} color={RARITY_COLOR[item.rarity] ?? "#fbbf24"} name={lang === "fr" ? item.nameFr : item.name} sub={lang === "fr" ? item.textFr : item.text} art={<span style={{ color: RARITY_COLOR[item.rarity] ?? "#fbbf24" }}><ItemGlyph id={item.id} size={46} /></span>} />;
+            if (item) return <CarouselCard key={i} width={cardW} onClick={onPick} color={RARITY_COLOR[item.rarity] ?? "#fbbf24"} name={lang === "fr" ? item.nameFr : item.name} sub={lang === "fr" ? item.textFr : item.text} art={<span style={{ color: RARITY_COLOR[item.rarity] ?? "#fbbf24" }}><ItemGlyph id={item.id} size={46} /></span>} />;
             const def = getDef(pick);
             return (
               <CarouselCard
                 key={i}
+                width={cardW}
                 onClick={onPick}
                 disabled={benchFull}
                 note={fullNote}
@@ -318,13 +350,13 @@ export function DraftOverlay({
     setPickerOpen(true);
     return () => setPickerOpen(false);
   }, [setPickerOpen]);
+  // Phone in landscape: the HUD behind must not print through this overlay.
+  const tight = useGameLayout().density === "compact";
   if (options.length === 0) return null;
   return (
     <div
       className="fixed inset-0 z-screen overflow-y-auto"
-      style={revealBoard
-        ? { background: "transparent" }
-        : { background: "radial-gradient(58% 58% at 50% 38%, rgba(13,80,120,0.42), rgba(2,6,23,0.93))", backdropFilter: "blur(7px)" }}
+      style={overlayBackdrop("rgba(13,80,120,0.42)", tight, revealBoard)}
     >
       <button
         onClick={() => setRevealBoard((v) => !v)}
@@ -419,9 +451,7 @@ export function AugmentOverlay({
   return (
     <div
       className="fixed inset-0 z-screen overflow-y-auto"
-      style={revealBoard
-        ? { background: "transparent" }
-        : { background: "radial-gradient(58% 58% at 50% 38%, rgba(76,29,149,0.4), rgba(2,6,23,0.93))", backdropFilter: "blur(7px)" }}
+      style={overlayBackdrop("rgba(76,29,149,0.4)", tight, revealBoard)}
     >
       <button
         onClick={() => setRevealBoard((v) => !v)}
