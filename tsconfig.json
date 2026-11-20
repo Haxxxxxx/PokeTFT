@@ -37,7 +37,6 @@
     "src-tauri",
     "tools",
     "out",
-    "out-landing",
     ".next"
   ]
 }

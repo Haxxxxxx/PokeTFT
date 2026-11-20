@@ -52,6 +52,9 @@ const run = async (standalone) => {
   console.log(`\n  ${standalone ? "INSTALLED (standalone)" : "BROWSER tab"}:`);
   console.log(`      popup: ${popup ?? "none"}`);
   console.log(`      main-frame navigations: ${navs.length} ${wentToGoogle ? "(reached the auth handler)" : ""}`);
+  for (const u of navs) console.log(`        -> ${u.slice(0, 120)}`);
+  const err = await page.evaluate(() => document.body.innerText.match(/[^\n]*(auth\/|erreur|error|Sign-in|échou)[^\n]*/i)?.[0] ?? "");
+  if (err) console.log(`      on-screen: ${err.slice(0, 120)}`);
   if (standalone) {
     ok(!popup, "no popup is opened — an installed app has nowhere to put one");
     ok(wentToGoogle, "the app's own window navigates to the auth flow");
