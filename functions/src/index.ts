@@ -24,7 +24,7 @@ import { getAuth } from "firebase-admin/auth";
 import { logger } from "firebase-functions/v2";
 
 import { setDbAdapter } from "../../src/game/net/db-adapter";
-import { resolveRoundStart, endCombat, endCarousel, concedeAtomic, applyRatingFor } from "../../src/game/net/match";
+import { resolveRoundStart, endCombat, endCarousel, concedeAtomic, applyRatingFor, joinedPlayers } from "../../src/game/net/match";
 import type { Room } from "../../src/game/net/roomStore";
 import { generatePlayerLikeBoard } from "../../src/game/engine/enemy";
 import { simulate } from "../../src/game/engine/combat";
@@ -218,106 +218,130 @@ const OVER_AGE_MS = 30 * 60_000;
 const IDLE_AGE_MS = 3 * 60 * 60_000;
 const GUEST_AGE_MS = 3 * 24 * 60 * 60_000;
 
-export const pruneStale = onSchedule({ region: REGION, schedule: "every 30 minutes" }, async () => {
-  const now = Date.now();
-  const updates: Record<string, null> = {};
+export const pruneStale = onSchedule(
+  // 540s/512MiB, not the 60s default. This sweep reads every game, and each one needing
+  // a rating repair costs two round trips plus a transaction per human. Everything it
+  // decides is applied as ONE multi-path update at the very end, so a timeout mid-loop
+  // discards the whole run — which grows the backlog, which makes the next run slower,
+  // which makes the next timeout more certain. retrainBrain already carries this budget.
+  { region: REGION, schedule: "every 30 minutes", timeoutSeconds: 540, memory: "512MiB" },
+  async () => {
+    const now = Date.now();
+    const updates: Record<string, null> = {};
 
-  // ── Stale games (+ their lobby/priv siblings) ──
-  const games = (await adb.ref("games").get()).val() as Record<string, { meta?: { phase?: string; updatedAt?: number } }> | null;
-  let prunedGames = 0;
-  for (const [code, g] of Object.entries(games ?? {})) {
-    const meta = g?.meta;
-    const updatedAt = typeof meta?.updatedAt === "number" ? meta.updatedAt : 0;
-    const stale = !meta
-      || (meta.phase === "over" && now - updatedAt > OVER_AGE_MS)
-      || (now - updatedAt > IDLE_AGE_MS);
-    if (stale) {
-      // Before deleting any game that had real play, make sure every human's rating
-      // was actually applied AND fully persisted. Two distinct gaps this repairs, both
-      // previously silent, permanent data loss:
-      //  1. A human never got applyRatingFor called at all — closed the tab/app instead
-      //     of using Concede, so the game went stale mid-match without ever finishing.
-      //  2. applyRatingFor WAS called and its rating transaction committed, but the
-      //     separate leaderboard/history/results write threw — a real incident traced
-      //     live: a player's rating changed with zero corresponding history or
-      //     leaderboard entry, and zero trace in any log, because the old claim was a
-      //     bare boolean consumed up front, so nothing would ever retry it. That can
-      //     happen on any finished ("over") game too, not just an abandoned in-progress
-      //     one, so this repair now runs for both instead of skipping "over" as before.
-      // applyRatingFor's own idempotency + self-heal logic (see match.ts) makes it safe
-      // to call again for every real player on every stale game: a fully-persisted
-      // player is detected via their history row already existing and short-circuits
-      // immediately; a partially-persisted one resumes from its stored decision without
-      // ever re-crediting rating.
-      if (meta?.phase && meta.phase !== "lobby") {
-        const room = await freshRoom(code);
-        if (room) {
-          const claims = ((await adb.ref(`games/${code}/rated`).get()).val() ?? {}) as Record<string, { place?: number } | boolean>;
-          const allPlayers = Object.values(room.players ?? {});
-          const realPlayers = allPlayers.filter((p) => !p.uid.startsWith("bot-"));
-          // Placement: honor whatever's already decided — endCombat's `place`, or a
-          // prior (possibly incomplete) claim's stored place — and only invent a fresh
-          // one for a player with neither, ranked by HP among themselves and slotted
-          // into whichever place numbers aren't already taken (still-mid-match
-          // stragglers on a genuinely abandoned game).
-          const usedPlaces = new Set(allPlayers.map((p) => p.place).filter((x): x is number => typeof x === "number"));
-          let nextPlace = 1;
-          const takePlace = () => { while (usedPlaces.has(nextPlace)) nextPlace++; usedPlaces.add(nextPlace); return nextPlace; };
-          const claimPlaceOf = (uid: string): number | undefined => {
-            const c = claims[uid];
-            return typeof c === "object" && c && typeof c.place === "number" ? c.place : undefined;
-          };
-          const needsInventedPlace = realPlayers
-            .filter((p) => typeof p.place !== "number" && claimPlaceOf(p.uid) === undefined)
-            .sort((a, b) => (b.alive ? 1 : 0) - (a.alive ? 1 : 0) || (b.hp ?? 0) - (a.hp ?? 0));
-          const inventedPlace = new Map(needsInventedPlace.map((p) => [p.uid, takePlace()]));
-          const jobs: Array<{ uid: string; place: number }> = realPlayers.map((p) => ({
-            uid: p.uid,
-            place: p.place ?? claimPlaceOf(p.uid) ?? inventedPlace.get(p.uid)!,
-          }));
-          await Promise.all(
-            jobs.map(({ uid, place }) => applyRatingFor(code, room, uid, place).catch(() => {})),
-          );
+    // ── Stale games (+ their lobby/priv siblings) ──
+    const games = (await adb.ref("games").get()).val() as Record<string, { meta?: { phase?: string; updatedAt?: number } }> | null;
+    let prunedGames = 0;
+    for (const [code, g] of Object.entries(games ?? {})) {
+      const meta = g?.meta;
+      const updatedAt = typeof meta?.updatedAt === "number" ? meta.updatedAt : 0;
+      const stale = !meta
+        || (meta.phase === "over" && now - updatedAt > OVER_AGE_MS)
+        || (now - updatedAt > IDLE_AGE_MS);
+      if (stale) {
+        // Before deleting any game that had real play, make sure every human's rating
+        // was actually applied AND fully persisted. Two distinct gaps this repairs, both
+        // previously silent, permanent data loss:
+        //  1. A human never got applyRatingFor called at all — closed the tab/app instead
+        //     of using Concede, so the game went stale mid-match without ever finishing.
+        //  2. applyRatingFor WAS called and its rating transaction committed, but the
+        //     separate leaderboard/history/results write threw — a real incident traced
+        //     live: a player's rating changed with zero corresponding history or
+        //     leaderboard entry, and zero trace in any log, because the old claim was a
+        //     bare boolean consumed up front, so nothing would ever retry it. That can
+        //     happen on any finished ("over") game too, not just an abandoned in-progress
+        //     one, so this repair now runs for both instead of skipping "over" as before.
+        // applyRatingFor's own idempotency + self-heal logic (see match.ts) makes it safe
+        // to call again for every real player on every stale game: a fully-persisted
+        // player is detected via their history row already existing and short-circuits
+        // immediately; a partially-persisted one resumes from its stored decision without
+        // ever re-crediting rating.
+        if (meta?.phase && meta.phase !== "lobby") {
+          // Head-of-line blocking is what actually broke this sweep, so no single game may
+          // end the run: a repair that throws now costs only its own game, and the rest of
+          // the backlog still gets collected.
+          try {
+            const room = await freshRoom(code);
+            if (room) {
+              const claims = ((await adb.ref(`games/${code}/rated`).get()).val() ?? {}) as Record<string, { place?: number } | boolean>;
+              // Presence stubs and the player-writable `uid` field are both traps here. A
+              // stub (`{connected: …}` with no uid, left behind by a client that dropped
+              // while joining) threw on EVERY run, and because this loop commits ONE
+              // multi-path update after it, that single throw aborted the entire sweep —
+              // 11 stub nodes were holding back 206 deletable games, and the backlog only
+              // grew. joinedPlayers() is the tested reader; see its doc comment.
+              const allPlayers = joinedPlayers(room);
+              const realPlayers = allPlayers.filter((p) => !p.uid.startsWith("bot-"));
+              // Placement: honor whatever's already decided — endCombat's `place`, or a
+              // prior (possibly incomplete) claim's stored place — and only invent a fresh
+              // one for a player with neither, ranked by HP among themselves and slotted
+              // into whichever place numbers aren't already taken (still-mid-match
+              // stragglers on a genuinely abandoned game).
+              const usedPlaces = new Set(allPlayers.map((p) => p.place).filter((x): x is number => typeof x === "number"));
+              let nextPlace = 1;
+              const takePlace = () => { while (usedPlaces.has(nextPlace)) nextPlace++; usedPlaces.add(nextPlace); return nextPlace; };
+              const claimPlaceOf = (uid: string): number | undefined => {
+                const c = claims[uid];
+                return typeof c === "object" && c && typeof c.place === "number" ? c.place : undefined;
+              };
+              const needsInventedPlace = realPlayers
+                .filter((p) => typeof p.place !== "number" && claimPlaceOf(p.uid) === undefined)
+                .sort((a, b) => (b.alive ? 1 : 0) - (a.alive ? 1 : 0) || (b.hp ?? 0) - (a.hp ?? 0));
+              const inventedPlace = new Map(needsInventedPlace.map((p) => [p.uid, takePlace()]));
+              const jobs: Array<{ uid: string; place: number }> = realPlayers.map((p) => ({
+                uid: p.uid,
+                place: p.place ?? claimPlaceOf(p.uid) ?? inventedPlace.get(p.uid)!,
+              }));
+              await Promise.all(
+                jobs.map(({ uid, place }) => applyRatingFor(code, room, uid, place).catch(() => {})),
+              );
+            }
+          } catch (err) {
+            // Skip deleting THIS game only: its repair is unfinished, and deleting it would
+            // lose the rating for good. It retries next tick and stays loud in the log.
+            logger.error(`pruneStale: rating repair failed for ${code}; left for the next run`, err);
+            continue;
+          }
         }
+        updates[`games/${code}`] = null;
+        updates[`lobbies/${code}`] = null;
+        updates[`priv/${code}`] = null;
+        prunedGames++;
       }
-      updates[`games/${code}`] = null;
-      updates[`lobbies/${code}`] = null;
-      updates[`priv/${code}`] = null;
-      prunedGames++;
     }
-  }
 
-  // ── Orphaned lobby entries (game already gone) ──
-  const lobbies = (await adb.ref("lobbies").get()).val() as Record<string, unknown> | null;
-  for (const code of Object.keys(lobbies ?? {})) {
-    if (!games?.[code]) updates[`lobbies/${code}`] = null;
-  }
-
-  // ── Abandoned guest profiles ──
-  const users = (await adb.ref("users").get()).val() as Record<string, { usernameLower?: string; createdAt?: number; online?: boolean; history?: unknown; friends?: unknown }> | null;
-  const guestUids: string[] = [];
-  for (const [uid, u] of Object.entries(users ?? {})) {
-    const isGuest = typeof u?.usernameLower === "string" && u.usernameLower.startsWith("guest-");
-    const old = typeof u?.createdAt === "number" && now - u.createdAt > GUEST_AGE_MS;
-    const empty = !u?.history && !u?.friends && u?.online !== true;
-    if (isGuest && old && empty) {
-      updates[`users/${uid}`] = null;
-      if (u.usernameLower) updates[`usernames/${u.usernameLower}`] = null;
-      guestUids.push(uid);
+    // ── Orphaned lobby entries (game already gone) ──
+    const lobbies = (await adb.ref("lobbies").get()).val() as Record<string, unknown> | null;
+    for (const code of Object.keys(lobbies ?? {})) {
+      if (!games?.[code]) updates[`lobbies/${code}`] = null;
     }
-  }
 
-  if (Object.keys(updates).length) await adb.ref().update(updates);
+    // ── Abandoned guest profiles ──
+    const users = (await adb.ref("users").get()).val() as Record<string, { usernameLower?: string; createdAt?: number; online?: boolean; history?: unknown; friends?: unknown }> | null;
+    const guestUids: string[] = [];
+    for (const [uid, u] of Object.entries(users ?? {})) {
+      const isGuest = typeof u?.usernameLower === "string" && u.usernameLower.startsWith("guest-");
+      const old = typeof u?.createdAt === "number" && now - u.createdAt > GUEST_AGE_MS;
+      const empty = !u?.history && !u?.friends && u?.online !== true;
+      if (isGuest && old && empty) {
+        updates[`users/${uid}`] = null;
+        if (u.usernameLower) updates[`usernames/${u.usernameLower}`] = null;
+        guestUids.push(uid);
+      }
+    }
 
-  // Best-effort: delete the orphaned anonymous Auth records for swept guests (rate-limited,
-  // so cap per run; the rest get caught on the next tick).
-  let prunedAuth = 0;
-  for (const uid of guestUids.slice(0, 50)) {
-    try { await getAuth().deleteUser(uid); prunedAuth++; } catch { /* already gone / not anon */ }
-  }
+    if (Object.keys(updates).length) await adb.ref().update(updates);
 
-  logger.info(`pruneStale: removed ${prunedGames} games, ${guestUids.length} guest profiles (${prunedAuth} auth)`);
-});
+    // Best-effort: delete the orphaned anonymous Auth records for swept guests (rate-limited,
+    // so cap per run; the rest get caught on the next tick).
+    let prunedAuth = 0;
+    for (const uid of guestUids.slice(0, 50)) {
+      try { await getAuth().deleteUser(uid); prunedAuth++; } catch { /* already gone / not anon */ }
+    }
+
+    logger.info(`pruneStale: removed ${prunedGames} games, ${guestUids.length} guest profiles (${prunedAuth} auth)`);
+  },
+);
 
 // ── Scheduled brain re-train ─────────────────────────────────────────────────
 /**

@@ -209,6 +209,36 @@ type RatingClaim = { place: number; delta: number; ratingApplied?: boolean };
  *  with zero trace in any log). Now the claim stores the decided outcome so a later call for
  *  the same uid+code can detect an incomplete persist and safely finish it, and any error
  *  that still occurs is logged and durably recorded instead of discarded. */
+/** A player record as it actually arrives from RTDB, with its uid taken from the key. */
+export type JoinedPlayer = Partial<RoomPlayer> & { uid: string };
+
+/**
+ * The players of a room that genuinely joined it, each carrying the uid of its OWN KEY.
+ *
+ * Two things make the raw `room.players` map unsafe to read directly, and both bit
+ * `pruneStale` in production:
+ *
+ *  1. **A record can be a presence stub.** Writing `players/<uid>/connected` creates the
+ *     parent node by itself, so a client that drops before it finishes joining leaves
+ *     `{connected: …}` behind — no uid, no name, no hp. `RoomPlayer` declares uid and name
+ *     as required, but that is a compile-time fiction over wire data: reading `p.uid` on a
+ *     stub typechecks and then throws at runtime. A stub also never played, so it must not
+ *     be given a placement — doing so would credit a phantom and shift every real place.
+ *
+ *  2. **The `uid` FIELD is player-writable.** `database.rules.json` enforces
+ *     `$uid === auth.uid` on the KEY, but puts no `.validate` on the field, so a client can
+ *     put anything in it. The key is the only trustworthy source — the same reasoning
+ *     `applyRatingFor` gives for keying its bot check off its uid argument.
+ *
+ * Every genuine record carries name/hp/level/alive, so `name` is what separates the two.
+ */
+export function joinedPlayers(room: Room): JoinedPlayer[] {
+  const raw = (room.players ?? {}) as Record<string, Partial<RoomPlayer> | null | undefined>;
+  return Object.entries(raw)
+    .filter((e): e is [string, Partial<RoomPlayer>] => !!e[1] && typeof e[1].name === "string")
+    .map(([uid, p]) => ({ ...p, uid }));
+}
+
 export async function applyRatingFor(code: string, room: Room, uid: string, place: number): Promise<void> {
   const p = room.players?.[uid];
   // Skip genuine bots. Key off the unforgeable "bot-" uid prefix (assigned in
